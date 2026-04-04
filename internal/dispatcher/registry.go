@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"cdua-org/ReconSR/modules/dns_caa"
 	"cdua-org/ReconSR/modules/dns_dmarc"
+	"cdua-org/ReconSR/modules/dns_domainkey"
 	"cdua-org/ReconSR/modules/dns_ip"
 	"cdua-org/ReconSR/modules/dns_mx"
 	"cdua-org/ReconSR/modules/dns_soa"
@@ -44,4 +45,5 @@ var ModuleRegistry = []schema.Module{
 	dns_soa.New(),
 	dns_mx.New(),
 	dns_dmarc.New(),
+	dns_domainkey.New(),
 }
