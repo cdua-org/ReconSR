@@ -136,6 +136,11 @@ func getMXData(target string) schema.ModuleExecution {
 	execution.RawData = string(rawData)
 
 	if len(mxs) == 0 {
+		execution.Results = []schema.ModuleResult{{
+			Type:    "string",
+			Value:   "No MX",
+			Context: "MX Records",
+		}}
 		return execution
 	}
 
@@ -160,14 +165,6 @@ func getMXData(target string) schema.ModuleExecution {
 			},
 		)
 	}
-
-	execution.Results = append(execution.Results,
-		schema.ModuleResult{
-			Type:    "string",
-			Value:   strconv.Itoa(len(mxs)),
-			Context: "Total MX Records",
-		},
-	)
 
 	return execution
 }
@@ -232,13 +229,18 @@ func parseMX(data string) (mxRecord, error) {
 		return mxRecord{}, errors.New("invalid MX record format")
 	}
 
+	host := strings.TrimSuffix(parts[1], ".")
+	if host == "" {
+		return mxRecord{}, errors.New("invalid MX record format")
+	}
+
 	pref, err := strconv.ParseUint(parts[0], 10, 16)
 	if err != nil {
 		return mxRecord{}, fmt.Errorf("parse priority: %w", err)
 	}
 
 	return mxRecord{
-		host: strings.TrimSuffix(parts[1], "."),
+		host: host,
 		pref: uint16(pref),
 	}, nil
 }

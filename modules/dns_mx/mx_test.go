@@ -99,3 +99,19 @@ func TestParseMX(t *testing.T) {
 		})
 	}
 }
+
+func TestGetMXDataEmpty(t *testing.T) {
+	execution := getMXData("nonexistent.domain.invalid")
+
+	if len(execution.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(execution.Results))
+	}
+
+	result := execution.Results[0]
+	if result.Type != "string" || result.Value != "No MX" {
+		t.Errorf("expected 'No MX' result, got %+v", result)
+	}
+	if result.Context != "MX Records" {
+		t.Errorf("expected context 'MX Records', got %q", result.Context)
+	}
+}
