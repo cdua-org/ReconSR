@@ -44,7 +44,11 @@ func Validate(targetType, targetValue string) (Result, error) {
 	case "email", "email-extra":
 		return validateEmail(targetValue)
 	default:
-		return Result{}, ErrUnsupportedType
+		// Accept unknown explicit types (like 'btc', 'tel') as-is without syntactic validation
+		return Result{
+			Type:  targetType,
+			Value: targetValue,
+		}, nil
 	}
 }
 

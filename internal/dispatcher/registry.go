@@ -1,7 +1,14 @@
 package dispatcher
 
 import (
+	"cdua-org/ReconSR/modules/dns_caa"
+	"cdua-org/ReconSR/modules/dns_ip"
+	"cdua-org/ReconSR/modules/dns_mx"
+	"cdua-org/ReconSR/modules/dns_soa"
+	"cdua-org/ReconSR/modules/dns_wildcard"
+	"cdua-org/ReconSR/modules/domainsbycerts"
 	"cdua-org/ReconSR/modules/subdomain_hierarchy"
+	"cdua-org/ReconSR/modules/whois"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -28,4 +35,11 @@ func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 
 var ModuleRegistry = []schema.Module{
 	&module{name: "subdomain_hierarchy", exec: subdomain_hierarchy.HandleData, caps: subdomain_hierarchy.GetCapabilities},
+	whois.New(),
+	domainsbycerts.New(),
+	dns_wildcard.New(),
+	dns_ip.New(),
+	dns_caa.New(),
+	dns_soa.New(),
+	dns_mx.New(),
 }

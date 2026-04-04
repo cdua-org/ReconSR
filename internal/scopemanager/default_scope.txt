@@ -26,6 +26,47 @@ digitalocean.com, digitaloceanspaces.com
 github.com, github.io, githubusercontent.com
 fastly.net, fastlylb.net
 
+# Additional CDNs and Edge Networks
+cdn.jsdelivr.net, cdnjs.cloudflare.com, unpkg.com
+cdn.cloudflare.com, cloudflare-nginx.com
+akamai.com, akamai.net, akamaiedge.net, akamaihd.net, akamaicdn.net
+fastly.com, fastlylb.net, fastly.net
+cloudfront.net
+cdn77.net, cdn77org.net
+maxcdn.com, maxcdn.net
+cdn.jsdelivr.net
+stackpath.com, stackpathcdn.com
+bun.net, buncdn.com
+quadranet.com, quadranet.net
+leaseweb.com, leasewebcdn.com
+OVH, ovh.net, ovhcloud.com
+vultr.com, vultr.net
+linode.com, linode.net
+
+# Certificate Authorities
+letsencrypt.org, ca.letsencrypt.org, acme-v01.api.letsencrypt.org, acme-v02.api.letsencrypt.org
+digicert.com, digicertcloud.com, digicerttrust.com, omaha.digicert.com
+godaddy.com, gdns1.godaddy.com, gdns2.godaddy.com
+globalsign.com, globalsign.net, globalsign.com.mx
+comodo.com, comodo.net, security.comodo.com
+certum.pl, certum.com, utn.pl
+Entrust.com, entrust.net, entrust.com.mx, certificates.entrust.com
+thawte.com, thawte.net, thawte.org
+geotrust.com, geotrust.net
+rapidssl.com, rapidssl.net
+symantec.com, verisign.com, verisign.net
+sectigo.com, sectigo.net, trust-provider.com
+identrust.com, identrust.net
+chambersign.org, chambersign.net
+startcom.org, startssl.com
+wosign.com, wowssl.com
+ssl.com, ssls.com
+namecheap.com, namecheap.net
+namesilo.com, namesilo.net
+register.com, register.net
+network solutions.com, networksolutions.com
+cscglobal.com, cscglobal.net
+
 # Email Services
 gmail.com, yahoo.com, outlook.com, hotmail.com, live.com, aol.com, icloud.com, proton.me, protonmail.com, zoho.com, mail.com, gmx.com, fastmail.com, tutanota.com, tuta.com, hey.com
 gmx.de, web.de, t-online.de, freenet.de, mail.fr, laposte.net, orange.fr, libero.it, virgilio.it, alice.it, onet.pl, wp.pl, o2.pl, seznam.cz, centrum.cz, i.ua, ukr.net, meta.ua
