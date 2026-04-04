@@ -151,17 +151,25 @@ func getDMARCData(target string) schema.ModuleExecution {
 
 		for _, key := range []string{"ruf", "rua"} {
 			if val, ok := parsed[key]; ok {
-				if email := extractEmail(val); email != "" {
+				emails := extractEmails(val)
+				for i, email := range emails {
 					emailDomain := ""
 					if _, after, found := strings.Cut(email, "@"); found {
 						emailDomain = after
 					}
-					isOOS := emailDomain != "" && !strings.HasSuffix(strings.ToLower(emailDomain), "."+strings.ToLower(target))
+					emailDomainLower := strings.ToLower(emailDomain)
+					targetLower := strings.ToLower(target)
+					isOOS := emailDomain != "" && emailDomainLower != targetLower && !strings.HasSuffix(emailDomainLower, "."+targetLower)
+
+					contextMsg := "DMARC " + strings.ToUpper(key)
+					if len(emails) > 1 {
+						contextMsg = fmt.Sprintf("DMARC %s #%d", strings.ToUpper(key), i+1)
+					}
 
 					execution.Results = append(execution.Results, schema.ModuleResult{
 						Type:       "email",
 						Value:      email,
-						Context:    "DMARC " + strings.ToUpper(key),
+						Context:    contextMsg,
 						OutOfScope: isOOS,
 					})
 				}
@@ -253,8 +261,18 @@ func parseDMARC(record string) map[string]string {
 	return result
 }
 
-func extractEmail(val string) string {
+func extractEmails(val string) []string {
 	val = strings.TrimSpace(val)
 	val = strings.TrimPrefix(val, "mailto:")
-	return val
+
+	var emails []string
+	//nolint:modernize // strings.Split is widely compatible
+	for _, part := range strings.Split(val, ",") {
+		part = strings.TrimSpace(part)
+		part = strings.TrimPrefix(part, "mailto:")
+		if part != "" && strings.Contains(part, "@") {
+			emails = append(emails, part)
+		}
+	}
+	return emails
 }

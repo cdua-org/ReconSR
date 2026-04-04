@@ -155,3 +155,46 @@ func TestGetDMARCDataEmpty(t *testing.T) {
 		t.Errorf("expected context 'DMARC Records', got %q", result.Context)
 	}
 }
+
+func TestExtractEmails(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "single email with mailto",
+			input:    "mailto:dmarc@example.com",
+			expected: []string{"dmarc@example.com"},
+		},
+		{
+			name:     "multiple emails comma separated",
+			input:    "mailto:email1@example.com,mailto:email2@example.com",
+			expected: []string{"email1@example.com", "email2@example.com"},
+		},
+		{
+			name:     "multiple emails first with mailto",
+			input:    "mailto:email1@example.com,email2@example.com",
+			expected: []string{"email1@example.com", "email2@example.com"},
+		},
+		{
+			name:     "real world multiple emails",
+			input:    "mailto:uuid@dmarc-reports.example.com,mailto:alert@example.tld",
+			expected: []string{"uuid@dmarc-reports.example.com", "alert@example.tld"},
+		},
+		{
+			name:     "empty input",
+			input:    "",
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractEmails(tt.input)
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("extractEmails() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
