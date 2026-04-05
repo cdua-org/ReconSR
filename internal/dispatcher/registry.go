@@ -7,7 +7,6 @@ import (
 	"cdua-org/ReconSR/modules/dns_domainkey"
 	"cdua-org/ReconSR/modules/dns_mx"
 	"cdua-org/ReconSR/modules/dns_txt"
-	"cdua-org/ReconSR/modules/dns_wildcard"
 	"cdua-org/ReconSR/modules/domainsbycerts"
 	"cdua-org/ReconSR/modules/subdomain_hierarchy"
 	"cdua-org/ReconSR/modules/whois"
@@ -39,7 +38,6 @@ var ModuleRegistry = []schema.Module{
 	&module{name: "subdomain_hierarchy", exec: subdomain_hierarchy.HandleData, caps: subdomain_hierarchy.GetCapabilities},
 	whois.New(),
 	domainsbycerts.New(),
-	dns_wildcard.New(),
 	dns.New(),
 	dns_mx.New(),
 	dns_dmarc.New(),
