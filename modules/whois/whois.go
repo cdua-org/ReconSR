@@ -185,25 +185,24 @@ func (m *module) buildResults(metadata *Metadata, target string) []schema.Module
 	var results []schema.ModuleResult
 
 	appendContact := func(c Contact, prefix string, forceOOS bool) {
-		// Mark as OOS if it's a known registrar role OR a privacy protection service
 		isOOS := forceOOS || isPrivacyService(c.Organization)
 
 		if c.Name != "" {
-			results = append(results, schema.ModuleResult{Type: "person", Value: c.Name, Context: prefix + " Name", OutOfScope: isOOS})
+			results = append(results, m.result("person", c.Name, prefix+" Name", isOOS))
 		}
 		if c.Organization != "" {
-			results = append(results, schema.ModuleResult{Type: "company", Value: c.Organization, Context: prefix + " Organization", OutOfScope: isOOS})
+			results = append(results, m.result("company", c.Organization, prefix+" Organization", isOOS))
 		}
 		if c.Email != "" {
-			results = append(results, schema.ModuleResult{Type: "email", Value: c.Email, Context: prefix + " Email", OutOfScope: isOOS})
+			results = append(results, m.result("email", c.Email, prefix+" Email", isOOS))
 		}
 		if c.Address != "" {
-			results = append(results, schema.ModuleResult{Type: "address", Value: c.Address, Context: prefix + " Address", OutOfScope: isOOS})
+			results = append(results, m.result("address", c.Address, prefix+" Address", isOOS))
 		}
 		if c.Phone != "" {
 			cleanPhone := normalizePhone(c.Phone)
 			if cleanPhone != "" {
-				results = append(results, schema.ModuleResult{Type: "tel", Value: cleanPhone, Context: prefix + " Phone", OutOfScope: isOOS})
+				results = append(results, m.result("tel", cleanPhone, prefix+" Phone", isOOS))
 			}
 		}
 	}
@@ -223,43 +222,46 @@ func (m *module) buildResults(metadata *Metadata, target string) []schema.Module
 	return results
 }
 
+func (m *module) result(typ, value, ctx string, oos bool) schema.ModuleResult {
+	return schema.ModuleResult{
+		Type:       typ,
+		Value:      value,
+		Context:    ctx,
+		Applied:    true,
+		OutOfScope: oos,
+	}
+}
+
 func (m *module) buildMetadataResults(metadata *Metadata, target string) []schema.ModuleResult {
 	var results []schema.ModuleResult
 
 	if metadata.RegistrarURL != "" {
-		results = append(results, schema.ModuleResult{Type: "url", Value: metadata.RegistrarURL, Context: "Registrar URL", OutOfScope: true})
+		results = append(results, m.result("url", metadata.RegistrarURL, "Registrar URL", true))
 	}
 	if metadata.WhoisServer != "" {
-		results = append(results, schema.ModuleResult{Type: "domain", Value: metadata.WhoisServer, Context: "Whois Server", OutOfScope: true})
+		results = append(results, m.result("domain", metadata.WhoisServer, "Whois Server", true))
 	}
 	if metadata.DNSSEC != "" {
-		results = append(results, schema.ModuleResult{Type: "string", Value: metadata.DNSSEC, Context: "DNSSEC Status"})
+		results = append(results, m.result("string", metadata.DNSSEC, "DNSSEC Status", false))
 	}
 	if metadata.IANAID != "" {
-		results = append(results, schema.ModuleResult{Type: "string", Value: metadata.IANAID, Context: "IANA ID", OutOfScope: true})
+		results = append(results, m.result("string", metadata.IANAID, "IANA ID", true))
 	}
 	if metadata.CreationDate != "" {
-		results = append(results, schema.ModuleResult{Type: "date", Value: metadata.CreationDate, Context: "Creation Date"})
+		results = append(results, m.result("date", metadata.CreationDate, "Creation Date", false))
 	}
 	if metadata.UpdatedDate != "" {
-		results = append(results, schema.ModuleResult{Type: "date", Value: metadata.UpdatedDate, Context: "Updated Date"})
+		results = append(results, m.result("date", metadata.UpdatedDate, "Updated Date", false))
 	}
 	if metadata.ExpirationDate != "" {
-		results = append(results, schema.ModuleResult{Type: "date", Value: metadata.ExpirationDate, Context: "Expiration Date"})
+		results = append(results, m.result("date", metadata.ExpirationDate, "Expiration Date", false))
 	}
 	for _, ns := range metadata.NameServers {
-		// Only mark as OOS if it's NOT a subdomain of our target.
-		// System's global scope check will catch external infra (Cloudflare, etc.) automatically.
 		oos := !strings.HasSuffix(strings.ToLower(ns), "."+strings.ToLower(target))
-		results = append(results, schema.ModuleResult{
-			Type:       "domain",
-			Value:      ns,
-			Context:    "Name Server",
-			OutOfScope: oos,
-		})
+		results = append(results, m.result("domain", ns, "Name Server", oos))
 	}
 	for _, st := range metadata.DomainStatus {
-		results = append(results, schema.ModuleResult{Type: "status", Value: st, Context: "Domain Status"})
+		results = append(results, m.result("status", st, "Domain Status", false))
 	}
 	return results
 }
