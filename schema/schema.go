@@ -210,5 +210,3 @@ type ProjectInfo struct {
 	Status             string
 	CreatedAt          time.Time
 }
-
-

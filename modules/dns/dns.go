@@ -1,0 +1,53 @@
+// Package dns provides unified, robust DNS resolution capabilities
+// including Plain and DoH protocols with fallback and retry logic.
+package dns
+
+import (
+	"cdua-org/ReconSR/schema"
+)
+
+type module struct{}
+
+// New instantiates the module for registration within the dispatcher's lifecycle.
+func New() schema.Module {
+	return &module{}
+}
+
+// Name provides the unique identifier used by the dispatcher for routing.
+func (m *module) Name() string {
+	return "dns"
+}
+
+// Capabilities declares the module's contract (inputs and functions) to the system core.
+func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
+	return schema.ModuleCapabilities{
+		Functions:  []string{"get_ip"},
+		InputTypes: []string{"domain", "subdomain"},
+	}, nil
+}
+
+// Exec acts as the stateless execution pipeline for incoming requests,
+// isolating the core routing from the underlying network extraction logic.
+func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
+	executions := make([]schema.ModuleExecution, 0, len(data.Functions))
+
+	for _, f := range data.Functions {
+		var execution schema.ModuleExecution
+
+		if f == "get_ip" {
+			execution = getIPData(data.Target.Value)
+		} else {
+			errMsg := "unsupported function: " + f
+			execution = schema.ModuleExecution{
+				Function: f,
+				Error:    &errMsg,
+			}
+		}
+
+		executions = append(executions, execution)
+	}
+
+	return schema.ModuleOutput{
+		Executions: executions,
+	}, nil
+}
