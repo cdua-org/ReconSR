@@ -4,7 +4,6 @@ import (
 	"cdua-org/ReconSR/modules/dns"
 	"cdua-org/ReconSR/modules/dns_dkim"
 	"cdua-org/ReconSR/modules/dns_dmarc"
-	"cdua-org/ReconSR/modules/dns_domainkey"
 	"cdua-org/ReconSR/modules/dns_mx"
 	"cdua-org/ReconSR/modules/dns_txt"
 	"cdua-org/ReconSR/modules/domainsbycerts"
@@ -41,7 +40,6 @@ var ModuleRegistry = []schema.Module{
 	dns.New(),
 	dns_mx.New(),
 	dns_dmarc.New(),
-	dns_domainkey.New(),
 	dns_dkim.New(),
 	dns_txt.New(),
 }
