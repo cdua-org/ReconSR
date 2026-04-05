@@ -44,6 +44,7 @@ func getDomainKeyData(target string) schema.ModuleExecution {
 	}
 
 	for _, rec := range records {
+		rec = strings.Trim(strings.TrimSpace(rec), "\"")
 		execution.Results = append(execution.Results, schema.ModuleResult{
 			Type:    "string",
 			Value:   rec,

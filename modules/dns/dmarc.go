@@ -97,7 +97,8 @@ func getDMARCData(target string) schema.ModuleExecution {
 func filterDMARC(records []string) []string {
 	var dmarc []string
 	for _, rec := range records {
-		if strings.HasPrefix(strings.TrimSpace(rec), "v=DMARC1") {
+		rec = strings.Trim(strings.TrimSpace(rec), "\"")
+		if strings.HasPrefix(rec, "v=DMARC1") {
 			dmarc = append(dmarc, rec)
 		}
 	}
