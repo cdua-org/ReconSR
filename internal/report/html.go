@@ -22,7 +22,7 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
 	targetSubDir := sanitizePath(graph.InitialTarget)
 	reportDir := filepath.Join("reports", targetSubDir)
 	if err := os.MkdirAll(reportDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create reports directory: %w", err)
+		return "", err
 	}
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
@@ -42,22 +42,29 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
 		BorderWidth int               `json:"borderWidth,omitempty"`
 	}
 	type visEdge struct {
-		ID        string `json:"id"`
-		From      string `json:"from"`
-		To        string `json:"to"`
-		Label     string `json:"label"`
-		Title     string `json:"title"`
-		RawData   string `json:"rawData,omitempty"`
-		Context   string `json:"context,omitempty"`
-		Module    string `json:"module"`
-		Function  string `json:"function"`
-		CreatedAt string `json:"createdAt"`
+		ID        string   `json:"id"`
+		From      string   `json:"from"`
+		To        string   `json:"to"`
+		Label     string   `json:"label"`
+		Title     string   `json:"title"`
+		RawData   string   `json:"rawData,omitempty"`
+		Contexts  []string `json:"contexts,omitempty"`
+		Module    string   `json:"module"`
+		Function  string   `json:"function"`
+		CreatedAt string   `json:"createdAt"`
 	}
 
 	nodesMap := make(map[string]visNode)
-	var visEdges []visEdge
 
-	for i, edge := range graph.Edges {
+	type edgeKey struct {
+		From     string
+		To       string
+		Function string
+	}
+	edgesMap := make(map[edgeKey]*visEdge)
+	edgeIDCounter := 0
+
+	for _, edge := range graph.Edges {
 		srcID := fmt.Sprintf("%s:%s", edge.Source.Type, edge.Source.Value)
 		dstID := fmt.Sprintf("%s:%s", edge.Target.Type, edge.Target.Value)
 
@@ -88,23 +95,58 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
 			nodesMap[dstID] = node
 		}
 
-		label := edge.Context
-		if label == "" {
-			label = edge.FunctionName
+		key := edgeKey{From: srcID, To: dstID, Function: edge.FunctionName}
+		if existingEdge, exists := edgesMap[key]; exists {
+			if edge.Context != "" {
+				found := false
+				for _, c := range existingEdge.Contexts {
+					if c == edge.Context {
+						found = true
+						break
+					}
+				}
+				if !found {
+					existingEdge.Contexts = append(existingEdge.Contexts, edge.Context)
+				}
+			}
+		} else {
+			var contexts []string
+			if edge.Context != "" {
+				contexts = append(contexts, edge.Context)
+			}
+			newEdge := &visEdge{
+				ID:        fmt.Sprintf("e_%d", edgeIDCounter),
+				From:      srcID,
+				To:        dstID,
+				RawData:   edge.RawData,
+				Contexts:  contexts,
+				Module:    edge.ModuleName,
+				Function:  edge.FunctionName,
+				CreatedAt: edge.CreatedAt,
+			}
+			edgesMap[key] = newEdge
+			edgeIDCounter++
+		}
+	}
+
+	var visEdges []visEdge
+	for _, e := range edgesMap {
+		if len(e.Contexts) == 0 {
+			e.Label = e.Function
+		} else if len(e.Contexts) == 1 {
+			e.Label = e.Contexts[0]
+		} else if len(e.Contexts) == 2 {
+			e.Label = fmt.Sprintf("%s | %s", e.Contexts[0], e.Contexts[1])
+		} else {
+			e.Label = fmt.Sprintf("%s(+%d)", e.Contexts[0], len(e.Contexts)-1)
 		}
 
-		visEdges = append(visEdges, visEdge{
-			ID:        fmt.Sprintf("e_%d", i),
-			From:      srcID,
-			To:        dstID,
-			Label:     label,
-			Title:     "Click for details",
-			RawData:   edge.RawData,
-			Context:   edge.Context,
-			Module:    edge.ModuleName,
-			Function:  edge.FunctionName,
-			CreatedAt: edge.CreatedAt,
-		})
+		var titleParts []string
+		titleParts = append(titleParts, e.Contexts...)
+		titleParts = append(titleParts, fmt.Sprintf("Function: %s", e.Function))
+		e.Title = strings.Join(titleParts, "\n")
+
+		visEdges = append(visEdges, *e)
 	}
 
 	var visNodes []interface{}
@@ -112,7 +154,6 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
 	for _, n := range nodesMap {
 		stats[n.Group]++
 		if n.Label == graph.InitialTarget {
-			// Add special styling for the root node
 			type highlightedNode struct {
 				visNode
 				Shape string            `json:"shape"`
@@ -135,12 +176,18 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
 
 	var statsParts []string
 	for t, count := range stats {
-		statsParts = append(statsParts, fmt.Sprintf("%s: %d", t, count))
+		statsParts = append(statsParts, fmt.Sprintf(`<label style="cursor:pointer; display:inline-flex; align-items:center; margin-right:12px;"><input type="checkbox" class="node-type-cb" value="%s" checked style="margin-right:4px; cursor:pointer;">%s: %d</label>`, t, t, count))
 	}
-	statsStr := strings.Join(statsParts, " | ")
+	statsStr := strings.Join(statsParts, "")
 
-	nodesJSON, _ := json.Marshal(visNodes)
-	edgesJSON, _ := json.Marshal(visEdges)
+	nodesJSON, err := json.Marshal(visNodes)
+	if err != nil {
+		return "", err
+	}
+	edgesJSON, err := json.Marshal(visEdges)
+	if err != nil {
+		return "", err
+	}
 
 	htmlContent := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en">
@@ -156,32 +203,38 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
         .brand::before { content: ''; display: inline-block; width: 12px; height: 12px; background: #38bdf8; margin-right: 10px; border-radius: 2px; }
         h1 { color: #38bdf8; margin: 0; font-size: 1.1rem; font-weight: 400; }
         .meta { color: #94a3b8; font-size: 0.8rem; margin-top: 5px; }
-        
+
         #modal { display: none; position: fixed; right: 0; top: 0; width: 450px; height: 100vh; background: #1e293b; border-left: 2px solid #334155; padding: 25px; box-sizing: border-box; overflow-y: auto; z-index: 1000; box-shadow: -5px 0 15px rgba(0,0,0,0.3); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 20px; }
         .close-btn { color: #94a3b8; cursor: pointer; font-size: 24px; }
         .close-btn:hover { color: #e2e8f0; }
-        
+
         .detail-item { margin-bottom: 20px; }
         .detail-label { color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
         .detail-value { color: #f1f5f9; font-size: 0.95rem; }
         .detail-value.code { color: #10b981; font-family: monospace; background: #0f172a; padding: 10px; border-radius: 4px; display: block; white-space: pre-wrap; word-break: break-all; margin-top: 8px; border: 1px solid #334155; }
-        
+
         h3 { color: #38bdf8; margin: 0; font-size: 1.1rem; }
-    </style>
-</head>
+
+        .meta label { pointer-events: auto; }
+        </style></head>
 <body>
     <div class="header">
         <div class="brand">ReconSR</div>
         <h1>Project: %s</h1>
-        <div class="meta">Generated: %s | Nodes: %d | Edges: %d</div>
-        <div class="meta">%s</div>
+        <div class="meta" style="margin-bottom: 6px;">
+            Generated: %s | Nodes: %d |
+            <label style="cursor:pointer; display:inline-flex; align-items:center; margin-left:4px;"><input type="checkbox" id="toggle-edge-labels" style="margin-right:4px; cursor:pointer;">Edges Labels: %d</label>
+        </div>
+        <div class="meta" style="display:flex; flex-wrap:wrap; align-items:center;">
+            %s
+        </div>
     </div>
-    
+
     <div id="modal">
         <div class="modal-header">
             <h3>Observation Details</h3>
-            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <span class="close-btn" style="pointer-events:auto;" onclick="closeModal()">&times;</span>
         </div>
         <div id="modalBody"></div>
     </div>
@@ -189,8 +242,15 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
     <div id="mynetwork"></div>
 
     <script type="text/javascript">
-        const nodes = new vis.DataSet(%s);
-        const edges = new vis.DataSet(%s);
+        const initialNodes = %s;
+        const initialEdges = %s;
+
+        initialEdges.forEach(e => {
+            e.font = { size: 0, strokeWidth: 0 };
+        });
+
+        const nodes = new vis.DataSet(initialNodes);
+        const edges = new vis.DataSet(initialEdges);
         const container = document.getElementById('mynetwork');
         const data = { nodes: nodes, edges: edges };
         const options = {
@@ -203,12 +263,12 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
                 width: 2,
                 color: { color: '#64748b', highlight: '#38bdf8', hover: '#94a3b8' },
                 arrows: { to: { enabled: true, scaleFactor: 0.8 } },
-                font: { 
-                    color: '#cbd5e1', 
-                    size: 11, 
-                    align: 'top', // Follow the line direction
+                font: {
+                    color: '#cbd5e1',
+                    size: 11,
+                    align: 'top',
                     strokeWidth: 2,
-                    strokeColor: '#0f172a' // Small dark outline instead of block background
+                    strokeColor: '#0f172a'
                 },
                 hoverWidth: 1.5, smooth: { type: 'continuous' }
             },
@@ -220,12 +280,12 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
             },
             physics: {
                 enabled: true,
-                barnesHut: { 
-                    gravitationalConstant: -1500, // Reduced repulsion
-                    centralGravity: 0.1,         // Reduced pull to center
+                barnesHut: {
+                    gravitationalConstant: -1500,
+                    centralGravity: 0.1,
                     springLength: 150,
-                    springConstant: 0.02,        // Much softer springs
-                    damping: 0.3,                // Higher damping to slow down movement
+                    springConstant: 0.02,
+                    damping: 0.3,
                     avoidOverlap: 0.2
                 },
                 stabilization: { iterations: 200 }
@@ -234,31 +294,92 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
         };
         const network = new vis.Network(container, data, options);
 
-        // Apply dark gray border for out-of-scope nodes while keeping group background
+        const originalColors = {};
         nodes.forEach(node => {
+            if (node.color) {
+                originalColors[node.id] = node.color;
+            }
             if (node.outOfScope) {
-                const groupColor = (options.groups[node.group] && options.groups[node.group].color) 
-                    ? options.groups[node.group].color.background 
+                const groupColor = (options.groups[node.group] && options.groups[node.group].color)
+                    ? options.groups[node.group].color.background
                     : '#64748b';
+                const newColor = {
+                    border: '#334155',
+                    background: groupColor
+                };
+                originalColors[node.id] = newColor;
                 nodes.update({
                     id: node.id,
-                    color: { border: '#334155', background: groupColor, highlight: groupColor }
+                    color: newColor
                 });
             }
         });
+        const nodeTypeCheckboxes = {};
+        document.querySelectorAll('.node-type-cb').forEach(cb => {
+            nodeTypeCheckboxes[cb.value] = cb;
+            cb.addEventListener('change', updateNodeLabels);
+        });
 
-        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+        function updateNodeLabels() {
+            const updates = [];
+            nodes.forEach(n => {
+                const isChecked = nodeTypeCheckboxes[n.group] ? nodeTypeCheckboxes[n.group].checked : true;
+                const updateObj = { id: n.id, font: { size: isChecked ? 16 : 0 } };
+                if (originalColors[n.id]) {
+                    updateObj.color = originalColors[n.id];
+                }
+                updates.push(updateObj);
+            });
+            nodes.update(updates);
+        }
 
+        const edgeLabelCheckbox = document.getElementById('toggle-edge-labels');
+        edgeLabelCheckbox.addEventListener('change', (e) => {
+            const show = e.target.checked;
+            const updates = [];
+            edges.forEach(edge => {
+                updates.push({
+                    id: edge.id,
+                    font: { size: show ? 11 : 0, strokeWidth: show ? 2 : 0 }
+                });
+            });
+            edges.update(updates);
+        });
+
+        let currentModalId = null;
+
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+            currentModalId = null;
+        }
         function formatTime(isoStr) {
             if (!isoStr) return '';
-            // Treat the string as local time (no Z or T forcing)
             const date = new Date(isoStr.replace(' ', 'T'));
             return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
         }
 
         network.on("click", function (params) {
+            let clickedId = null;
+            if (params.nodes.length > 0) {
+                clickedId = 'n_' + params.nodes[0];
+            } else if (params.edges.length > 0) {
+                clickedId = 'e_' + params.edges[0];
+            }
+
+            const modal = document.getElementById('modal');
+            if (!clickedId) {
+                closeModal();
+                return;
+            }
+
+            if (clickedId === currentModalId && modal.style.display === 'block') {
+                closeModal();
+                return;
+            }
+
+            currentModalId = clickedId;
             let content = '';
-            // 1. Check if a Node was clicked
+
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0];
                 const node = nodes.get(nodeId);
@@ -273,14 +394,14 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
                     document.getElementById('modalBody').innerHTML = content;
                     document.getElementById('modal').style.display = 'block';
                 }
-            } 
-            // 2. Check if an Edge was clicked
+            }
             else if (params.edges.length > 0) {
                 const edgeId = params.edges[0];
                 const edge = edges.get(edgeId);
                 if (edge) {
-                    if (edge.context) {
-                        content += '<div class="detail-item"><div class="detail-label">Context</div><div class="detail-value code">' + edge.context + '</div></div>';
+                    if (edge.contexts && edge.contexts.length > 0) {
+                        const contextsHtml = edge.contexts.join('<br>');
+                        content += '<div class="detail-item"><div class="detail-label">Contexts</div><div class="detail-value code">' + contextsHtml + '</div></div>';
                     }
                     if (edge.rawData) {
                         content += '<div class="detail-item"><div class="detail-label">Raw Data</div><div class="detail-value code">' + edge.rawData + '</div></div>';
@@ -298,7 +419,7 @@ func GenerateHTML(graph *schema.ProjectGraph) (string, error) {
 </body>
 </html>`, graph.ProjectName, graph.ProjectName, timestamp, len(visNodes), len(visEdges), statsStr, string(nodesJSON), string(edgesJSON))
 
-	err := os.WriteFile(reportPath, []byte(htmlContent), 0600)
+	err = os.WriteFile(reportPath, []byte(htmlContent), 0600)
 	if err != nil {
 		return "", err
 	}

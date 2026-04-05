@@ -37,17 +37,29 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	}
 	fmt.Println()
 
-	// 1. Build adjacency map and deduplicate edges
+	// 1. Build adjacency map
 	adj := make(map[string][]schema.GraphEdge)
-	seenEdges := make(map[string]bool)
+	edgeMap := make(map[string]*schema.GraphEdge)
 
 	for _, edge := range graph.Edges {
 		edgeKey := fmt.Sprintf("%s|%s|%s|%s", edge.Source.Value, edge.Target.Value, edge.ModuleName, edge.FunctionName)
-		if seenEdges[edgeKey] {
-			continue
+		
+		if existing, ok := edgeMap[edgeKey]; ok {
+			if edge.Context != "" && existing.Context != "" {
+				if existing.Context != edge.Context {
+					existing.Context = existing.Context + " | " + edge.Context
+				}
+			} else if edge.Context != "" {
+				existing.Context = edge.Context
+			}
+		} else {
+			newEdge := edge
+			edgeMap[edgeKey] = &newEdge
 		}
-		adj[edge.Source.Value] = append(adj[edge.Source.Value], edge)
-		seenEdges[edgeKey] = true
+	}
+
+	for _, edgePtr := range edgeMap {
+		adj[edgePtr.Source.Value] = append(adj[edgePtr.Source.Value], *edgePtr)
 	}
 
 	// 2. Start recursion from initial target
