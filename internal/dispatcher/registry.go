@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"cdua-org/ReconSR/modules/dns"
 	"cdua-org/ReconSR/modules/domainsbycerts"
+	"cdua-org/ReconSR/modules/hackertarget"
 	"cdua-org/ReconSR/modules/subdomain_hierarchy"
 	"cdua-org/ReconSR/modules/whois"
 	"cdua-org/ReconSR/schema"
@@ -33,5 +34,6 @@ var ModuleRegistry = []schema.Module{
 	&module{name: "subdomain_hierarchy", exec: subdomain_hierarchy.HandleData, caps: subdomain_hierarchy.GetCapabilities},
 	whois.New(),
 	domainsbycerts.New(),
+	hackertarget.New(),
 	dns.New(),
 }
