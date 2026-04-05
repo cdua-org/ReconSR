@@ -1,11 +1,8 @@
 [DoH]
 https://dns.cloudflare.com/dns-query
-https://dns.google/dns-query
-https://unfiltered.adguard-dns.com/dns-query
-https://dns10.quad9.net/dns-query
+https://dns.google/resolve
+https://unfiltered.adguard-dns.com/resolve
 https://doh.dns.sb/dns-query
-https://freedns.controld.com/p0
-https://dns.mullvad.net/dns-query
 
 [Plain]
 1.1.1.1

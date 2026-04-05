@@ -2,7 +2,6 @@ package dispatcher
 
 import (
 	"cdua-org/ReconSR/modules/dns"
-	"cdua-org/ReconSR/modules/dns_caa"
 	"cdua-org/ReconSR/modules/dns_cname"
 	"cdua-org/ReconSR/modules/dns_dkim"
 	"cdua-org/ReconSR/modules/dns_dmarc"
@@ -45,7 +44,6 @@ var ModuleRegistry = []schema.Module{
 	domainsbycerts.New(),
 	dns_wildcard.New(),
 	dns.New(),
-	dns_caa.New(),
 	dns_soa.New(),
 	dns_mx.New(),
 	dns_dmarc.New(),
