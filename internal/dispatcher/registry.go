@@ -7,7 +7,6 @@ import (
 	"cdua-org/ReconSR/modules/dns_dmarc"
 	"cdua-org/ReconSR/modules/dns_domainkey"
 	"cdua-org/ReconSR/modules/dns_mx"
-	"cdua-org/ReconSR/modules/dns_soa"
 	"cdua-org/ReconSR/modules/dns_txt"
 	"cdua-org/ReconSR/modules/dns_wildcard"
 	"cdua-org/ReconSR/modules/domainsbycerts"
@@ -43,7 +42,6 @@ var ModuleRegistry = []schema.Module{
 	domainsbycerts.New(),
 	dns_wildcard.New(),
 	dns.New(),
-	dns_soa.New(),
 	dns_mx.New(),
 	dns_dmarc.New(),
 	dns_domainkey.New(),
