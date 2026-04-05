@@ -1,15 +1,9 @@
-// Package domainsbycerts provides functionality to discover subdomains
-// for a given target domain by querying Certificate Transparency (CT) logs
-// and passive DNS sources with built-in retries and fallbacks.
+// Package domainsbycerts discovers subdomains from Certificate Transparency logs.
 package domainsbycerts
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -22,7 +16,6 @@ const (
 	timeFormatDate    = "2006-01-02 15:04:05"
 )
 
-// module represents the domainsbycerts module implementation.
 type module struct{}
 
 // New instantiates the module for registration within the dispatcher's lifecycle.
@@ -30,12 +23,10 @@ func New() schema.Module {
 	return &module{}
 }
 
-// Name provides the unique identifier used by the dispatcher for routing.
 func (m *module) Name() string {
 	return "domainsbycerts"
 }
 
-// Capabilities declares the module's contract (inputs and functions) to the system core.
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
 		Functions:  []string{"get_domains"},
@@ -43,8 +34,6 @@ func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	}, nil
 }
 
-// Exec acts as the stateless execution pipeline for incoming requests,
-// isolating the core routing from the underlying network extraction logic.
 func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	executions := make([]schema.ModuleExecution, 0, len(data.Functions))
 
@@ -107,27 +96,40 @@ type collectedDomains struct {
 	domains []domainSource
 }
 
+type domainEntry struct {
+	domain   string
+	notAfter time.Time
+	rawData  json.RawMessage
+}
+
+// CertFetcher defines the interface for certificate transparency APIs.
+type CertFetcher interface {
+	Fetch(ctx context.Context, target string) []domainEntry
+	Name() string
+}
+
 func collectAllDomains(ctx context.Context, target string) collectedDomains {
 	var result collectedDomains
 	rawPayloads := make(map[string]json.RawMessage)
 
-	entries := fetchFromCertspotter(ctx, target)
-	if len(entries) > 0 {
-		for _, e := range entries {
-			result.domains = append(result.domains, domainSource{domain: e.domain, source: "Certspotter", NotAfter: e.notAfter})
-		}
-		if len(rawPayloads) == 0 {
-			rawPayloads["certspotter"] = entries[0].rawData
-		}
+	fetchers := []CertFetcher{
+		newCertspotterFetcher(),
+		newCrtshFetcher(),
 	}
 
-	entries = fetchFromCrtsh(ctx, target)
-	if len(entries) > 0 {
-		for _, e := range entries {
-			result.domains = append(result.domains, domainSource{domain: e.domain, source: "crt.sh", NotAfter: e.notAfter})
-		}
-		if len(rawPayloads) == 0 {
-			rawPayloads["crtsh"] = entries[0].rawData
+	for _, f := range fetchers {
+		entries := f.Fetch(ctx, target)
+		if len(entries) > 0 {
+			for _, e := range entries {
+				result.domains = append(result.domains, domainSource{
+					domain:   e.domain,
+					source:   f.Name(),
+					NotAfter: e.notAfter,
+				})
+			}
+			if len(rawPayloads) == 0 {
+				rawPayloads[f.Name()] = entries[0].rawData
+			}
 		}
 	}
 
@@ -142,8 +144,19 @@ func filterAndFormatDomains(domains []domainSource, target string) []schema.Modu
 	domainMaxNotAfter := make(map[string]time.Time)
 	domainSourceInfo := make(map[string]string)
 
+	var targetMaxNotAfter time.Time
+	var targetSource string
+
 	for _, ds := range domains {
 		d := normalizeDomain(ds.domain)
+		if d == target {
+			if ds.NotAfter.After(targetMaxNotAfter) {
+				targetMaxNotAfter = ds.NotAfter
+				targetSource = ds.source
+			}
+			continue
+		}
+
 		if !isValidSubdomain(d, target) {
 			continue
 		}
@@ -157,6 +170,20 @@ func filterAndFormatDomains(domains []domainSource, target string) []schema.Modu
 	now := time.Now()
 	var results []schema.ModuleResult
 	var ghostDomains []string
+
+	if !targetMaxNotAfter.IsZero() && targetMaxNotAfter.After(now) {
+		results = append(results,
+			schema.ModuleResult{
+				Type:    "domain",
+				Value:   target,
+				Context: targetSource,
+			},
+			schema.ModuleResult{
+				Type:    "string",
+				Value:   targetMaxNotAfter.Format(time.RFC3339),
+				Context: targetSource + " " + target + " expires on",
+			})
+	}
 
 	for d, notAfter := range domainMaxNotAfter {
 		if notAfter.IsZero() || notAfter.After(now) {
@@ -199,143 +226,6 @@ func normalizeDomain(d string) string {
 
 func isValidSubdomain(d, target string) bool {
 	return d != "" && d != target && strings.HasSuffix(d, "."+target)
-}
-
-func doRequestWithRetry(ctx context.Context, reqURL string) ([]byte, error) {
-	client := &http.Client{Timeout: 15 * time.Second}
-	var lastErr error
-
-	for attempt := 1; attempt <= 3; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
-		if err != nil {
-			return nil, fmt.Errorf("create request: %w", err)
-		}
-
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-
-		resp, err := client.Do(req)
-		if err != nil {
-			lastErr = fmt.Errorf("do request: %w", err)
-			if !sleepContext(ctx, 2*time.Second) {
-				return nil, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
-			}
-			continue
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		//nolint:errcheck // defer body close error is not critical
-		_ = resp.Body.Close()
-
-		if err != nil {
-			lastErr = fmt.Errorf("read body: %w", err)
-			if !sleepContext(ctx, 2*time.Second) {
-				return nil, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
-			}
-			continue
-		}
-
-		if resp.StatusCode == http.StatusOK {
-			return body, nil
-		}
-
-		if isTemporaryError(resp.StatusCode) {
-			lastErr = fmt.Errorf("temporary status %d", resp.StatusCode)
-			if !sleepContext(ctx, 2*time.Second) {
-				return nil, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
-			}
-			continue
-		}
-
-		return nil, fmt.Errorf("hard failure status %d: %s", resp.StatusCode, string(body))
-	}
-
-	return nil, lastErr
-}
-
-func isTemporaryError(code int) bool {
-	return code == http.StatusTooManyRequests || code == http.StatusBadGateway || code == http.StatusServiceUnavailable || code == http.StatusGatewayTimeout
-}
-
-func sleepContext(ctx context.Context, d time.Duration) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	case <-time.After(d):
-		return true
-	}
-}
-
-type certspotterResponse []struct {
-	NotBefore string   `json:"not_before"`
-	NotAfter  string   `json:"not_after"`
-	DNSNames  []string `json:"dns_names"`
-}
-
-type domainEntry struct {
-	domain   string
-	notAfter time.Time
-	rawData  json.RawMessage
-}
-
-func fetchFromCertspotter(ctx context.Context, target string) []domainEntry {
-	u := "https://api.certspotter.com/v1/issuances?domain=" + url.QueryEscape(target) + "&include_subdomains=true&expand=dns_names"
-	body, err := doRequestWithRetry(ctx, u)
-	if err != nil {
-		return nil
-	}
-
-	var records certspotterResponse
-	if err := json.Unmarshal(body, &records); err != nil {
-		return nil
-	}
-
-	var entries []domainEntry
-	for _, rec := range records {
-		notAfter := parseCertTimestamp(rec.NotAfter)
-		for _, name := range rec.DNSNames {
-			entries = append(entries, domainEntry{
-				domain:   name,
-				notAfter: notAfter,
-				rawData:  body,
-			})
-		}
-	}
-	return entries
-}
-
-type crtshRecord struct {
-	NameValue string `json:"name_value"`
-	NotAfter  string `json:"not_after"`
-}
-
-func fetchFromCrtsh(ctx context.Context, target string) []domainEntry {
-	u := "https://crt.sh/?q=%25." + url.QueryEscape(target) + "&output=json"
-	body, err := doRequestWithRetry(ctx, u)
-	if err != nil {
-		return nil
-	}
-
-	var records []crtshRecord
-	if err := json.Unmarshal(body, &records); err != nil {
-		return nil
-	}
-
-	var entries []domainEntry
-	for _, rec := range records {
-		notAfter := parseCertTimestamp(rec.NotAfter)
-		for name := range strings.SplitSeq(rec.NameValue, "\n") {
-			name = strings.TrimSpace(name)
-			if name == "" {
-				continue
-			}
-			entries = append(entries, domainEntry{
-				domain:   name,
-				notAfter: notAfter,
-				rawData:  body,
-			})
-		}
-	}
-	return entries
 }
 
 func parseCertTimestamp(ts string) time.Time {
