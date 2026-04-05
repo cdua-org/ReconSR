@@ -2,7 +2,6 @@ package dispatcher
 
 import (
 	"cdua-org/ReconSR/modules/dns"
-	"cdua-org/ReconSR/modules/dns_txt"
 	"cdua-org/ReconSR/modules/domainsbycerts"
 	"cdua-org/ReconSR/modules/subdomain_hierarchy"
 	"cdua-org/ReconSR/modules/whois"
@@ -35,5 +34,4 @@ var ModuleRegistry = []schema.Module{
 	whois.New(),
 	domainsbycerts.New(),
 	dns.New(),
-	dns_txt.New(),
 }
