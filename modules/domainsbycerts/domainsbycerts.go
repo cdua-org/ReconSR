@@ -17,6 +17,11 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
+const (
+	timeFormatRFC3339 = "2006-01-02T15:04:05Z07:00"
+	timeFormatDate    = "2006-01-02 15:04:05"
+)
+
 // module represents the domainsbycerts module implementation.
 type module struct{}
 
@@ -34,7 +39,7 @@ func (m *module) Name() string {
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
 		Functions:  []string{"get_domains"},
-		InputTypes: []string{"domain", "subdomain"},
+		InputTypes: []string{"domain"},
 	}, nil
 }
 
@@ -73,54 +78,127 @@ func getDomains(target string) schema.ModuleExecution {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	var rawDomains []string
-	var err error
-	var rawData []byte
+	allDomains := collectAllDomains(ctx, target)
 
-	rawDomains, rawData, err = fetchFromCertspotter(ctx, target)
-	if err != nil || len(rawDomains) == 0 {
-		rawDomains, rawData, err = fetchFromCrtsh(ctx, target)
-		if err != nil || len(rawDomains) == 0 {
-			rawDomains, rawData, err = fetchFromHackerTarget(ctx, target)
-		}
-	}
-
-	if err != nil && len(rawDomains) == 0 {
-		errMsg := "all cert discovery methods exhausted for " + target + ": " + err.Error()
+	if len(allDomains.domains) == 0 {
+		errMsg := "all cert discovery methods exhausted for " + target
 		execution.Error = &errMsg
-		execution.Results = nil
 		return execution
 	}
 
-	execution.RawData = string(rawData)
+	execution.RawData = allDomains.rawData
+	execution.Results = filterAndFormatDomains(allDomains.domains, target)
 
-	uniqueDomains := make(map[string]bool)
-	var result []string
+	sort.Slice(execution.Results, func(i, j int) bool {
+		return execution.Results[i].Value < execution.Results[j].Value
+	})
 
-	for _, d := range rawDomains {
-		d = strings.ToLower(strings.TrimSpace(d))
-		d = strings.TrimPrefix(d, "*.")
+	return execution
+}
 
-		if d != "" && d != target && strings.HasSuffix(d, "."+target) {
-			if !uniqueDomains[d] {
-				uniqueDomains[d] = true
-				result = append(result, d)
-			}
+type domainSource struct {
+	NotAfter time.Time
+	domain   string
+	source   string
+}
+
+type collectedDomains struct {
+	rawData string
+	domains []domainSource
+}
+
+func collectAllDomains(ctx context.Context, target string) collectedDomains {
+	var result collectedDomains
+	rawPayloads := make(map[string]json.RawMessage)
+
+	entries := fetchFromCertspotter(ctx, target)
+	if len(entries) > 0 {
+		for _, e := range entries {
+			result.domains = append(result.domains, domainSource{domain: e.domain, source: "Certspotter", NotAfter: e.notAfter})
+		}
+		if len(rawPayloads) == 0 {
+			rawPayloads["certspotter"] = entries[0].rawData
 		}
 	}
 
-	sort.Strings(result)
+	entries = fetchFromCrtsh(ctx, target)
+	if len(entries) > 0 {
+		for _, e := range entries {
+			result.domains = append(result.domains, domainSource{domain: e.domain, source: "crt.sh", NotAfter: e.notAfter})
+		}
+		if len(rawPayloads) == 0 {
+			rawPayloads["crtsh"] = entries[0].rawData
+		}
+	}
 
-	for _, d := range result {
-		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:    "domain",
-			Value:   d,
-			Context: "Certificate Transparency",
-			Applied: true, // Prevents redundant CT queries for already discovered subtrees
+	if combined, err := json.Marshal(rawPayloads); err == nil {
+		result.rawData = string(combined)
+	}
+
+	return result
+}
+
+func filterAndFormatDomains(domains []domainSource, target string) []schema.ModuleResult {
+	domainMaxNotAfter := make(map[string]time.Time)
+	domainSourceInfo := make(map[string]string)
+
+	for _, ds := range domains {
+		d := normalizeDomain(ds.domain)
+		if !isValidSubdomain(d, target) {
+			continue
+		}
+
+		if ds.NotAfter.After(domainMaxNotAfter[d]) {
+			domainMaxNotAfter[d] = ds.NotAfter
+			domainSourceInfo[d] = ds.source
+		}
+	}
+
+	now := time.Now()
+	var results []schema.ModuleResult
+	var ghostDomains []string
+
+	for d, notAfter := range domainMaxNotAfter {
+		if notAfter.IsZero() || notAfter.After(now) {
+			results = append(results, schema.ModuleResult{
+				Type:    "domain",
+				Value:   d,
+				Context: domainSourceInfo[d],
+				Applied: true,
+			})
+
+			if !notAfter.IsZero() {
+				results = append(results, schema.ModuleResult{
+					Type:    "string",
+					Value:   notAfter.Format(time.RFC3339),
+					Context: domainSourceInfo[d] + " " + d + " expires on",
+				})
+			}
+		} else {
+			ghostDomains = append(ghostDomains, d)
+		}
+	}
+
+	if len(ghostDomains) > 0 {
+		sort.Strings(ghostDomains)
+		results = append(results, schema.ModuleResult{
+			Type:    "string",
+			Value:   strings.Join(ghostDomains, ", "),
+			Context: "Ghost subdomains",
 		})
 	}
 
-	return execution
+	return results
+}
+
+func normalizeDomain(d string) string {
+	d = strings.ToLower(strings.TrimSpace(d))
+	d = strings.TrimPrefix(d, "*.")
+	return d
+}
+
+func isValidSubdomain(d, target string) bool {
+	return d != "" && d != target && strings.HasSuffix(d, "."+target)
 }
 
 func doRequestWithRetry(ctx context.Context, reqURL string) ([]byte, error) {
@@ -188,62 +266,90 @@ func sleepContext(ctx context.Context, d time.Duration) bool {
 }
 
 type certspotterResponse []struct {
-	DNSNames []string `json:"dns_names"`
+	NotBefore string   `json:"not_before"`
+	NotAfter  string   `json:"not_after"`
+	DNSNames  []string `json:"dns_names"`
 }
 
-func fetchFromCertspotter(ctx context.Context, target string) (names []string, body []byte, err error) {
+type domainEntry struct {
+	domain   string
+	notAfter time.Time
+	rawData  json.RawMessage
+}
+
+func fetchFromCertspotter(ctx context.Context, target string) []domainEntry {
 	u := "https://api.certspotter.com/v1/issuances?domain=" + url.QueryEscape(target) + "&include_subdomains=true&expand=dns_names"
-	body, err = doRequestWithRetry(ctx, u)
+	body, err := doRequestWithRetry(ctx, u)
 	if err != nil {
-		return nil, nil, err
+		return nil
 	}
 
 	var records certspotterResponse
-	if err = json.Unmarshal(body, &records); err != nil {
-		return nil, body, fmt.Errorf("unmarshal certspotter: %w", err)
+	if err := json.Unmarshal(body, &records); err != nil {
+		return nil
 	}
 
+	var entries []domainEntry
 	for _, rec := range records {
-		names = append(names, rec.DNSNames...)
+		notAfter := parseCertTimestamp(rec.NotAfter)
+		for _, name := range rec.DNSNames {
+			entries = append(entries, domainEntry{
+				domain:   name,
+				notAfter: notAfter,
+				rawData:  body,
+			})
+		}
 	}
-	return names, body, nil
+	return entries
 }
 
 type crtshRecord struct {
 	NameValue string `json:"name_value"`
+	NotAfter  string `json:"not_after"`
 }
 
-func fetchFromCrtsh(ctx context.Context, target string) (names []string, body []byte, err error) {
+func fetchFromCrtsh(ctx context.Context, target string) []domainEntry {
 	u := "https://crt.sh/?q=%25." + url.QueryEscape(target) + "&output=json"
-	body, err = doRequestWithRetry(ctx, u)
+	body, err := doRequestWithRetry(ctx, u)
 	if err != nil {
-		return nil, nil, err
+		return nil
 	}
 
 	var records []crtshRecord
-	if err = json.Unmarshal(body, &records); err != nil {
-		return nil, body, fmt.Errorf("unmarshal crt.sh: %w", err)
+	if err := json.Unmarshal(body, &records); err != nil {
+		return nil
 	}
 
+	var entries []domainEntry
 	for _, rec := range records {
-		parts := strings.Split(rec.NameValue, "\n")
-		names = append(names, parts...)
-	}
-	return names, body, nil
-}
-
-func fetchFromHackerTarget(ctx context.Context, target string) (names []string, body []byte, err error) {
-	u := "https://api.hackertarget.com/hostsearch/?q=" + url.QueryEscape(target)
-	body, err = doRequestWithRetry(ctx, u)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	for line := range strings.SplitSeq(string(body), "\n") {
-		parts := strings.Split(line, ",")
-		if len(parts) > 0 && parts[0] != "" {
-			names = append(names, parts[0])
+		notAfter := parseCertTimestamp(rec.NotAfter)
+		for name := range strings.SplitSeq(rec.NameValue, "\n") {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				continue
+			}
+			entries = append(entries, domainEntry{
+				domain:   name,
+				notAfter: notAfter,
+				rawData:  body,
+			})
 		}
 	}
-	return names, body, nil
+	return entries
+}
+
+func parseCertTimestamp(ts string) time.Time {
+	if ts == "" {
+		return time.Time{}
+	}
+
+	if t, err := time.Parse(timeFormatRFC3339, ts); err == nil {
+		return t
+	}
+
+	if t, err := time.Parse(timeFormatDate, ts); err == nil {
+		return t
+	}
+
+	return time.Time{}
 }
