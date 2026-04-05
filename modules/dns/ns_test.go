@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-//nolint:goconst // allow repetitive "string" in tests
 func TestGetNSDataEmpty(t *testing.T) {
 	execution := getNSData("nonexistent.domain.invalid")
 

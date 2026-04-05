@@ -53,6 +53,7 @@ func TestParseCAARecord(t *testing.T) {
 	}
 }
 
+//nolint:goconst // allow repetitive "string" in tests
 func TestGetCAAData(t *testing.T) {
 	// A basic integration test
 	res := getCAAData("example.com")
