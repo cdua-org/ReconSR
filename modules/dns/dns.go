@@ -21,7 +21,7 @@ func (m *module) Name() string {
 // Capabilities declares the module's contract (inputs and functions) to the system core.
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
-		Functions:  []string{"get_ip", "get_caa"},
+		Functions:  []string{"get_ip", "get_caa", "get_ns"},
 		InputTypes: []string{"domain", "subdomain"},
 	}, nil
 }
@@ -39,6 +39,8 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 			execution = getIPData(data.Target.Value)
 		case "get_caa":
 			execution = getCAAData(data.Target.Value)
+		case "get_ns":
+			execution = getNSData(data.Target.Value)
 		default:
 			errMsg := "unsupported function: " + f
 			execution = schema.ModuleExecution{
