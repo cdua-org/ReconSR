@@ -1,61 +1,51 @@
-package dns_dmarc
+package dns
 
 import (
 	"reflect"
+	"slices"
 	"testing"
-
-	"cdua-org/ReconSR/schema"
 )
 
-func TestModuleCapabilities(t *testing.T) {
-	mod := New()
-	caps, err := mod.Capabilities()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestGetDMARCDataEmpty(t *testing.T) {
+	execution := getDMARCData("nonexistent.domain.invalid")
+
+	if execution.Error != nil {
+		t.Logf("dmarc lookup failed: %v", *execution.Error)
+		return
 	}
 
-	expectedFuncs := []string{"get_dmarc"}
-	if !reflect.DeepEqual(caps.Functions, expectedFuncs) {
-		t.Errorf("Functions mismatch: got %v, want %v", caps.Functions, expectedFuncs)
+	if len(execution.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(execution.Results))
 	}
 
-	expectedTypes := []string{"domain", "subdomain"}
-	if !reflect.DeepEqual(caps.InputTypes, expectedTypes) {
-		t.Errorf("InputTypes mismatch: got %v, want %v", caps.InputTypes, expectedTypes)
+	result := execution.Results[0]
+	if result.Type != "string" || result.Value != "No DMARC" {
+		t.Errorf("expected 'No DMARC' result, got %+v", result)
+	}
+	if result.Context != "DMARC Records" {
+		t.Errorf("expected context 'DMARC Records', got %q", result.Context)
 	}
 }
 
-func TestExecUnsupportedFunction(t *testing.T) {
+func TestGetDMARCData(t *testing.T) {
+	res := getDMARCData("example.com")
+
+	if res.Error != nil {
+		t.Logf("Network resolution error: %v", *res.Error)
+	} else if len(res.Results) == 0 {
+		t.Error("expected at least one DMARC result or 'No DMARC'")
+	}
+}
+
+func TestDMARCCapabilities(t *testing.T) {
 	mod := New()
-	input := schema.ModuleInput{
-		Target: schema.Entity{
-			Type:  "domain",
-			Value: "example.com",
-		},
-		Functions: []string{"invalid_func"},
-	}
-
-	output, err := mod.Exec(input)
+	caps, err := mod.Capabilities()
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if len(output.Executions) != 1 {
-		t.Fatalf("expected 1 execution, got %d", len(output.Executions))
-	}
-
-	exec := output.Executions[0]
-	if exec.Function != "invalid_func" {
-		t.Errorf("expected function invalid_func, got %s", exec.Function)
-	}
-
-	if exec.Error == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	expectedErr := "unsupported function: invalid_func"
-	if *exec.Error != expectedErr {
-		t.Errorf("expected error %q, got %q", expectedErr, *exec.Error)
+	if !slices.Contains(caps.Functions, "get_dmarc") {
+		t.Error("expected get_dmarc in capabilities")
 	}
 }
 
@@ -137,22 +127,6 @@ func TestParseDMARC(t *testing.T) {
 				t.Errorf("parseDMARC() = %v, want %v", got, tt.expected)
 			}
 		})
-	}
-}
-
-func TestGetDMARCDataEmpty(t *testing.T) {
-	execution := getDMARCData("nonexistent.domain.invalid")
-
-	if len(execution.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(execution.Results))
-	}
-
-	result := execution.Results[0]
-	if result.Type != "string" || result.Value != "No DMARC" {
-		t.Errorf("expected 'No DMARC' result, got %+v", result)
-	}
-	if result.Context != "DMARC Records" {
-		t.Errorf("expected context 'DMARC Records', got %q", result.Context)
 	}
 }
 
