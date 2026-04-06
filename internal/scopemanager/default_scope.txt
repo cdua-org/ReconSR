@@ -1,3 +1,21 @@
+# ==============================================================================
+# ReconSR Scope Configuration
+# ==============================================================================
+# This file defines the entities (domains, IPs, etc.) that should be considered
+# "Out of Scope" (ignored) by the application.
+#
+# WHITELISTING (EXCEPTIONS):
+# You can allow specific subdomains or IPs by prefixing them with '!'.
+# Allowed items ALWAYS take precedence over blocked ones.
+#
+# Examples:
+# [domain]
+# example.com, !api.example.com  # Blocks all example.com EXCEPT api.example.com
+#
+# [ip]
+# 10.0.0.0/8, !10.0.1.0/24       # Blocks the 10.0.0.0/8 subnet EXCEPT 10.0.1.0/24
+# ==============================================================================
+
 [domain]
 gov, mil, fed.us
 gc.ca, gob.mx, gov.br, jus.br, leg.br, gob.ar, gov.ar, gob.cl, gov.co, gob.pe, gob.ve, gob.ec, gub.uy, gob.cu

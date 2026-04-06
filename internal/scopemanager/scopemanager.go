@@ -26,7 +26,15 @@ var (
 	blockedNets []*net.IPNet
 	// blockedGeneric stores exact matches for other types: map[type]map[value]struct{}
 	blockedGeneric map[string]map[string]struct{}
-	mu             sync.RWMutex
+
+	// allowedDotDomains stores exception domains with a leading dot
+	allowedDotDomains []string
+	// allowedNets stores exception IP ranges
+	allowedNets []*net.IPNet
+	// allowedGeneric stores exception exact matches for other types
+	allowedGeneric map[string]map[string]struct{}
+
+	mu sync.RWMutex
 )
 
 // Setup ensures that the scope configuration file exists.
@@ -54,6 +62,10 @@ func Load() (err error) {
 	blockedDotDomains = nil
 	blockedNets = nil
 	blockedGeneric = make(map[string]map[string]struct{})
+
+	allowedDotDomains = nil
+	allowedNets = nil
+	allowedGeneric = make(map[string]map[string]struct{})
 
 	file, fErr := os.Open(configFile)
 	if fErr != nil {
@@ -86,16 +98,31 @@ func Load() (err error) {
 		normalizedLine := strings.ReplaceAll(line, ",", " ")
 		for _, el := range strings.Fields(normalizedLine) {
 			val := strings.ToLower(el)
+
+			isAllowed := false
+			if strings.HasPrefix(val, "!") {
+				isAllowed = true
+				val = strings.TrimPrefix(val, "!")
+			}
+
 			switch currentSection {
 			case "domain", "subdomain":
 				// Normalize domain/subdomain using validator (handles Punycode/IDN)
-				res, err := validator.Validate("domain", val)
+				// We prepend a dummy domain ("testscope.") because the validator expects a full domain (eTLD+1 or higher).
+				// This allows validating TLDs (e.g., "edu") and public suffixes (e.g., "edu.au") without failing.
+				cleanVal := strings.TrimPrefix(val, ".")
+				testVal := "testscope." + cleanVal
+				res, err := validator.Validate("domain", testVal)
 				if err == nil {
-					val = res.Value
-					if !strings.HasPrefix(val, ".") {
-						val = "." + val
+					finalVal := strings.TrimPrefix(res.Value, "testscope.")
+					if !strings.HasPrefix(finalVal, ".") {
+						finalVal = "." + finalVal
 					}
-					blockedDotDomains = append(blockedDotDomains, val)
+					if isAllowed {
+						allowedDotDomains = append(allowedDotDomains, finalVal)
+					} else {
+						blockedDotDomains = append(blockedDotDomains, finalVal)
+					}
 				}
 			case "ip", "ipv4", "ipv6", "ipv4_ambiguous":
 				if !strings.Contains(val, "/") {
@@ -106,14 +133,25 @@ func Load() (err error) {
 					}
 				}
 				if _, ipnet, err := net.ParseCIDR(val); err == nil {
-					blockedNets = append(blockedNets, ipnet)
+					if isAllowed {
+						allowedNets = append(allowedNets, ipnet)
+					} else {
+						blockedNets = append(blockedNets, ipnet)
+					}
 				}
 			default:
 				// Exact text match for any other types
-				if blockedGeneric[currentSection] == nil {
-					blockedGeneric[currentSection] = make(map[string]struct{})
+				if isAllowed {
+					if allowedGeneric[currentSection] == nil {
+						allowedGeneric[currentSection] = make(map[string]struct{})
+					}
+					allowedGeneric[currentSection][val] = struct{}{}
+				} else {
+					if blockedGeneric[currentSection] == nil {
+						blockedGeneric[currentSection] = make(map[string]struct{})
+					}
+					blockedGeneric[currentSection][val] = struct{}{}
 				}
-				blockedGeneric[currentSection][val] = struct{}{}
 			}
 		}
 	}
@@ -129,6 +167,13 @@ func IsOutOfScope(entityType, value string) bool {
 	switch entityType {
 	case "domain", "subdomain":
 		dotVal := "." + value
+		// Check allowed first
+		for _, a := range allowedDotDomains {
+			if strings.HasSuffix(dotVal, a) {
+				return false
+			}
+		}
+		// Check blocked
 		for _, d := range blockedDotDomains {
 			if strings.HasSuffix(dotVal, d) {
 				return true
@@ -139,13 +184,26 @@ func IsOutOfScope(entityType, value string) bool {
 		if ip == nil {
 			return false
 		}
+		// Check allowed first
+		for _, aNet := range allowedNets {
+			if aNet.Contains(ip) {
+				return false
+			}
+		}
+		// Check blocked
 		for _, bNet := range blockedNets {
 			if bNet.Contains(ip) {
 				return true
 			}
 		}
 	default:
-		// Check generic exact match table
+		// Check allowed generic exact match table first
+		if typeMap, ok := allowedGeneric[entityType]; ok {
+			if _, allowed := typeMap[value]; allowed {
+				return false
+			}
+		}
+		// Check blocked generic exact match table
 		if typeMap, ok := blockedGeneric[entityType]; ok {
 			if _, blocked := typeMap[value]; blocked {
 				return true
