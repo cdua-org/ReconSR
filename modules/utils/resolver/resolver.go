@@ -30,6 +30,11 @@ var (
 	dohIndex     atomic.Uint32
 	plainIndex   atomic.Uint32
 
+	// LastUsedDoH tracks the last used DoH resolution target for debug metrics.
+	LastUsedDoH string
+	// LastUsedPlain tracks the last used Plain DNS resolution target for debug metrics.
+	LastUsedPlain string
+
 	// Timeout controls default network dials across modules.
 	Timeout = 5 * time.Second
 	// KeepAlive defines connection persistency timeframe.
@@ -41,10 +46,27 @@ var (
 	initOnce sync.Once
 )
 
+func init() {
+	initResolver()
+}
+
 func initResolver() {
 	initOnce.Do(func() {
 		loadConfig()
 	})
+}
+
+// GetOption securely retrieves a network configuration key, ensuring initialization.
+func GetOption(key string) (string, bool) {
+	initResolver()
+	val, ok := Options[key]
+	return val, ok
+}
+
+// GetConfiguredDNS safely returns the active slices of DNS servers for diagnostics.
+func GetConfiguredDNS() (doh, plain string) {
+	initResolver()
+	return strings.Join(dohServers, ", "), strings.Join(plainServers, ", ")
 }
 
 func loadConfig() {
@@ -134,13 +156,17 @@ func parseOption(line string) {
 func resolveNextDoH() string {
 	idx := dohIndex.Add(1)
 	//nolint:gosec // modulo on small length
-	return dohServers[int(idx%uint32(len(dohServers)))]
+	server := dohServers[int(idx%uint32(len(dohServers)))]
+	LastUsedDoH = server
+	return server
 }
 
 func resolveNextPlain() string {
 	idx := plainIndex.Add(1)
 	//nolint:gosec // modulo on small length
-	return plainServers[int(idx%uint32(len(plainServers)))]
+	server := plainServers[int(idx%uint32(len(plainServers)))]
+	LastUsedPlain = server
+	return server
 }
 
 // DoHResponse represents a JSON DNS response
