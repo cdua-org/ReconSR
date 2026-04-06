@@ -62,12 +62,37 @@ func GetAllCapabilities() map[string][]string {
 
 // LoadConfig updates the module index and repository based on provided settings.
 func LoadConfig(ctx context.Context, settings map[string]map[string]bool) error {
-	enabledConfigs = settings
+	cleanSettings := make(map[string]map[string]bool)
+	allCaps := GetAllCapabilities()
+
+	for mod, fns := range settings {
+		validFns, exists := allCaps[mod]
+		if !exists {
+			continue
+		}
+
+		validFnMap := make(map[string]bool)
+		for _, fn := range validFns {
+			validFnMap[fn] = true
+		}
+
+		cleanSettings[mod] = make(map[string]bool)
+		for fn, state := range fns {
+			if validFnMap[fn] {
+				cleanSettings[mod][fn] = state
+			}
+		}
+	}
+
+	enabledConfigs = cleanSettings
 	moduleIndex = make(map[string][]moduleEntry)
 	var registrations []schema.ModuleRegistration
 
 	for _, m := range ModuleRegistry {
-		caps, _ := m.Capabilities()
+		caps, err := m.Capabilities()
+		if err != nil {
+			continue
+		}
 		reg := schema.ModuleRegistration{
 			Name:        m.Name(),
 			Caps:        caps,
