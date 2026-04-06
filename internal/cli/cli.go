@@ -149,20 +149,49 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 
 		tM, aM, tF, aF, _ := controller.GetSystemStatus(ctx)
 		fmt.Printf("%s%s:%s  %d/%d %s, %d/%d %s\n", colorCyan, i18n.T["LBL_ACTIVE_TOOLS"], colorReset, aM, tM, i18n.T["LBL_MODS"], aF, tF, i18n.T["LBL_FUNCS"])
-		fmt.Println("\n" + colorYellow + "[!] " + i18n.T["MSG_CONFIG_INFO"] + colorReset)
-
-		projects, hasModules, err := controller.GetProjects(ctx, targetType, targetValue)
+		projects, hasModules, hasActiveFuncs, err := controller.GetProjects(ctx, targetType, targetValue)
 		if err != nil {
 			fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
 			os.Exit(1)
 		}
 
 		if !hasModules {
-			fmt.Println(colorRed + i18n.T["ERR_NO_MODULES"] + colorReset)
-			if len(projects) == 0 {
+			fmt.Printf(colorRed+i18n.T["ERR_NO_MODULES"]+colorReset+"\n", targetType)
+			os.Exit(0)
+		}
+
+		if !hasActiveFuncs {
+			fmt.Printf(colorRed+i18n.T["ERR_NO_ACTIVE_FUNCS"]+colorReset+"\n", targetType)
+			fmt.Println("\n" + colorYellow + "[!] " + i18n.T["MSG_CONFIG_INFO"] + colorReset)
+
+			fmt.Printf("\n1. %s\n", i18n.T["OPT_EXIT"])
+			fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
+
+			var choice string
+			if _, err := fmt.Scanln(&choice); err != nil {
 				os.Exit(0)
 			}
+			fmt.Println("--------------------------------------------------")
+
+			if choice == "0" {
+				handleModuleConfiguration(ctx)
+				continue
+			}
+
+			var idx int
+			if _, err := fmt.Sscanf(choice, "%d", &idx); err != nil {
+				fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
+				continue
+			}
+
+			if idx == 1 {
+				return false
+			}
+			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
+			continue
 		}
+
+		fmt.Println("\n" + colorYellow + "[!] " + i18n.T["MSG_CONFIG_INFO"] + colorReset)
 
 		fmt.Println("\n" + colorCyan + colorBold + "--- " + i18n.T["MSG_PROJECTS_EXIST_2"] + " ---" + colorReset)
 		fmt.Printf("1. %s\n", i18n.T["OPT_NEW_PROJECT"])
@@ -264,8 +293,7 @@ func handleModuleConfiguration(ctx context.Context) {
 			}
 		}
 
-		saveIdx := len(actions) + 1
-		fmt.Printf("\n%d. %s\n", saveIdx, i18n.T["OPT_SAVE_EXIT"])
+		fmt.Printf("\n0. %s[ %s ]%s\n", colorGreen, i18n.T["OPT_SAVE_EXIT"], colorReset)
 
 		fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
 		var choice string
@@ -278,7 +306,7 @@ func handleModuleConfiguration(ctx context.Context) {
 			continue
 		}
 
-		if idx == saveIdx {
+		if idx == 0 {
 			if err := controller.UpdateModuleSettings(ctx, settings); err != nil {
 				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
 			} else {

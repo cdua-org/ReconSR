@@ -20,6 +20,7 @@ var (
 	ErrInvalidSyntax   = validator.ErrInvalidSyntax
 	ErrOutOfScope      = errors.New("out_of_scope")
 	ErrNoModules       = errors.New("no_modules_found")
+	ErrNoActiveFuncs   = errors.New("no_active_functions")
 )
 
 // GetInjection returns the prepared injection for the pipeline and clears it.
@@ -68,7 +69,7 @@ func ValidateTarget(targetType, rawInput string) (string, string, error) {
 }
 
 // GetProjects searches for existing projects and checks module support by target.
-func GetProjects(ctx context.Context, targetType, targetValue string) ([]schema.ProjectInfo, bool, error) {
+func GetProjects(ctx context.Context, targetType, targetValue string) ([]schema.ProjectInfo, bool, bool, error) {
 	return repository.FindProjects(ctx, targetType, targetValue)
 }
 
@@ -85,12 +86,15 @@ func ResetProjectLog(ctx context.Context, projectID string, clearAll, clearError
 // CreateNewProject generates a DB and prepares the initial session state.
 func CreateNewProject(ctx context.Context, targetType, targetValue string) (string, error) {
 	// Double check module availability before final creation
-	_, hasModules, err := repository.FindProjects(ctx, targetType, targetValue)
+	_, hasModules, hasActiveFuncs, err := repository.FindProjects(ctx, targetType, targetValue)
 	if err != nil {
 		return "", err
 	}
 	if !hasModules {
 		return "", ErrNoModules
+	}
+	if !hasActiveFuncs {
+		return "", ErrNoActiveFuncs
 	}
 
 	routeRef, err := repository.CreateProjectDB(ctx, targetType, targetValue)

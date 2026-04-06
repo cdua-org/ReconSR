@@ -152,11 +152,11 @@ func SyncMasterDB(ctx context.Context, regs []schema.ModuleRegistration) (err er
 }
 
 // FindProjects searches for projects and checks module support for a target type in the master database.
-func FindProjects(ctx context.Context, targetType, targetValue string) (projects []schema.ProjectInfo, supported bool, err error) {
+func FindProjects(ctx context.Context, targetType, targetValue string) (projects []schema.ProjectInfo, hasModules bool, hasActiveFuncs bool, err error) {
 	dbPath := filepath.Join("storage", "base", "master.db")
 	db, dbErr := sql.Open("sqlite", dbPath)
 	if dbErr != nil {
-		return nil, false, dbErr
+		return nil, false, false, dbErr
 	}
 	defer func() {
 		cerr := db.Close()
@@ -166,12 +166,12 @@ func FindProjects(ctx context.Context, targetType, targetValue string) (projects
 	}()
 
 	// 1. Find existing projects
-	queryProjects := `SELECT id, name, db_identifier, initial_target_type, initial_target_value, status, created_at 
-	                  FROM projects 
+	queryProjects := `SELECT id, name, db_identifier, initial_target_type, initial_target_value, status, created_at
+	                  FROM projects
 	                  WHERE initial_target_type = ? AND initial_target_value = ? AND status = 'active'`
 	rows, rErr := db.QueryContext(ctx, queryProjects, targetType, targetValue)
 	if rErr != nil {
-		return nil, false, rErr
+		return nil, false, false, rErr
 	}
 	defer func() {
 		cerr := rows.Close()
@@ -184,7 +184,7 @@ func FindProjects(ctx context.Context, targetType, targetValue string) (projects
 		var p schema.ProjectInfo
 		var createdAtStr string
 		if sErr := rows.Scan(&p.ID, &p.Name, &p.DBIdentifier, &p.InitialTargetType, &p.InitialTargetValue, &p.Status, &createdAtStr); sErr != nil {
-			return nil, false, sErr
+			return nil, false, false, sErr
 		}
 		layouts := []string{"2006-01-02 15:04:05", "2006-01-02T15:04:05Z"}
 		var parsedTime time.Time
@@ -200,13 +200,18 @@ func FindProjects(ctx context.Context, targetType, targetValue string) (projects
 	}
 
 	// 2. Check for module support
-	var count int
-	queryModules := `SELECT COUNT(*) FROM modules WHERE input_type = ? AND is_enabled = 1`
-	if mErr := db.QueryRowContext(ctx, queryModules, targetType).Scan(&count); mErr != nil {
-		return projects, false, mErr
+	var totalCount, enabledCount int
+	queryTotal := `SELECT COUNT(*) FROM modules WHERE input_type = ?`
+	if mErr := db.QueryRowContext(ctx, queryTotal, targetType).Scan(&totalCount); mErr != nil {
+		return projects, false, false, mErr
 	}
 
-	return projects, count > 0, nil
+	queryEnabled := `SELECT COUNT(*) FROM modules WHERE input_type = ? AND is_enabled = 1`
+	if mErr := db.QueryRowContext(ctx, queryEnabled, targetType).Scan(&enabledCount); mErr != nil {
+		return projects, totalCount > 0, false, mErr
+	}
+
+	return projects, totalCount > 0, enabledCount > 0, nil
 }
 
 // CreateProjectDB creates a new project database and registers it in the master database.
@@ -519,8 +524,8 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 				placeholders = append(placeholders, "(?, ?, ?, ?)")
 				values = append(values, l.eid, data.ModuleName, l.fn, l.ok)
 			}
-			query := fmt.Sprintf(`INSERT INTO entity_function_log(entity_id, module_name, function_name, is_success) 
-			                      VALUES %s ON CONFLICT(entity_id, module_name, function_name) 
+			query := fmt.Sprintf(`INSERT INTO entity_function_log(entity_id, module_name, function_name, is_success)
+			                      VALUES %s ON CONFLICT(entity_id, module_name, function_name)
 			                      DO UPDATE SET is_success = excluded.is_success`, strings.Join(placeholders, ","))
 			if _, err := tx.ExecContext(ctx, query, values...); err != nil {
 				return nil, err
@@ -584,7 +589,7 @@ func upsertAndGetEntities(ctx context.Context, tx *sql.Tx, entityMap map[string]
 			key := fmt.Sprintf("%s:%s", entity.Type, entity.Value)
 			values = append(values, entity.Type, entity.Value, scopeMap[key])
 		}
-		query := fmt.Sprintf(`INSERT INTO entities(type, value, out_of_scope) VALUES %s 
+		query := fmt.Sprintf(`INSERT INTO entities(type, value, out_of_scope) VALUES %s
 		                      ON CONFLICT(type, value) DO UPDATE SET out_of_scope = out_of_scope OR excluded.out_of_scope`,
 			strings.Join(placeholders, ","))
 		if _, err := tx.ExecContext(ctx, query, values...); err != nil {
@@ -937,8 +942,8 @@ func GetGraphData(ctx context.Context, projectID string) (graph *schema.ProjectG
 
 	// 3. Extract Edges (Relations + Observations + Entity Data)
 	query := `
-		SELECT 
-			e1.type, e1.value, 
+		SELECT
+			e1.type, e1.value,
 			e2.type, e2.value, e2.out_of_scope,
 			o.module_name, o.function_name, o.context, o.raw_data, o.created_at
 		FROM relations r
