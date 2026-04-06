@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
 	"fmt"
 	"net"
@@ -73,7 +74,7 @@ func getDKIMData(target string) schema.ModuleExecution {
 				return txts, nil
 			}
 
-			records, _, err := ResolveRecord(ctx, domain, 16, plainFallback)
+			records, _, err := resolver.ResolveRecord(ctx, domain, 16, plainFallback)
 			if err != nil || len(records) == 0 {
 				return
 			}

@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
 	"fmt"
 	"net"
@@ -32,7 +33,7 @@ func getNSData(target string) schema.ModuleExecution {
 	}
 
 	// QTYPE 2 is NS
-	records, raw, err := ResolveRecord(ctx, target, 2, plainFallback)
+	records, raw, err := resolver.ResolveRecord(ctx, target, 2, plainFallback)
 	if err != nil {
 		errMsg := "ns lookup failed: " + err.Error()
 		execution.Error = &errMsg

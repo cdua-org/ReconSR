@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -26,7 +27,7 @@ func getCAAData(target string) schema.ModuleExecution {
 
 	// CAA is QTYPE 257. Standard net.Resolver does not support CAA lookups easily,
 	// so we pass nil for plainFallback to rely exclusively on DoH servers for CAA.
-	records, raw, err := ResolveRecord(ctx, target, 257, nil)
+	records, raw, err := resolver.ResolveRecord(ctx, target, 257, nil)
 	if err != nil {
 		errMsg := "caa lookup failed: " + err.Error()
 		execution.Error = &errMsg

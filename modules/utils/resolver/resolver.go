@@ -1,4 +1,5 @@
-package dns
+// Package resolver provides a unified DNS connection pool and generic network options.
+package resolver
 
 import (
 	"bytes"
@@ -20,8 +21,8 @@ import (
 	"time"
 )
 
-//go:embed default_dns.txt
-var defaultDNSConfig []byte
+//go:embed default_network.txt
+var defaultNetworkConfig []byte
 
 var (
 	dohServers   []string
@@ -29,8 +30,25 @@ var (
 	dohIndex     atomic.Uint32
 	plainIndex   atomic.Uint32
 
+	// LastUsedDoH tracks the last used DoH resolution target for debug metrics.
+	LastUsedDoH string
+	// LastUsedPlain tracks the last used Plain DNS resolution target for debug metrics.
+	LastUsedPlain string
+
+	// Timeout controls default network dials across modules.
+	Timeout = 5 * time.Second
+	// KeepAlive defines connection persistency timeframe.
+	KeepAlive = 30 * time.Second
+
+	// Options acts as a generic configuration dictionary.
+	Options = make(map[string]string)
+
 	initOnce sync.Once
 )
+
+func init() {
+	initResolver()
+}
 
 func initResolver() {
 	initOnce.Do(func() {
@@ -38,27 +56,40 @@ func initResolver() {
 	})
 }
 
+// GetOption securely retrieves a network configuration key, ensuring initialization.
+func GetOption(key string) (string, bool) {
+	initResolver()
+	val, ok := Options[key]
+	return val, ok
+}
+
+// GetConfiguredDNS safely returns the active slices of DNS servers for diagnostics.
+func GetConfiguredDNS() (doh, plain string) {
+	initResolver()
+	return strings.Join(dohServers, ", "), strings.Join(plainServers, ", ")
+}
+
 func loadConfig() {
 	if strings.HasSuffix(os.Args[0], ".test") {
-		parseConfig(string(defaultDNSConfig))
+		parseConfig(string(defaultNetworkConfig))
 		return
 	}
 
 	configDir := "configs"
 	if err := os.MkdirAll(configDir, 0o750); err != nil {
-		parseConfig(string(defaultDNSConfig))
+		parseConfig(string(defaultNetworkConfig))
 		return
 	}
 
-	configPath := filepath.Join(configDir, "dns.txt")
+	configPath := filepath.Join(configDir, "network.txt")
 	//nolint:gosec // Internal path constructed safely
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			//nolint:errcheck // Ignore error writing default config, fallback is used
-			_ = os.WriteFile(configPath, defaultDNSConfig, 0o600)
+			_ = os.WriteFile(configPath, defaultNetworkConfig, 0o600)
 		}
-		parseConfig(string(defaultDNSConfig))
+		parseConfig(string(defaultNetworkConfig))
 		return
 	}
 	parseConfig(string(data))
@@ -81,6 +112,8 @@ func parseConfig(content string) {
 		}
 
 		switch currentSection {
+		case "[Options]":
+			parseOption(line)
 		case "[DoH]":
 			doh = append(doh, line)
 		case "[Plain]":
@@ -92,23 +125,48 @@ func parseConfig(content string) {
 	plainServers = plain
 
 	if len(dohServers) == 0 {
-		dohServers = []string{"https://dns.cloudflare.com/dns-query"}
+		dohServers = []string{"https://dns.cloudflare.com/dns-query", "https://dns.google/resolve"}
 	}
 	if len(plainServers) == 0 {
-		plainServers = []string{"1.1.1.1"}
+		plainServers = []string{"1.1.1.1", "8.8.8.8"}
+	}
+}
+
+func parseOption(line string) {
+	parts := strings.SplitN(line, "=", 2)
+	if len(parts) != 2 {
+		return
+	}
+	key := strings.TrimSpace(parts[0])
+	val := strings.TrimSpace(parts[1])
+	Options[key] = val
+
+	switch key {
+	case "Timeout":
+		if v, err := strconv.Atoi(val); err == nil {
+			Timeout = time.Duration(v) * time.Second
+		}
+	case "KeepAlive":
+		if v, err := strconv.Atoi(val); err == nil {
+			KeepAlive = time.Duration(v) * time.Second
+		}
 	}
 }
 
 func resolveNextDoH() string {
 	idx := dohIndex.Add(1)
 	//nolint:gosec // modulo on small length
-	return dohServers[int(idx%uint32(len(dohServers)))]
+	server := dohServers[int(idx%uint32(len(dohServers)))]
+	LastUsedDoH = server
+	return server
 }
 
 func resolveNextPlain() string {
 	idx := plainIndex.Add(1)
 	//nolint:gosec // modulo on small length
-	return plainServers[int(idx%uint32(len(plainServers)))]
+	server := plainServers[int(idx%uint32(len(plainServers)))]
+	LastUsedPlain = server
+	return server
 }
 
 // DoHResponse represents a JSON DNS response
@@ -139,7 +197,7 @@ func resolveDoH(ctx context.Context, endpoint, target string, qtype int) (ips []
 	}
 	req.Header.Set("Accept", "application/dns-json")
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: Timeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, nil, fmt.Errorf("doh request failed: %w", err)
@@ -202,7 +260,7 @@ func ResolveRecord(ctx context.Context, target string, qtype int, plainFallback 
 		r := &net.Resolver{
 			PreferGo: true,
 			Dial: func(dialCtx context.Context, _, _ string) (net.Conn, error) {
-				d := net.Dialer{Timeout: 5 * time.Second}
+				d := net.Dialer{Timeout: Timeout}
 				return d.DialContext(dialCtx, "udp", net.JoinHostPort(server, "53"))
 			},
 		}
@@ -273,7 +331,7 @@ func ResolveIP(ctx context.Context, target string) (ips []string, raw []byte, er
 		r := &net.Resolver{
 			PreferGo: true,
 			Dial: func(dialCtx context.Context, _, _ string) (net.Conn, error) {
-				d := net.Dialer{Timeout: 5 * time.Second}
+				d := net.Dialer{Timeout: Timeout}
 				return d.DialContext(dialCtx, "udp", net.JoinHostPort(server, "53"))
 			},
 		}
@@ -305,4 +363,26 @@ func ResolveIP(ctx context.Context, target string) (ips []string, raw []byte, er
 		return nil, nil, fmt.Errorf("all resolution attempts failed, last error: %w", lastErr)
 	}
 	return nil, nil, errors.New("all resolution attempts failed")
+}
+
+// GetResolver returns a net.Resolver that rotates through Plain DNS servers from the configuration.
+func GetResolver() *net.Resolver {
+	initResolver()
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			server := resolveNextPlain()
+			d := net.Dialer{Timeout: Timeout}
+			return d.DialContext(ctx, "udp", net.JoinHostPort(server, "53"))
+		},
+	}
+}
+
+// GetDialer returns a preconfigured net.Dialer equipped with the shared plain DNS resolver rotation.
+func GetDialer() *net.Dialer {
+	return &net.Dialer{
+		Timeout:   Timeout,
+		KeepAlive: KeepAlive,
+		Resolver:  GetResolver(),
+	}
 }

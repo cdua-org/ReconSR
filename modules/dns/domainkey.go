@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
 	"fmt"
 	"net"
@@ -30,7 +31,7 @@ func getDomainKeyData(target string) schema.ModuleExecution {
 	}
 
 	// QTYPE 16 is TXT
-	records, raw, err := ResolveRecord(ctx, domainkeyTarget, 16, plainFallback)
+	records, raw, err := resolver.ResolveRecord(ctx, domainkeyTarget, 16, plainFallback)
 	if err != nil {
 		errMsg := "domainkey lookup failed: " + err.Error()
 		execution.Error = &errMsg

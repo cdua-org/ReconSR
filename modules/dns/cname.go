@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
 	"fmt"
 	"net"
@@ -99,9 +100,9 @@ func lookupCNAME(ctx context.Context, target string) (cnameStr string, rawData [
 	}
 
 	// QTYPE 5 is CNAME
-	records, raw, err := ResolveRecord(ctx, target, 5, plainFallback)
+	records, raw, err := resolver.ResolveRecord(ctx, target, 5, plainFallback)
 	if err != nil {
-		return "", nil, err
+		return "", nil, fmt.Errorf("cname resolution failed: %w", err)
 	}
 
 	var cname string
