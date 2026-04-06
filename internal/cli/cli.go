@@ -214,20 +214,25 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 func handleModuleConfiguration(ctx context.Context) {
 	settings := controller.GetModuleSettings()
 
-	type flatFunc struct {
-		modName string
-		fnName  string
+	type menuAction struct {
+		actionType string
+		modName    string
+		fnName     string
 	}
 
 	for {
-		var flatList []flatFunc
+		var actions []menuAction
 		mods := make([]string, 0, len(settings))
 		for m := range settings {
 			mods = append(mods, m)
 		}
 		sort.Strings(mods)
 
+		actions = append(actions, menuAction{actionType: "toggleAll"})
+
 		for _, m := range mods {
+			actions = append(actions, menuAction{actionType: "toggleModule", modName: m})
+
 			fns := settings[m]
 			fnNames := make([]string, 0, len(fns))
 			for f := range fns {
@@ -235,29 +240,31 @@ func handleModuleConfiguration(ctx context.Context) {
 			}
 			sort.Strings(fnNames)
 			for _, f := range fnNames {
-				flatList = append(flatList, flatFunc{m, f})
+				actions = append(actions, menuAction{actionType: "toggleFunc", modName: m, fnName: f})
 			}
 		}
 
 		fmt.Println("\n" + colorCyan + colorBold + "--- " + i18n.T["LBL_CONFIG_TITLE"] + " ---" + colorReset)
 
-		lastMod := ""
-		for i, item := range flatList {
-			if item.modName != lastMod {
-				fmt.Printf("\n%s[ %s ]%s\n", colorCyan, item.modName, colorReset)
-				lastMod = item.modName
+		for i, item := range actions {
+			idx := i + 1
+			switch item.actionType {
+			case "toggleAll":
+				fmt.Printf("%d. %s[ %s ]%s\n", idx, colorCyan, i18n.T["OPT_TOGGLE_ALL"], colorReset)
+			case "toggleModule":
+				fmt.Printf("\n%d. %s[ %s ]%s\n", idx, colorCyan, item.modName, colorReset)
+			case "toggleFunc":
+				status := "[ ]"
+				color := colorRed
+				if settings[item.modName][item.fnName] {
+					status = "[X]"
+					color = colorGreen
+				}
+				fmt.Printf("   %d. %s%s%s %s\n", idx, color, status, colorReset, item.fnName)
 			}
-
-			status := i18n.T["LBL_DISABLED"]
-			color := colorRed
-			if settings[item.modName][item.fnName] {
-				status = i18n.T["LBL_ENABLED"]
-				color = colorGreen
-			}
-			fmt.Printf("%d. %s%s%s %s\n", i+1, color, status, colorReset, item.fnName)
 		}
 
-		saveIdx := len(flatList) + 1
+		saveIdx := len(actions) + 1
 		fmt.Printf("\n%d. %s\n", saveIdx, i18n.T["OPT_SAVE_EXIT"])
 
 		fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
@@ -280,9 +287,39 @@ func handleModuleConfiguration(ctx context.Context) {
 			return
 		}
 
-		if idx > 0 && idx <= len(flatList) {
-			target := flatList[idx-1]
-			settings[target.modName][target.fnName] = !settings[target.modName][target.fnName]
+		if idx > 0 && idx <= len(actions) {
+			target := actions[idx-1]
+			switch target.actionType {
+			case "toggleAll":
+				allEnabled := true
+				for _, fns := range settings {
+					for _, enabled := range fns {
+						if !enabled {
+							allEnabled = false
+						}
+					}
+				}
+				newState := !allEnabled
+				for m, fns := range settings {
+					for f := range fns {
+						settings[m][f] = newState
+					}
+				}
+			case "toggleModule":
+				allEnabled := true
+				for _, enabled := range settings[target.modName] {
+					if !enabled {
+						allEnabled = false
+						break
+					}
+				}
+				newState := !allEnabled
+				for f := range settings[target.modName] {
+					settings[target.modName][f] = newState
+				}
+			case "toggleFunc":
+				settings[target.modName][target.fnName] = !settings[target.modName][target.fnName]
+			}
 		}
 	}
 }
