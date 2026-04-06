@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
 	"fmt"
 	"net"
@@ -30,7 +31,7 @@ func getDMARCData(target string) schema.ModuleExecution {
 	}
 
 	// QTYPE 16 is TXT
-	records, raw, err := ResolveRecord(ctx, dmarcTarget, 16, plainFallback)
+	records, raw, err := resolver.ResolveRecord(ctx, dmarcTarget, 16, plainFallback)
 	if err != nil {
 		errMsg := "dmarc lookup failed: " + err.Error()
 		execution.Error = &errMsg

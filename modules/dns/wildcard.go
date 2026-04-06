@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -28,7 +29,7 @@ func checkWildcard(target string) schema.ModuleExecution {
 
 	testDomain := "recon-" + hex.EncodeToString(bytes) + "." + target
 
-	ips, raw, err := ResolveIP(ctx, testDomain)
+	ips, raw, err := resolver.ResolveIP(ctx, testDomain)
 	if err != nil {
 		// ResolveIP returns an error only if all attempts (DoH + Plain) fail.
 		// NXDOMAIN (no such host) does not return an error, it returns empty results.

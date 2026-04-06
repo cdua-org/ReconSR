@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
 	"fmt"
 	"net"
@@ -28,7 +29,7 @@ func getTXTData(target string) schema.ModuleExecution {
 	}
 
 	// QTYPE 16 is TXT
-	records, raw, err := ResolveRecord(ctx, target, 16, plainFallback)
+	records, raw, err := resolver.ResolveRecord(ctx, target, 16, plainFallback)
 	if err != nil {
 		errMsg := "txt lookup failed: " + err.Error()
 		execution.Error = &errMsg

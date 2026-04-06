@@ -1,3 +1,8 @@
+[Options]
+Timeout=5
+KeepAlive=30
+DisableRDAP=false
+
 [DoH]
 https://dns.cloudflare.com/dns-query
 https://dns.google/resolve

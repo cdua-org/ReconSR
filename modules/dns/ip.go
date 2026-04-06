@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
 	"strings"
 	"time"
@@ -17,7 +18,7 @@ func getIPData(target string) schema.ModuleExecution {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	ips, raw, err := ResolveIP(ctx, target)
+	ips, raw, err := resolver.ResolveIP(ctx, target)
 	if err != nil {
 		errMsg := "dns lookup failed: " + err.Error()
 		execution.Error = &errMsg

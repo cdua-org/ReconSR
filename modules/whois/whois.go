@@ -6,15 +6,17 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
-	"sync/atomic"
 	"time"
 
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -30,17 +32,15 @@ const (
 // Contact consolidates fragmented vCard and text-based contact fields into a unified schema
 // for consistent mapping across both RDAP and legacy WHOIS responses.
 type Contact struct {
-	Name         string
-	Organization string
-	Email        string
-	Address      string
-	Phone        string
+	Name         []string
+	Organization []string
+	Email        []string
+	Address      []string
+	Phone        []string
 }
 
 // Metadata defines the normalized intersection of RDAP and WHOIS fields.
 // It acts as the canonical data source before final conversion into graph Entities.
-//
-//nolint:govet // field alignment optimization is negligible here
 type Metadata struct {
 	NameServers    []string
 	DomainStatus   []string
@@ -57,46 +57,6 @@ type Metadata struct {
 	Tech           Contact
 	Billing        Contact
 	Abuse          Contact
-}
-
-var dnsServers = []string{
-	"1.1.1.1:53",
-	"1.0.0.1:53",
-	"8.8.8.8:53",
-	"8.8.4.4:53",
-	"84.200.69.80:53",
-	"84.200.70.40:53",
-	"193.183.98.154:53",
-	"185.121.177.177:53",
-	"4.2.2.1:53",
-	"4.2.2.2:53",
-}
-
-var dnsIndex atomic.Uint32
-
-func getNextDNSServer() string {
-	idx := dnsIndex.Add(1)
-	//nolint:gosec // slice length is small and known
-	pos := int(idx % uint32(len(dnsServers)))
-	return dnsServers[pos]
-}
-
-func getCustomResolver() *net.Resolver {
-	return &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			d := net.Dialer{Timeout: 5 * time.Second}
-			return d.DialContext(ctx, "udp", getNextDNSServer())
-		},
-	}
-}
-
-func getDialer() *net.Dialer {
-	return &net.Dialer{
-		Timeout:   5 * time.Second,
-		KeepAlive: 30 * time.Second,
-		Resolver:  getCustomResolver(),
-	}
 }
 
 type module struct{}
@@ -157,16 +117,34 @@ func (m *module) getWhoisData(target string) schema.ModuleExecution {
 	var metadata Metadata
 	var rawData string
 
-	rdapData, rErr := queryRDAP(ctx, target)
-	if rErr == nil {
+	disableRDAP := false
+	if val, ok := resolver.Options["DisableRDAP"]; ok && strings.EqualFold(val, "true") {
+		disableRDAP = true
+	}
+
+	rErr := func() error {
+		if disableRDAP {
+			return errors.New("RDAP disabled via configuration")
+		}
+		rdapData, err := queryRDAP(ctx, target)
+		if err != nil {
+			return fmt.Errorf("rdap failed: %w", err)
+		}
 		metadata = parseRDAP(rdapData)
 		if rawBytes, mErr := json.Marshal(rdapData); mErr == nil {
 			rawData = string(rawBytes)
 		}
-	} else {
+		return nil
+	}()
+
+	if rawData == "" {
 		whoisRaw, wErr := queryWHOIS(ctx, target)
 		if wErr != nil {
-			errMsg := "rdap failed: " + rErr.Error() + "; whois fallback failed: " + wErr.Error()
+			errStr := ""
+			if rErr != nil {
+				errStr = rErr.Error() + "; "
+			}
+			errMsg := errStr + "whois fallback failed: " + wErr.Error()
 			execution.Error = &errMsg
 			execution.Results = nil
 			return execution
@@ -184,23 +162,28 @@ func (m *module) getWhoisData(target string) schema.ModuleExecution {
 func (m *module) buildResults(metadata *Metadata, target string) []schema.ModuleResult {
 	var results []schema.ModuleResult
 
-	appendContact := func(c Contact, prefix string, forceOOS bool) {
-		isOOS := forceOOS || isPrivacyService(c.Organization)
+	appendSlice := func(arr []string, typ, prefix string, isOOS bool) {
+		for _, v := range arr {
+			v = strings.TrimSpace(v)
+			if v != "" {
+				results = append(results, m.result(typ, v, prefix, isOOS))
+			}
+		}
+	}
 
-		if c.Name != "" {
-			results = append(results, m.result("person", c.Name, prefix+" Name", isOOS))
+	appendContact := func(c Contact, prefix string, forceOOS bool) {
+		isOOS := forceOOS
+		if slices.ContainsFunc(c.Organization, isPrivacyService) {
+			isOOS = true
 		}
-		if c.Organization != "" {
-			results = append(results, m.result("company", c.Organization, prefix+" Organization", isOOS))
-		}
-		if c.Email != "" {
-			results = append(results, m.result("email", c.Email, prefix+" Email", isOOS))
-		}
-		if c.Address != "" {
-			results = append(results, m.result("address", c.Address, prefix+" Address", isOOS))
-		}
-		if c.Phone != "" {
-			cleanPhone := normalizePhone(c.Phone)
+
+		appendSlice(c.Name, "person", prefix+" Name", isOOS)
+		appendSlice(c.Organization, "company", prefix+" Organization", isOOS)
+		appendSlice(c.Email, "email", prefix+" Email", isOOS)
+		appendSlice(c.Address, "address", prefix+" Address", isOOS)
+
+		for _, p := range c.Phone {
+			cleanPhone := normalizePhone(p)
 			if cleanPhone != "" {
 				results = append(results, m.result("tel", cleanPhone, prefix+" Phone", isOOS))
 			}
@@ -323,7 +306,7 @@ func queryRDAP(ctx context.Context, domain string) (map[string]any, error) {
 	req.Header.Set("Accept", "application/rdap+json")
 
 	transport := &http.Transport{
-		DialContext:         getDialer().DialContext,
+		DialContext:         resolver.GetDialer().DialContext,
 		TLSHandshakeTimeout: 5 * time.Second,
 	}
 	client := &http.Client{
@@ -388,7 +371,7 @@ func queryWHOIS(ctx context.Context, domain string) (string, error) {
 }
 
 func dialWHOIS(ctx context.Context, server, query string) (string, error) {
-	d := getDialer()
+	d := resolver.GetDialer()
 	conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(server, "43"))
 	if err != nil {
 		return "", fmt.Errorf("dial error: %w", err)
@@ -472,7 +455,7 @@ func parseRDAPEntities(m *Metadata, entities []any) {
 		}
 		for _, r := range roles {
 			role, ok := r.(string)
-			if !ok || (role != roleRegistrar && role != roleRegistrant) {
+			if !ok {
 				continue
 			}
 			vcards, ok := entity["vcardArray"].([]any)
@@ -512,6 +495,17 @@ func extractVCardProps(m *Metadata, role string, props []any) {
 	}
 }
 
+func appendUnique(slice []string, val string) []string {
+	val = strings.TrimSpace(val)
+	if val == "" {
+		return slice
+	}
+	if slices.Contains(slice, val) {
+		return slice
+	}
+	return append(slice, val)
+}
+
 func applyVCardProp(m *Metadata, c *Contact, role string, p any) {
 	prop, ok := p.([]any)
 	if !ok || len(prop) < 4 {
@@ -522,15 +516,15 @@ func applyVCardProp(m *Metadata, c *Contact, role string, p any) {
 
 	switch name {
 	case "fn":
-		c.Name = value
+		c.Name = appendUnique(c.Name, value)
 	case "org":
-		c.Organization = value
+		c.Organization = appendUnique(c.Organization, value)
 	case "email":
-		c.Email = value
+		c.Email = appendUnique(c.Email, value)
 	case "adr":
-		c.Address = value
+		c.Address = appendUnique(c.Address, value)
 	case "tel":
-		c.Phone = value
+		c.Phone = appendUnique(c.Phone, value)
 	case "url":
 		if role == roleRegistrar {
 			m.RegistrarURL = value
@@ -661,9 +655,7 @@ func applyWHOISMatch(m *Metadata, key, val string) {
 func applyRegistrarMatch(m *Metadata, key, val string) bool {
 	switch key {
 	case "registrar":
-		if m.Registrar.Name == "" {
-			m.Registrar.Name = val
-		}
+		m.Registrar.Name = appendUnique(m.Registrar.Name, val)
 		return true
 	case "url":
 		if m.RegistrarURL == "" {
@@ -696,31 +688,19 @@ func applyContactMatch(c *Contact, key, prefix, val string) bool {
 	field := strings.TrimPrefix(key, prefix)
 	switch field {
 	case "org":
-		if c.Organization == "" {
-			c.Organization = val
-		}
+		c.Organization = appendUnique(c.Organization, val)
 		return true
 	case "name":
-		if c.Name == "" {
-			c.Name = val
-		}
+		c.Name = appendUnique(c.Name, val)
 		return true
 	case "email":
-		if c.Email == "" {
-			c.Email = val
-		}
+		c.Email = appendUnique(c.Email, val)
 		return true
 	case "addr":
-		if c.Address == "" {
-			c.Address = val
-		} else {
-			c.Address += ", " + val
-		}
+		c.Address = appendUnique(c.Address, val)
 		return true
 	case "phone":
-		if c.Phone == "" {
-			c.Phone = val
-		}
+		c.Phone = appendUnique(c.Phone, val)
 		return true
 	}
 	return false

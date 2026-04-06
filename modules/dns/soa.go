@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
 	"strconv"
 	"strings"
@@ -31,7 +32,7 @@ func getSOAData(target string) schema.ModuleExecution {
 
 	// QTYPE 6 is SOA. Standard net.Resolver does not support SOA lookups easily,
 	// so we pass nil for plainFallback to rely exclusively on DoH servers for SOA.
-	records, raw, err := ResolveRecord(ctx, target, 6, nil)
+	records, raw, err := resolver.ResolveRecord(ctx, target, 6, nil)
 	if err != nil {
 		errMsg := "soa lookup failed: " + err.Error()
 		execution.Error = &errMsg

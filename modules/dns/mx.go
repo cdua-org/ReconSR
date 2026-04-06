@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
 	"errors"
 	"fmt"
@@ -41,7 +42,7 @@ func getMXData(target string) schema.ModuleExecution {
 	}
 
 	// QTYPE 15 is MX
-	records, raw, err := ResolveRecord(ctx, target, 15, plainFallback)
+	records, raw, err := resolver.ResolveRecord(ctx, target, 15, plainFallback)
 	if err != nil {
 		errMsg := "mx lookup failed: " + err.Error()
 		execution.Error = &errMsg
