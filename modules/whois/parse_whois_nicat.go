@@ -11,17 +11,9 @@ func applyAustrianMatch(m *Metadata, key, val string) {
 		}
 	case "at_nserver":
 		addNameServer(m, val)
-	case "at_registrar":
-		m.Registrar.Name = appendUnique(m.Registrar.Name, val)
-	case "at_registrant":
-		m.Registrant.Organization = appendUnique(m.Registrant.Organization, val)
 	case "at_tech_c":
 		m.Tech.Name = appendUnique(m.Tech.Name, val)
 	case "at_admin_c":
 		m.Admin.Name = appendUnique(m.Admin.Name, val)
-	case "at_personname":
-		m.Registrant.Name = appendUnique(m.Registrant.Name, val)
-	case "at_organization":
-		m.Registrant.Organization = appendUnique(m.Registrant.Organization, val)
 	}
 }

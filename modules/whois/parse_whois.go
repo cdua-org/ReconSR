@@ -35,8 +35,11 @@ var roleMarkers = []roleMarker{
 	{"abuse:", roleAbuse, false},
 	{"name servers:", roleNameServers, false},
 
-	// Prefix: Italian bare-word sections
+	// Prefix: Italian/generic bare-word sections
 	{"admin contact", roleAdministrative, true},
+	{"technical", roleTechnical, true},
+	{"registrant", roleRegistrant, true},
+	{"registrar", roleRegistrar, true},
 	{"nameservers", roleNameServers, true},
 
 	// Prefix: Korean name server sections
@@ -118,11 +121,11 @@ var whoisPatterns = map[string]*regexp.Regexp{
 	"abuse_phone": regexp.MustCompile(`(?i)Registrar\s+Abuse\s+Contact\s+Phone\s*:\s+(.*)`),
 
 	// RPSL / generic unstructured
-	"rpsl_name":  regexp.MustCompile(`(?i)^\s*(?:person|name)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_name":  regexp.MustCompile(`(?i)^\s*(?:person(?:name)?|name)(?:-loc)?\s*:\s+(.*)`),
 	"rpsl_org":   regexp.MustCompile(`(?i)^\s*(?:organization|org)(?:-loc)?\s*:\s+(.*)`),
 	"rpsl_email": regexp.MustCompile(`(?i)^\s*(?:e-mail|email|abuse-email)\s*:\s+(.*)`),
 	"rpsl_addr":  regexp.MustCompile(`(?i)^\s*(?:address|street(?:\s+address)?|city|state|postal[\s-]code|country|abuse-postal)(?:-loc)?\s*:\s+(.*)`),
-	"rpsl_phone": regexp.MustCompile(`(?i)^\s*(?:phone|tel|abuse-phone|fax)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_phone": regexp.MustCompile(`(?i)^\s*(?:phone|tel|abuse-phone|fax(?:-no)?)(?:-loc)?\s*:\s+(.*)`),
 
 	// Chinese WHOIS
 	"cn_registrant":       regexp.MustCompile(`(?i)Registrant\s*:\s+(.+)`),
@@ -157,14 +160,10 @@ var whoisPatterns = map[string]*regexp.Regexp{
 	"jp2_fax":           regexp.MustCompile(`(?i)\[Fax\]\s+(.+)`),
 
 	// Austrian .at WHOIS
-	"at_personname":   regexp.MustCompile(`(?i)^\s*personname:\s+(.*)`),
-	"at_organization": regexp.MustCompile(`(?i)^\s*organization:\s+(.*)`),
-	"at_changed":      regexp.MustCompile(`(?i)^\s*changed:\s+(.*)`),
-	"at_registrar":    regexp.MustCompile(`(?i)^\s*registrar:\s+(.*)`),
-	"at_registrant":   regexp.MustCompile(`(?i)^\s*registrant:\s+(.*)`),
-	"at_tech_c":       regexp.MustCompile(`(?i)^\s*tech-c:\s+(.*)`),
-	"at_admin_c":      regexp.MustCompile(`(?i)^\s*admin-c:\s+(.*)`),
-	"at_nserver":      regexp.MustCompile(`(?i)^\s*nserver:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
+	"at_changed": regexp.MustCompile(`(?i)^\s*changed\s*:\s+(.*)`),
+	"at_tech_c":  regexp.MustCompile(`(?i)^\s*tech-c\s*:\s+(.*)`),
+	"at_admin_c": regexp.MustCompile(`(?i)^\s*admin-c\s*:\s+(.*)`),
+	"at_nserver": regexp.MustCompile(`(?i)^\s*nserver\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
 
 	// Korean .kr WHOIS
 	"kr_hostname": regexp.MustCompile(`(?i)Host\s+Name\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
@@ -175,8 +174,7 @@ var whoisPatterns = map[string]*regexp.Regexp{
 	"kr_reg_zip":  regexp.MustCompile(`(?i)Registrant\s+Zip\s+Code\s*:\s+(.*)`),
 }
 
-// --- Core parser ---
-
+// parseWHOIS leverages regex matching, context tracking, and RPSL fallback.
 func parseWHOIS(raw string) Metadata {
 	m := Metadata{}
 	scanner := bufio.NewScanner(strings.NewReader(raw))
@@ -187,6 +185,11 @@ func parseWHOIS(raw string) Metadata {
 	for scanner.Scan() {
 		rawLine := scanner.Text()
 		line := strings.TrimSpace(rawLine)
+
+		if line == "" {
+			currentRole = ""
+			continue
+		}
 		lineLower := strings.ToLower(line)
 
 		newRole := updateRoleContext(lineLower, currentRole)
@@ -196,25 +199,12 @@ func parseWHOIS(raw string) Metadata {
 			indentedIndex = 0
 		}
 
-		matched := false
-		for key, re := range whoisPatterns {
-			match := re.FindStringSubmatch(line)
-			if len(match) <= 1 {
-				continue
-			}
-			matched = true
-			val := strings.TrimSpace(match[len(match)-1])
-
-			if field, found := strings.CutPrefix(key, "rpsl_"); found {
-				applyRPSLMatch(&m, currentRole, lineLower, field, val)
-			} else {
-				applyWHOISMatch(&m, key, val)
-			}
+		matched, key := matchPatterns(&m, currentRole, line, lineLower)
+		if matched {
 			lastKey = key
-			break
 		}
 
-		if matched || roleChanged || line == "" {
+		if matched || roleChanged {
 			continue
 		}
 
@@ -222,7 +212,7 @@ func parseWHOIS(raw string) Metadata {
 		// field prefix indicates a multi-line value from the previous field
 		// (e.g., JPRS [Postal Address] spanning two lines).
 		if lastKey != "" && leadingSpaces(rawLine) >= 16 && !strings.HasPrefix(line, "[") {
-			applyContinuation(&m, lastKey, line)
+			applyContinuation(&m, lastKey, currentRole, line)
 			continue
 		}
 
@@ -236,6 +226,24 @@ func parseWHOIS(raw string) Metadata {
 		}
 	}
 	return m
+}
+
+// matchPatterns iterates over compiled regexes and applies the first match.
+func matchPatterns(m *Metadata, currentRole, line, lineLower string) (matched bool, matchedKey string) {
+	for key, re := range whoisPatterns {
+		match := re.FindStringSubmatch(line)
+		if len(match) <= 1 {
+			continue
+		}
+		val := strings.TrimSpace(match[len(match)-1])
+		if field, found := strings.CutPrefix(key, "rpsl_"); found {
+			applyRPSLMatch(m, currentRole, lineLower, field, val)
+		} else {
+			applyWHOISMatch(m, key, val)
+		}
+		return true, key
+	}
+	return false, ""
 }
 
 // --- NS deduplication helper (DRY) ---
@@ -258,15 +266,42 @@ func leadingSpaces(rawLine string) int {
 
 // applyContinuation appends a multi-line continuation value to the same
 // metadata field that was populated by the previous regex match (lastKey).
-func applyContinuation(m *Metadata, lastKey, val string) {
+// Uses currentRole for context-aware routing of RPSL address fields.
+func applyContinuation(m *Metadata, lastKey, currentRole, val string) {
 	switch lastKey {
-	case "jp2_address", "reg_addr", "admin_addr", "tech_addr",
-		"billing_addr", "rpsl_addr", "at_street", "at_postal",
-		"at_city", "at_country":
+	case "rpsl_addr":
+		if target := contactByRole(m, currentRole); target != nil {
+			target.Address = appendUnique(target.Address, val)
+		}
+	case "reg_addr":
 		m.Registrant.Address = appendUnique(m.Registrant.Address, val)
-	case "jp2_postal_code", "kr_reg_zip":
+	case "admin_addr":
+		m.Admin.Address = appendUnique(m.Admin.Address, val)
+	case "tech_addr":
+		m.Tech.Address = appendUnique(m.Tech.Address, val)
+	case "billing_addr":
+		m.Billing.Address = appendUnique(m.Billing.Address, val)
+	case "jp2_address", "jp2_postal_code", "kr_reg_zip":
 		m.Registrant.Address = appendUnique(m.Registrant.Address, val)
 	}
+}
+
+func contactByRole(m *Metadata, role string) *Contact {
+	switch role {
+	case roleRegistrar:
+		return &m.Registrar
+	case roleRegistrant:
+		return &m.Registrant
+	case roleAdministrative:
+		return &m.Admin
+	case roleTechnical:
+		return &m.Tech
+	case roleBilling:
+		return &m.Billing
+	case roleAbuse:
+		return &m.Abuse
+	}
+	return nil
 }
 
 // --- RPSL match ---
@@ -281,14 +316,17 @@ func applyRPSLMatch(m *Metadata, currentRole, lineLower, field, val string) {
 	switch currentRole {
 	case roleRegistrar:
 		target = &m.Registrar
-	case roleRegistrant:
-		target = &m.Registrant
 	case roleAdministrative:
 		target = &m.Admin
 	case roleTechnical:
 		target = &m.Tech
 	case roleBilling:
 		target = &m.Billing
+	case roleAbuse:
+		target = &m.Abuse
+	default:
+		// Fallbacks go to registrant (e.g. Austrian AT root-level contacts, basic JPRS)
+		target = &m.Registrant
 	}
 
 	if target != nil {
@@ -409,7 +447,20 @@ func applyWHOISMatch(m *Metadata, key, val string) {
 		applyKRMatch(m, key, val)
 		return
 	}
+	if strings.HasPrefix(key, "cn_") {
+		applyCNMatch(m, key, val)
+		return
+	}
 	applyDomainMatch(m, key, val)
+}
+
+func applyCNMatch(m *Metadata, key, val string) {
+	switch key {
+	case "cn_registrant":
+		m.Registrant.Organization = appendUnique(m.Registrant.Organization, val)
+	case "cn_registrant_email":
+		m.Registrant.Email = appendUnique(m.Registrant.Email, val)
+	}
 }
 
 func applyRegistrarMatch(m *Metadata, key, val string) bool {
