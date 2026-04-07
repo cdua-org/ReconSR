@@ -14,8 +14,11 @@ const (
 	roleAbuse          = "abuse"
 	roleNameServers    = "nameservers"
 
-	fieldOrg   = "org"
-	fieldEmail = "email"
+	fieldOrg        = "org"
+	fieldEmail      = "email"
+	fieldExpiration = "expiration"
+	fieldURL        = "url"
+	fieldStatus     = "status"
 )
 
 // Contact represents parsed contact information from WHOIS/RDAP data.
@@ -25,6 +28,7 @@ type Contact struct {
 	Email        []string
 	Address      []string
 	Phone        []string
+	Fax          []string
 }
 
 // Metadata represents parsed domain registration metadata.

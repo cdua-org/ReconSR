@@ -43,7 +43,7 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 
 	for _, edge := range graph.Edges {
 		edgeKey := fmt.Sprintf("%s|%s|%s|%s", edge.Source.Value, edge.Target.Value, edge.ModuleName, edge.FunctionName)
-		
+
 		if existing, ok := edgeMap[edgeKey]; ok {
 			if edge.Context != "" && existing.Context != "" {
 				if existing.Context != edge.Context {

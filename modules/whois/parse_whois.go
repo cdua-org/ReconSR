@@ -33,7 +33,9 @@ var roleMarkers = []roleMarker{
 	{"tech:", roleTechnical, false},
 	{"technical:", roleTechnical, false},
 	{"abuse:", roleAbuse, false},
+	{"abuse contact:", roleAbuse, false},
 	{"name servers:", roleNameServers, false},
+	{"domain nameservers:", roleNameServers, false},
 
 	// Prefix: Italian/generic bare-word sections
 	{"admin contact", roleAdministrative, true},
@@ -52,10 +54,27 @@ var roleMarkers = []roleMarker{
 }
 
 func updateRoleContext(lineLower, currentRole string) string {
+	if strings.HasPrefix(lineLower, "contact:") {
+		if strings.Contains(lineLower, "administrative") {
+			return roleAdministrative
+		}
+		if strings.Contains(lineLower, "technical") {
+			return roleTechnical
+		}
+		if strings.Contains(lineLower, "billing") {
+			return roleBilling
+		}
+	}
+
 	for _, m := range roleMarkers {
 		if m.isPrefix {
 			if strings.HasPrefix(lineLower, m.pattern) {
-				return m.role
+				rest := strings.TrimSpace(lineLower[len(m.pattern):])
+				// Allow bare section headers ("Registrar", "Technical Contacts")
+				// but block structured fields ("Registrar URL:", "Registrar IANA ID:")
+				if !strings.Contains(rest, ":") || rest == ":" || strings.HasPrefix(rest, ": ") {
+					return m.role
+				}
 			}
 		} else if strings.Contains(lineLower, m.pattern) {
 			return m.role
@@ -76,56 +95,63 @@ func updateRoleContext(lineLower, currentRole string) string {
 
 var whoisPatterns = map[string]*regexp.Regexp{
 	// Generic ICANN
-	"registrar":   regexp.MustCompile(`(?i)Registrar\s*:\s+(.*)`),
+	"registrar":   regexp.MustCompile(`(?i)Registrar(?:\s+Name)?\s*:\s+(.*)`),
 	"url":         regexp.MustCompile(`(?i)(?:Registrar\s+)?(?:URL|Web)\s*:\s+(.*)`),
+	"url_bare":    regexp.MustCompile(`(?i)^\s*(https?://[^\s<>]+)\s*$`),
 	"whoisserver": regexp.MustCompile(`(?i)Registrar\s+WHOIS\s+Server\s*:\s+(.*)`),
 	"ianaid":      regexp.MustCompile(`(?i)Registrar\s+IANA\s+ID\s*:\s+(.*)`),
 	"dnssec":      regexp.MustCompile(`(?i)DNSSEC\s*:\s*(.*)`),
 
 	"creation":   regexp.MustCompile(`(?i)(Creation|Created(?:\s+On)?|Registered(?:\s+on)?|Activated|Registration\s+Time|Registered\s+Time)(?:\s+Date)?\s*:\s+(.*)`),
-	"updated":    regexp.MustCompile(`(?i)(Updated|Last\s+Updated(?:\s+On)?|Last\s+Update|Modified|Changed)(?:\s+Date)?\s*:\s+(.*)`),
-	"expiration": regexp.MustCompile(`(?i)(Registry\s+Expiry|Expiration|Expiry|Expire|Expires|Expiration\s+Time)(?:\s+Date)?\s*:\s+(.*)`),
-	"ns":         regexp.MustCompile(`(?i)(Name\s+Server|nserver|DNS)\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
-	"status":     regexp.MustCompile(`(?i)(Domain\s+)?Status\s*:\s+(.*)`),
+	"updated":    regexp.MustCompile(`(?i)(Updated|Last[\s-]+Updated|Last[\s-]+Update|Last\s+Modified|Modified|Changed)(?:\s+(?:Date|On))?(?:\s*:\s*|\s+)(.*)`),
+	"expiration": regexp.MustCompile(`(?i)(Registry\s+Expiry|Expiration|Expiry|Expire|Expires|Expiration\s+Time|paid-till|Renewal\s+Date)(?:\s+Date)?\s*:\s+(.*)`),
+	"ns":         regexp.MustCompile(`(?i)(Name\s+Server|nserver|nameservers?|DNS)\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
+	"status":     regexp.MustCompile(`(?i)(Domain\s+)?(Status|State)\s*:\s+(.*)`),
 
 	// Registrant contact (ICANN standard)
-	"reg_name":  regexp.MustCompile(`(?i)Registrant\s+Name\s*:\s+(.*)`),
+	"reg_name":  regexp.MustCompile(`(?i)Registrant\s+(?:Contact\s+)?Name\s*:\s+(.*)`),
 	"reg_org":   regexp.MustCompile(`(?i)Registrant\s+Organization\s*:\s+(.*)`),
 	"reg_email": regexp.MustCompile(`(?i)Registrant\s+Email\s*:\s+(.*)`),
 	"reg_addr":  regexp.MustCompile(`(?i)Registrant\s+(?:Street|Address|City|State/Province|Postal Code|Country|Zip\s+Code)\s*:\s+(.*)`),
 	"reg_phone": regexp.MustCompile(`(?i)Registrant\s+Phone\s*:\s+(.*)`),
+	"reg_fax":   regexp.MustCompile(`(?i)Registrant\s+Fax\s*:\s+(.*)`),
 
 	// Admin contact (ICANN standard)
-	"admin_name":  regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Name\s*:\s+(.*)`),
+	"admin_name":  regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+(?:Contact\s+)?Name\s*:\s+(.*)`),
 	"admin_org":   regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Organization\s*:\s+(.*)`),
 	"admin_email": regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Email\s*:\s+(.*)`),
 	"admin_addr":  regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+(?:Street|Address|City|State/Province|Postal Code|Country)\s*:\s+(.*)`),
 	"admin_phone": regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Phone\s*:\s+(.*)`),
+	"admin_fax":   regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Fax\s*:\s+(.*)`),
 
 	// Tech contact (ICANN standard)
-	"tech_name":  regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Name\s*:\s+(.*)`),
+	"tech_name":  regexp.MustCompile(`(?i)(?:Tech|Technical)\s+(?:Contact\s+)?Name\s*:\s+(.*)`),
 	"tech_org":   regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Organization\s*:\s+(.*)`),
 	"tech_email": regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Email\s*:\s+(.*)`),
 	"tech_addr":  regexp.MustCompile(`(?i)(?:Tech|Technical)\s+(?:Street|Address|City|State/Province|Postal Code|Country)\s*:\s+(.*)`),
 	"tech_phone": regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Phone\s*:\s+(.*)`),
+	"tech_fax":   regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Fax\s*:\s+(.*)`),
 
 	// Billing contact (ICANN standard)
-	"billing_name":  regexp.MustCompile(`(?i)Billing\s+Name\s*:\s+(.*)`),
+	"billing_name":  regexp.MustCompile(`(?i)Billing\s+(?:Contact\s+)?Name\s*:\s+(.*)`),
 	"billing_org":   regexp.MustCompile(`(?i)Billing\s+Organization\s*:\s+(.*)`),
 	"billing_email": regexp.MustCompile(`(?i)Billing\s+Email\s*:\s+(.*)`),
 	"billing_addr":  regexp.MustCompile(`(?i)Billing\s+(?:Street|Address|City|State/Province|Postal Code|Country)\s*:\s+(.*)`),
 	"billing_phone": regexp.MustCompile(`(?i)Billing\s+Phone\s*:\s+(.*)`),
+	"billing_fax":   regexp.MustCompile(`(?i)Billing\s+Fax\s*:\s+(.*)`),
 
 	// Abuse contact
 	"abuse_email": regexp.MustCompile(`(?i)Registrar\s+Abuse\s+Contact\s+Email\s*:\s+(.*)`),
 	"abuse_phone": regexp.MustCompile(`(?i)Registrar\s+Abuse\s+Contact\s+Phone\s*:\s+(.*)`),
+	"abuse_fax":   regexp.MustCompile(`(?i)Registrar\s+Abuse\s+Contact\s+Fax\s*:\s+(.*)`),
 
 	// RPSL / generic unstructured
 	"rpsl_name":  regexp.MustCompile(`(?i)^\s*(?:person(?:name)?|name)(?:-loc)?\s*:\s+(.*)`),
-	"rpsl_org":   regexp.MustCompile(`(?i)^\s*(?:organization|org)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_org":   regexp.MustCompile(`(?i)^\s*(?:organi[zs]ation|org)(?:-loc)?\s*:\s+(.*)`),
 	"rpsl_email": regexp.MustCompile(`(?i)^\s*(?:e-mail|email|abuse-email)\s*:\s+(.*)`),
 	"rpsl_addr":  regexp.MustCompile(`(?i)^\s*(?:address|street(?:\s+address)?|city|state|postal[\s-]code|country|abuse-postal)(?:-loc)?\s*:\s+(.*)`),
-	"rpsl_phone": regexp.MustCompile(`(?i)^\s*(?:phone|tel|abuse-phone|fax(?:-no)?)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_phone": regexp.MustCompile(`(?i)^\s*(?:phone|tel|abuse-phone)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_fax":   regexp.MustCompile(`(?i)^\s*(?:fax(?:-no)?)(?:-loc)?\s*:\s+(.*)`),
 
 	// Chinese WHOIS
 	"cn_registrant":       regexp.MustCompile(`(?i)Registrant\s*:\s+(.+)`),
@@ -172,6 +198,10 @@ var whoisPatterns = map[string]*regexp.Regexp{
 	"kr_ac_email": regexp.MustCompile(`(?i)AC\s+E-Mail\s*:\s+(.*)`),
 	"kr_ac_phone": regexp.MustCompile(`(?i)AC\s+Phone\s+Number\s*:\s+(.*)`),
 	"kr_reg_zip":  regexp.MustCompile(`(?i)Registrant\s+Zip\s+Code\s*:\s+(.*)`),
+
+	// Brazilian .br WHOIS
+	"br_owner":   regexp.MustCompile(`(?i)^owner\s*:\s+(.*)`),
+	"br_ownerid": regexp.MustCompile(`(?i)^ownerid\s*:\s+(.*)`),
 }
 
 // parseWHOIS leverages regex matching, context tracking, and RPSL fallback.
@@ -181,14 +211,23 @@ func parseWHOIS(raw string) Metadata {
 	currentRole := ""
 	indentedIndex := 0
 	lastKey := ""
+	handleRoles := make(map[string]string)
+
+	rawLower := strings.ToLower(raw)
+	registryType := detectRegistry(rawLower)
 
 	for scanner.Scan() {
 		rawLine := scanner.Text()
 		line := strings.TrimSpace(rawLine)
 
-		if line == "" {
-			currentRole = ""
+		if skipLine(line) {
+			if line == "" {
+				currentRole = ""
+			}
 			continue
+		}
+		if isFooterMarker(line) {
+			break
 		}
 		lineLower := strings.ToLower(line)
 
@@ -199,19 +238,24 @@ func parseWHOIS(raw string) Metadata {
 			indentedIndex = 0
 		}
 
-		matched, key := matchPatterns(&m, currentRole, line, lineLower)
+		parts := strings.SplitN(lineLower, ":", 2)
+		if len(parts) == 2 && processHandles(parts, handleRoles, &currentRole, registryType) {
+			continue
+		}
+
+		matched, key := matchPatterns(&m, currentRole, line, lineLower, registryType)
 		if matched {
 			lastKey = key
+			if isDomainLevelKey(key) {
+				currentRole = ""
+			}
 		}
 
 		if matched || roleChanged {
 			continue
 		}
 
-		// Continuation lines: deep indentation (16+ spaces) without a
-		// field prefix indicates a multi-line value from the previous field
-		// (e.g., JPRS [Postal Address] spanning two lines).
-		if lastKey != "" && leadingSpaces(rawLine) >= 16 && !strings.HasPrefix(line, "[") {
+		if isContinuation(rawLine, line, lastKey) {
 			applyContinuation(&m, lastKey, currentRole, line)
 			continue
 		}
@@ -219,8 +263,8 @@ func parseWHOIS(raw string) Metadata {
 		// Fallback for bare NS hostnames (Italian 2-space indent, etc.).
 		if currentRole == roleNameServers {
 			addNameServer(&m, strings.Fields(line)[0])
-		} else if isIndented(rawLine) && currentRole != "" {
-			// Indented freeform lines (EDUCAUSE tabs, .uk/.it spaces).
+		} else if isFreeformLine(rawLine, line, currentRole) {
+			// Indented freeform lines (EDUCAUSE tabs, .uk/.it spaces) or un-indented blocks (.pl).
 			classifyIndentedLine(&m, currentRole, line, indentedIndex)
 			indentedIndex++
 		}
@@ -228,16 +272,107 @@ func parseWHOIS(raw string) Metadata {
 	return m
 }
 
+func detectRegistry(rawLower string) string {
+	if strings.Contains(rawLower, "\nnic-hdl-br:") || strings.Contains(rawLower, "\nownerid:") {
+		return "br"
+	}
+	if strings.Contains(rawLower, "\nnsset:") {
+		return "cz"
+	}
+	if strings.Contains(rawLower, "\nregistrar:   nicar") || strings.Contains(rawLower, ".com.ar\n") {
+		return "ar"
+	}
+	return ""
+}
+
+func isContinuation(rawLine, line, lastKey string) bool {
+	return lastKey != "" && leadingSpaces(rawLine) >= 16 && !strings.HasPrefix(line, "[")
+}
+
+func isPlaceholder(val string) bool {
+	v := strings.ToLower(val)
+	return v == "n/a" || v == "none" || v == "null" || v == "-" || v == "." || v == "not applicable"
+}
+
+func skipLine(line string) bool {
+	return line == "" || strings.HasPrefix(line, "%") || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//")
+}
+
+func isFooterMarker(line string) bool {
+	lower := strings.ToLower(line)
+	return strings.HasPrefix(line, ">>>") ||
+		strings.HasPrefix(lower, "notice:") ||
+		strings.HasPrefix(lower, "terms of use:") ||
+		strings.HasPrefix(lower, "the registry database contains")
+}
+
+func isDomainLevelKey(key string) bool {
+	switch key {
+	case "domain", fieldStatus, "ns", "dnssec", "creation", "updated", fieldExpiration,
+		"whoisserver", "ianaid", fieldURL:
+		return true
+	}
+	return false
+}
+
+func isFreeformLine(rawLine, line, currentRole string) bool {
+	return currentRole != "" && (isIndented(rawLine) || !strings.Contains(line, ":"))
+}
+
+func processHandles(parts []string, handleRoles map[string]string, currentRole *string, registryType string) bool {
+	k := strings.TrimSpace(parts[0])
+	v := strings.TrimSpace(parts[1])
+	switch k {
+	case "registrant":
+		if registryType == "cz" || registryType == "ar" {
+			handleRoles[v] = roleRegistrant
+			return true // Skip parsing handle as Name/Org
+		}
+	case "admin-c":
+		handleRoles[v] = roleAdministrative
+		return registryType == "cz" || registryType == "br"
+	case "tech-c":
+		handleRoles[v] = roleTechnical
+		return registryType == "cz" || registryType == "br"
+	case "owner-c":
+		handleRoles[v] = roleAdministrative
+		return registryType == "br"
+	case "nic-hdl-br", "nic-hdl", "contact":
+		if r, ok := handleRoles[v]; ok {
+			*currentRole = r
+			return true
+		}
+	case "nsset":
+		*currentRole = roleNameServers
+		return true
+	}
+	return false
+}
+
 // matchPatterns iterates over compiled regexes and applies the first match.
-func matchPatterns(m *Metadata, currentRole, line, lineLower string) (matched bool, matchedKey string) {
+func matchPatterns(m *Metadata, currentRole, line, lineLower, registryType string) (matched bool, matchedKey string) {
 	for key, re := range whoisPatterns {
+		// Context-aware disambiguation to prevent map iteration race conditions
+		if strings.HasPrefix(lineLower, "state:") {
+			if key == "status" && currentRole != "" {
+				continue
+			}
+			if key == "rpsl_addr" && currentRole == "" {
+				continue
+			}
+		}
+
 		match := re.FindStringSubmatch(line)
 		if len(match) <= 1 {
 			continue
 		}
 		val := strings.TrimSpace(match[len(match)-1])
+		if isPlaceholder(val) {
+			return true, key
+		}
+
 		if field, found := strings.CutPrefix(key, "rpsl_"); found {
-			applyRPSLMatch(m, currentRole, lineLower, field, val)
+			applyRPSLMatch(m, currentRole, lineLower, field, val, registryType)
 		} else {
 			applyWHOISMatch(m, key, val)
 		}
@@ -283,6 +418,8 @@ func applyContinuation(m *Metadata, lastKey, currentRole, val string) {
 		m.Billing.Address = appendUnique(m.Billing.Address, val)
 	case "jp2_address", "jp2_postal_code", "kr_reg_zip":
 		m.Registrant.Address = appendUnique(m.Registrant.Address, val)
+	case "ns":
+		addNameServer(m, strings.Fields(val)[0])
 	}
 }
 
@@ -306,7 +443,7 @@ func contactByRole(m *Metadata, role string) *Contact {
 
 // --- RPSL match ---
 
-func applyRPSLMatch(m *Metadata, currentRole, lineLower, field, val string) {
+func applyRPSLMatch(m *Metadata, currentRole, lineLower, field, val, registryType string) {
 	if strings.HasPrefix(lineLower, "abuse-") {
 		applyContactMatch(&m.Abuse, "abuse_"+field, "abuse_", val)
 		return
@@ -332,7 +469,11 @@ func applyRPSLMatch(m *Metadata, currentRole, lineLower, field, val string) {
 	if target != nil {
 		switch field {
 		case "name":
-			target.Name = appendUnique(target.Name, val)
+			if registryType == "ar" {
+				target.Organization = appendUnique(target.Organization, val)
+			} else {
+				target.Name = appendUnique(target.Name, val)
+			}
 		case fieldOrg:
 			target.Organization = appendUnique(target.Organization, val)
 		case fieldEmail:
@@ -341,6 +482,8 @@ func applyRPSLMatch(m *Metadata, currentRole, lineLower, field, val string) {
 			target.Address = appendUnique(target.Address, val)
 		case "phone":
 			target.Phone = appendUnique(target.Phone, val)
+		case "fax":
+			target.Fax = appendUnique(target.Fax, val)
 		}
 	}
 }
@@ -443,6 +586,10 @@ func applyWHOISMatch(m *Metadata, key, val string) {
 		applyAustrianMatch(m, key, val)
 		return
 	}
+	if strings.HasPrefix(key, "br_") {
+		applyBRMatch(m, key, val)
+		return
+	}
 	if strings.HasPrefix(key, "kr_") {
 		applyKRMatch(m, key, val)
 		return
@@ -452,6 +599,15 @@ func applyWHOISMatch(m *Metadata, key, val string) {
 		return
 	}
 	applyDomainMatch(m, key, val)
+}
+
+func applyBRMatch(m *Metadata, key, val string) {
+	switch key {
+	case "br_owner":
+		m.Registrant.Organization = appendUnique(m.Registrant.Organization, val)
+	case "br_ownerid":
+		m.Registrant.Organization = appendUnique(m.Registrant.Organization, val)
+	}
 }
 
 func applyCNMatch(m *Metadata, key, val string) {
@@ -468,7 +624,7 @@ func applyRegistrarMatch(m *Metadata, key, val string) bool {
 	case "registrar":
 		m.Registrar.Name = appendUnique(m.Registrar.Name, val)
 		return true
-	case "url":
+	case "url", "url_bare":
 		if m.RegistrarURL == "" {
 			m.RegistrarURL = val
 		}
@@ -484,9 +640,7 @@ func applyRegistrarMatch(m *Metadata, key, val string) bool {
 		}
 		return true
 	case "dnssec":
-		if m.DNSSEC == "" {
-			m.DNSSEC = val
-		}
+		m.DNSSEC = val
 		return true
 	}
 	return false
@@ -498,13 +652,13 @@ func applyContactMatch(c *Contact, key, prefix, val string) bool {
 	}
 	field := strings.TrimPrefix(key, prefix)
 	switch field {
-	case "org":
+	case fieldOrg:
 		c.Organization = appendUnique(c.Organization, val)
 		return true
 	case "name":
 		c.Name = appendUnique(c.Name, val)
 		return true
-	case "email":
+	case fieldEmail:
 		c.Email = appendUnique(c.Email, val)
 		return true
 	case "addr":
@@ -512,6 +666,9 @@ func applyContactMatch(c *Contact, key, prefix, val string) bool {
 		return true
 	case "phone":
 		c.Phone = appendUnique(c.Phone, val)
+		return true
+	case "fax":
+		c.Fax = appendUnique(c.Fax, val)
 		return true
 	}
 	return false
