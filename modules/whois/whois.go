@@ -222,7 +222,11 @@ func (m *module) buildMetadataResults(metadata *Metadata, target, sourceCtx stri
 	}
 	for _, ns := range metadata.NameServers {
 		oos := !strings.HasSuffix(strings.ToLower(ns), "."+strings.ToLower(target))
-		results = append(results, m.result("domain", ns, "Name Server ("+sourceCtx+")", oos))
+		typ := "domain"
+		if !strings.Contains(ns, ".") {
+			typ = "string"
+		}
+		results = append(results, m.result(typ, ns, "Name Server ("+sourceCtx+")", oos))
 	}
 	for _, st := range metadata.DomainStatus {
 		results = append(results, m.result("status", st, "Domain Status ("+sourceCtx+")", false))

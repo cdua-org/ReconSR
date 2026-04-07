@@ -10,6 +10,9 @@ import (
 // postalCodeRe is compiled once at package level to avoid per-call overhead.
 var postalCodeRe = regexp.MustCompile(`^\d{4,6}$`)
 
+// dotPaddingRe cleans up trailing dots before colons (e.g., .fi format)
+var dotPaddingRe = regexp.MustCompile(`\.{2,}:\s*`)
+
 // --- Section header detection (table-driven) ---
 
 type roleMarker struct {
@@ -39,6 +42,7 @@ var roleMarkers = []roleMarker{
 	{"domain servers in listed order:", roleNameServers, false},
 
 	// Prefix: Italian/generic bare-word sections
+	{"holder", roleRegistrant, true},
 	{"admin contact", roleAdministrative, true},
 	{"technical", roleTechnical, true},
 	{"registrant", roleRegistrant, true},
@@ -152,11 +156,16 @@ var whoisPatterns = map[string]*regexp.Regexp{
 	"tw_registrar": regexp.MustCompile(`(?i)Registration\s+Service\s+Provider\s*:\s+(.*)`),
 	"tw_url":       regexp.MustCompile(`(?i)Registration\s+Service\s+URL\s*:\s+(.*)`),
 
+	// Norwegian .no WHOIS (Handles)
+	"no_registrar": regexp.MustCompile(`(?i)Registrar\s+Handle\s*:\s+(.*)`),
+	"no_nserver":   regexp.MustCompile(`(?i)Name\s+Server\s+Handle\s*:\s+(.*)`),
+	"no_tech":      regexp.MustCompile(`(?i)Tech-c\s+Handle\s*:\s+(.*)`),
+
 	// RPSL / generic unstructured
 	"rpsl_name":  regexp.MustCompile(`(?i)^\s*(?:person(?:name)?|name)(?:-loc)?\s*:\s+(.*)`),
 	"rpsl_org":   regexp.MustCompile(`(?i)^\s*(?:organi[zs]ation|org)(?:-loc)?\s*:\s+(.*)`),
-	"rpsl_email": regexp.MustCompile(`(?i)^\s*(?:e-mail|email|abuse-email)\s*:\s+(.*)`),
-	"rpsl_addr":  regexp.MustCompile(`(?i)^\s*(?:address|street(?:\s+address)?|city|state|postal[\s-]code|country|abuse-postal)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_email": regexp.MustCompile(`(?i)^\s*(?:e-mail|email|abuse-email|holder\s+email)\s*:\s+(.*)`),
+	"rpsl_addr":  regexp.MustCompile(`(?i)^\s*(?:address|street(?:\s+address)?|city|state|postal(?:\s*-?code)?|country|abuse-postal)(?:-loc)?\s*:\s+(.*)`),
 	"rpsl_phone": regexp.MustCompile(`(?i)^\s*(?:phone|tel|abuse-phone)(?:-loc)?\s*:\s+(.*)`),
 	"rpsl_fax":   regexp.MustCompile(`(?i)^\s*(?:fax(?:-no)?)(?:-loc)?\s*:\s+(.*)`),
 
@@ -226,6 +235,9 @@ func parseWHOIS(raw string) Metadata {
 	for scanner.Scan() {
 		rawLine := scanner.Text()
 		line := strings.TrimSpace(rawLine)
+
+		// Preprocess line to remove dot padding (.fi)
+		line = dotPaddingRe.ReplaceAllString(line, ": ")
 
 		if skipLine(line) {
 			if line == "" {
@@ -589,6 +601,10 @@ func applyWHOISMatch(m *Metadata, key, val string) {
 		applyTWMatch(m, key, val)
 		return
 	}
+	if strings.HasPrefix(key, "no_") {
+		applyNOMatch(m, key, val)
+		return
+	}
 	if strings.HasPrefix(key, "jp") || strings.HasPrefix(key, "ns_jp") {
 		applyJPMatch(m, key, val)
 		return
@@ -627,6 +643,20 @@ func applyTWMatch(m *Metadata, key, val string) {
 	case "tw_url":
 		if m.RegistrarURL == "" {
 			m.RegistrarURL = val
+		}
+	}
+}
+
+func applyNOMatch(m *Metadata, key, val string) {
+	switch key {
+	case "no_registrar":
+		m.Registrar.Name = appendUnique(m.Registrar.Name, val)
+	case "no_tech":
+		m.Tech.Name = appendUnique(m.Tech.Name, val)
+	case "no_nserver":
+		val = strings.TrimSpace(val)
+		if val != "" && !slices.Contains(m.NameServers, val) {
+			m.NameServers = append(m.NameServers, val)
 		}
 	}
 }

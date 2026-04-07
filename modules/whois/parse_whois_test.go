@@ -916,3 +916,93 @@ For more information on Whois status codes, please visit https://icann.org/epp
 	// Ensure the "http://" prefix is stripped from WhoisServer!
 	assertEq(t, "WhoisServer", got.WhoisServer, "whois.fakeregistrar.com")
 }
+
+// TestParseWHOIS_FI validates Finnish .fi WHOIS format (Traficom).
+func TestParseWHOIS_FI(t *testing.T) {
+	rawWHOIS := `domain.............: fake.fi
+status.............: Registered
+created............: 1.1.1991 00:00:00
+expires............: 31.8.2030 00:00:00
+available..........: 30.9.2030 00:00:00
+modified...........: 17.3.2022 13:30:38
+RegistryLock.......: locked
+
+Nameservers
+
+nserver............: ns1.fake.fi [192.0.2.1] [OK]
+nserver............: ns2.fake.fi [OK]
+nserver............: ns-secondary.fake.fi [192.0.2.2] [2001:db8::53] [OK]
+
+DNSSEC
+
+dnssec.............: no
+
+Holder
+
+name...............: Fake Registrant
+register number....: 1234567-8
+address............: Fake Street 1
+postal.............: 00100
+city...............: Fake City
+country............: Finland
+phone..............: +358.123456789
+holder email.......: admin@fake.fi
+
+Registrar
+
+registrar..........: Fake Registrar`
+
+	got := parseWHOIS(rawWHOIS)
+
+	// The .fi registry uses a unique 'key.............: value' format heavily padded with dots.
+	assertEq(t, "CreationDate", got.CreationDate, "1.1.1991 00:00:00")
+	assertEq(t, "UpdatedDate", got.UpdatedDate, "17.3.2022 13:30:38")
+	assertEq(t, "ExpirationDate", got.ExpirationDate, "31.8.2030 00:00:00")
+	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"Registered"})
+
+	// Nameservers in .fi WHOIS append IP addresses (IPv4 and IPv6) and health status tags within brackets (e.g., [OK]) which must be stripped.
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.fi", "ns2.fake.fi", "ns-secondary.fake.fi"})
+	assertEq(t, "DNSSEC", got.DNSSEC, "no")
+
+	// The section header 'Holder' maps to the Registrant role in standard ICANN taxonomy.
+	// Specific keys like 'holder email', 'postal', and 'city' must be mapped correctly despite non-standard naming.
+	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Fake Registrant"})
+	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"Fake Street 1", "00100", "Fake City", "Finland"})
+	assertSlice(t, "Registrant.Phone", got.Registrant.Phone, []string{"+358.123456789"})
+	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"admin@fake.fi"})
+
+	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"Fake Registrar"})
+}
+
+// TestParseWHOIS_NO validates Norwegian .no WHOIS format (Norid).
+func TestParseWHOIS_NO(t *testing.T) {
+	rawWHOIS := `
+Domain Information
+
+NORID Handle...............: FAKE69D-NORID
+Domain Name................: fake.no
+Registrar Handle...........: REG99-NORID
+Tech-c Handle..............: NH1234R-NORID
+Name Server Handle.........: A1111H-NORID
+Name Server Handle.........: A2222H-NORID
+DNSSEC.....................: Signed
+
+Additional information:
+Created:         1999-11-15
+Last updated:    2025-10-18
+`
+
+	got := parseWHOIS(rawWHOIS)
+
+	assertEq(t, "CreationDate", got.CreationDate, "1999-11-15")
+	assertEq(t, "UpdatedDate", got.UpdatedDate, "2025-10-18")
+	assertEq(t, "DNSSEC", got.DNSSEC, "Signed")
+
+	// Norid WHOIS restricts plaintext PII and hostnames, providing only relational handles. These handles must be mapped to standard fields to retain registry linkage.
+	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"REG99-NORID"})
+
+	// The 'Tech-c Handle' field represents the technical contact entity. Relational handles must be captured and mapped to the Technical Contact Name/ID.
+	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"NH1234R-NORID"})
+	// Actual nameserver hostnames are obfuscated behind handles in the .no registry; extract the handles to indicate DNS delegation exists.
+	assertSlice(t, "NameServers", got.NameServers, []string{"A1111H-NORID", "A2222H-NORID"})
+}
