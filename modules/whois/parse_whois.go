@@ -36,6 +36,7 @@ var roleMarkers = []roleMarker{
 	{"abuse contact:", roleAbuse, false},
 	{"name servers:", roleNameServers, false},
 	{"domain nameservers:", roleNameServers, false},
+	{"domain servers in listed order:", roleNameServers, false},
 
 	// Prefix: Italian/generic bare-word sections
 	{"admin contact", roleAdministrative, true},
@@ -144,6 +145,12 @@ var whoisPatterns = map[string]*regexp.Regexp{
 	"abuse_email": regexp.MustCompile(`(?i)Registrar\s+Abuse\s+Contact\s+Email\s*:\s+(.*)`),
 	"abuse_phone": regexp.MustCompile(`(?i)Registrar\s+Abuse\s+Contact\s+Phone\s*:\s+(.*)`),
 	"abuse_fax":   regexp.MustCompile(`(?i)Registrar\s+Abuse\s+Contact\s+Fax\s*:\s+(.*)`),
+
+	// Taiwanese .tw WHOIS
+	"tw_created":   regexp.MustCompile(`(?i)Record\s+created\s+on\s+(.*)`),
+	"tw_expires":   regexp.MustCompile(`(?i)Record\s+expires\s+on\s+(.*)`),
+	"tw_registrar": regexp.MustCompile(`(?i)Registration\s+Service\s+Provider\s*:\s+(.*)`),
+	"tw_url":       regexp.MustCompile(`(?i)Registration\s+Service\s+URL\s*:\s+(.*)`),
 
 	// RPSL / generic unstructured
 	"rpsl_name":  regexp.MustCompile(`(?i)^\s*(?:person(?:name)?|name)(?:-loc)?\s*:\s+(.*)`),
@@ -578,6 +585,10 @@ func applyWHOISMatch(m *Metadata, key, val string) {
 	if applyContactMatch(&m.Abuse, key, "abuse_", val) {
 		return
 	}
+	if strings.HasPrefix(key, "tw_") {
+		applyTWMatch(m, key, val)
+		return
+	}
 	if strings.HasPrefix(key, "jp") || strings.HasPrefix(key, "ns_jp") {
 		applyJPMatch(m, key, val)
 		return
@@ -601,6 +612,25 @@ func applyWHOISMatch(m *Metadata, key, val string) {
 	applyDomainMatch(m, key, val)
 }
 
+func applyTWMatch(m *Metadata, key, val string) {
+	switch key {
+	case "tw_created":
+		if m.CreationDate == "" {
+			m.CreationDate = val
+		}
+	case "tw_expires":
+		if m.ExpirationDate == "" {
+			m.ExpirationDate = val
+		}
+	case "tw_registrar":
+		m.Registrar.Name = appendUnique(m.Registrar.Name, val)
+	case "tw_url":
+		if m.RegistrarURL == "" {
+			m.RegistrarURL = val
+		}
+	}
+}
+
 func applyBRMatch(m *Metadata, key, val string) {
 	switch key {
 	case "br_owner":
@@ -618,6 +648,12 @@ func applyCNMatch(m *Metadata, key, val string) {
 		m.Registrant.Email = appendUnique(m.Registrant.Email, val)
 	}
 }
+func cleanWhoisServer(val string) string {
+	val = strings.TrimSpace(val)
+	val = strings.TrimPrefix(val, "http://")
+	val = strings.TrimPrefix(val, "https://")
+	return strings.TrimSuffix(val, "/")
+}
 
 func applyRegistrarMatch(m *Metadata, key, val string) bool {
 	switch key {
@@ -631,7 +667,7 @@ func applyRegistrarMatch(m *Metadata, key, val string) bool {
 		return true
 	case "whoisserver":
 		if m.WhoisServer == "" {
-			m.WhoisServer = val
+			m.WhoisServer = cleanWhoisServer(val)
 		}
 		return true
 	case "ianaid":

@@ -840,3 +840,79 @@ Registrars.`
 	assertSlice(t, "Abuse.Email", got.Abuse.Email, []string{"abuse@fakeregistrar.com"})
 	assertSlice(t, "Abuse.Phone", got.Abuse.Phone, []string{"+1.2085551234"})
 }
+
+// TestParseWHOIS_TW validates Taiwanese .tw WHOIS format (TWNIC).
+func TestParseWHOIS_TW(t *testing.T) {
+	rawWHOIS := `
+Domain Name: fake.com.tw
+   Domain Status: clientTransferProhibited
+   Registrant:
+      Fake Taiwan Corp.
+      Fake Global Inc.
+      admin@fake.com.tw
+      TW
+
+   Record expires on 2035-05-31 00:00:00 (UTC+8)
+   Record created on 1985-07-04 00:00:00 (UTC+8)
+
+   Domain servers in listed order:
+      ns1.fake.com.tw      1.2.3.4
+      ns2.fake.com.tw      5.6.7.8
+
+Registration Service Provider: FAKEPROVIDER
+Registration Service URL: http://registrar.fake.tw
+Registrar Abuse Contact Email: abuse@fake.tw
+`
+
+	got := parseWHOIS(rawWHOIS)
+
+	// TWNIC uses a distinct date prefix "Record created/expires on" followed by a timestamp and timezone, which requires specific pattern matching.
+	assertEq(t, "CreationDate", got.CreationDate, "1985-07-04 00:00:00 (UTC+8)")
+	assertEq(t, "ExpirationDate", got.ExpirationDate, "2035-05-31 00:00:00 (UTC+8)")
+
+	// Nameservers are grouped under a "Domain servers in listed order" header and often include associated IP addresses (glue records) that must be filtered out.
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.com.tw", "ns2.fake.com.tw"})
+
+	// "Registration Service Provider" is the standard field name for the Registrar in the .tw registry.
+	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"FAKEPROVIDER"})
+
+	assertEq(t, "RegistrarURL", got.RegistrarURL, "http://registrar.fake.tw")
+	assertSlice(t, "Abuse.Email", got.Abuse.Email, []string{"abuse@fake.tw"})
+
+	// The Registrant block uses positional indentation to provide the Name, Organization, Email, and Location, necessitating sequential classification.
+	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Fake Taiwan Corp."})
+	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake Global Inc."})
+	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"admin@fake.com.tw"})
+	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"TW"})
+}
+
+// TestParseWHOIS_WhoisServerHTTP_Noise validates that 'http://' or 'https://' prefixes are stripped
+// from the WhoisServer field so it remains a valid hostname rather than a URL.
+func TestParseWHOIS_WhoisServerHTTP_Noise(t *testing.T) {
+	rawWHOIS := `
+Domain Name: fake.org
+Registry Domain ID: REDACTED
+Registrar WHOIS Server: http://whois.fakeregistrar.com
+Registrar URL: http://www.fakeregistrar.com
+Updated Date: 2025-12-17T09:26:13Z
+Creation Date: 2001-01-13T00:12:14Z
+Registry Expiry Date: 2027-01-13T00:12:14Z
+Registrar: FakeRegistrar Inc.
+Registrar IANA ID: 292
+Registrar Abuse Contact Email: abuse@fakeregistrar.com
+Registrar Abuse Contact Phone: +1.2083895740
+Domain Status: clientDeleteProhibited https://icann.org/epp#clientDeleteProhibited
+Name Server: ns0.fake.org
+DNSSEC: unsigned
+URL of the ICANN Whois Inaccuracy Complaint Form: https://icann.org/wicf/
+>>> Last update of WHOIS database: 2026-04-07T14:44:13Z <<<
+
+For more information on Whois status codes, please visit https://icann.org/epp
+`
+	got := parseWHOIS(rawWHOIS)
+
+	assertEq(t, "RegistrarURL", got.RegistrarURL, "http://www.fakeregistrar.com")
+
+	// Ensure the "http://" prefix is stripped from WhoisServer!
+	assertEq(t, "WhoisServer", got.WhoisServer, "whois.fakeregistrar.com")
+}
