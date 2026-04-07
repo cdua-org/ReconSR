@@ -30,7 +30,7 @@ var (
 	dohIndex     atomic.Uint32
 	plainIndex   atomic.Uint32
 
-	lastUsedMu sync.RWMutex
+	lastUsedMu    sync.RWMutex
 	lastUsedDoH   string
 	lastUsedPlain string
 
@@ -191,7 +191,6 @@ func GetLastUsedPlain() string {
 }
 
 // DoHResponse represents a JSON DNS response
-//
 type DoHDnsRecord struct {
 	Name string `json:"name"`
 	Type int    `json:"type"`
@@ -294,7 +293,7 @@ func QueryDoHDns(ctx context.Context, target string, qtype int) (*DoHResponse, [
 			lastErr = err
 			continue
 		}
-		
+
 		body, err := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {

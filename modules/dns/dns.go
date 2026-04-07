@@ -21,13 +21,15 @@ func (m *module) Name() string {
 // Capabilities declares the module's contract (inputs and functions) to the system core.
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
-		Functions:  []string{"get_ip", "get_caa", "get_ns", "get_soa", "get_cname", "check_wildcard", "get_domainkey", "get_dmarc", "get_dkim", "get_mx", "get_txt", "get_srv", "get_nsec"},
+		Functions:  []string{"get_ip", "get_caa", "get_ns", "get_soa", "get_cname", "check_wildcard", "get_domainkey", "get_dmarc", "get_dkim", "get_mx", "get_txt", "get_srv", "get_nsec", "get_loc"},
 		InputTypes: []string{"domain", "subdomain"},
 	}, nil
 }
 
 // Exec acts as the stateless execution pipeline for incoming requests,
 // isolating the core routing from the underlying network extraction logic.
+//
+//nolint:gocyclo // router switch naturally grows linearly
 func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	executions := make([]schema.ModuleExecution, 0, len(data.Functions))
 
@@ -61,6 +63,8 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 			execution = getSRVData(data.Target.Value)
 		case "get_nsec":
 			execution = getNSECData(data.Target.Value)
+		case "get_loc":
+			execution = getLOCData(data.Target.Value)
 		default:
 			errMsg := "unsupported function: " + f
 			execution = schema.ModuleExecution{
