@@ -30,10 +30,9 @@ var (
 	dohIndex     atomic.Uint32
 	plainIndex   atomic.Uint32
 
-	// LastUsedDoH tracks the last used DoH resolution target for debug metrics.
-	LastUsedDoH string
-	// LastUsedPlain tracks the last used Plain DNS resolution target for debug metrics.
-	LastUsedPlain string
+	lastUsedMu sync.RWMutex
+	lastUsedDoH   string
+	lastUsedPlain string
 
 	// Timeout controls default network dials across modules.
 	Timeout = 5 * time.Second
@@ -157,7 +156,11 @@ func resolveNextDoH() string {
 	idx := dohIndex.Add(1)
 	//nolint:gosec // modulo on small length
 	server := dohServers[int(idx%uint32(len(dohServers)))]
-	LastUsedDoH = server
+
+	lastUsedMu.Lock()
+	lastUsedDoH = server
+	lastUsedMu.Unlock()
+
 	return server
 }
 
@@ -165,8 +168,26 @@ func resolveNextPlain() string {
 	idx := plainIndex.Add(1)
 	//nolint:gosec // modulo on small length
 	server := plainServers[int(idx%uint32(len(plainServers)))]
-	LastUsedPlain = server
+
+	lastUsedMu.Lock()
+	lastUsedPlain = server
+	lastUsedMu.Unlock()
+
 	return server
+}
+
+// GetLastUsedDoH safely retrieves the last used DoH domain.
+func GetLastUsedDoH() string {
+	lastUsedMu.RLock()
+	defer lastUsedMu.RUnlock()
+	return lastUsedDoH
+}
+
+// GetLastUsedPlain safely retrieves the last used Plain DNS server.
+func GetLastUsedPlain() string {
+	lastUsedMu.RLock()
+	defer lastUsedMu.RUnlock()
+	return lastUsedPlain
 }
 
 // DoHResponse represents a JSON DNS response

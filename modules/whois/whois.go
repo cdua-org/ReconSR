@@ -120,7 +120,7 @@ func (m *module) getWhoisData(target string) schema.ModuleExecution {
 
 	debugVal, debugOk := resolver.GetOption("Debug")
 	if debugOk && strings.EqualFold(debugVal, "true") {
-		fmt.Fprintf(os.Stderr, "[whois-debug] method=%q usedDNS=%q rawLen=%d\n", methodUsed, resolver.LastUsedPlain, len(rawData))
+		fmt.Fprintf(os.Stderr, "[whois-debug] method=%q usedDNS=%q rawLen=%d\n", methodUsed, resolver.GetLastUsedPlain(), len(rawData))
 		if rawData != "" {
 			sample := rawData
 			if len(sample) > 300 {
