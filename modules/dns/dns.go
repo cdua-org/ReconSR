@@ -21,7 +21,7 @@ func (m *module) Name() string {
 // Capabilities declares the module's contract (inputs and functions) to the system core.
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
-		Functions:  []string{"get_ip", "get_caa", "get_ns", "get_soa", "get_cname", "check_wildcard", "get_domainkey", "get_dmarc", "get_dkim", "get_mx", "get_txt", "get_srv", "get_nsec", "get_loc", "get_hinfo", "get_rp", "get_uri", "get_svcb"},
+		Functions:  []string{"get_ip", "get_caa", "get_ns", "get_soa", "get_cname", "check_wildcard", "get_domainkey", "get_dmarc", "get_dkim", "get_mx", "get_txt", "get_srv", "get_nsec", "get_loc", "get_hinfo", "get_rp", "get_uri", "get_svcb", "get_sshfp"},
 		InputTypes: []string{"domain", "subdomain"},
 	}, nil
 }
@@ -73,6 +73,8 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 			execution = getURIData(data.Target.Value)
 		case "get_svcb":
 			execution = getSVCBData(data.Target.Value)
+		case "get_sshfp":
+			execution = getSSHFPData(data.Target.Value)
 		default:
 			errMsg := "unsupported function: " + f
 			execution = schema.ModuleExecution{
