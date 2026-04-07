@@ -48,7 +48,7 @@ func TestSafeString(t *testing.T) {
 	}
 }
 
-func TestParseWHOIS(t *testing.T) {
+func TestParseWHOIS_ICANN(t *testing.T) {
 	rawWHOIS := `
 Domain Name: EXAMPLE.COM
 Registry Domain ID: 123456789_DOMAIN_COM-VRSN
@@ -129,8 +129,262 @@ Tech Email: tech@tech.com
 
 	got := parseWHOIS(rawWHOIS)
 	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("parseWHOIS() mismatch\nGot:  %+v\nWant: %+v", got, expected)
+		t.Errorf("parseWHOIS(ICANN) mismatch\nGot:  %+v\nWant: %+v", got, expected)
 	}
+}
+
+// TestParseWHOIS_EDUCAUSE validates EDUCAUSE tab-indented freeform format
+// with org-on-line-1 heuristic (lineIndex==1 without digits → Organization).
+func TestParseWHOIS_EDUCAUSE(t *testing.T) {
+	rawWHOIS := `Domain Name: TESTUNI.EDU
+
+Registrant:
+	Testland University
+	42 Campus Drive
+	Testville, TS 99001
+	US
+
+Administrative Contact:
+	Alice Tester
+	Testland University
+	Admin Bldg Room 101, 42 Campus Drive
+	Testville, TS 99001-1234
+	US
+	+1.5550001111
+	alice@testuni.fake
+
+Technical Contact:
+	NetOps Team
+	Testland University
+	NOC Room 202, 42 Campus Drive
+	Testville, TS 99001-1234
+	US
+	+1.5550002222
+	noc@testuni.fake
+
+Name Servers:
+	NS1.TESTUNI.FAKE
+	NS2.TESTUNI.FAKE
+
+Domain record activated:    01-Jan-1990
+Domain record last updated: 15-Mar-2026
+Domain expires:             31-Dec-2027
+`
+
+	got := parseWHOIS(rawWHOIS)
+
+	assertEq(t, "CreationDate", got.CreationDate, "01-Jan-1990")
+	assertEq(t, "UpdatedDate", got.UpdatedDate, "15-Mar-2026")
+	assertEq(t, "ExpirationDate", got.ExpirationDate, "31-Dec-2027")
+
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.testuni.fake", "ns2.testuni.fake"})
+
+	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Testland University"})
+	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"42 Campus Drive", "Testville, TS 99001", "US"})
+
+	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"Alice Tester"})
+	assertSlice(t, "Admin.Organization", got.Admin.Organization, []string{"Testland University"})
+	assertSlice(t, "Admin.Email", got.Admin.Email, []string{"alice@testuni.fake"})
+	assertSlice(t, "Admin.Phone", got.Admin.Phone, []string{"+1.5550001111"})
+	assertSlice(t, "Admin.Address", got.Admin.Address,
+		[]string{"Admin Bldg Room 101, 42 Campus Drive", "Testville, TS 99001-1234", "US"})
+
+	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"NetOps Team"})
+	assertSlice(t, "Tech.Organization", got.Tech.Organization, []string{"Testland University"})
+	assertSlice(t, "Tech.Email", got.Tech.Email, []string{"noc@testuni.fake"})
+	assertSlice(t, "Tech.Phone", got.Tech.Phone, []string{"+1.5550002222"})
+}
+
+// TestParseWHOIS_JPRS1 validates JPRS format 1 (letter-prefixed bracket fields).
+func TestParseWHOIS_JPRS1(t *testing.T) {
+	rawWHOIS := `[ JPRS database provides information on network administration. ]
+Domain Information:
+a. [Domain Name]                FAKECORP.CO.JP
+g. [Organization]               Fake Corporation
+l. [Organization Type]          Corporation
+m. [Administrative Contact]     AB12345JP
+n. [Technical Contact]          CD67890JP
+n. [Technical Contact]          EF11111JP
+p. [Name Server]                ns1.fake.example
+p. [Name Server]                ns2.fake.example
+s. [Signing Key]                
+[State]                         Connected (2028/06/30)
+[Registered Date]                
+[Connected Date]                2015/07/01
+[Last Update]                   2026/03/15 10:30:00 (JST)
+`
+
+	got := parseWHOIS(rawWHOIS)
+
+	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake Corporation"})
+	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"AB12345JP"})
+	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"CD67890JP", "EF11111JP"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.example", "ns2.fake.example"})
+	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"Connected (2028/06/30)"})
+	assertEq(t, "CreationDate", got.CreationDate, "2015/07/01")
+	assertEq(t, "UpdatedDate", got.UpdatedDate, "2026/03/15 10:30:00 (JST)")
+}
+
+// TestParseWHOIS_JPRS2 validates JPRS format 2 (bracket fields without
+// letter prefix) including Contact Information with continuation lines.
+func TestParseWHOIS_JPRS2(t *testing.T) {
+	rawWHOIS := `Domain Information:
+[Domain Name]                   FAKESTORE.JP
+
+[Registrant]                    Fake Store Inc.
+
+[Name Server]                   ns1.fakecdn.example
+[Name Server]                   ns2.fakecdn.example
+[Signing Key]                   
+
+[Created on]                    2005/04/10
+[Expires on]                    2028/04/10
+[Status]                        Active
+[Lock Status]                   DomainTransferLocked
+[Last Updated]                  2026/02/20 09:15:00 (JST)
+
+Contact Information:
+[Name]                          Proxy Solutions Ltd. Fake
+[Email]                         proxy@fakeprivacy.example
+[Web Page]                       
+[Postal code]                   100-0001
+[Postal Address]                Fake Tower 5F, 1-2-3 Marunouchi
+                                Chiyoda-ku, Tokyo
+[Phone]                         +81.312345678
+[Fax]                           +81.312345679
+`
+
+	got := parseWHOIS(rawWHOIS)
+
+	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake Store Inc."})
+	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Proxy Solutions Ltd. Fake"})
+	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"proxy@fakeprivacy.example"})
+	assertSlice(t, "Registrant.Phone", got.Registrant.Phone, []string{"+81.312345678", "+81.312345679"})
+	assertSlice(t, "Registrant.Address", got.Registrant.Address,
+		[]string{"100-0001", "Fake Tower 5F, 1-2-3 Marunouchi", "Chiyoda-ku, Tokyo"})
+
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fakecdn.example", "ns2.fakecdn.example"})
+	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"Active", "DomainTransferLocked"})
+	assertEq(t, "CreationDate", got.CreationDate, "2005/04/10")
+	assertEq(t, "ExpirationDate", got.ExpirationDate, "2028/04/10")
+	assertEq(t, "UpdatedDate", got.UpdatedDate, "2026/02/20 09:15:00 (JST)")
+}
+
+// TestParseWHOIS_NICMexico validates NIC Mexico format with rpsl-style
+// indented sections and DNS: name server format.
+func TestParseWHOIS_NICMexico(t *testing.T) {
+	rawWHOIS := `Domain Name:       fakeshop.com.mx
+
+Created On:        2010-05-15
+Expiration Date:   2028-05-15
+Last Updated On:   2026-03-01
+Registrar:         FakeRegistrar
+URL:               http://www.fakeregistrar.example/
+
+Registrant:
+   Name:           Domain Ops
+   City:           Faketown
+   State:          Fakestate
+   Country:        Fakeland
+
+Administrative Contact:
+   Name:           Domain Ops
+   City:           Faketown
+   State:          Fakestate
+   Country:        Fakeland
+
+Technical Contact:
+   Name:           Domain Ops
+   City:           Faketown
+   State:          Fakestate
+   Country:        Fakeland
+
+Billing Contact:
+   Name:           Billing Team
+   City:           Otherville
+   State:          Otherstate
+   Country:        Fakeland
+
+Name Servers:
+   DNS:            ns1.fakeshop.example
+   DNS:            ns2.fakeshop.example
+
+DNSSEC DS Records:
+`
+
+	got := parseWHOIS(rawWHOIS)
+
+	assertEq(t, "CreationDate", got.CreationDate, "2010-05-15")
+	assertEq(t, "ExpirationDate", got.ExpirationDate, "2028-05-15")
+	assertEq(t, "UpdatedDate", got.UpdatedDate, "2026-03-01")
+	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"FakeRegistrar"})
+	assertEq(t, "RegistrarURL", got.RegistrarURL, "http://www.fakeregistrar.example/")
+
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fakeshop.example", "ns2.fakeshop.example"})
+
+	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Domain Ops"})
+	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"Faketown", "Fakestate", "Fakeland"})
+
+	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"Domain Ops"})
+	assertSlice(t, "Admin.Address", got.Admin.Address, []string{"Faketown", "Fakestate", "Fakeland"})
+
+	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"Domain Ops"})
+	assertSlice(t, "Tech.Address", got.Tech.Address, []string{"Faketown", "Fakestate", "Fakeland"})
+
+	// Billing Contact must not leak into other contacts.
+	assertSlice(t, "Billing.Name", got.Billing.Name, []string{"Billing Team"})
+	assertSlice(t, "Billing.Address", got.Billing.Address, []string{"Otherville", "Otherstate", "Fakeland"})
+}
+
+// TestParseWHOIS_KRNIC validates Korean KRNIC format with Host Name
+// name servers and Administrative Contact(AC) fields.
+func TestParseWHOIS_KRNIC(t *testing.T) {
+	rawWHOIS := `
+# ENGLISH
+
+Domain Name                 : fakecompany.co.kr
+Registrant                  : Fake Company Ltd
+Registrant Address          : 99, Fake-ro, Gangnam-gu, Seoul
+Registrant Zip Code         : 06100
+Administrative Contact(AC)  : Fake Company Ltd
+AC E-Mail                   : domain@fakecompany.example
+AC Phone Number             : 02-1234-5678
+Registered Date             : 2000. 03. 15.
+Last Updated Date           : 2024. 06. 20.
+Expiration Date             : 2027. 03. 15.
+Publishes                   : Y
+Authorized Agency           : FakeAgent Corp.(http://fakeagent.example)
+DNSSEC                      : unsigned
+Domain Status               : clientTransferProhibited
+
+Primary Name Server
+   Host Name                : ns1.fakecompany.example
+
+Secondary Name Server
+   Host Name                : ns2.fakecompany.example
+   Host Name                : ns3.fakecompany.example
+`
+
+	got := parseWHOIS(rawWHOIS)
+
+	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake Company Ltd"})
+	assertSlice(t, "Registrant.Address", got.Registrant.Address,
+		[]string{"99, Fake-ro, Gangnam-gu, Seoul", "06100"})
+
+	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"Fake Company Ltd"})
+	assertSlice(t, "Admin.Email", got.Admin.Email, []string{"domain@fakecompany.example"})
+	assertSlice(t, "Admin.Phone", got.Admin.Phone, []string{"02-1234-5678"})
+
+	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"FakeAgent Corp.(http://fakeagent.example)"})
+
+	assertEq(t, "CreationDate", got.CreationDate, "2000. 03. 15.")
+	assertEq(t, "UpdatedDate", got.UpdatedDate, "2024. 06. 20.")
+	assertEq(t, "ExpirationDate", got.ExpirationDate, "2027. 03. 15.")
+	assertEq(t, "DNSSEC", got.DNSSEC, "unsigned")
+	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"clientTransferProhibited"})
+
+	assertSlice(t, "NameServers", got.NameServers,
+		[]string{"ns1.fakecompany.example", "ns2.fakecompany.example", "ns3.fakecompany.example"})
 }
 
 func TestParseRDAP(t *testing.T) {
@@ -201,5 +455,21 @@ func TestParseRDAP(t *testing.T) {
 	got := parseRDAP(data)
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("parseRDAP() mismatch\nGot:  %+v\nWant: %+v", got, expected)
+	}
+}
+
+// --- Test helpers ---
+
+func assertEq(t *testing.T, field, got, want string) {
+	t.Helper()
+	if got != want {
+		t.Errorf("%s = %q, want %q", field, got, want)
+	}
+}
+
+func assertSlice(t *testing.T, field string, got, want []string) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("%s = %v, want %v", field, got, want)
 	}
 }

@@ -218,7 +218,7 @@ func parseHostSearch(body string) []schema.ModuleResult {
 			results = append(results, schema.ModuleResult{
 				Type:    "ip",
 				Value:   ip,
-				Context: "HackerTarget Resolved IP",
+				Context: "HackerTarget Resolved IP for " + domain,
 			})
 		}
 	}

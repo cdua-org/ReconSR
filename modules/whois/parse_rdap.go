@@ -1,6 +1,9 @@
 package whois
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 func parseRDAP(data map[string]any) Metadata {
 	m := Metadata{}
@@ -129,8 +132,16 @@ func parseRDAPNameservers(m *Metadata, ns []any) {
 		if !ok {
 			continue
 		}
-		if host := safeString(entry["ldhName"]); host != "" {
-			m.NameServers = append(m.NameServers, strings.ToLower(host))
+		host := safeString(entry["ldhName"])
+		if host == "" {
+			continue
+		}
+		if idx := strings.Index(host, " ["); idx > 0 {
+			host = host[:idx]
+		}
+		host = strings.ToLower(host)
+		if !slices.Contains(m.NameServers, host) {
+			m.NameServers = append(m.NameServers, host)
 		}
 	}
 }

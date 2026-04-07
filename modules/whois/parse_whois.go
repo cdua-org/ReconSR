@@ -3,79 +3,65 @@ package whois
 import (
 	"bufio"
 	"regexp"
+	"slices"
 	"strings"
 )
 
-var whoisPatterns = map[string]*regexp.Regexp{
-	"registrar":   regexp.MustCompile(`(?i)Registrar:\s+(.*)`),
-	"url":         regexp.MustCompile(`(?i)(?:Registrar\s+)?URL:\s+(.*)`),
-	"whoisserver": regexp.MustCompile(`(?i)Registrar\s+WHOIS\s+Server:\s+(.*)`),
-	"ianaid":      regexp.MustCompile(`(?i)Registrar\s+IANA\s+ID:\s+(.*)`),
-	"dnssec":      regexp.MustCompile(`(?i)DNSSEC:\s+(.*)`),
+// postalCodeRe is compiled once at package level to avoid per-call overhead.
+var postalCodeRe = regexp.MustCompile(`^\d{4,6}$`)
 
-	"creation":   regexp.MustCompile(`(?i)(Creation|Created|Registered(?:\s+on)?|Activated)(?:\s+Date)?:\s+(.*)`),
-	"updated":    regexp.MustCompile(`(?i)(Updated|Last\s+Updated|Modified)(?:\s+Date)?:\s+(.*)`),
-	"expiration": regexp.MustCompile(`(?i)(Registry\s+Expiry|Expiration|Expiry|Expires)(?:\s+Date)?:\s+(.*)`),
-	"ns":         regexp.MustCompile(`(?i)(Name\s+Server|nserver):\s+(.*)`),
-	"status":     regexp.MustCompile(`(?i)(Domain\s+)?Status:\s+(.*)`),
+// --- Section header detection (table-driven) ---
 
-	"reg_name":  regexp.MustCompile(`(?i)Registrant\s+Name:\s+(.*)`),
-	"reg_org":   regexp.MustCompile(`(?i)Registrant\s+Organization:\s+(.*)`),
-	"reg_email": regexp.MustCompile(`(?i)Registrant\s+Email:\s+(.*)`),
-	"reg_addr":  regexp.MustCompile(`(?i)Registrant\s+(?:Street|Address|City|State/Province|Postal Code|Country):\s+(.*)`),
-	"reg_phone": regexp.MustCompile(`(?i)Registrant\s+Phone:\s+(.*)`),
+type roleMarker struct {
+	pattern  string
+	role     string
+	isPrefix bool
+}
 
-	"admin_name":  regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Name:\s+(.*)`),
-	"admin_org":   regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Organization:\s+(.*)`),
-	"admin_email": regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Email:\s+(.*)`),
-	"admin_addr":  regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+(?:Street|Address|City|State/Province|Postal Code|Country):\s+(.*)`),
-	"admin_phone": regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Phone:\s+(.*)`),
+// roleMarkers defines section headers in priority order.
+// Contains-based checks (colon-bearing) precede HasPrefix checks (bare words)
+// to ensure correct precedence on overlap.
+var roleMarkers = []roleMarker{
+	// Contains: generic ICANN / RPSL / EDUCAUSE
+	{"registrar:", roleRegistrar, false},
+	{"registrant:", roleRegistrant, false},
+	{"administrative contact:", roleAdministrative, false},
+	{"billing contact:", roleBilling, false},
+	{"admin:", roleAdministrative, false},
+	{"administrative:", roleAdministrative, false},
+	{"technical contact:", roleTechnical, false},
+	{"tech:", roleTechnical, false},
+	{"technical:", roleTechnical, false},
+	{"abuse:", roleAbuse, false},
+	{"name servers:", roleNameServers, false},
 
-	"tech_name":  regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Name:\s+(.*)`),
-	"tech_org":   regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Organization:\s+(.*)`),
-	"tech_email": regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Email:\s+(.*)`),
-	"tech_addr":  regexp.MustCompile(`(?i)(?:Tech|Technical)\s+(?:Street|Address|City|State/Province|Postal Code|Country):\s+(.*)`),
-	"tech_phone": regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Phone:\s+(.*)`),
+	// Prefix: Italian bare-word sections
+	{"admin contact", roleAdministrative, true},
+	{"nameservers", roleNameServers, true},
 
-	"billing_name":  regexp.MustCompile(`(?i)Billing\s+Name:\s+(.*)`),
-	"billing_org":   regexp.MustCompile(`(?i)Billing\s+Organization:\s+(.*)`),
-	"billing_email": regexp.MustCompile(`(?i)Billing\s+Email:\s+(.*)`),
-	"billing_addr":  regexp.MustCompile(`(?i)Billing\s+(?:Street|Address|City|State/Province|Postal Code|Country):\s+(.*)`),
-	"billing_phone": regexp.MustCompile(`(?i)Billing\s+Phone:\s+(.*)`),
+	// Prefix: Korean name server sections
+	{"primary name server", roleNameServers, true},
+	{"secondary name server", roleNameServers, true},
 
-	"abuse_email": regexp.MustCompile(`(?i)Registrar\s+Abuse\s+Contact\s+Email:\s+(.*)`),
-	"abuse_phone": regexp.MustCompile(`(?i)Registrar\s+Abuse\s+Contact\s+Phone:\s+(.*)`),
-
-	"rpsl_name":  regexp.MustCompile(`(?i)^\s*(?:person|name)(?:-loc)?:\s+(.*)`),
-	"rpsl_org":   regexp.MustCompile(`(?i)^\s*(?:organization|org)(?:-loc)?:\s+(.*)`),
-	"rpsl_email": regexp.MustCompile(`(?i)^\s*(?:e-mail|email|abuse-email):\s+(.*)`),
-	"rpsl_addr":  regexp.MustCompile(`(?i)^\s*(?:address|street|city|state|postal-code|country|abuse-postal)(?:-loc)?:\s+(.*)`),
-	"rpsl_phone": regexp.MustCompile(`(?i)^\s*(?:phone|tel|abuse-phone|fax)(?:-loc)?:\s+(.*)`),
+	// Prefix: Austrian RPSL-style sections
+	{"tech-c:", roleTechnical, true},
+	{"admin-c:", roleAdministrative, true},
 }
 
 func updateRoleContext(lineLower, currentRole string) string {
-	switch {
-	case strings.Contains(lineLower, "registrar:"):
-		return roleRegistrar
-	case strings.Contains(lineLower, "registrant:"):
-		return roleRegistrant
-	case strings.Contains(lineLower, "administrative contact:") ||
-		strings.Contains(lineLower, "admin:") ||
-		strings.Contains(lineLower, "administrative:"):
-		return roleAdministrative
-	case strings.Contains(lineLower, "technical contact:") ||
-		strings.Contains(lineLower, "tech:") ||
-		strings.Contains(lineLower, "technical:"):
-		return roleTechnical
-	case strings.Contains(lineLower, "abuse:"):
-		return roleAbuse
-	case strings.Contains(lineLower, "name servers:"):
-		return roleNameServers
+	for _, m := range roleMarkers {
+		if m.isPrefix {
+			if strings.HasPrefix(lineLower, m.pattern) {
+				return m.role
+			}
+		} else if strings.Contains(lineLower, m.pattern) {
+			return m.role
+		}
 	}
 
 	// Lines ending with ":" without a value indicate an unknown section
-	// header (e.g., "Relevant dates:", "Registration status:"). Reset
-	// role to prevent data leakage from prior sections.
+	// header (e.g., "Relevant dates:", "Registration status:").
+	// Reset role to prevent data leakage from prior sections.
 	if strings.HasSuffix(lineLower, ":") {
 		return ""
 	}
@@ -83,88 +69,120 @@ func updateRoleContext(lineLower, currentRole string) string {
 	return currentRole
 }
 
-func applyRPSLMatch(m *Metadata, currentRole, lineLower, field, val string) {
-	if strings.HasPrefix(lineLower, "abuse-") {
-		applyContactMatch(&m.Abuse, "abuse_"+field, "abuse_", val)
-		return
-	}
+// --- Regex patterns (all zones consolidated) ---
 
-	var target *Contact
-	switch currentRole {
-	case roleRegistrar:
-		target = &m.Registrar
-	case roleRegistrant:
-		target = &m.Registrant
-	case roleAdministrative:
-		target = &m.Admin
-	case roleTechnical:
-		target = &m.Tech
-	}
+var whoisPatterns = map[string]*regexp.Regexp{
+	// Generic ICANN
+	"registrar":   regexp.MustCompile(`(?i)Registrar\s*:\s+(.*)`),
+	"url":         regexp.MustCompile(`(?i)(?:Registrar\s+)?(?:URL|Web)\s*:\s+(.*)`),
+	"whoisserver": regexp.MustCompile(`(?i)Registrar\s+WHOIS\s+Server\s*:\s+(.*)`),
+	"ianaid":      regexp.MustCompile(`(?i)Registrar\s+IANA\s+ID\s*:\s+(.*)`),
+	"dnssec":      regexp.MustCompile(`(?i)DNSSEC\s*:\s*(.*)`),
 
-	if target != nil {
-		switch field {
-		case "name":
-			target.Name = appendUnique(target.Name, val)
-		case fieldOrg:
-			target.Organization = appendUnique(target.Organization, val)
-		case fieldEmail:
-			target.Email = appendUnique(target.Email, val)
-		case "addr":
-			target.Address = appendUnique(target.Address, val)
-		case "phone":
-			target.Phone = appendUnique(target.Phone, val)
-		}
-	}
+	"creation":   regexp.MustCompile(`(?i)(Creation|Created(?:\s+On)?|Registered(?:\s+on)?|Activated|Registration\s+Time|Registered\s+Time)(?:\s+Date)?\s*:\s+(.*)`),
+	"updated":    regexp.MustCompile(`(?i)(Updated|Last\s+Updated(?:\s+On)?|Last\s+Update|Modified|Changed)(?:\s+Date)?\s*:\s+(.*)`),
+	"expiration": regexp.MustCompile(`(?i)(Registry\s+Expiry|Expiration|Expiry|Expire|Expires|Expiration\s+Time)(?:\s+Date)?\s*:\s+(.*)`),
+	"ns":         regexp.MustCompile(`(?i)(Name\s+Server|nserver|DNS)\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
+	"status":     regexp.MustCompile(`(?i)(Domain\s+)?Status\s*:\s+(.*)`),
+
+	// Registrant contact (ICANN standard)
+	"reg_name":  regexp.MustCompile(`(?i)Registrant\s+Name\s*:\s+(.*)`),
+	"reg_org":   regexp.MustCompile(`(?i)Registrant\s+Organization\s*:\s+(.*)`),
+	"reg_email": regexp.MustCompile(`(?i)Registrant\s+Email\s*:\s+(.*)`),
+	"reg_addr":  regexp.MustCompile(`(?i)Registrant\s+(?:Street|Address|City|State/Province|Postal Code|Country|Zip\s+Code)\s*:\s+(.*)`),
+	"reg_phone": regexp.MustCompile(`(?i)Registrant\s+Phone\s*:\s+(.*)`),
+
+	// Admin contact (ICANN standard)
+	"admin_name":  regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Name\s*:\s+(.*)`),
+	"admin_org":   regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Organization\s*:\s+(.*)`),
+	"admin_email": regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Email\s*:\s+(.*)`),
+	"admin_addr":  regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+(?:Street|Address|City|State/Province|Postal Code|Country)\s*:\s+(.*)`),
+	"admin_phone": regexp.MustCompile(`(?i)(?:Admin|Administrative)\s+Phone\s*:\s+(.*)`),
+
+	// Tech contact (ICANN standard)
+	"tech_name":  regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Name\s*:\s+(.*)`),
+	"tech_org":   regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Organization\s*:\s+(.*)`),
+	"tech_email": regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Email\s*:\s+(.*)`),
+	"tech_addr":  regexp.MustCompile(`(?i)(?:Tech|Technical)\s+(?:Street|Address|City|State/Province|Postal Code|Country)\s*:\s+(.*)`),
+	"tech_phone": regexp.MustCompile(`(?i)(?:Tech|Technical)\s+Phone\s*:\s+(.*)`),
+
+	// Billing contact (ICANN standard)
+	"billing_name":  regexp.MustCompile(`(?i)Billing\s+Name\s*:\s+(.*)`),
+	"billing_org":   regexp.MustCompile(`(?i)Billing\s+Organization\s*:\s+(.*)`),
+	"billing_email": regexp.MustCompile(`(?i)Billing\s+Email\s*:\s+(.*)`),
+	"billing_addr":  regexp.MustCompile(`(?i)Billing\s+(?:Street|Address|City|State/Province|Postal Code|Country)\s*:\s+(.*)`),
+	"billing_phone": regexp.MustCompile(`(?i)Billing\s+Phone\s*:\s+(.*)`),
+
+	// Abuse contact
+	"abuse_email": regexp.MustCompile(`(?i)Registrar\s+Abuse\s+Contact\s+Email\s*:\s+(.*)`),
+	"abuse_phone": regexp.MustCompile(`(?i)Registrar\s+Abuse\s+Contact\s+Phone\s*:\s+(.*)`),
+
+	// RPSL / generic unstructured
+	"rpsl_name":  regexp.MustCompile(`(?i)^\s*(?:person|name)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_org":   regexp.MustCompile(`(?i)^\s*(?:organization|org)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_email": regexp.MustCompile(`(?i)^\s*(?:e-mail|email|abuse-email)\s*:\s+(.*)`),
+	"rpsl_addr":  regexp.MustCompile(`(?i)^\s*(?:address|street(?:\s+address)?|city|state|postal[\s-]code|country|abuse-postal)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_phone": regexp.MustCompile(`(?i)^\s*(?:phone|tel|abuse-phone|fax)(?:-loc)?\s*:\s+(.*)`),
+
+	// Chinese WHOIS
+	"cn_registrant":       regexp.MustCompile(`(?i)Registrant\s*:\s+(.+)`),
+	"cn_registrant_email": regexp.MustCompile(`(?i)Registrant\s+Contact\s+Email\s*:\s+(.+)`),
+
+	// Japanese WHOIS (JPRS format 1)
+	"jp_domain":      regexp.MustCompile(`(?i)a\.\s*\[Domain\s+Name\]\s+(.+)`),
+	"jp_org":         regexp.MustCompile(`(?i)g\.\s*\[Organization\]\s+(.+)`),
+	"jp_org_type":    regexp.MustCompile(`(?i)l\.\s*\[Organization\s+Type\]\s+(.+)`),
+	"jp_admin":       regexp.MustCompile(`(?i)m\.\s*\[Administrative\s+Contact\]\s+(.+)`),
+	"jp_tech":        regexp.MustCompile(`(?i)n\.\s*\[Technical\s+Contact\]\s+(.+)`),
+	"jp_registered":  regexp.MustCompile(`(?i)\[Registered\s+Date\]\s+(.+)`),
+	"jp_connected":   regexp.MustCompile(`(?i)\[Connected\s+Date\]\s+(.+)`),
+	"jp_last_update": regexp.MustCompile(`(?i)\[Last\s+Update\]\s+(.+)`),
+	"jp_state":       regexp.MustCompile(`(?i)\[State\]\s+(.+)`),
+	"jp_lock":        regexp.MustCompile(`(?i)\[Lock\s+Status\]\s+(.+)`),
+	"ns_jp":          regexp.MustCompile(`(?i)p\.\s*\[Name\s+Server\]\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
+
+	// Japanese WHOIS (JPRS format 2 — bracket style)
+	"jp2_ns":            regexp.MustCompile(`(?i)\[Name\s+Server\]\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
+	"jp2_created":       regexp.MustCompile(`(?i)\[Created\s+on\]\s+(.+)`),
+	"jp2_expires":       regexp.MustCompile(`(?i)\[Expires\s+on\]\s+(.+)`),
+	"jp2_status":        regexp.MustCompile(`(?i)\[Status\]\s+(.+)`),
+	"jp2_registrant":    regexp.MustCompile(`(?i)\[Registrant\]\s+(.+)`),
+	"jp2_lock":          regexp.MustCompile(`(?i)\[Lock\s+Status\]\s+(.+)`),
+	"jp2_updated":       regexp.MustCompile(`(?i)\[Last\s+Updated\]\s+(.+)`),
+	"jp2_contact_name":  regexp.MustCompile(`(?i)\[Name\]\s+(.+)`),
+	"jp2_contact_email": regexp.MustCompile(`(?i)\[Email\]\s+(.+)`),
+	"jp2_postal_code":   regexp.MustCompile(`(?i)\[Postal\s+code\]\s+(.+)`),
+	"jp2_address":       regexp.MustCompile(`(?i)\[Postal\s+Address\]\s+(.+)`),
+	"jp2_phone":         regexp.MustCompile(`(?i)\[Phone\]\s+(.+)`),
+	"jp2_fax":           regexp.MustCompile(`(?i)\[Fax\]\s+(.+)`),
+
+	// Austrian .at WHOIS
+	"at_personname":   regexp.MustCompile(`(?i)^\s*personname:\s+(.*)`),
+	"at_organization": regexp.MustCompile(`(?i)^\s*organization:\s+(.*)`),
+	"at_changed":      regexp.MustCompile(`(?i)^\s*changed:\s+(.*)`),
+	"at_registrar":    regexp.MustCompile(`(?i)^\s*registrar:\s+(.*)`),
+	"at_registrant":   regexp.MustCompile(`(?i)^\s*registrant:\s+(.*)`),
+	"at_tech_c":       regexp.MustCompile(`(?i)^\s*tech-c:\s+(.*)`),
+	"at_admin_c":      regexp.MustCompile(`(?i)^\s*admin-c:\s+(.*)`),
+	"at_nserver":      regexp.MustCompile(`(?i)^\s*nserver:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
+
+	// Korean .kr WHOIS
+	"kr_hostname": regexp.MustCompile(`(?i)Host\s+Name\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
+	"kr_agency":   regexp.MustCompile(`(?i)Authorized\s+Agency\s*:\s+(.*)`),
+	"kr_ac_name":  regexp.MustCompile(`(?i)Administrative\s+Contact\(AC\)\s*:\s+(.*)`),
+	"kr_ac_email": regexp.MustCompile(`(?i)AC\s+E-Mail\s*:\s+(.*)`),
+	"kr_ac_phone": regexp.MustCompile(`(?i)AC\s+Phone\s+Number\s*:\s+(.*)`),
+	"kr_reg_zip":  regexp.MustCompile(`(?i)Registrant\s+Zip\s+Code\s*:\s+(.*)`),
 }
 
-// classifyIndentedLine routes indented freeform lines (EDUCAUSE, .uk registry)
-// to the appropriate contact field using content-based heuristics.
-func classifyIndentedLine(m *Metadata, role, line string, lineIndex int) {
-	if role == roleNameServers {
-		host := strings.Fields(line)[0]
-		if strings.Contains(host, ".") {
-			m.NameServers = append(m.NameServers, strings.ToLower(host))
-		}
-		return
-	}
-
-	var target *Contact
-	switch role {
-	case roleRegistrar:
-		target = &m.Registrar
-	case roleRegistrant:
-		target = &m.Registrant
-	case roleAdministrative:
-		target = &m.Admin
-	case roleTechnical:
-		target = &m.Tech
-	case roleAbuse:
-		target = &m.Abuse
-	default:
-		return
-	}
-
-	switch {
-	case strings.Contains(line, "@"):
-		target.Email = appendUnique(target.Email, line)
-	case strings.HasPrefix(line, "+"):
-		target.Phone = appendUnique(target.Phone, line)
-	case lineIndex == 0:
-		target.Name = appendUnique(target.Name, line)
-	default:
-		target.Address = appendUnique(target.Address, line)
-	}
-}
-
-func isIndented(rawLine string) bool {
-	return strings.HasPrefix(rawLine, "\t") || strings.HasPrefix(rawLine, "    ")
-}
+// --- Core parser ---
 
 func parseWHOIS(raw string) Metadata {
 	m := Metadata{}
 	scanner := bufio.NewScanner(strings.NewReader(raw))
 	currentRole := ""
 	indentedIndex := 0
+	lastKey := ""
 
 	for scanner.Scan() {
 		rawLine := scanner.Text()
@@ -192,17 +210,173 @@ func parseWHOIS(raw string) Metadata {
 			} else {
 				applyWHOISMatch(&m, key, val)
 			}
+			lastKey = key
+			break
 		}
 
-		// Fallback: indented freeform lines (EDUCAUSE tabs, .uk spaces).
-		// Skip when the line is itself a section header (roleChanged).
-		if !matched && !roleChanged && isIndented(rawLine) && line != "" && currentRole != "" {
+		if matched || roleChanged || line == "" {
+			continue
+		}
+
+		// Continuation lines: deep indentation (16+ spaces) without a
+		// field prefix indicates a multi-line value from the previous field
+		// (e.g., JPRS [Postal Address] spanning two lines).
+		if lastKey != "" && leadingSpaces(rawLine) >= 16 && !strings.HasPrefix(line, "[") {
+			applyContinuation(&m, lastKey, line)
+			continue
+		}
+
+		// Fallback for bare NS hostnames (Italian 2-space indent, etc.).
+		if currentRole == roleNameServers {
+			addNameServer(&m, strings.Fields(line)[0])
+		} else if isIndented(rawLine) && currentRole != "" {
+			// Indented freeform lines (EDUCAUSE tabs, .uk/.it spaces).
 			classifyIndentedLine(&m, currentRole, line, indentedIndex)
 			indentedIndex++
 		}
 	}
 	return m
 }
+
+// --- NS deduplication helper (DRY) ---
+
+func addNameServer(m *Metadata, val string) {
+	hostname := strings.TrimSuffix(strings.TrimSpace(val), ".")
+	if hostname == "" || !strings.Contains(hostname, ".") {
+		return
+	}
+	hostname = strings.ToLower(hostname)
+	if !slices.Contains(m.NameServers, hostname) {
+		m.NameServers = append(m.NameServers, hostname)
+	}
+}
+
+// leadingSpaces returns the number of leading space characters in a raw line.
+func leadingSpaces(rawLine string) int {
+	return len(rawLine) - len(strings.TrimLeft(rawLine, " "))
+}
+
+// applyContinuation appends a multi-line continuation value to the same
+// metadata field that was populated by the previous regex match (lastKey).
+func applyContinuation(m *Metadata, lastKey, val string) {
+	switch lastKey {
+	case "jp2_address", "reg_addr", "admin_addr", "tech_addr",
+		"billing_addr", "rpsl_addr", "at_street", "at_postal",
+		"at_city", "at_country":
+		m.Registrant.Address = appendUnique(m.Registrant.Address, val)
+	case "jp2_postal_code", "kr_reg_zip":
+		m.Registrant.Address = appendUnique(m.Registrant.Address, val)
+	}
+}
+
+// --- RPSL match ---
+
+func applyRPSLMatch(m *Metadata, currentRole, lineLower, field, val string) {
+	if strings.HasPrefix(lineLower, "abuse-") {
+		applyContactMatch(&m.Abuse, "abuse_"+field, "abuse_", val)
+		return
+	}
+
+	var target *Contact
+	switch currentRole {
+	case roleRegistrar:
+		target = &m.Registrar
+	case roleRegistrant:
+		target = &m.Registrant
+	case roleAdministrative:
+		target = &m.Admin
+	case roleTechnical:
+		target = &m.Tech
+	case roleBilling:
+		target = &m.Billing
+	}
+
+	if target != nil {
+		switch field {
+		case "name":
+			target.Name = appendUnique(target.Name, val)
+		case fieldOrg:
+			target.Organization = appendUnique(target.Organization, val)
+		case fieldEmail:
+			target.Email = appendUnique(target.Email, val)
+		case "addr":
+			target.Address = appendUnique(target.Address, val)
+		case "phone":
+			target.Phone = appendUnique(target.Phone, val)
+		}
+	}
+}
+
+// --- Freeform indented-line classification ---
+
+func classifyIndentedLine(m *Metadata, role, line string, lineIndex int) {
+	if role == roleNameServers {
+		addNameServer(m, strings.Fields(line)[0])
+		return
+	}
+
+	var target *Contact
+	switch role {
+	case roleRegistrar:
+		target = &m.Registrar
+	case roleRegistrant:
+		target = &m.Registrant
+	case roleAdministrative:
+		target = &m.Admin
+	case roleTechnical:
+		target = &m.Tech
+	case roleAbuse:
+		target = &m.Abuse
+	case roleBilling:
+		target = &m.Billing
+	default:
+		return
+	}
+
+	switch {
+	case strings.Contains(line, "@"):
+		target.Email = appendUnique(target.Email, line)
+	case strings.HasPrefix(line, "+"):
+		target.Phone = appendUnique(target.Phone, line)
+	case lineIndex == 0 && !isLikelyAddress(line):
+		target.Name = appendUnique(target.Name, line)
+	case lineIndex == 1 && !strings.ContainsAny(line, "0123456789"):
+		target.Organization = appendUnique(target.Organization, line)
+	default:
+		target.Address = appendUnique(target.Address, line)
+	}
+}
+
+func isIndented(rawLine string) bool {
+	return strings.HasPrefix(rawLine, "\t") || strings.HasPrefix(rawLine, "  ")
+}
+
+// isLikelyAddress detects standalone geographic tokens (country codes,
+// postal codes, city names) that must not be classified as person names.
+func isLikelyAddress(line string) bool {
+	upper := strings.ToUpper(line)
+	if slices.Contains(addressTokens, upper) {
+		return true
+	}
+	return postalCodeRe.MatchString(line)
+}
+
+// addressTokens consolidates country codes, region abbreviations, and
+// major city names used across Italian, Austrian, and generic WHOIS formats.
+var addressTokens = []string{
+	// Country codes
+	"IT", "US", "UK", "DE", "FR", "ES", "AT", "CH", "NL", "BE",
+	// Italian regions
+	"MI", "RM", "TO", "NA", "BA", "PA", "VE", "FI", "BO", "MO",
+	"CT", "TA", "VA", "BS", "PD", "VR", "GE", "FC", "PI",
+	// Major cities
+	"MILANO", "ROMA", "NAPOLI", "TORINO", "PALERMO", "GENOVA",
+	"BOLOGNA", "FIRENZE", "BARI", "CATANIA", "VERONA", "PADOVA",
+	"VENEZIA", "TRIESTE", "BRESCIA", "CAGLIARI", "MESSINA",
+	"TARANTO", "ROMAGNA",
+}
+
+// --- WHOIS match router ---
 
 func applyWHOISMatch(m *Metadata, key, val string) {
 	if applyRegistrarMatch(m, key, val) {
@@ -221,6 +395,18 @@ func applyWHOISMatch(m *Metadata, key, val string) {
 		return
 	}
 	if applyContactMatch(&m.Abuse, key, "abuse_", val) {
+		return
+	}
+	if strings.HasPrefix(key, "jp") || strings.HasPrefix(key, "ns_jp") {
+		applyJPMatch(m, key, val)
+		return
+	}
+	if strings.HasPrefix(key, "at_") {
+		applyAustrianMatch(m, key, val)
+		return
+	}
+	if strings.HasPrefix(key, "kr_") {
+		applyKRMatch(m, key, val)
 		return
 	}
 	applyDomainMatch(m, key, val)
@@ -295,8 +481,14 @@ func applyDomainMatch(m *Metadata, key, val string) {
 			m.ExpirationDate = val
 		}
 	case "ns":
-		m.NameServers = append(m.NameServers, strings.ToLower(val))
+		addNameServer(m, val)
 	case "status":
-		m.DomainStatus = append(m.DomainStatus, val)
+		if !slices.Contains(m.DomainStatus, val) {
+			m.DomainStatus = append(m.DomainStatus, val)
+		}
+	case "cn_registrant":
+		m.Registrant.Organization = appendUnique(m.Registrant.Organization, val)
+	case "cn_registrant_email":
+		m.Registrant.Email = appendUnique(m.Registrant.Email, val)
 	}
 }

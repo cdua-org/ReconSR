@@ -121,22 +121,34 @@ func (m *module) getWhoisData(target string) schema.ModuleExecution {
 	debugVal, debugOk := resolver.GetOption("Debug")
 	if debugOk && strings.EqualFold(debugVal, "true") {
 		fmt.Fprintf(os.Stderr, "[whois-debug] method=%q usedDNS=%q rawLen=%d\n", methodUsed, resolver.LastUsedPlain, len(rawData))
+		if rawData != "" {
+			sample := rawData
+			if len(sample) > 300 {
+				sample = sample[:300] + "..."
+			}
+			fmt.Fprintf(os.Stderr, "[whois-debug] rawSample: %s\n", sample)
+		}
 	}
 
 	execution.RawData = rawData
-	execution.Results = m.buildResults(&metadata, target)
+	execution.Results = m.buildResults(&metadata, target, methodUsed)
 
 	return execution
 }
 
-func (m *module) buildResults(metadata *Metadata, target string) []schema.ModuleResult {
+func (m *module) buildResults(metadata *Metadata, target, methodUsed string) []schema.ModuleResult {
 	var results []schema.ModuleResult
+
+	sourceCtx := "RDAP"
+	if methodUsed == "TCP 43 WHOIS" {
+		sourceCtx = "WHOIS"
+	}
 
 	appendSlice := func(arr []string, typ, prefix string, isOOS bool) {
 		for _, v := range arr {
 			v = strings.TrimSpace(v)
 			if v != "" {
-				results = append(results, m.result(typ, v, prefix, isOOS))
+				results = append(results, m.result(typ, v, prefix+" ("+sourceCtx+")", isOOS))
 			}
 		}
 	}
@@ -155,7 +167,7 @@ func (m *module) buildResults(metadata *Metadata, target string) []schema.Module
 		for _, p := range c.Phone {
 			cleanPhone := normalizePhone(p)
 			if cleanPhone != "" {
-				results = append(results, m.result("tel", cleanPhone, prefix+" Phone", isOOS))
+				results = append(results, m.result("tel", cleanPhone, prefix+" Phone ("+sourceCtx+")", isOOS))
 			}
 		}
 	}
@@ -170,8 +182,7 @@ func (m *module) buildResults(metadata *Metadata, target string) []schema.Module
 	appendContact(metadata.Tech, "Tech", false)
 	appendContact(metadata.Billing, "Billing", false)
 
-	results = append(results, m.buildMetadataResults(metadata, target)...)
-
+	results = append(results, m.buildMetadataResults(metadata, target, sourceCtx)...)
 	return results
 }
 
@@ -185,36 +196,36 @@ func (m *module) result(typ, value, ctx string, oos bool) schema.ModuleResult {
 	}
 }
 
-func (m *module) buildMetadataResults(metadata *Metadata, target string) []schema.ModuleResult {
+func (m *module) buildMetadataResults(metadata *Metadata, target, sourceCtx string) []schema.ModuleResult {
 	var results []schema.ModuleResult
 
 	if metadata.RegistrarURL != "" {
-		results = append(results, m.result("url", metadata.RegistrarURL, "Registrar URL", true))
+		results = append(results, m.result("url", metadata.RegistrarURL, "Registrar URL ("+sourceCtx+")", true))
 	}
 	if metadata.WhoisServer != "" {
-		results = append(results, m.result("domain", metadata.WhoisServer, "Whois Server", true))
+		results = append(results, m.result("domain", metadata.WhoisServer, "Whois Server ("+sourceCtx+")", true))
 	}
 	if metadata.DNSSEC != "" {
-		results = append(results, m.result("string", metadata.DNSSEC, "DNSSEC Status", false))
+		results = append(results, m.result("string", metadata.DNSSEC, "DNSSEC Status ("+sourceCtx+")", false))
 	}
 	if metadata.IANAID != "" {
-		results = append(results, m.result("string", metadata.IANAID, "IANA ID", true))
+		results = append(results, m.result("string", metadata.IANAID, "IANA ID ("+sourceCtx+")", true))
 	}
 	if metadata.CreationDate != "" {
-		results = append(results, m.result("date", metadata.CreationDate, "Creation Date", false))
+		results = append(results, m.result("date", metadata.CreationDate, "Creation Date ("+sourceCtx+")", false))
 	}
 	if metadata.UpdatedDate != "" {
-		results = append(results, m.result("date", metadata.UpdatedDate, "Updated Date", false))
+		results = append(results, m.result("date", metadata.UpdatedDate, "Updated Date ("+sourceCtx+")", false))
 	}
 	if metadata.ExpirationDate != "" {
-		results = append(results, m.result("date", metadata.ExpirationDate, "Expiration Date", false))
+		results = append(results, m.result("date", metadata.ExpirationDate, "Expiration Date ("+sourceCtx+")", false))
 	}
 	for _, ns := range metadata.NameServers {
 		oos := !strings.HasSuffix(strings.ToLower(ns), "."+strings.ToLower(target))
-		results = append(results, m.result("domain", ns, "Name Server", oos))
+		results = append(results, m.result("domain", ns, "Name Server ("+sourceCtx+")", oos))
 	}
 	for _, st := range metadata.DomainStatus {
-		results = append(results, m.result("status", st, "Domain Status", false))
+		results = append(results, m.result("status", st, "Domain Status ("+sourceCtx+")", false))
 	}
 	return results
 }
@@ -222,7 +233,7 @@ func (m *module) buildMetadataResults(metadata *Metadata, target string) []schem
 // --- Network functions ---
 
 func queryRDAP(ctx context.Context, domain string) (map[string]any, error) {
-	url := "https://rdap.org/domain/" + domain
+	url := buildRDAPURL(domain)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("create rdap request: %w", err)
@@ -295,6 +306,9 @@ func queryWHOIS(ctx context.Context, domain string) (string, error) {
 }
 
 func dialWHOIS(ctx context.Context, server, query string) (string, error) {
+	// Format queries based on specific WHOIS server requirements
+	query = formatWHOISQuery(server, query)
+
 	d := resolver.GetDialer()
 	conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(server, "43"))
 	if err != nil {
@@ -320,4 +334,20 @@ func dialWHOIS(ctx context.Context, server, query string) (string, error) {
 		return "", fmt.Errorf("read error: %w", rErr)
 	}
 	return string(res), nil
+}
+
+// formatWHOISQuery adjusts the query string for specific WHOIS servers
+// that require special formatting to return parseable results.
+func formatWHOISQuery(server, query string) string {
+	switch {
+	case strings.HasSuffix(server, "jprs.jp") && !strings.HasSuffix(query, "/e"):
+		return query + "/e"
+	case strings.HasSuffix(server, "verisign-grs.com") && !strings.HasPrefix(query, "="):
+		return "=" + query
+	case strings.HasSuffix(server, "denic.de") && !strings.HasPrefix(query, "-T dn "):
+		return "-T dn " + query
+	case strings.HasSuffix(server, "nic.name") && !strings.HasPrefix(query, "domain="):
+		return "domain=" + query
+	}
+	return query
 }
