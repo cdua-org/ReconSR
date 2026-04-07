@@ -53,7 +53,6 @@ func TestParseCAARecord(t *testing.T) {
 	}
 }
 
-//nolint:goconst // allow repetitive "string" in tests
 func TestGetCAAData(t *testing.T) {
 	// A basic integration test
 	res := getCAAData("example.com")
@@ -67,7 +66,7 @@ func TestGetCAAData(t *testing.T) {
 		// So we just pass if it doesn't fail with an error.
 		t.Log("No CAA records found for example.com")
 	default:
-		if res.Results[0].Type != "string" {
+		if res.Results[0].Type != "string" { //nolint:goconst // isolated occurrence
 			t.Errorf("expected type 'string' (raw CAA), got '%s'", res.Results[0].Type)
 		}
 	}

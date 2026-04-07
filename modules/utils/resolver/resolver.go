@@ -192,14 +192,16 @@ func GetLastUsedPlain() string {
 
 // DoHResponse represents a JSON DNS response
 //
-//nolint:govet // field alignment
+type DoHDnsRecord struct {
+	Name string `json:"name"`
+	Type int    `json:"type"`
+	Data string `json:"data"`
+}
+
 type DoHResponse struct {
-	Status int `json:"Status"`
-	Answer []struct {
-		Name string `json:"name"`
-		Type int    `json:"type"`
-		Data string `json:"data"`
-	} `json:"Answer"`
+	Status    int            `json:"Status"`
+	Answer    []DoHDnsRecord `json:"Answer"`
+	Authority []DoHDnsRecord `json:"Authority"`
 }
 
 func resolveDoH(ctx context.Context, endpoint, target string, qtype int) (ips []string, raw []byte, err error) {
@@ -210,6 +212,7 @@ func resolveDoH(ctx context.Context, endpoint, target string, qtype int) (ips []
 	q := u.Query()
 	q.Set("name", target)
 	q.Set("type", strconv.Itoa(qtype))
+	q.Set("do", "true") // Request DNSSEC records (NSEC, NSEC3, RRSIG) if available
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
@@ -252,7 +255,68 @@ func resolveDoH(ctx context.Context, endpoint, target string, qtype int) (ips []
 			results = append(results, ans.Data)
 		}
 	}
+	// Also check Authority section, particularly useful for NSEC/NSEC3/SOA on NXDOMAIN
+	for _, auth := range dohResp.Authority {
+		if auth.Type == qtype {
+			results = append(results, auth.Data)
+		}
+	}
 	return results, body, nil
+}
+
+// QueryDoHDns performs a raw DoH resolution using the rotation logic and returns the full JSON structure.
+// This is essential for DNSSEC/NSEC tasks where the Record Name (e.g., NSEC3 hash) is required alongside the data.
+func QueryDoHDns(ctx context.Context, target string, qtype int) (*DoHResponse, []byte, error) {
+	initResolver()
+	var lastErr error
+
+	for range dohServers {
+		server := resolveNextDoH()
+		u, err := url.Parse(server)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid endpoint url: %w", err)
+		}
+		q := u.Query()
+		q.Set("name", target)
+		q.Set("type", strconv.Itoa(qtype))
+		q.Set("do", "true")
+		u.RawQuery = q.Encode()
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
+		if err != nil {
+			return nil, nil, fmt.Errorf("create doh request: %w", err)
+		}
+		req.Header.Set("Accept", "application/dns-json")
+
+		client := &http.Client{Timeout: Timeout}
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		
+		body, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("doh status %d", resp.StatusCode)
+			continue
+		}
+
+		var dohResp DoHResponse
+		if err := json.Unmarshal(body, &dohResp); err != nil {
+			lastErr = err
+			continue
+		}
+
+		return &dohResp, body, nil
+	}
+
+	return nil, nil, fmt.Errorf("all DoH attempts failed: %w", lastErr)
 }
 
 // ResolveRecord handles retries, rotation, and optional fallback from DoH to Plain.
