@@ -112,7 +112,12 @@ func validateDomain(value string) (Result, error) {
 
 	orgDomain, err := publicsuffix.EffectiveTLDPlusOne(asciiDomain)
 	if err != nil {
-		return Result{}, ErrInvalidSyntax
+		suffix, icann := publicsuffix.PublicSuffix(asciiDomain)
+		if suffix == asciiDomain && !icann {
+			orgDomain = asciiDomain
+		} else {
+			return Result{}, ErrInvalidSyntax
+		}
 	}
 
 	correctedType := "subdomain"
