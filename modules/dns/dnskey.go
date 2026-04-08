@@ -86,12 +86,6 @@ func getDNSKEYData(target string) schema.ModuleExecution {
 	for _, rec := range records {
 		parsed := parseDNSKEY(rec)
 
-		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:    "string",
-			Value:   parsed,
-			Context: "DNSKEY Record",
-		})
-
 		parts := strings.Fields(parsed)
 		if len(parts) >= 4 {
 			flagsStr := parts[0]
