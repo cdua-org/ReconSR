@@ -1,6 +1,6 @@
 module cdua-org/ReconSR
 
-go 1.26.1
+go 1.26.2
 
 require (
 	golang.org/x/net v0.52.0
