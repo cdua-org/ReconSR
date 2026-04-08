@@ -4,6 +4,7 @@ import (
 	"cdua-org/ReconSR/modules/dns"
 	"cdua-org/ReconSR/modules/domainsbycerts"
 	"cdua-org/ReconSR/modules/hackertarget"
+	"cdua-org/ReconSR/modules/mailcrypto"
 	"cdua-org/ReconSR/modules/subdomain_hierarchy"
 	"cdua-org/ReconSR/modules/whois"
 	"cdua-org/ReconSR/schema"
@@ -36,4 +37,5 @@ var ModuleRegistry = []schema.Module{
 	domainsbycerts.New(),
 	hackertarget.New(),
 	dns.New(),
+	mailcrypto.New(),
 }

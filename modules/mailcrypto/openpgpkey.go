@@ -1,9 +1,7 @@
-package dns
+package mailcrypto
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/base32"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -35,13 +33,7 @@ func parseOPENPGPKEY(raw string) string {
 	return base64.StdEncoding.EncodeToString(data)
 }
 
-func generateOpenPGPKeyDomain(localPart, domain string) string {
-	hash := sha256.Sum256([]byte(strings.ToLower(localPart)))
-	encoded := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:28])
-	return fmt.Sprintf("%s._openpgpkey.%s", strings.ToLower(encoded), domain)
-}
-
-func getOPENPGPKEYData(target string) schema.ModuleExecution {
+func getOPENPGPKEYData(localParts []string, domain string) schema.ModuleExecution {
 	execution := schema.ModuleExecution{
 		Function: "get_openpgpkey",
 		Results:  []schema.ModuleResult{},
@@ -50,25 +42,26 @@ func getOPENPGPKEYData(target string) schema.ModuleExecution {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	users := []string{"admin", "administrator", "postmaster", "hostmaster", "security", "webmaster", "info"}
 	var rawData []string
 	var lastErr error
 
-	for _, user := range users {
-		queryDomain := generateOpenPGPKeyDomain(user, target)
+	for _, user := range localParts {
+		queryDomain := GenerateMailHashDomain(user, domain, "._openpgpkey.")
 		records, raw, err := resolver.ResolveRecord(ctx, queryDomain, 61, nil)
 		if err != nil {
 			lastErr = err
 			continue
 		}
+
 		if len(raw) > 0 {
 			rawData = append(rawData, string(raw))
 		}
+
 		for _, rec := range records {
 			execution.Results = append(execution.Results, schema.ModuleResult{
 				Type:    "string",
 				Value:   parseOPENPGPKEY(rec),
-				Context: fmt.Sprintf("OPENPGPKEY (%s@%s)", user, target),
+				Context: fmt.Sprintf("OPENPGPKEY (%s@%s)", user, domain),
 			})
 		}
 	}
