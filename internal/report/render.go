@@ -37,29 +37,82 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	}
 	fmt.Println()
 
-	// 1. Build adjacency map
+	// 1. Build adjacency map and group contexts chronologically
 	adj := make(map[string][]schema.GraphEdge)
-	edgeMap := make(map[string]*schema.GraphEdge)
+
+	type contextGroup struct {
+		context   string
+		firstSeen string
+		lastSeen  string
+	}
+	type edgeKey struct {
+		src string
+		dst string
+		mod string
+		fn  string
+	}
+	edgeGroups := make(map[edgeKey][]contextGroup)
+	edgeBase := make(map[edgeKey]schema.GraphEdge)
 
 	for _, edge := range graph.Edges {
-		edgeKey := fmt.Sprintf("%s|%s|%s|%s", edge.Source.Value, edge.Target.Value, edge.ModuleName, edge.FunctionName)
-
-		if existing, ok := edgeMap[edgeKey]; ok {
-			if edge.Context != "" && existing.Context != "" {
-				if existing.Context != edge.Context {
-					existing.Context = existing.Context + " | " + edge.Context
-				}
-			} else if edge.Context != "" {
-				existing.Context = edge.Context
-			}
-		} else {
-			newEdge := edge
-			edgeMap[edgeKey] = &newEdge
+		key := edgeKey{
+			src: edge.Source.Value,
+			dst: edge.Target.Value,
+			mod: edge.ModuleName,
+			fn:  edge.FunctionName,
 		}
+
+		if _, exists := edgeBase[key]; !exists {
+			edgeBase[key] = edge
+		}
+
+		dateStr := edge.CreatedAt
+		if len(dateStr) >= 10 {
+			dateStr = dateStr[:10] // Extract YYYY-MM-DD
+		}
+
+		groups := edgeGroups[key]
+		if len(groups) > 0 && groups[len(groups)-1].context == edge.Context {
+			// Same context as the last one, update lastSeen
+			groups[len(groups)-1].lastSeen = dateStr
+		} else {
+			// New context or first time seeing this edge
+			groups = append(groups, contextGroup{
+				context:   edge.Context,
+				firstSeen: dateStr,
+				lastSeen:  dateStr,
+			})
+		}
+		edgeGroups[key] = groups
 	}
 
-	for _, edgePtr := range edgeMap {
-		adj[edgePtr.Source.Value] = append(adj[edgePtr.Source.Value], *edgePtr)
+	for key, groups := range edgeGroups {
+		baseEdge := edgeBase[key]
+
+		var formattedContexts []string
+		for _, g := range groups {
+			timeStr := fmt.Sprintf("[%s]", g.firstSeen)
+			if g.firstSeen != g.lastSeen {
+				timeStr = fmt.Sprintf("[%s - %s]", g.firstSeen, g.lastSeen)
+			}
+
+			if g.context != "" {
+				formattedContexts = append(formattedContexts, fmt.Sprintf("%s %s", timeStr, g.context))
+			} else {
+				formattedContexts = append(formattedContexts, timeStr) // No context, just time
+			}
+		}
+
+		// Re-use existing separator for backwards compatibility in UI, but now with time
+		finalContext := ""
+		for i, fc := range formattedContexts {
+			if i > 0 {
+				finalContext += " | "
+			}
+			finalContext += fc
+		}
+		baseEdge.Context = finalContext
+		adj[baseEdge.Source.Value] = append(adj[baseEdge.Source.Value], baseEdge)
 	}
 
 	// 2. Start recursion from initial target
