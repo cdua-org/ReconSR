@@ -260,6 +260,7 @@ func CreateProjectDB(ctx context.Context, targetType, targetValue string) (id st
                         module_name TEXT NOT NULL,
 			function_name TEXT NOT NULL,
 			is_success BOOLEAN NOT NULL,
+			raw_data TEXT,
 			UNIQUE(entity_id, module_name, function_name)
 		);`,
 		`CREATE TABLE observations (
@@ -267,7 +268,6 @@ func CreateProjectDB(ctx context.Context, targetType, targetValue string) (id st
 			relation_id INTEGER NOT NULL REFERENCES relations(id),
 			module_name TEXT NOT NULL,
 			function_name TEXT NOT NULL,
-			raw_data TEXT,
 			context TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);`,
@@ -436,7 +436,7 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 
 	// 4. Batch Insert Observations
 	if len(data.ValidResults) > 0 {
-		const batchSize = 199 // 5 fields per row
+		const batchSize = 249 // 4 fields per row
 		for i := 0; i < len(data.ValidResults); i += batchSize {
 			end := i + batchSize
 			if end > len(data.ValidResults) {
@@ -444,15 +444,15 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 			}
 			currentBatch := data.ValidResults[i:end]
 			placeholders := make([]string, 0, len(currentBatch))
-			values := make([]interface{}, 0, len(currentBatch)*5)
+			values := make([]interface{}, 0, len(currentBatch)*4)
 			for _, res := range currentBatch {
 				targetKey := fmt.Sprintf("%s:%s", res.Type, res.Value)
 				targetID := entityMetaMap[targetKey].id
 				relID := relationIDMap[targetID]
-				placeholders = append(placeholders, "(?, ?, ?, ?, ?)")
-				values = append(values, relID, data.ModuleName, res.Function, res.RawData, res.Context)
+				placeholders = append(placeholders, "(?, ?, ?, ?)")
+				values = append(values, relID, data.ModuleName, res.Function, res.Context)
 			}
-			query := fmt.Sprintf("INSERT INTO observations(relation_id, module_name, function_name, raw_data, context) VALUES %s", strings.Join(placeholders, ","))
+			query := fmt.Sprintf("INSERT INTO observations(relation_id, module_name, function_name, context) VALUES %s", strings.Join(placeholders, ","))
 			if _, err := tx.ExecContext(ctx, query, values...); err != nil {
 				return nil, err
 			}
@@ -486,6 +486,7 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 		eid int64
 		fn  string
 		ok  int
+		raw string
 	}
 	var logs []logItem
 	doneFn := make(map[string]bool)
@@ -493,25 +494,31 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 	// Results success
 	for _, res := range data.ValidResults {
 		if !doneFn[res.Function] {
-			logs = append(logs, logItem{sourceID, res.Function, 1})
+			logs = append(logs, logItem{sourceID, res.Function, 1, data.FunctionRawData[res.Function]})
 			doneFn[res.Function] = true
 		}
 		if res.Applied {
 			targetKey := fmt.Sprintf("%s:%s", res.Type, res.Value)
-			logs = append(logs, logItem{entityMetaMap[targetKey].id, res.Function, 1})
+			logs = append(logs, logItem{entityMetaMap[targetKey].id, res.Function, 1, ""})
 		}
 	}
 	// Errors failure
 	for _, e := range data.Errors {
-		logs = append(logs, logItem{sourceID, e.Function, 0})
+		if !doneFn[e.Function] {
+			logs = append(logs, logItem{sourceID, e.Function, 0, data.FunctionRawData[e.Function]})
+			doneFn[e.Function] = true
+		}
 	}
 	// Empty results success
 	for _, fn := range data.FunctionsWithoutResults {
-		logs = append(logs, logItem{sourceID, fn, 1})
+		if !doneFn[fn] {
+			logs = append(logs, logItem{sourceID, fn, 1, data.FunctionRawData[fn]})
+			doneFn[fn] = true
+		}
 	}
 
 	if len(logs) > 0 {
-		const batchSize = 249 // 4 fields per row
+		const batchSize = 199 // 5 fields per row
 		for i := 0; i < len(logs); i += batchSize {
 			end := i + batchSize
 			if end > len(logs) {
@@ -519,14 +526,14 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 			}
 			currentBatch := logs[i:end]
 			placeholders := make([]string, 0, len(currentBatch))
-			values := make([]interface{}, 0, len(currentBatch)*4)
+			values := make([]interface{}, 0, len(currentBatch)*5)
 			for _, l := range currentBatch {
-				placeholders = append(placeholders, "(?, ?, ?, ?)")
-				values = append(values, l.eid, data.ModuleName, l.fn, l.ok)
+				placeholders = append(placeholders, "(?, ?, ?, ?, ?)")
+				values = append(values, l.eid, data.ModuleName, l.fn, l.ok, l.raw)
 			}
-			query := fmt.Sprintf(`INSERT INTO entity_function_log(entity_id, module_name, function_name, is_success)
+			query := fmt.Sprintf(`INSERT INTO entity_function_log(entity_id, module_name, function_name, is_success, raw_data)
 			                      VALUES %s ON CONFLICT(entity_id, module_name, function_name)
-			                      DO UPDATE SET is_success = excluded.is_success`, strings.Join(placeholders, ","))
+			                      DO UPDATE SET is_success = excluded.is_success, raw_data = excluded.raw_data`, strings.Join(placeholders, ","))
 			if _, err := tx.ExecContext(ctx, query, values...); err != nil {
 				return nil, err
 			}
@@ -945,11 +952,12 @@ func GetGraphData(ctx context.Context, projectID string) (graph *schema.ProjectG
 		SELECT
 			e1.type, e1.value,
 			e2.type, e2.value, e2.out_of_scope,
-			o.module_name, o.function_name, o.context, o.raw_data, o.created_at
+			o.module_name, o.function_name, o.context, COALESCE(efl.raw_data, ''), o.created_at
 		FROM relations r
 		JOIN entities e1 ON r.source_entity_id = e1.id
 		JOIN entities e2 ON r.target_entity_id = e2.id
 		JOIN observations o ON r.id = o.relation_id
+		LEFT JOIN entity_function_log efl ON e1.id = efl.entity_id AND o.module_name = efl.module_name AND o.function_name = efl.function_name
 	`
 	rows, rErr := db.QueryContext(ctx, query)
 	if rErr != nil {

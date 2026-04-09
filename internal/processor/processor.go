@@ -32,6 +32,7 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 	returnedSet := make(map[string]bool)
 	functionHasFindings := make(map[string]bool)
 	functionHasErrors := make(map[string]bool)
+	functionRawData := make(map[string]string)
 	var rogueFunctions []string
 
 	// First pass: identify rogue functions
@@ -55,6 +56,8 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 	}
 
 	for _, exec := range data.Executions {
+		functionRawData[exec.Function] = exec.RawData
+
 		// Skip if already handled by contract violation logic or if rogue
 		if returnedSet[exec.Function] || (len(data.RequestedFunctions) > 0 && !requestedSet[exec.Function]) {
 			continue
@@ -113,13 +116,27 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 				outOfScope = scopemanager.IsOutOfScope(vRes.Type, vRes.Value)
 			}
 
+			applied := res.Applied
+			if applied {
+				validTypes := data.FunctionInputTypes[exec.Function]
+				typeSupported := false
+				for _, t := range validTypes {
+					if t == vRes.Type {
+						typeSupported = true
+						break
+					}
+				}
+				if !typeSupported {
+					applied = false
+				}
+			}
+
 			validResults = append(validResults, schema.ProcessorToRepoValidResult{
 				Function:   exec.Function,
 				Type:       vRes.Type,
 				Value:      vRes.Value,
 				Context:    res.Context,
-				RawData:    exec.RawData,
-				Applied:    res.Applied,
+				Applied:    applied,
 				OutOfScope: outOfScope,
 			})
 			functionHasFindings[exec.Function] = true
@@ -157,6 +174,7 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 			SourceEntity:            data.SourceEntity,
 			ValidResults:            validResults,
 			FunctionsWithoutResults: functionsWithoutResults,
+			FunctionRawData:         functionRawData,
 			Errors:                  errors,
 		}
 

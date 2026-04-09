@@ -19,7 +19,7 @@ var T = make(map[string]string)
 // Setup ensures the default language file exists in the lang directory and loads it.
 func Setup(langPath string) error {
 	dir := filepath.Dir(langPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return err
 	}
 
@@ -28,7 +28,7 @@ func Setup(langPath string) error {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(langPath, content, 0644); err != nil {
+		if err := os.WriteFile(langPath, content, 0600); err != nil {
 			return err
 		}
 	}

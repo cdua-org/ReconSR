@@ -110,6 +110,7 @@ type ProcessorInputData struct {
 	SourceEntity       Entity                    `json:"SourceEntity"`
 	Executions         []ProcessorInputExecution `json:"Executions"`
 	RequestedFunctions []string                  `json:"RequestedFunctions,omitempty"`
+	FunctionInputTypes map[string][]string       `json:"FunctionInputTypes,omitempty"`
 	Errors             []ProcessorInputError     `json:"Errors,omitempty"`
 }
 
@@ -127,7 +128,6 @@ type ProcessorToRepoValidResult struct {
 	Type       string `json:"Type"`
 	Value      string `json:"Value"`
 	Context    string `json:"Context"`
-	RawData    string `json:"RawData,omitempty"`
 	Applied    bool   `json:"Applied,omitempty"`
 	OutOfScope bool   `json:"OutOfScope,omitempty"`
 }
@@ -146,6 +146,7 @@ type ProcessorToRepoData struct {
 	SourceEntity            Entity                       `json:"SourceEntity"`
 	ValidResults            []ProcessorToRepoValidResult `json:"ValidResults"`
 	FunctionsWithoutResults []string                     `json:"FunctionsWithoutResults"`
+	FunctionRawData         map[string]string            `json:"FunctionRawData,omitempty"`
 	Errors                  []ProcessorToRepoError       `json:"Errors"`
 }
 

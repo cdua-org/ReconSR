@@ -158,6 +158,12 @@ func Dispatch(data *schema.RepoToDispatcherData, out chan<- *schema.ProcessorToR
 					continue
 				}
 
+				caps, _ := entry.mod.Capabilities()
+				functionInputTypes := make(map[string][]string)
+				for _, fn := range pending {
+					functionInputTypes[fn] = caps.InputTypes
+				}
+
 				payload := schema.ModuleInput{
 					Target:    item.Entity,
 					Functions: pending,
@@ -202,6 +208,7 @@ func Dispatch(data *schema.RepoToDispatcherData, out chan<- *schema.ProcessorToR
 						ModuleName:         entry.mod.Name(),
 						SourceEntity:       item.Entity,
 						RequestedFunctions: pending,
+						FunctionInputTypes: functionInputTypes,
 						Errors:             systemErrors,
 					}
 					moduleResults = append(moduleResults, processorData)
@@ -234,6 +241,7 @@ func Dispatch(data *schema.RepoToDispatcherData, out chan<- *schema.ProcessorToR
 					SourceEntity:       item.Entity,
 					Executions:         executions,
 					RequestedFunctions: pending,
+					FunctionInputTypes: functionInputTypes,
 				}
 
 				moduleResults = append(moduleResults, processorData)
