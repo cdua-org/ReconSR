@@ -160,8 +160,8 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 			os.Exit(0)
 		}
 
-		if !hasActiveFuncs {
-			fmt.Printf(colorRed+i18n.T["ERR_NO_ACTIVE_FUNCS"]+colorReset+"\n", targetType)
+		if !hasActiveFuncs && len(projects) == 0 {
+			fmt.Println(colorRed + i18n.T["ERR_NO_ACTIVE_FUNCS"] + colorReset)
 			fmt.Println("\n" + colorYellow + "[!] " + i18n.T["MSG_CONFIG_INFO"] + colorReset)
 
 			fmt.Printf("\n1. %s\n", i18n.T["OPT_EXIT"])
@@ -194,7 +194,11 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 		fmt.Println("\n" + colorYellow + "[!] " + i18n.T["MSG_CONFIG_INFO"] + colorReset)
 
 		fmt.Println("\n" + colorCyan + colorBold + "--- " + i18n.T["MSG_PROJECTS_EXIST_2"] + " ---" + colorReset)
-		fmt.Printf("1. %s\n", i18n.T["OPT_NEW_PROJECT"])
+		if !hasActiveFuncs {
+			fmt.Printf("1. %s %s(%s)%s\n", i18n.T["OPT_NEW_PROJECT"], colorRed, i18n.T["ERR_NO_ACTIVE_FUNCS"], colorReset)
+		} else {
+			fmt.Printf("1. %s\n", i18n.T["OPT_NEW_PROJECT"])
+		}
 
 		for i, p := range projects {
 			fmt.Printf("%d. %s %s (%s: %s)\n", i+2, i18n.T["OPT_CONTINUE_PROJECT"], p.Name, i18n.T["LBL_CREATED"], p.CreatedAt.Format("2006-01-02 15:04:05"))
@@ -225,6 +229,10 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 		if idx == exitIdx {
 			return false
 		} else if idx == 1 {
+			if !hasActiveFuncs {
+				fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
+				continue
+			}
 			newID, err := controller.CreateNewProject(ctx, targetType, targetValue)
 			if err != nil {
 				fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
