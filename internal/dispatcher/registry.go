@@ -1,6 +1,7 @@
 package dispatcher
 
 import (
+	"cdua-org/ReconSR/modules/ipv4ambiguous"
 	"cdua-org/ReconSR/modules/dns"
 	"cdua-org/ReconSR/modules/domainsbycerts"
 	"cdua-org/ReconSR/modules/hackertarget"
@@ -38,4 +39,5 @@ var ModuleRegistry = []schema.Module{
 	hackertarget.New(),
 	dns.New(),
 	mailcrypto.New(),
+	ipv4ambiguous.New(),
 }
