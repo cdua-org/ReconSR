@@ -3,7 +3,6 @@ package subdomain_hierarchy
 
 import (
 	"cdua-org/ReconSR/schema"
-	"fmt"
 	"strings"
 
 	"golang.org/x/net/publicsuffix"
@@ -11,7 +10,7 @@ import (
 
 // HandleData decomposes the target subdomain into its constituent hierarchical levels.
 func HandleData(data schema.ModuleInput) (schema.ModuleOutput, error) {
-	var executions []schema.ModuleExecution
+	executions := make([]schema.ModuleExecution, 0, len(data.Functions))
 
 	for _, f := range data.Functions {
 		execution := schema.ModuleExecution{
@@ -26,7 +25,7 @@ func HandleData(data schema.ModuleInput) (schema.ModuleOutput, error) {
 			if err != nil {
 				errMsg := err.Error()
 				execution.Error = &errMsg
-				execution.RawData = fmt.Sprintf("decompose failed for %s", target)
+				execution.RawData = "decompose failed for " + target
 				break
 			}
 
@@ -53,7 +52,7 @@ func HandleData(data schema.ModuleInput) (schema.ModuleOutput, error) {
 				}
 			}
 		default:
-			errMsg := fmt.Sprintf("unsupported function: %s", f)
+			errMsg := "unsupported function: " + f
 			execution.Error = &errMsg
 		}
 
