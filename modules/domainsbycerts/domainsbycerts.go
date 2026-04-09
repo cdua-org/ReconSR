@@ -244,10 +244,15 @@ func formatResults(classified classifiedDomains, target string, disableGhostDoma
 			continue
 		}
 
+		srcContext := classified.subdomainSources[d]
+		if isExpired && disableGhostDomains {
+			srcContext += " (Ghost)"
+		}
+
 		results = append(results, schema.ModuleResult{
 			Type:    "domain",
 			Value:   d,
-			Context: classified.subdomainSources[d],
+			Context: srcContext,
 			Applied: true,
 		})
 
@@ -255,7 +260,7 @@ func formatResults(classified classifiedDomains, target string, disableGhostDoma
 			results = append(results, schema.ModuleResult{
 				Type:    "string",
 				Value:   notAfter.Format(time.RFC3339),
-				Context: classified.subdomainSources[d] + " " + d + " expires on",
+				Context: srcContext + " " + d + " expires on",
 			})
 		}
 	}
