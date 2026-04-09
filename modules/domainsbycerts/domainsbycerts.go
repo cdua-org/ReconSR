@@ -154,6 +154,8 @@ func collectAllDomains(ctx context.Context, target string) collectedDomains {
 			if len(rawPayloads) == 0 {
 				rawPayloads[f.Name()] = entries[0].rawData
 			}
+			// Skip remaining fetchers to conserve resources since CT logs heavily overlap
+			break
 		}
 	}
 
