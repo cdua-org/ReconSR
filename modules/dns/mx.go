@@ -64,11 +64,6 @@ func getMXData(target string) schema.ModuleExecution {
 	}
 
 	if len(mxs) == 0 {
-		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:    "string",
-			Value:   "No MX",
-			Context: "MX Records",
-		})
 		return execution
 	}
 

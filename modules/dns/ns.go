@@ -55,11 +55,6 @@ func getNSData(target string) schema.ModuleExecution {
 	}
 
 	if len(nss) == 0 {
-		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:    "string",
-			Value:   "No NS",
-			Context: "NS Records",
-		})
 		return execution
 	}
 

@@ -47,11 +47,6 @@ func getDMARCData(target string) schema.ModuleExecution {
 	dmarcRecords := filterDMARC(records)
 
 	if len(dmarcRecords) == 0 {
-		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:    "string",
-			Value:   "No DMARC",
-			Context: "DMARC Records",
-		})
 		return execution
 	}
 

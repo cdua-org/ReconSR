@@ -14,16 +14,8 @@ func TestGetNSDataEmpty(t *testing.T) {
 		return
 	}
 
-	if len(execution.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(execution.Results))
-	}
-
-	result := execution.Results[0]
-	if result.Type != "string" || result.Value != "No NS" {
-		t.Errorf("expected 'No NS' result, got %+v", result)
-	}
-	if result.Context != "NS Records" {
-		t.Errorf("expected context 'NS Records', got %q", result.Context)
+	if len(execution.Results) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(execution.Results))
 	}
 }
 

@@ -14,16 +14,8 @@ func TestGetDMARCDataEmpty(t *testing.T) {
 		return
 	}
 
-	if len(execution.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(execution.Results))
-	}
-
-	result := execution.Results[0]
-	if result.Type != "string" || result.Value != "No DMARC" {
-		t.Errorf("expected 'No DMARC' result, got %+v", result)
-	}
-	if result.Context != "DMARC Records" {
-		t.Errorf("expected context 'DMARC Records', got %q", result.Context)
+	if len(execution.Results) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(execution.Results))
 	}
 }
 
@@ -33,7 +25,7 @@ func TestGetDMARCData(t *testing.T) {
 	if res.Error != nil {
 		t.Logf("Network resolution error: %v", *res.Error)
 	} else if len(res.Results) == 0 {
-		t.Error("expected at least one DMARC result or 'No DMARC'")
+		t.Log("No DMARC records found for example.com")
 	}
 }
 
