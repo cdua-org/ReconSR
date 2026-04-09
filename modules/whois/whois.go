@@ -238,39 +238,65 @@ func (m *module) buildMetadataResults(metadata *Metadata, target, sourceCtx stri
 
 func queryRDAP(ctx context.Context, domain string) (map[string]any, error) {
 	url := buildRDAPURL(domain)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
-	if err != nil {
-		return nil, fmt.Errorf("create rdap request: %w", err)
-	}
-	req.Header.Set("Accept", "application/rdap+json")
+	var lastErr error
 
-	transport := &http.Transport{
-		DialContext:         resolver.GetDialer().DialContext,
-		TLSHandshakeTimeout: 5 * time.Second,
-	}
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   7 * time.Second,
+	for attempt := 1; attempt <= resolver.MaxRetriesWhois; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+		if err != nil {
+			return nil, fmt.Errorf("create rdap request: %w", err)
+		}
+		req.Header.Set("Accept", "application/rdap+json")
+
+		transport := &http.Transport{
+			DialContext:         resolver.GetDialer().DialContext,
+			TLSHandshakeTimeout: 5 * time.Second,
+		}
+		client := &http.Client{
+			Transport: transport,
+			Timeout:   7 * time.Second,
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("rdap do request: %w", err)
+			if attempt < resolver.MaxRetriesWhois && sleepContext(ctx) {
+				continue
+			}
+			break
+		}
+
+		bodyOk := true
+		if resp.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("rdap status %d", resp.StatusCode)
+			bodyOk = false
+		}
+
+		// read and close body
+		var data map[string]any
+		err = json.NewDecoder(resp.Body).Decode(&data)
+		if cerr := resp.Body.Close(); cerr != nil && isDebug() {
+			fmt.Fprintf(os.Stderr, "[whois-debug] warning: failed to close rdap body: %v\n", cerr)
+		}
+
+		if !bodyOk {
+			if attempt < resolver.MaxRetriesWhois && sleepContext(ctx) {
+				continue
+			}
+			break
+		}
+
+		if err != nil {
+			lastErr = fmt.Errorf("rdap decode error: %w", err)
+			if attempt < resolver.MaxRetriesWhois && sleepContext(ctx) {
+				continue
+			}
+			break
+		}
+
+		return data, nil
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("rdap do request: %w", err)
-	}
-	defer func() {
-		//nolint:errcheck // defer body close error is not critical
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("rdap status %d", resp.StatusCode)
-	}
-
-	var data map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("rdap decode error: %w", err)
-	}
-	return data, nil
+	return nil, lastErr
 }
 
 func queryWHOIS(ctx context.Context, domain string) (string, error) {
@@ -312,32 +338,49 @@ func queryWHOIS(ctx context.Context, domain string) (string, error) {
 func dialWHOIS(ctx context.Context, server, query string) (string, error) {
 	// Format queries based on specific WHOIS server requirements
 	query = formatWHOISQuery(server, query)
-
 	d := resolver.GetDialer()
-	conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(server, "43"))
-	if err != nil {
-		return "", fmt.Errorf("dial error: %w", err)
-	}
-	defer func() {
-		//nolint:errcheck // defer connection close error is not critical
-		_ = conn.Close()
-	}()
+	var lastErr error
 
-	if deadline, ok := ctx.Deadline(); ok {
-		if sErr := conn.SetDeadline(deadline); sErr != nil {
-			return "", fmt.Errorf("set deadline error: %w", sErr)
+	for attempt := 1; attempt <= resolver.MaxRetriesWhois; attempt++ {
+		res, err := func() (string, error) {
+			conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(server, "43"))
+			if err != nil {
+				return "", fmt.Errorf("dial error: %w", err)
+			}
+			defer func() {
+				if cerr := conn.Close(); cerr != nil && isDebug() {
+					fmt.Fprintf(os.Stderr, "[whois-debug] warning: failed to close whois connection: %v\n", cerr)
+				}
+			}()
+
+			if deadline, ok := ctx.Deadline(); ok {
+				if sErr := conn.SetDeadline(deadline); sErr != nil {
+					return "", fmt.Errorf("set deadline error: %w", sErr)
+				}
+			}
+
+			if _, wErr := fmt.Fprintf(conn, "%s\r\n", query); wErr != nil {
+				return "", fmt.Errorf("write error: %w", wErr)
+			}
+
+			b, rErr := io.ReadAll(conn)
+			if rErr != nil {
+				return "", fmt.Errorf("read error: %w", rErr)
+			}
+			return string(b), nil
+		}()
+
+		if err == nil {
+			return res, nil
+		}
+
+		lastErr = err
+		if attempt < resolver.MaxRetriesWhois && sleepContext(ctx) {
+			continue
 		}
 	}
 
-	if _, wErr := fmt.Fprintf(conn, "%s\r\n", query); wErr != nil {
-		return "", fmt.Errorf("write error: %w", wErr)
-	}
-
-	res, rErr := io.ReadAll(conn)
-	if rErr != nil {
-		return "", fmt.Errorf("read error: %w", rErr)
-	}
-	return string(res), nil
+	return "", lastErr
 }
 
 // formatWHOISQuery adjusts the query string for specific WHOIS servers
@@ -354,4 +397,17 @@ func formatWHOISQuery(server, query string) string {
 		return "domain=" + query
 	}
 	return query
+}
+
+func sleepContext(ctx context.Context) bool {
+	select {
+	case <-time.After(2 * time.Second):
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+func isDebug() bool {
+	val, ok := resolver.GetOption("Debug")
+	return ok && val == "true"
 }

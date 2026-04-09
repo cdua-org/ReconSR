@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -86,9 +87,7 @@ func (m *module) getHosts(target string) schema.ModuleExecution {
 }
 
 func fetchWithRetry(ctx context.Context, target string) (body string, isQuotaLimit bool) {
-	const maxAttempts = 3
-
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
+	for attempt := 1; attempt <= resolver.MaxRetriesHT; attempt++ {
 		body, isQuota, errMsg := doRequest(ctx, target)
 		if body != "" {
 			return body, false
@@ -98,7 +97,7 @@ func fetchWithRetry(ctx context.Context, target string) (body string, isQuotaLim
 			return "", true
 		}
 
-		if errMsg != nil && attempt < maxAttempts && sleepContext(ctx, 2*time.Second) {
+		if errMsg != nil && attempt < resolver.MaxRetriesHT && sleepContext(ctx, 2*time.Second) {
 			continue
 		}
 

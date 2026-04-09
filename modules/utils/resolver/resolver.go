@@ -39,6 +39,15 @@ var (
 	// KeepAlive defines connection persistency timeframe.
 	KeepAlive = 30 * time.Second
 
+	// MaxRetriesCert defines maximum attempts for domainsbycerts.
+	MaxRetriesCert = 3
+	// MaxRetriesWhois defines maximum attempts for whois/RDAP.
+	MaxRetriesWhois = 3
+	// MaxRetriesDNS defines maximum attempts for normal DNS queries.
+	MaxRetriesDNS = 3
+	// MaxRetriesHT defines maximum attempts for hackertarget API.
+	MaxRetriesHT = 3
+
 	// Options acts as a generic configuration dictionary.
 	Options = make(map[string]string)
 
@@ -131,6 +140,7 @@ func parseConfig(content string) {
 	}
 }
 
+//nolint:gocyclo // simple configuration switch
 func parseOption(line string) {
 	parts := strings.SplitN(line, "=", 2)
 	if len(parts) != 2 {
@@ -148,6 +158,22 @@ func parseOption(line string) {
 	case "KeepAlive":
 		if v, err := strconv.Atoi(val); err == nil {
 			KeepAlive = time.Duration(v) * time.Second
+		}
+	case "MaxRetriesCert":
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			MaxRetriesCert = v
+		}
+	case "MaxRetriesWhois":
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			MaxRetriesWhois = v
+		}
+	case "MaxRetriesDNS":
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			MaxRetriesDNS = v
+		}
+	case "MaxRetriesHT":
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			MaxRetriesHT = v
 		}
 	}
 }
@@ -190,17 +216,19 @@ func GetLastUsedPlain() string {
 	return lastUsedPlain
 }
 
-// DoHResponse represents a JSON DNS response
+// DoHDnsRecord represents a JSON DNS response answer.
 type DoHDnsRecord struct {
 	Name string `json:"name"`
-	Type int    `json:"type"`
 	Data string `json:"data"`
+	Type int    `json:"type"`
+	TTL  int    `json:"TTL"`
 }
 
+// DoHResponse represents a JSON DNS response payload.
 type DoHResponse struct {
-	Status    int            `json:"Status"`
 	Answer    []DoHDnsRecord `json:"Answer"`
 	Authority []DoHDnsRecord `json:"Authority"`
+	Status    int            `json:"Status"`
 }
 
 func resolveDoH(ctx context.Context, endpoint, target string, qtype int) (ips []string, raw []byte, err error) {
@@ -226,8 +254,9 @@ func resolveDoH(ctx context.Context, endpoint, target string, qtype int) (ips []
 		return nil, nil, fmt.Errorf("doh request failed: %w", err)
 	}
 	defer func() {
-		//nolint:errcheck // defer body close
-		_ = resp.Body.Close()
+		if cerr := resp.Body.Close(); cerr != nil && isDebug() {
+			fmt.Fprintf(os.Stderr, "[resolver-debug] warning: failed to close cache fetch body: %v\n", cerr)
+		}
 	}()
 
 	if resp.StatusCode != http.StatusOK {
@@ -295,7 +324,9 @@ func QueryDoHDns(ctx context.Context, target string, qtype int) (*DoHResponse, [
 		}
 
 		body, err := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
+		if cerr := resp.Body.Close(); cerr != nil && isDebug() {
+			fmt.Fprintf(os.Stderr, "[resolver-debug] warning: failed to close DoH body: %v\n", cerr)
+		}
 		if err != nil {
 			lastErr = err
 			continue
@@ -324,8 +355,8 @@ func ResolveRecord(ctx context.Context, target string, qtype int, plainFallback 
 	initResolver()
 	var lastErr error
 
-	// Try DoH up to len(dohServers) times
-	for range dohServers {
+	// Try DoH up to MaxRetriesDNS times
+	for attempt := 1; attempt <= MaxRetriesDNS; attempt++ {
 		server := resolveNextDoH()
 		recs, rData, rErr := resolveDoH(ctx, server, target, qtype)
 		if rErr == nil {
@@ -338,8 +369,8 @@ func ResolveRecord(ctx context.Context, target string, qtype int, plainFallback 
 		return nil, nil, fmt.Errorf("all DoH resolution attempts failed, last error: %w", lastErr)
 	}
 
-	// Fallback to Plain up to len(plainServers) times
-	for range plainServers {
+	// Fallback to Plain up to MaxRetriesDNS times
+	for attempt := 1; attempt <= MaxRetriesDNS; attempt++ {
 		server := resolveNextPlain()
 		r := &net.Resolver{
 			PreferGo: true,
@@ -373,8 +404,8 @@ func ResolveIP(ctx context.Context, target string) (ips []string, raw []byte, er
 	initResolver()
 	var lastErr error
 
-	// Try DoH up to len(dohServers) times
-	for range dohServers {
+	// Try DoH up to MaxRetriesDNS times
+	for attempt := 1; attempt <= MaxRetriesDNS; attempt++ {
 		server := resolveNextDoH()
 		ipsA, rawA, errA := resolveDoH(ctx, server, target, 1)           // A
 		ipsAAAA, rawAAAA, errAAAA := resolveDoH(ctx, server, target, 28) // AAAA
@@ -409,8 +440,8 @@ func ResolveIP(ctx context.Context, target string) (ips []string, raw []byte, er
 		}
 	}
 
-	// Fallback to Plain up to len(plainServers) times
-	for range plainServers {
+	// Fallback to Plain up to MaxRetriesDNS times
+	for attempt := 1; attempt <= MaxRetriesDNS; attempt++ {
 		server := resolveNextPlain()
 		r := &net.Resolver{
 			PreferGo: true,
@@ -469,4 +500,8 @@ func GetDialer() *net.Dialer {
 		KeepAlive: KeepAlive,
 		Resolver:  GetResolver(),
 	}
+}
+func isDebug() bool {
+	val, ok := GetOption("Debug")
+	return ok && val == "true"
 }

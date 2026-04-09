@@ -22,7 +22,7 @@ func doRequestWithRetry(ctx context.Context, reqURL string) ([]byte, error) {
 	var lastErr error
 	debug := isDebug()
 
-	for attempt := 1; attempt <= 3; attempt++ {
+	for attempt := 1; attempt <= resolver.MaxRetriesCert; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 		if err != nil {
 			return nil, fmt.Errorf("create request: %w", err)
