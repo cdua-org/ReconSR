@@ -746,10 +746,29 @@ func ResetProjectLog(ctx context.Context, projectID string, clearAll, clearError
 		}
 	}()
 
+	masterDBPath := filepath.Join("storage", "base", "master.db")
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("ATTACH DATABASE '%s' AS master", masterDBPath)); err != nil {
+		return err
+	}
+
 	if clearAll {
-		_, err = db.ExecContext(ctx, "DELETE FROM entity_function_log")
+		query := `DELETE FROM entity_function_log
+		          WHERE EXISTS (
+		              SELECT 1 FROM master.modules m
+		              WHERE m.module_name = entity_function_log.module_name
+		                AND m.function = entity_function_log.function_name
+		                AND m.is_enabled = 1
+		          )`
+		_, err = db.ExecContext(ctx, query)
 	} else if clearErrors {
-		_, err = db.ExecContext(ctx, "DELETE FROM entity_function_log WHERE is_success = 0")
+		query := `DELETE FROM entity_function_log
+		          WHERE is_success = 0 AND EXISTS (
+		              SELECT 1 FROM master.modules m
+		              WHERE m.module_name = entity_function_log.module_name
+		                AND m.function = entity_function_log.function_name
+		                AND m.is_enabled = 1
+		          )`
+		_, err = db.ExecContext(ctx, query)
 	}
 	return err
 }
