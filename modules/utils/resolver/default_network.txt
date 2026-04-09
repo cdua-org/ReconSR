@@ -2,6 +2,8 @@
 Timeout=5
 KeepAlive=30
 DisableRDAP=false
+DisableCertspotter=false
+DisableGhostDomains=false
 
 [DoH]
 https://dns.cloudflare.com/dns-query

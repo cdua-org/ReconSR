@@ -4,16 +4,20 @@ package domainsbycerts
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
 const (
-	timeFormatRFC3339 = "2006-01-02T15:04:05Z07:00"
-	timeFormatDate    = "2006-01-02 15:04:05"
+	timeFormatRFC3339  = "2006-01-02T15:04:05Z07:00"
+	timeFormatDateTime = "2006-01-02T15:04:05"
+	timeFormatDate     = "2006-01-02 15:04:05"
 )
 
 type module struct{}
@@ -75,8 +79,14 @@ func getDomains(target string) schema.ModuleExecution {
 		return execution
 	}
 
+	disableGhostDomains := false
+	if val, ok := resolver.GetOption("DisableGhostDomains"); ok && strings.EqualFold(val, "true") {
+		disableGhostDomains = true
+	}
+
 	execution.RawData = allDomains.rawData
-	execution.Results = filterAndFormatDomains(allDomains.domains, target)
+	classified := classifyDomains(allDomains.domains, target)
+	execution.Results = formatResults(classified, target, disableGhostDomains)
 
 	sort.Slice(execution.Results, func(i, j int) bool {
 		return execution.Results[i].Value < execution.Results[j].Value
@@ -111,14 +121,28 @@ type CertFetcher interface {
 func collectAllDomains(ctx context.Context, target string) collectedDomains {
 	var result collectedDomains
 	rawPayloads := make(map[string]json.RawMessage)
+	debug := isDebug()
 
-	fetchers := []CertFetcher{
-		newCertspotterFetcher(),
-		newCrtshFetcher(),
+	disableCertspotter := false
+	if val, ok := resolver.GetOption("DisableCertspotter"); ok && strings.EqualFold(val, "true") {
+		disableCertspotter = true
 	}
+
+	var fetchers []CertFetcher
+	if !disableCertspotter {
+		fetchers = append(fetchers, newCertspotterFetcher())
+	} else if debug {
+		fmt.Fprintf(os.Stderr, "[certs-debug] Certspotter disabled via config\n")
+	}
+	fetchers = append(fetchers, newCrtshFetcher())
 
 	for _, f := range fetchers {
 		entries := f.Fetch(ctx, target)
+
+		if debug {
+			fmt.Fprintf(os.Stderr, "[certs-debug] fetcher=%q target=%q entries=%d\n", f.Name(), target, len(entries))
+		}
+
 		if len(entries) > 0 {
 			for _, e := range entries {
 				result.domains = append(result.domains, domainSource{
@@ -133,6 +157,10 @@ func collectAllDomains(ctx context.Context, target string) collectedDomains {
 		}
 	}
 
+	if debug {
+		fmt.Fprintf(os.Stderr, "[certs-debug] totalDomains=%d\n", len(result.domains))
+	}
+
 	if combined, err := json.Marshal(rawPayloads); err == nil {
 		result.rawData = string(combined)
 	}
@@ -140,69 +168,95 @@ func collectAllDomains(ctx context.Context, target string) collectedDomains {
 	return result
 }
 
-func filterAndFormatDomains(domains []domainSource, target string) []schema.ModuleResult {
-	domainMaxNotAfter := make(map[string]time.Time)
-	domainSourceInfo := make(map[string]string)
+type classifiedDomains struct {
+	subdomains       map[string]time.Time // domain -> max NotAfter
+	subdomainSources map[string]string    // domain -> source name
+	targetMaxExpiry  time.Time
+	targetSource     string
+}
 
-	var targetMaxNotAfter time.Time
-	var targetSource string
+func classifyDomains(domains []domainSource, target string) classifiedDomains {
+	result := classifiedDomains{
+		subdomains:       make(map[string]time.Time),
+		subdomainSources: make(map[string]string),
+	}
+	debug := isDebug()
+	var targetCount, invalidCount, subdomainCount int
 
 	for _, ds := range domains {
 		d := normalizeDomain(ds.domain)
 		if d == target {
-			if ds.NotAfter.After(targetMaxNotAfter) {
-				targetMaxNotAfter = ds.NotAfter
-				targetSource = ds.source
+			targetCount++
+			if ds.NotAfter.After(result.targetMaxExpiry) {
+				result.targetMaxExpiry = ds.NotAfter
+				result.targetSource = ds.source
 			}
 			continue
 		}
 
 		if !isValidSubdomain(d, target) {
+			invalidCount++
+			if debug && invalidCount <= 10 {
+				fmt.Fprintf(os.Stderr, "[certs-debug] rejected domain=%q (not a subdomain of %q)\n", d, target)
+			}
 			continue
 		}
 
-		if ds.NotAfter.After(domainMaxNotAfter[d]) {
-			domainMaxNotAfter[d] = ds.NotAfter
-			domainSourceInfo[d] = ds.source
+		subdomainCount++
+		if ds.NotAfter.After(result.subdomains[d]) {
+			result.subdomains[d] = ds.NotAfter
+			result.subdomainSources[d] = ds.source
 		}
 	}
 
+	if debug {
+		fmt.Fprintf(os.Stderr, "[certs-debug] filter: targetHits=%d invalidSkipped=%d validSubdomains=%d uniqueSubdomains=%d\n",
+			targetCount, invalidCount, subdomainCount, len(result.subdomains))
+	}
+
+	return result
+}
+
+func formatResults(classified classifiedDomains, target string, disableGhostDomains bool) []schema.ModuleResult {
 	now := time.Now()
 	var results []schema.ModuleResult
 	var ghostDomains []string
 
-	if !targetMaxNotAfter.IsZero() && targetMaxNotAfter.After(now) {
+	if !classified.targetMaxExpiry.IsZero() && classified.targetMaxExpiry.After(now) {
 		results = append(results,
 			schema.ModuleResult{
 				Type:    "domain",
 				Value:   target,
-				Context: targetSource,
+				Context: classified.targetSource,
 			},
 			schema.ModuleResult{
 				Type:    "string",
-				Value:   targetMaxNotAfter.Format(time.RFC3339),
-				Context: targetSource + " " + target + " expires on",
+				Value:   classified.targetMaxExpiry.Format(time.RFC3339),
+				Context: classified.targetSource + " " + target + " expires on",
 			})
 	}
 
-	for d, notAfter := range domainMaxNotAfter {
-		if notAfter.IsZero() || notAfter.After(now) {
-			results = append(results, schema.ModuleResult{
-				Type:    "domain",
-				Value:   d,
-				Context: domainSourceInfo[d],
-				Applied: true,
-			})
+	for d, notAfter := range classified.subdomains {
+		isExpired := !notAfter.IsZero() && !notAfter.After(now)
 
-			if !notAfter.IsZero() {
-				results = append(results, schema.ModuleResult{
-					Type:    "string",
-					Value:   notAfter.Format(time.RFC3339),
-					Context: domainSourceInfo[d] + " " + d + " expires on",
-				})
-			}
-		} else {
+		if isExpired && !disableGhostDomains {
 			ghostDomains = append(ghostDomains, d)
+			continue
+		}
+
+		results = append(results, schema.ModuleResult{
+			Type:    "domain",
+			Value:   d,
+			Context: classified.subdomainSources[d],
+			Applied: true,
+		})
+
+		if !notAfter.IsZero() {
+			results = append(results, schema.ModuleResult{
+				Type:    "string",
+				Value:   notAfter.Format(time.RFC3339),
+				Context: classified.subdomainSources[d] + " " + d + " expires on",
+			})
 		}
 	}
 
@@ -213,6 +267,10 @@ func filterAndFormatDomains(domains []domainSource, target string) []schema.Modu
 			Value:   strings.Join(ghostDomains, ", "),
 			Context: "Ghost subdomains",
 		})
+	}
+
+	if isDebug() {
+		fmt.Fprintf(os.Stderr, "[certs-debug] output: results=%d ghostDomains=%d\n", len(results), len(ghostDomains))
 	}
 
 	return results
@@ -234,6 +292,10 @@ func parseCertTimestamp(ts string) time.Time {
 	}
 
 	if t, err := time.Parse(timeFormatRFC3339, ts); err == nil {
+		return t
+	}
+
+	if t, err := time.Parse(timeFormatDateTime, ts); err == nil {
 		return t
 	}
 
