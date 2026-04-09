@@ -5,7 +5,6 @@ package ipv4ambiguous
 
 import (
 	"cdua-org/ReconSR/schema"
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 
 type module struct{}
 
+// New instantiates the ipv4ambiguous module.
 func New() schema.Module {
 	return &module{}
 }
@@ -29,7 +29,7 @@ func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 }
 
 func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
-	var executions []schema.ModuleExecution
+	executions := make([]schema.ModuleExecution, 0, len(data.Functions))
 
 	for _, f := range data.Functions {
 		execution := schema.ModuleExecution{
@@ -41,7 +41,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		case "parse_ambiguous":
 			execution.Results = extractIPs(data.Target.Value)
 		default:
-			errMsg := fmt.Sprintf("unsupported function: %s", f)
+			errMsg := "unsupported function: " + f
 			execution.Error = &errMsg
 		}
 
