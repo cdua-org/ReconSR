@@ -83,6 +83,16 @@ func TestExec_ParseAmbiguous(t *testing.T) {
 			input:        "192.168.1.1",
 			expectedVals: []string{"192.168.1.1"},
 		},
+		{
+			name:         "octal overflow",
+			input:        "0400.0400.0400.0400",
+			expectedVals: []string{},
+		},
+		{
+			name:         "invalid decimal but valid octal posix",
+			input:        "0300.0250.001.001",
+			expectedVals: []string{"192.168.1.1"},
+		},
 	}
 
 	for _, tt := range tests {
