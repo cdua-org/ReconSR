@@ -33,6 +33,9 @@ func Validate(targetType, targetValue string) (Result, error) {
 		if res, err := validateDomain(targetValue); err == nil {
 			return res, nil
 		}
+		if res, err := validateASN(targetValue); err == nil {
+			return res, nil
+		}
 		return Result{}, ErrInvalidSyntax
 	}
 
@@ -43,6 +46,8 @@ func Validate(targetType, targetValue string) (Result, error) {
 		return validateIP(targetValue)
 	case "email", "email-extra":
 		return validateEmail(targetValue)
+	case "asn":
+		return validateASN(targetValue)
 	default:
 		// Accept unknown explicit types (like 'btc', 'tel') as-is without syntactic validation
 		return Result{
@@ -305,5 +310,32 @@ func validateEmail(value string) (Result, error) {
 	return Result{
 		Type:  resType,
 		Value: localPart + "@" + domainValue,
+	}, nil
+}
+
+func validateASN(value string) (Result, error) {
+	val := strings.TrimSpace(value)
+	if val == "" {
+		return Result{}, ErrInvalidSyntax
+	}
+
+	val = strings.ToUpper(val)
+	if !strings.HasPrefix(val, "AS") {
+		val = "AS" + val
+	}
+
+	if len(val) <= 2 {
+		return Result{}, ErrInvalidSyntax
+	}
+
+	for _, c := range val[2:] {
+		if c < '0' || c > '9' {
+			return Result{}, ErrInvalidSyntax
+		}
+	}
+
+	return Result{
+		Type:  "asn",
+		Value: val,
 	}, nil
 }
