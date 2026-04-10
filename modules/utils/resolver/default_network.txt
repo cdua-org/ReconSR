@@ -1,5 +1,6 @@
 [Options]
 Timeout=5
+HTTPTimeout=30
 KeepAlive=30
 DisableRDAP=false
 DisableCertspotter=false
@@ -9,6 +10,9 @@ MaxRetriesWhois=3
 MaxRetriesDNS=3
 MaxRetriesHT=3
 MaxRetriesIPMeta=3
+MaxRetriesASNMeta=3
+TimeoutASNMeta=30
+MaxRecursionDepth=3
 
 [DoH]
 https://dns.cloudflare.com/dns-query

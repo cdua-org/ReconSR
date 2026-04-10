@@ -1,11 +1,12 @@
 package dispatcher
 
 import (
-	"cdua-org/ReconSR/modules/ipv4ambiguous"
+	"cdua-org/ReconSR/modules/asn_metadata"
 	"cdua-org/ReconSR/modules/dns"
 	"cdua-org/ReconSR/modules/domainsbycerts"
 	"cdua-org/ReconSR/modules/hackertarget"
 	"cdua-org/ReconSR/modules/ip_metadata"
+	"cdua-org/ReconSR/modules/ipv4ambiguous"
 	"cdua-org/ReconSR/modules/mailcrypto"
 	"cdua-org/ReconSR/modules/subdomain_hierarchy"
 	"cdua-org/ReconSR/modules/whois"
@@ -39,6 +40,7 @@ var ModuleRegistry = []schema.Module{
 	domainsbycerts.New(),
 	hackertarget.New(),
 	ip_metadata.New(),
+	asn_metadata.New(),
 	dns.New(),
 	mailcrypto.New(),
 	ipv4ambiguous.New(),

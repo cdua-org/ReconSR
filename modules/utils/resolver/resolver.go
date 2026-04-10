@@ -36,9 +36,10 @@ var (
 
 	// Timeout controls default network dials across modules.
 	Timeout = 5 * time.Second
+	// HTTPTimeout defines timeout for HTTP API requests (RIPE, etc).
+	HTTPTimeout = 30 * time.Second
 	// KeepAlive defines connection persistency timeframe.
 	KeepAlive = 30 * time.Second
-
 	// MaxRetriesCert defines maximum attempts for domainsbycerts.
 	MaxRetriesCert = 3
 	// MaxRetriesWhois defines maximum attempts for whois/RDAP.
@@ -49,6 +50,12 @@ var (
 	MaxRetriesHT = 3
 	// MaxRetriesIPMeta defines maximum attempts for IP metadata lookups.
 	MaxRetriesIPMeta = 3
+	// MaxRetriesASNMeta defines maximum attempts for ASN metadata lookups.
+	MaxRetriesASNMeta = 3
+	// TimeoutASNMeta controls HTTP timeout for ASN metadata API lookups.
+	TimeoutASNMeta = 30 * time.Second
+	// MaxRecursionDepth defines maximum depth for ASN transit chain traversal.
+	MaxRecursionDepth = 3
 
 	// Options acts as a generic configuration dictionary.
 	Options = make(map[string]string)
@@ -160,6 +167,10 @@ func parseOption(line string) {
 		if v, err := strconv.Atoi(val); err == nil {
 			KeepAlive = time.Duration(v) * time.Second
 		}
+	case "TimeoutASNMeta":
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			TimeoutASNMeta = time.Duration(v) * time.Second
+		}
 	default:
 		parseIntOption(key, val)
 	}
@@ -181,6 +192,14 @@ func parseIntOption(key, val string) {
 		MaxRetriesHT = v
 	case "MaxRetriesIPMeta":
 		MaxRetriesIPMeta = v
+	case "MaxRetriesASNMeta":
+		MaxRetriesASNMeta = v
+	case "MaxRecursionDepth":
+		MaxRecursionDepth = v
+	case "HTTPTimeout":
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			HTTPTimeout = time.Duration(v) * time.Second
+		}
 	}
 }
 
