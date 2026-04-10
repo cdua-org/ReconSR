@@ -8,6 +8,7 @@ MaxRetriesCert=3
 MaxRetriesWhois=3
 MaxRetriesDNS=3
 MaxRetriesHT=3
+MaxRetriesIPMeta=3
 
 [DoH]
 https://dns.cloudflare.com/dns-query

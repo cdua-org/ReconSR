@@ -47,6 +47,8 @@ var (
 	MaxRetriesDNS = 3
 	// MaxRetriesHT defines maximum attempts for hackertarget API.
 	MaxRetriesHT = 3
+	// MaxRetriesIPMeta defines maximum attempts for IP metadata lookups.
+	MaxRetriesIPMeta = 3
 
 	// Options acts as a generic configuration dictionary.
 	Options = make(map[string]string)
@@ -174,6 +176,10 @@ func parseOption(line string) {
 	case "MaxRetriesHT":
 		if v, err := strconv.Atoi(val); err == nil && v > 0 {
 			MaxRetriesHT = v
+		}
+	case "MaxRetriesIPMeta":
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			MaxRetriesIPMeta = v
 		}
 	}
 }
