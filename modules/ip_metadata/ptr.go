@@ -23,7 +23,6 @@ func getPTRData(target string) schema.ModuleExecution {
 	var names []string
 
 	for attempt := 1; attempt <= resolver.MaxRetriesIPMeta; attempt++ {
-		// Provide a bounded window for the individual network attempt.
 		ctx, cancel := context.WithTimeout(context.Background(), resolver.Timeout)
 
 		r := resolver.GetResolver()
@@ -41,14 +40,12 @@ func getPTRData(target string) schema.ModuleExecution {
 
 		var dnsErr *net.DNSError
 		if errors.As(err, &dnsErr) && (dnsErr.IsNotFound || strings.Contains(err.Error(), "no such host")) {
-			// Treat NXDOMAIN as an empty discovery rather than a systemic failure.
 			if debug {
 				fmt.Fprintf(os.Stderr, "[ip_meta-debug] get_ptr attempt=%d target=%q nxdomain\n", attempt, target)
 			}
 			return execution
 		}
 		if strings.Contains(err.Error(), "unrecognized address") {
-			// net.Resolver validates IP syntax prior to transmission; catch to avoid obfuscating as a network error.
 			errMsg := "invalid ip address format: " + target
 			execution.Error = &errMsg
 			if debug {
@@ -56,7 +53,6 @@ func getPTRData(target string) schema.ModuleExecution {
 			}
 			return execution
 		}
-
 		lastErr = err
 		if debug {
 			fmt.Fprintf(os.Stderr, "[ip_meta-debug] get_ptr attempt=%d target=%q err=%v\n", attempt, target, err)

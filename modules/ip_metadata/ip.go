@@ -26,7 +26,7 @@ func (m *module) Name() string {
 // Capabilities declares the module's contract (inputs and functions) to the system core.
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
-		Functions:  []string{"get_ptr", "get_asn"},
+		Functions:  []string{"get_ptr", "get_asn", "get_tor"},
 		InputTypes: []string{"ip", "ipv4", "ipv6", "ipv4_ambiguous"},
 	}, nil
 }
@@ -43,6 +43,8 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 			execution = getPTRData(data.Target.Value)
 		case "get_asn":
 			execution = getASNData(data.Target.Value)
+		case "get_tor":
+			execution = getTorData(data.Target.Value)
 		default:
 			errMsg := "unsupported function: " + f
 			execution = schema.ModuleExecution{

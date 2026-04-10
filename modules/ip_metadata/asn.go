@@ -12,31 +12,12 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func reverseIPForCymru(target string) (rev string, isIPv4 bool, err error) {
-	ip := net.ParseIP(target)
-	if ip == nil {
-		return "", false, errors.New("invalid IP address")
-	}
-
-	if ip4 := ip.To4(); ip4 != nil {
-		return fmt.Sprintf("%d.%d.%d.%d", ip4[3], ip4[2], ip4[1], ip4[0]), true, nil
-	}
-
-	var sb strings.Builder
-	for i := 15; i >= 0; i-- {
-		b := ip[i]
-		fmt.Fprintf(&sb, "%x.%x.", b&0xf, b>>4)
-	}
-	return strings.TrimSuffix(sb.String(), "."), false, nil
-}
-
 func performTXTQuery(target, query, queryType string) ([]string, error) {
 	debug := isDebug()
 	var lastErr error
 	var names []string
 
 	for attempt := 1; attempt <= resolver.MaxRetriesIPMeta; attempt++ {
-		// Enforce tight operational windows per query to prevent hang-ups.
 		ctx, cancel := context.WithTimeout(context.Background(), resolver.Timeout)
 		r := resolver.GetResolver()
 		var err error
@@ -52,7 +33,6 @@ func performTXTQuery(target, query, queryType string) ([]string, error) {
 
 		var dnsErr *net.DNSError
 		if errors.As(err, &dnsErr) && (dnsErr.IsNotFound || strings.Contains(err.Error(), "no such host") || strings.Contains(err.Error(), "server misbehaving")) {
-			// Treat NXDOMAIN as an empty response rather than a structural failure.
 			if debug {
 				fmt.Fprintf(os.Stderr, "[ip_meta-debug] get_asn %s attempt=%d target=%q nxdomain\n", queryType, attempt, target)
 			}
@@ -103,9 +83,8 @@ func getASNData(target string) schema.ModuleExecution {
 		Results:  []schema.ModuleResult{},
 	}
 
-	rev, isIPv4, err := reverseIPForCymru(target)
+	rev, isIPv4, err := resolver.ReverseIP(target)
 	if err != nil {
-		// Validated locally to avoid submitting malformed queries to upstream resolvers.
 		errMsg := "invalid ip address format: " + target
 		execution.Error = &errMsg
 		return execution
@@ -116,7 +95,6 @@ func getASNData(target string) schema.ModuleExecution {
 		originZone = "origin.asn.cymru.com"
 	}
 
-	// We query origin to map the structural authority.
 	originNames, originErr := performTXTQuery(target, rev+"."+originZone, "origin")
 
 	if originErr != nil {

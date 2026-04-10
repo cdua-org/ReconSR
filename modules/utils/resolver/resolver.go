@@ -507,6 +507,26 @@ func GetDialer() *net.Dialer {
 		Resolver:  GetResolver(),
 	}
 }
+
+// ReverseIP formats an IP address into the reversed nibble/octet string suitable for in-addr.arpa or other reverse zone queries.
+func ReverseIP(target string) (rev string, isIPv4 bool, err error) {
+	ip := net.ParseIP(target)
+	if ip == nil {
+		return "", false, errors.New("invalid IP address")
+	}
+
+	if ip4 := ip.To4(); ip4 != nil {
+		return fmt.Sprintf("%d.%d.%d.%d", ip4[3], ip4[2], ip4[1], ip4[0]), true, nil
+	}
+
+	var sb strings.Builder
+	for i := 15; i >= 0; i-- {
+		b := ip[i]
+		fmt.Fprintf(&sb, "%x.%x.", b&0xf, b>>4)
+	}
+	return strings.TrimSuffix(sb.String(), "."), false, nil
+}
+
 func isDebug() bool {
 	val, ok := GetOption("Debug")
 	return ok && val == "true"

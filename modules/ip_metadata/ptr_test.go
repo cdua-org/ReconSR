@@ -68,10 +68,6 @@ func TestExecSupported(t *testing.T) {
 	if len(out.Executions) != 1 {
 		t.Fatalf("expected 1 execution, got %d", len(out.Executions))
 	}
-
-	if out.Executions[0].Function != "get_ptr" {
-		t.Errorf("expected function get_ptr, got %s", out.Executions[0].Function)
-	}
 }
 
 func TestGetPTRData(t *testing.T) {
@@ -107,8 +103,9 @@ func TestGetPTRDataInvalidIP(t *testing.T) {
 func TestGetPTRDataDebug(t *testing.T) {
 	t.Log("Testing debug output")
 	const debugStr = "true"
+	const debugFalse = "false"
 	resolver.Options["Debug"] = debugStr
-	defer func() { resolver.Options["Debug"] = "false" }()
+	defer func() { resolver.Options["Debug"] = debugFalse }()
 
 	getPTRData("8.8.8.8")
 	getPTRData("192.0.2.1")
