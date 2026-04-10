@@ -106,10 +106,10 @@ func TestGetPTRDataInvalidIP(t *testing.T) {
 
 func TestGetPTRDataDebug(t *testing.T) {
 	t.Log("Testing debug output")
-	resolver.Options["Debug"] = "true"
+	const debugStr = "true"
+	resolver.Options["Debug"] = debugStr
 	defer func() { resolver.Options["Debug"] = "false" }()
 
-	// Trigger debug lines for success, nxdomain, and invalid
 	getPTRData("8.8.8.8")
 	getPTRData("192.0.2.1")
 	getPTRData("invalid")
