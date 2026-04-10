@@ -91,13 +91,13 @@ func loadConfig() {
 		return
 	}
 
-	configPath := filepath.Join(configDir, "network.txt")
-	//nolint:gosec // Internal path constructed safely
+	configPath := filepath.Clean(filepath.Join(configDir, "network.txt"))
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			//nolint:errcheck // Ignore error writing default config, fallback is used
-			_ = os.WriteFile(configPath, defaultNetworkConfig, 0o600)
+			if writeErr := os.WriteFile(configPath, defaultNetworkConfig, 0o600); writeErr != nil && isDebug() {
+				fmt.Fprintf(os.Stderr, "[resolver-debug] failed to write default config: %v\n", writeErr)
+			}
 		}
 		parseConfig(string(defaultNetworkConfig))
 		return
@@ -142,7 +142,6 @@ func parseConfig(content string) {
 	}
 }
 
-//nolint:gocyclo // simple configuration switch
 func parseOption(line string) {
 	parts := strings.SplitN(line, "=", 2)
 	if len(parts) != 2 {
@@ -161,33 +160,33 @@ func parseOption(line string) {
 		if v, err := strconv.Atoi(val); err == nil {
 			KeepAlive = time.Duration(v) * time.Second
 		}
+	default:
+		parseIntOption(key, val)
+	}
+}
+
+func parseIntOption(key, val string) {
+	v, err := strconv.Atoi(val)
+	if err != nil || v <= 0 {
+		return
+	}
+	switch key {
 	case "MaxRetriesCert":
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			MaxRetriesCert = v
-		}
+		MaxRetriesCert = v
 	case "MaxRetriesWhois":
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			MaxRetriesWhois = v
-		}
+		MaxRetriesWhois = v
 	case "MaxRetriesDNS":
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			MaxRetriesDNS = v
-		}
+		MaxRetriesDNS = v
 	case "MaxRetriesHT":
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			MaxRetriesHT = v
-		}
+		MaxRetriesHT = v
 	case "MaxRetriesIPMeta":
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			MaxRetriesIPMeta = v
-		}
+		MaxRetriesIPMeta = v
 	}
 }
 
 func resolveNextDoH() string {
 	idx := dohIndex.Add(1)
-	//nolint:gosec // modulo on small length
-	server := dohServers[int(idx%uint32(len(dohServers)))]
+	server := dohServers[int(idx)%len(dohServers)]
 
 	lastUsedMu.Lock()
 	lastUsedDoH = server
@@ -198,8 +197,7 @@ func resolveNextDoH() string {
 
 func resolveNextPlain() string {
 	idx := plainIndex.Add(1)
-	//nolint:gosec // modulo on small length
-	server := plainServers[int(idx%uint32(len(plainServers)))]
+	server := plainServers[int(idx)%len(plainServers)]
 
 	lastUsedMu.Lock()
 	lastUsedPlain = server
@@ -298,8 +296,7 @@ func resolveDoH(ctx context.Context, endpoint, target string, qtype int) (ips []
 	return results, body, nil
 }
 
-// QueryDoHDns performs a raw DoH resolution using the rotation logic and returns the full JSON structure.
-// This is essential for DNSSEC/NSEC tasks where the Record Name (e.g., NSEC3 hash) is required alongside the data.
+// QueryDoHDns queries the target using DoH and returns the raw JSON response.
 func QueryDoHDns(ctx context.Context, target string, qtype int) (*DoHResponse, []byte, error) {
 	initResolver()
 	var lastErr error
@@ -355,8 +352,7 @@ func QueryDoHDns(ctx context.Context, target string, qtype int) (*DoHResponse, [
 	return nil, nil, fmt.Errorf("all DoH attempts failed: %w", lastErr)
 }
 
-// ResolveRecord handles retries, rotation, and optional fallback from DoH to Plain.
-// If plainFallback is nil, it only uses DoH (useful for records like CAA not supported by net.Resolver).
+// ResolveRecord performs a DNS query with DoH and optional Plain DNS fallback.
 func ResolveRecord(ctx context.Context, target string, qtype int, plainFallback func(context.Context, *net.Resolver) ([]string, error)) (records []string, raw []byte, err error) {
 	initResolver()
 	var lastErr error
@@ -403,50 +399,55 @@ func ResolveRecord(ctx context.Context, target string, qtype int, plainFallback 
 	return nil, nil, fmt.Errorf("all resolution attempts failed, last error: %w", lastErr)
 }
 
-// ResolveIP handles retries, rotation and fallbacks from DoH to Plain for A and AAAA records.
-//
-//nolint:gocyclo,nestif // Core resolution logic with fallback requires moderate complexity
+// ResolveIP rotates through configured DNS servers to resolve IP addresses with retries.
 func ResolveIP(ctx context.Context, target string) (ips []string, raw []byte, err error) {
 	initResolver()
 	var lastErr error
 
-	// Try DoH up to MaxRetriesDNS times
+	ips, raw, err = attemptDoHResolution(ctx, target)
+	if err == nil {
+		return ips, raw, nil
+	}
+	lastErr = err
+
+	ips, err = attemptPlainResolution(ctx, target)
+	if err == nil {
+		return ips, nil, nil
+	}
+
+	if !errors.Is(err, errPlainNXDOMAIN) {
+		lastErr = err
+	}
+
+	if lastErr != nil {
+		return nil, nil, fmt.Errorf("all resolution attempts failed, last error: %w", lastErr)
+	}
+	return nil, nil, errors.New("all resolution attempts failed")
+}
+
+var errPlainNXDOMAIN = errors.New("nxdomain")
+
+func attemptDoHResolution(ctx context.Context, target string) (ips []string, raw []byte, err error) {
+	var lastErr error
 	for attempt := 1; attempt <= MaxRetriesDNS; attempt++ {
 		server := resolveNextDoH()
-		ipsA, rawA, errA := resolveDoH(ctx, server, target, 1)           // A
-		ipsAAAA, rawAAAA, errAAAA := resolveDoH(ctx, server, target, 28) // AAAA
+		ipsA, rawA, errA := resolveDoH(ctx, server, target, 1)
+		ipsAAAA, rawAAAA, errAAAA := resolveDoH(ctx, server, target, 28)
 
 		if errA == nil && errAAAA == nil {
-			var combined []string
-			seen := make(map[string]bool)
-			for _, ip := range append(ipsA, ipsAAAA...) {
-				if !seen[ip] {
-					seen[ip] = true
-					combined = append(combined, ip)
-				}
-			}
-
-			var raw bytes.Buffer
-			if len(rawA) > 0 {
-				raw.Write(rawA)
-			}
-			if len(rawAAAA) > 0 {
-				if raw.Len() > 0 {
-					raw.WriteByte('\n')
-				}
-				raw.Write(rawAAAA)
-			}
-			return combined, raw.Bytes(), nil
+			return mergeIPResults(ipsA, ipsAAAA, rawA, rawAAAA)
 		}
-
 		if errA != nil {
 			lastErr = errA
 		} else {
 			lastErr = errAAAA
 		}
 	}
+	return nil, nil, lastErr
+}
 
-	// Fallback to Plain up to MaxRetriesDNS times
+func attemptPlainResolution(ctx context.Context, target string) (ips []string, err error) {
+	var lastErr error
 	for attempt := 1; attempt <= MaxRetriesDNS; attempt++ {
 		server := resolveNextPlain()
 		r := &net.Resolver{
@@ -457,33 +458,52 @@ func ResolveIP(ctx context.Context, target string) (ips []string, raw []byte, er
 			},
 		}
 
-		ips, err := r.LookupIPAddr(ctx, target)
-		if err == nil {
+		resolvedIPs, rErr := r.LookupIPAddr(ctx, target)
+		if rErr == nil {
 			var results []string
 			seen := make(map[string]bool)
-			for _, ip := range ips {
+			for _, ip := range resolvedIPs {
 				ipStr := ip.IP.String()
 				if !seen[ipStr] {
 					seen[ipStr] = true
 					results = append(results, ipStr)
 				}
 			}
-			return results, nil, nil
+			return results, nil
 		}
 
 		var dnsErr *net.DNSError
-		if errors.As(err, &dnsErr) {
-			if dnsErr.IsNotFound || strings.Contains(err.Error(), "no such host") || strings.Contains(err.Error(), "server misbehaving") {
-				return nil, nil, nil // NXDOMAIN equivalent, just return empty success
+		if errors.As(rErr, &dnsErr) {
+			if dnsErr.IsNotFound || strings.Contains(rErr.Error(), "no such host") || strings.Contains(rErr.Error(), "server misbehaving") {
+				return nil, errPlainNXDOMAIN
 			}
 		}
-		lastErr = err
+		lastErr = rErr
+	}
+	return nil, lastErr
+}
+
+func mergeIPResults(ipsA, ipsAAAA []string, rawA, rawAAAA []byte) (ips []string, raw []byte, err error) {
+	var combined []string
+	seen := make(map[string]bool)
+	for _, ip := range append(ipsA, ipsAAAA...) {
+		if !seen[ip] {
+			seen[ip] = true
+			combined = append(combined, ip)
+		}
 	}
 
-	if lastErr != nil {
-		return nil, nil, fmt.Errorf("all resolution attempts failed, last error: %w", lastErr)
+	var rawBuf bytes.Buffer
+	if len(rawA) > 0 {
+		rawBuf.Write(rawA)
 	}
-	return nil, nil, errors.New("all resolution attempts failed")
+	if len(rawAAAA) > 0 {
+		if rawBuf.Len() > 0 {
+			rawBuf.WriteByte('\n')
+		}
+		rawBuf.Write(rawAAAA)
+	}
+	return combined, rawBuf.Bytes(), nil
 }
 
 // GetResolver returns a net.Resolver that rotates through Plain DNS servers from the configuration.
