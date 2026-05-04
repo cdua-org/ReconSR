@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/apiconfig"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
@@ -22,12 +23,18 @@ import (
 
 var dbg = debuglog.New("ht")
 
+var apiBaseURL = "https://api.hackertarget.com"
+
 // New instantiates the module for registration within the dispatcher's lifecycle.
 func New() schema.Module {
-	return &module{}
+	return &module{
+		apiKey: apiconfig.GetKey("HackerTarget"),
+	}
 }
 
-type module struct{}
+type module struct {
+	apiKey string
+}
 
 func (m *module) Name() string {
 	return "hackertarget"
@@ -74,7 +81,7 @@ func (m *module) getHosts(target string) schema.ModuleExecution {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	body, isQuotaLimit := fetchWithRetry(ctx, target)
+	body, isQuotaLimit := fetchWithRetry(ctx, target, m.apiKey)
 
 	dbg.Printf("getHosts target=%q results=%d quota=%v", target, len(execution.Results), isQuotaLimit)
 
@@ -97,11 +104,11 @@ func (m *module) getHosts(target string) schema.ModuleExecution {
 	return execution
 }
 
-func fetchWithRetry(ctx context.Context, target string) (body string, isQuotaLimit bool) {
+func fetchWithRetry(ctx context.Context, target, apiKey string) (body string, isQuotaLimit bool) {
 	for attempt := 1; attempt <= resolver.MaxRetriesHT; attempt++ {
 		dbg.Printf("fetchWithRetry attempt=%d/%d target=%q", attempt, resolver.MaxRetriesHT, target)
 
-		body, isQuota, errMsg, action := doRequest(ctx, target)
+		body, isQuota, errMsg, action := doRequest(ctx, target, apiKey)
 		if body != "" {
 			return body, false
 		}
@@ -128,8 +135,11 @@ func fetchWithRetry(ctx context.Context, target string) (body string, isQuotaLim
 	return "", false
 }
 
-func doRequest(ctx context.Context, target string) (body string, isQuota bool, errMsg *string, action httputil.ResponseAction) {
-	u := "https://api.hackertarget.com/hostsearch/?q=" + url.QueryEscape(target)
+func doRequest(ctx context.Context, target, apiKey string) (body string, isQuota bool, errMsg *string, action httputil.ResponseAction) {
+	u := apiBaseURL + "/hostsearch/?q=" + url.QueryEscape(target)
+	if apiKey != "" {
+		u += "&apikey=" + url.QueryEscape(apiKey)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {

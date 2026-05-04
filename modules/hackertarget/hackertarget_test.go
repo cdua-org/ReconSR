@@ -1,6 +1,7 @@
 package hackertarget
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -181,6 +182,52 @@ func TestParseHostSearch(t *testing.T) {
 	}
 }
 
+func TestDoRequestWithAPIKey(t *testing.T) {
+	var capturedURL string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedURL = r.URL.String()
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("test.example.com,1.2.3.4\n")); err != nil {
+			t.Errorf("test server write error: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := apiBaseURL
+	apiBaseURL = server.URL
+	defer func() { apiBaseURL = originalBaseURL }()
+
+	_, _, _, _ = doRequest(context.Background(), "example.com", "mock_api_key")
+
+	expectedURL := "/hostsearch/?q=example.com&apikey=mock_api_key"
+	if capturedURL != expectedURL {
+		t.Errorf("expected request URL to be %q, got %q", expectedURL, capturedURL)
+	}
+}
+
+func TestDoRequestWithoutAPIKey(t *testing.T) {
+	var capturedURL string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedURL = r.URL.String()
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("test.example.com,1.2.3.4\n")); err != nil {
+			t.Errorf("test server write error: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := apiBaseURL
+	apiBaseURL = server.URL
+	defer func() { apiBaseURL = originalBaseURL }()
+
+	_, _, _, _ = doRequest(context.Background(), "example.com", "")
+
+	expectedURL := "/hostsearch/?q=example.com"
+	if capturedURL != expectedURL {
+		t.Errorf("expected request URL to be %q, got %q", expectedURL, capturedURL)
+	}
+}
+
 func TestDoRequestQuotaExceeded(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("X-Api-Count", "100")
@@ -192,16 +239,12 @@ func TestDoRequestQuotaExceeded(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalBaseURL := "https://api.hackertarget.com"
-	_ = originalBaseURL
+	originalBaseURL := apiBaseURL
+	apiBaseURL = server.URL
+	defer func() { apiBaseURL = originalBaseURL }()
 
-	_ = server.URL
-
-	header := http.Header{}
-	header.Set("X-Api-Count", "100")
-	header.Set("X-Api-Quota", "100")
-
-	if !isQuotaExceeded(header) {
-		t.Error("expected quota to be exceeded")
+	_, isQuota, _, _ := doRequest(context.Background(), "example.com", "")
+	if !isQuota {
+		t.Error("expected doRequest to detect quota exceeded")
 	}
 }
