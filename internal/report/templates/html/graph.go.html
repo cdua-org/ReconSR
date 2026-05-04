@@ -1,0 +1,1647 @@
+{{define "header"}}<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>ReconSR Graph - {{ .ProjectName }}</title>
+        <script
+            type="text/javascript"
+            src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"
+        ></script>
+        <style>
+            body {
+                background-color: #0f172a;
+                color: #e2e8f0;
+                margin: 0;
+                padding: 0;
+                font-family: sans-serif;
+                overflow: hidden;
+            }
+            #mynetwork {
+                width: 100vw;
+                height: 100vh;
+                background-color: #0f172a;
+            }
+            #top-bar {
+                position: absolute;
+                top: 20px;
+                left: 20px;
+                pointer-events: none;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                max-width: 280px;
+            }
+            #top-bar-text {
+                position: relative;
+                z-index: 10;
+                pointer-events: auto;
+            }
+            .brand {
+                color: #f8fafc;
+                font-weight: 800;
+                font-size: 1.4rem;
+                letter-spacing: 0.05rem;
+                margin-bottom: 2px;
+                display: flex;
+                align-items: center;
+                pointer-events: auto;
+            }
+            .brand::before {
+                content: "";
+                display: inline-block;
+                width: 12px;
+                height: 12px;
+                background: #38bdf8;
+                margin-right: 10px;
+                border-radius: 2px;
+            }
+            #top-bar h1 {
+                color: #38bdf8;
+                margin: 0;
+                font-size: 1.1rem;
+                font-weight: 400;
+                pointer-events: auto;
+            }
+            #top-bar .meta {
+                color: #94a3b8;
+                font-size: 0.8rem;
+                margin-top: 5px;
+                pointer-events: auto;
+            }
+            #sidebar {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 320px;
+                height: 100vh;
+                background: #1e293b;
+                border-right: 2px solid #334155;
+                padding: 25px;
+                box-sizing: border-box;
+                overflow-y: auto;
+                z-index: 1000;
+                box-shadow: 5px 0 15px rgba(0, 0, 0, 0.3);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                display: flex;
+                flex-direction: column;
+            }
+            #sidebar.collapsed {
+                transform: translateX(-100%);
+            }
+            #sidebar h2 {
+                color: #f1f5f9;
+                margin: 0 0 20px 0;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #334155;
+                font-size: 1.1rem;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 0.05rem;
+            }
+            #sidebar-toggle {
+                margin-top: 15px;
+                position: relative;
+                z-index: 1001;
+                pointer-events: auto;
+                background: #1e293b;
+                border: 2px solid #334155;
+                color: #94a3b8;
+                width: 40px;
+                height: 40px;
+                border-radius: 8px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                transition:
+                    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                    background-color 0.2s,
+                    color 0.2s;
+            }
+            #sidebar-toggle.sidebar-open {
+                transform: translateX(320px);
+            }
+            #sidebar-toggle:hover {
+                color: #f1f5f9;
+                background: #334155;
+            }
+            .sidebar-section {
+                margin-bottom: 20px;
+                padding-bottom: 15px;
+                border-bottom: 1px solid #334155;
+            }
+            .sidebar-section:last-child {
+                border-bottom: none;
+                margin-bottom: 0;
+            }
+            .sidebar-section-title {
+                color: #64748b;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                font-weight: bold;
+                margin-bottom: 12px;
+                letter-spacing: 0.05em;
+            }
+            .meta-item {
+                color: #cbd5e1;
+                font-size: 0.95rem;
+                margin-bottom: 10px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                width: 100%;
+            }
+            .meta-item-left {
+                display: flex;
+                align-items: center;
+                flex-grow: 1;
+            }
+            .meta-item-controls {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .meta-item input[type="checkbox"] {
+                cursor: pointer;
+                width: 16px;
+                height: 16px;
+                accent-color: #38bdf8;
+            }
+            .meta-item label {
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                user-select: none;
+                flex-grow: 1;
+            }
+            .stat-badge {
+                background: #334155;
+                color: #f8fafc;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 0.75rem;
+                font-weight: bold;
+            }
+            .icon-btn {
+                cursor: pointer;
+                color: #64748b;
+                transition: color 0.2s;
+                display: flex;
+                align-items: center;
+            }
+            .icon-btn:hover,
+            .icon-btn.active {
+                color: #38bdf8;
+            }
+
+            #modal {
+                display: none;
+                position: fixed;
+                right: 0;
+                top: 0;
+                width: 450px;
+                height: 100vh;
+                background: #1e293b;
+                border-left: 2px solid #334155;
+                padding: 25px;
+                box-sizing: border-box;
+                overflow-y: auto;
+                z-index: 1000;
+                box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
+            }
+            .modal-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid #334155;
+                padding-bottom: 10px;
+                margin-bottom: 20px;
+            }
+            .close-btn {
+                color: #94a3b8;
+                cursor: pointer;
+                font-size: 24px;
+            }
+            .close-btn:hover {
+                color: #e2e8f0;
+            }
+
+            .detail-item {
+                margin-bottom: 20px;
+            }
+            .detail-label {
+                color: #94a3b8;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                font-weight: bold;
+                margin-bottom: 5px;
+            }
+            .detail-value {
+                color: #f1f5f9;
+                font-size: 0.95rem;
+            }
+            .detail-value.code {
+                color: #10b981;
+                font-family: monospace;
+                background: #0f172a;
+                padding: 10px;
+                border-radius: 4px;
+                display: block;
+                white-space: pre-wrap;
+                word-break: break-all;
+                margin-top: 8px;
+                border: 1px solid #334155;
+            }
+
+            .raw-data-btn {
+                background: #334155;
+                border: 1px solid #475569;
+                color: #94a3b8;
+                padding: 2px 6px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.65rem;
+                margin-left: 10px;
+                text-transform: none;
+            }
+            .raw-data-btn:hover {
+                background: #475569;
+                color: #f1f5f9;
+            }
+            .raw-data-content {
+                display: none;
+                margin-top: 5px;
+                background: #0f172a;
+                border: 1px solid #334155;
+                padding: 10px;
+                border-radius: 4px;
+                font-family: monospace;
+                font-size: 0.85rem;
+                color: #10b981;
+                white-space: pre-wrap;
+                word-break: break-all;
+            }
+            .prop-container {
+                margin-bottom: 15px;
+                background: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 6px;
+                padding: 10px;
+            }
+            .prop-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 8px;
+            }
+            .prop-title {
+                color: #38bdf8;
+                font-size: 0.85rem;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+            .prop-value {
+                color: #f1f5f9;
+                font-size: 0.95rem;
+                word-break: break-all;
+            }
+
+            h3 {
+                color: #f1f5f9;
+                margin: 0;
+                font-size: 1.1rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05rem;
+            }
+
+            div.vis-network div.vis-navigation div.vis-button {
+                filter: grayscale(1) invert(0.8) sepia(0.3) hue-rotate(180deg)
+                    brightness(1.1);
+                opacity: 0.6;
+                transition: all 0.2s;
+            }
+            div.vis-network div.vis-navigation div.vis-button:hover {
+                filter: grayscale(1) invert(1) sepia(0.3) hue-rotate(180deg)
+                    brightness(1.3) drop-shadow(0 0 4px rgba(56, 189, 248, 0.5));
+                opacity: 1;
+            }
+
+            #timeline-container {
+                position: absolute;
+                bottom: 15px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 65%;
+                background: rgba(30, 41, 59, 0.9);
+                border: 1px solid #334155;
+                border-radius: 8px;
+                padding: 6px 12px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+                z-index: 100;
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                pointer-events: auto;
+            }
+            .timeline-controls {
+                display: flex;
+                align-items: center;
+                white-space: nowrap;
+            }
+            .timeline-controls button {
+                background: #334155;
+                border: none;
+                color: #f1f5f9;
+                padding: 3px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.75rem;
+                margin-left: 5px;
+            }
+            .timeline-controls button:hover {
+                background: #475569;
+            }
+            #reset-btn {
+                width: 44px;
+                height: 36px;
+                padding: 0;
+                line-height: 1.1;
+                font-size: 0.7rem;
+                text-align: center;
+                margin-left: 0;
+            }
+            #timeline-canvas-wrapper {
+                position: relative;
+                flex-grow: 1;
+                height: 36px;
+                background: #0f172a;
+                border-radius: 4px;
+                overflow: hidden;
+                cursor: default;
+            }
+            #timeline-canvas-wrapper:active {
+                cursor: default;
+            }
+            #timeline-canvas {
+                position: absolute;
+                top: 0;
+                left: 0;
+                height: 100%;
+                width: 100%;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="top-bar">
+            <div id="top-bar-text">
+                <div class="brand">ReconSR</div>
+                <h1>Project: {{ .ProjectName }}</h1>
+                <div class="meta" style="margin-bottom: 2px">
+                    Generated: {{ .Timestamp }}
+                </div>
+                <div class="meta" style="margin-bottom: 6px">
+                    Nodes: {{ .NodesCount }} | Properties: {{ .PropertiesCount
+                    }}
+                </div>
+            </div>
+            <button
+                id="sidebar-toggle"
+                onclick="toggleSidebar()"
+                title="Toggle Sidebar"
+            >
+                <svg
+                    id="sidebar-icon-collapse"
+                    style="width: 24px; height: 24px; display: none"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M15 18l-6-6 6-6" />
+                </svg>
+                <svg
+                    id="sidebar-icon-expand"
+                    style="width: 24px; height: 24px; display: block"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M9 18l6-6-6-6" />
+                </svg>
+            </button>
+        </div>
+
+        <div id="sidebar" class="collapsed">
+            <h2>Graph Filters</h2>
+
+            <div class="sidebar-section">
+                <div class="meta-item">
+                    <div class="meta-item-left">
+                        <span
+                            style="
+                                color: #cbd5e1;
+                                font-size: 0.95rem;
+                                user-select: none;
+                            "
+                            >Out of Scope</span
+                        >
+                    </div>
+                    <div class="meta-item-controls">
+                        <span class="stat-badge">{{ .OutOfScopeCount }}</span>
+                        <div style="width: 18px; display: inline-block"></div>
+                        <div
+                            class="icon-btn"
+                            id="toggle-oos-btn"
+                            title="Toggle Out of Scope Visibility"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path
+                                    d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                                ></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-item-left">
+                        <span
+                            style="
+                                color: #cbd5e1;
+                                font-size: 0.95rem;
+                                user-select: none;
+                            "
+                            >Edge Labels</span
+                        >
+                    </div>
+                    <div class="meta-item-controls">
+                        <span class="stat-badge">{{ .EdgesCount }}</span>
+                        <div
+                            class="icon-btn"
+                            id="toggle-edge-labels-btn"
+                            title="Toggle Edge Labels"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M4 7V4h16v3M12 4v16M8 20h8" />
+                            </svg>
+                        </div>
+                        <div style="width: 18px; display: inline-block"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div
+                    class="sidebar-section-title"
+                    style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    "
+                >
+                    <span>Node Types</span>
+                    <div style="display: flex; gap: 8px">
+                        <div
+                            class="icon-btn active"
+                            id="toggle-all-labels-btn"
+                            title="Toggle All Labels"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M4 7V4h16v3M12 4v16M8 20h8" />
+                            </svg>
+                        </div>
+                        <div
+                            class="icon-btn active"
+                            id="toggle-all-vis-btn"
+                            title="Toggle All Visibility"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path
+                                    d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                                ></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                {{range .Stats}}
+                <div class="meta-item">
+                    <div class="meta-item-left">
+                        <span
+                            style="
+                                color: #cbd5e1;
+                                font-size: 0.95rem;
+                                text-transform: capitalize;
+                                user-select: none;
+                            "
+                            >{{.Type}}</span
+                        >
+                    </div>
+                    <div class="meta-item-controls">
+                        <span class="stat-badge">{{.Count}}</span>
+                        <div
+                            class="icon-btn active label-toggle-btn"
+                            data-type="{{.Type}}"
+                            title="Toggle Label"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M4 7V4h16v3M12 4v16M8 20h8" />
+                            </svg>
+                        </div>
+                        <div
+                            class="icon-btn active vis-toggle-btn"
+                            data-type="{{.Type}}"
+                            title="Toggle Visibility"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path
+                                    d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                                ></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+
+        <div id="timeline-container">
+            <div class="timeline-controls" style="margin-right: 15px">
+                <span
+                    id="current-time-display"
+                    style="
+                        color: #38bdf8;
+                        font-weight: bold;
+                        margin-right: 10px;
+                        font-size: 0.85rem;
+                        min-width: 135px;
+                        text-align: center;
+                    "
+                ></span>
+                <button
+                    onclick="stepPrev()"
+                    title="Previous Event"
+                    style="margin-left: 0"
+                >
+                    ⏮
+                </button>
+                <button onclick="stepNext()" title="Next Event">⏭</button>
+            </div>
+            <div id="timeline-canvas-wrapper">
+                <canvas id="timeline-canvas"></canvas>
+            </div>
+            <div class="timeline-controls" style="margin-left: 15px">
+                <button
+                    id="reset-btn"
+                    onclick="resetZoom()"
+                    title="Reset Zoom"
+                    style="margin-left: 0"
+                >
+                    Reset<br />Zoom
+                </button>
+            </div>
+        </div>
+
+        <div id="modal">
+            <div class="modal-header">
+                <h3>Details</h3>
+                <span
+                    class="close-btn"
+                    style="pointer-events: auto"
+                    onclick="closeModal()"
+                    >&times;</span
+                >
+            </div>
+            <div id="modalBody"></div>
+        </div>
+
+        <div id="mynetwork"></div>
+
+        <script type="text/javascript">
+                    function toggleSidebar() {
+                        const sidebar = document.getElementById('sidebar');
+                        const toggleBtn = document.getElementById('sidebar-toggle');
+                        const iconCollapse = document.getElementById('sidebar-icon-collapse');
+                        const iconExpand = document.getElementById('sidebar-icon-expand');
+
+                        sidebar.classList.toggle('collapsed');
+                        toggleBtn.classList.toggle('sidebar-open');
+
+                        if (sidebar.classList.contains('collapsed')) {                            iconCollapse.style.display = 'none';
+                            iconExpand.style.display = 'block';
+                        } else {
+                            iconCollapse.style.display = 'block';
+                            iconExpand.style.display = 'none';
+                        }
+                    }
+
+                    function escapeHTML(str) {
+                        if (!str) return "";
+                        return str.replace(/[&<>"']/g, function(m) {
+                            return {
+                                '&': '&amp;',
+                                '<': '&lt;',
+                                '>': '&gt;',
+                                '"': '&quot;',
+                                "'": '&#39;'
+                            }[m];
+                        });
+                    }
+
+                    function toggleRawData(id) {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            el.style.display = (el.style.display === 'block') ? 'none' : 'block';
+                        }
+                    }
+
+                    const initialNodes = [{{end}}
+
+            {{define "middle"}}] ; const initialEdges = [{{end}}
+
+            {{define "footer"}}] ;
+                    initialEdges.forEach(e => {
+                        e.font = { size: 0, strokeWidth: 0 };
+                    });
+
+                    let uniqueTimesSet = new Set();
+                    initialEdges.forEach(e => {
+                        uniqueTimesSet.add(e.firstSeen);
+                        uniqueTimesSet.add(e.lastSeen);
+                    });
+                    const uniqueTimes = Array.from(uniqueTimesSet).sort((a, b) => a - b);
+
+                    let minTime = uniqueTimes[0] || Date.now();
+                    let maxTime = uniqueTimes[uniqueTimes.length - 1] || Date.now();
+                    if (minTime === maxTime) {
+                        minTime -= 3600000;
+                        maxTime += 3600000;
+                    }
+
+                    const timePadding = (maxTime - minTime) * 0.05 || 3600000;
+                    const viewMinTime = minTime - timePadding;
+                    const viewMaxTime = maxTime + timePadding;
+
+                    let viewStart = viewMinTime;
+                    let viewEnd = viewMaxTime;
+                    let currentSliderTime = maxTime;
+
+                    const canvas = document.getElementById('timeline-canvas');
+                    const ctx = canvas.getContext('2d');
+                    const wrapper = document.getElementById('timeline-canvas-wrapper');
+                    const timeDisplay = document.getElementById('current-time-display');
+
+                    function resizeCanvas() {
+                        canvas.width = wrapper.clientWidth;
+                        canvas.height = wrapper.clientHeight;
+                        drawTimeline();
+                    }
+                    window.addEventListener('resize', resizeCanvas);
+
+                    function formatDateTime(ms) {
+                        if (!ms) return '';
+                        const date = new Date(ms);
+                        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
+
+                    function drawTimeline() {
+                        if (!ctx) return;
+                        const width = canvas.width;
+                        const height = canvas.height;
+                        const viewDuration = viewEnd - viewStart;
+
+                        ctx.clearRect(0, 0, width, height);
+
+                        // Calculate visible time events and group them into bins for density calculation
+                        let visibleTicks = [];
+                        const bins = new Int32Array(width);
+                        let maxBinCount = 0;
+
+                        uniqueTimes.forEach(t => {
+                            if (t >= viewStart && t <= viewEnd) {
+                                const x = ((t - viewStart) / viewDuration) * width;
+                                visibleTicks.push(x);
+
+                                const binX = Math.floor(x);
+                                if (binX >= 0 && binX < width) {
+                                    bins[binX]++;
+                                    if (bins[binX] > maxBinCount) maxBinCount = bins[binX];
+                                }
+                            }
+                        });
+
+                        // Render heatmap background based on event density
+                        if (maxBinCount > 0) {
+                            for (let i = 0; i < width; i++) {
+                                if (bins[i] > 0) {
+                                    const intensity = Math.max(0.1, Math.log(bins[i] + 1) / Math.log(maxBinCount + 1));
+                                    ctx.fillStyle = 'rgba(239, 68, 68, ' + (intensity * 0.4) + ')';
+                                    ctx.fillRect(i, 0, 1, height);
+                                }
+                            }
+                        }
+
+                        // Cluster events that are closer than the visual threshold to prevent overdrawing
+                        const THRESHOLD = 10;
+                        let clusters = [];
+                        let currentCluster = null;
+                        let maxCount = 0;
+
+                        visibleTicks.forEach(x => {
+                            if (!currentCluster) {
+                                currentCluster = { count: 1, startX: x, endX: x };
+                                clusters.push(currentCluster);
+                            } else {
+                                if (x - currentCluster.endX <= THRESHOLD) {
+                                    currentCluster.count++;
+                                    currentCluster.endX = x;
+                                } else {
+                                    currentCluster = { count: 1, startX: x, endX: x };
+                                    clusters.push(currentCluster);
+                                }
+                            }
+                        });
+
+                        clusters.forEach(c => {
+                            if (c.count > maxCount) maxCount = c.count;
+                        });
+
+                        const topHalf = height / 2;
+
+                        // Render dynamic clusters and individual event ticks
+                        if (maxCount > 0) {
+                            ctx.fillStyle = 'rgba(245, 158, 11, 0.85)'; // Amber/Orange for density
+                            clusters.forEach(c => {
+                                const clusterWidth = Math.max(4, c.endX - c.startX);
+                                const centerX = (c.startX + c.endX) / 2;
+                                // Height is strictly relative to the maximum cluster currently visible
+                                const h = Math.max(2, (c.count / maxCount) * topHalf);
+
+                                ctx.fillRect(centerX - clusterWidth / 2, topHalf - h, clusterWidth, h);
+                            });
+                        }
+
+                        ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+                        uniqueTimes.forEach(t => {
+                            if (t >= viewStart && t <= viewEnd) {
+                                const x = Math.round(((t - viewStart) / viewDuration) * width);
+                                ctx.fillRect(x, topHalf, 1, topHalf);
+                            }
+                        });
+
+                        // Render timeline playhead
+                        if (currentSliderTime >= viewStart && currentSliderTime <= viewEnd) {
+                            const px = Math.round(((currentSliderTime - viewStart) / viewDuration) * width);
+                            ctx.fillStyle = '#ef4444';
+                            ctx.fillRect(px - 1, 0, 2, height);
+                            ctx.beginPath();
+                            ctx.moveTo(px - 4, 0);
+                            ctx.lineTo(px + 4, 0);
+                            ctx.lineTo(px, 5);
+                            ctx.fill();
+                        }
+                    }        let isDragging = false;
+                    let isPanning = false;
+                    let startDragX = 0;
+                    let startViewStart = 0;
+                    let startViewEnd = 0;
+
+                    function clampView() {
+                        let duration = viewEnd - viewStart;
+                        const maxDuration = viewMaxTime - viewMinTime;
+
+                        if (duration > maxDuration) {
+                            duration = maxDuration;
+                        }
+
+                        if (viewStart < viewMinTime) {
+                            viewStart = viewMinTime;
+                            viewEnd = viewStart + duration;
+                        }
+                        if (viewEnd > viewMaxTime) {
+                            viewEnd = viewMaxTime;
+                            viewStart = viewEnd - duration;
+                            if (viewStart < viewMinTime) {
+                                viewStart = viewMinTime;
+                            }
+                        }
+                    }
+
+                    wrapper.addEventListener('contextmenu', (e) => e.preventDefault());
+
+                    wrapper.addEventListener('mousedown', (e) => {
+                        const rect = wrapper.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const viewDuration = viewEnd - viewStart;
+                        const clickTime = viewStart + (x / rect.width) * viewDuration;
+
+                        const playheadX = ((currentSliderTime - viewStart) / viewDuration) * rect.width;
+                        if (Math.abs(x - playheadX) < 15) {
+                            isDragging = true;
+                        } else if (e.shiftKey || e.button === 1 || e.button === 2) {
+                            isPanning = true;
+                            startDragX = x;
+                            startViewStart = viewStart;
+                            startViewEnd = viewEnd;
+                        } else {
+                            let snappedTime = clickTime;
+                            let minDist = Number.MAX_VALUE;
+                            const pxPerMs = rect.width / viewDuration;
+                            uniqueTimes.forEach(t => {
+                                const distMs = Math.abs(t - clickTime);
+                                const distPx = distMs * pxPerMs;
+                                if (distPx < 10 && distPx < minDist) {
+                                    minDist = distPx;
+                                    snappedTime = t;
+                                }
+                            });
+                            setTime(snappedTime);
+                            isDragging = true;
+                        }
+                    });
+
+                    window.addEventListener('mousemove', (e) => {
+                        if (isDragging) {
+                            const rect = wrapper.getBoundingClientRect();
+                            const x = e.clientX - rect.left;
+                            const viewDuration = viewEnd - viewStart;
+                            let newTime = viewStart + (x / rect.width) * viewDuration;
+                            if (newTime < minTime) newTime = minTime;
+                            if (newTime > maxTime) newTime = maxTime;
+                            setTime(newTime);
+                        } else if (isPanning) {
+                            const rect = wrapper.getBoundingClientRect();
+                            const x = e.clientX - rect.left;
+                            const dx = x - startDragX;
+                            const viewDuration = startViewEnd - startViewStart;
+                            const dt = (dx / rect.width) * viewDuration;
+                            viewStart = startViewStart - dt;
+                            viewEnd = startViewEnd - dt;
+                            clampView();
+                            drawTimeline();
+                        }
+                    });
+
+                    window.addEventListener('mouseup', () => {
+                        isDragging = false;
+                        isPanning = false;
+                    });
+                    window.addEventListener('mouseleave', () => {
+                        isDragging = false;
+                        isPanning = false;
+                    });
+
+                    wrapper.addEventListener('wheel', (e) => {
+                        e.preventDefault();
+                        const rect = wrapper.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const viewDuration = viewEnd - viewStart;
+                        const pointerTime = viewStart + (x / rect.width) * viewDuration;
+
+                        const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
+                        let newDuration = viewDuration * zoomFactor;
+
+                        const maxDuration = viewMaxTime - viewMinTime;
+                        if (newDuration > maxDuration) {
+                            newDuration = maxDuration;
+                        }
+                        if (newDuration < 60000) {
+                            newDuration = 60000;
+                        }
+
+                        const ratio = newDuration / viewDuration;
+                        viewStart = pointerTime - (pointerTime - viewStart) * ratio;
+                        viewEnd = pointerTime + (viewEnd - pointerTime) * ratio;
+
+                        clampView();
+                        drawTimeline();
+                    });
+
+                    function setTime(t) {
+                        currentSliderTime = t;
+
+                        const viewDuration = viewEnd - viewStart;
+                        const padding = viewDuration * 0.15;
+
+                        if (currentSliderTime < viewStart) {
+                            viewStart = currentSliderTime - padding;
+                            viewEnd = viewStart + viewDuration;
+                            clampView();
+                        } else if (currentSliderTime > viewEnd) {
+                            viewEnd = currentSliderTime + padding;
+                            viewStart = viewEnd - viewDuration;
+                            clampView();
+                        }
+
+                        timeDisplay.innerText = formatDateTime(currentSliderTime);
+                        drawTimeline();
+                        applyTimeFilter();
+                    }
+
+                    function resetZoom() {
+                        viewStart = viewMinTime;
+                        viewEnd = viewMaxTime;
+                        clampView();
+                        drawTimeline();
+                    }
+                    function stepNext() {
+                        const nextTime = uniqueTimes.find(t => t > currentSliderTime);
+                        if (nextTime) setTime(nextTime);
+                    }
+
+                    function stepPrev() {
+                        const prevTimes = uniqueTimes.filter(t => t < currentSliderTime);
+                        if (prevTimes.length > 0) setTime(prevTimes[prevTimes.length - 1]);
+                    }
+
+                    const nodes = new vis.DataSet(initialNodes);
+                    const edges = new vis.DataSet(initialEdges);
+                    const container = document.getElementById('mynetwork');
+                    const data = { nodes: nodes, edges: edges };
+                    const options = {
+                        nodes: {
+                            shape: 'dot', size: 20,
+                            font: { color: '#f1f5f9', size: 16, face: 'Segoe UI', strokeWidth: 0 },
+                            borderWidth: 2, shadow: true
+                        },
+                        edges: {
+                            width: 2,
+                            color: { color: '#64748b', highlight: '#38bdf8', hover: '#94a3b8' },
+                            arrows: { to: { enabled: true, scaleFactor: 0.8 } },
+                            font: {
+                                color: '#cbd5e1',
+                                size: 11,
+                                align: 'top',
+                                strokeWidth: 2,
+                                strokeColor: '#0f172a'
+                            },
+                            hoverWidth: 1.5, smooth: { type: 'continuous' }
+                        },
+                        groups: {
+                            domain: { color: { background: '#0ea5e9', border: '#0284c7' } },
+                            subdomain: { color: { background: '#8b5cf6', border: '#7c3aed' } },
+                            ipv4: { color: { background: '#10b981', border: '#059669' } },
+                            email: { color: { background: '#f59e0b', border: '#d97706' } }
+                        },
+                        physics: {
+                            enabled: true,
+                            barnesHut: {
+                                gravitationalConstant: -1500,
+                                centralGravity: 0.1,
+                                springLength: 150,
+                                springConstant: 0.02,
+                                damping: 0.3,
+                                avoidOverlap: 0.2
+                            },
+                            stabilization: { iterations: 200 }
+                        },
+                        interaction: { hover: true, navigationButtons: true, keyboard: true, dragNodes: true }
+                    };
+                    const network = new vis.Network(container, data, options);
+
+                    const originalColors = {};
+                    nodes.forEach(node => {
+                        if (node.color) {
+                            originalColors[node.id] = node.color;
+                        }
+                        if (node.outOfScope) {
+                            const groupColor = (options.groups[node.group] && options.groups[node.group].color)
+                                ? options.groups[node.group].color.background
+                                : '#64748b';
+                            const newColor = {
+                                border: '#334155',
+                                background: groupColor
+                            };
+                            originalColors[node.id] = newColor;
+                            nodes.update({
+                                id: node.id,
+                                color: newColor
+                            });
+                        }
+                    });
+                    const hiddenLabelTypes = new Set();
+
+                    function updateNodeLabels() {
+                        const updates = [];
+                        nodes.forEach(n => {
+                            const isHidden = hiddenLabelTypes.has(n.group);
+                            const updateObj = { id: n.id, font: { size: isHidden ? 0 : 16 } };
+                            if (originalColors[n.id]) {
+                                updateObj.color = originalColors[n.id];
+                            }
+                            updates.push(updateObj);
+                        });
+                        nodes.update(updates);
+                    }
+
+                    const edgeLabelBtn = document.getElementById('toggle-edge-labels-btn');
+                    if (edgeLabelBtn) {
+                        edgeLabelBtn.addEventListener('click', function() {
+                            this.classList.toggle('active');
+                            const show = this.classList.contains('active');
+                            const updates = [];
+                            edges.forEach(edge => {
+                                updates.push({
+                                    id: edge.id,
+                                    font: { size: show ? 11 : 0, strokeWidth: show ? 2 : 0 }
+                                });
+                            });
+                            edges.update(updates);
+                        });
+                    }
+
+                    const hiddenTypes = new Set();
+                    document.addEventListener('click', function(e) {
+                        const labelBtn = e.target.closest('.label-toggle-btn');
+                        if (labelBtn) {
+                            const type = labelBtn.getAttribute('data-type');
+                            labelBtn.classList.toggle('active');
+                            if (labelBtn.classList.contains('active')) {
+                                hiddenLabelTypes.delete(type);
+                            } else {
+                                hiddenLabelTypes.add(type);
+                            }
+                            updateNodeLabels();
+                            return;
+                        }
+
+                        const visBtn = e.target.closest('.vis-toggle-btn');
+                        if (visBtn) {
+                            const type = visBtn.getAttribute('data-type');
+                            visBtn.classList.toggle('active');
+                            if (visBtn.classList.contains('active')) {
+                                hiddenTypes.delete(type);
+                            } else {
+                                hiddenTypes.add(type);
+                            }
+                            applyTimeFilter();
+                            return;
+                        }
+
+                        const toggleAllLabelsBtn = e.target.closest('#toggle-all-labels-btn');
+                        if (toggleAllLabelsBtn) {
+                            const rootNode = initialNodes.find(n => n.shape === 'diamond') || initialNodes[0];
+                            const rootType = rootNode ? rootNode.group : null;
+                            const allLabelBtns = document.querySelectorAll('.label-toggle-btn');
+
+                            toggleAllLabelsBtn.classList.toggle('active');
+                            const targetActive = toggleAllLabelsBtn.classList.contains('active');
+
+                            allLabelBtns.forEach(b => {
+                                const type = b.getAttribute('data-type');
+                                if (type === rootType) return;
+
+                                if (targetActive) {
+                                    b.classList.add('active');
+                                    hiddenLabelTypes.delete(type);
+                                } else {
+                                    b.classList.remove('active');
+                                    hiddenLabelTypes.add(type);
+                                }
+                            });
+                            updateNodeLabels();
+                            return;
+                        }
+
+                        const toggleAllVisBtn = e.target.closest('#toggle-all-vis-btn');
+                        if (toggleAllVisBtn) {
+                            const rootNode = initialNodes.find(n => n.shape === 'diamond') || initialNodes[0];
+                            const rootType = rootNode ? rootNode.group : null;
+                            const allVisBtns = document.querySelectorAll('.vis-toggle-btn');
+
+                            toggleAllVisBtn.classList.toggle('active');
+                            const targetActive = toggleAllVisBtn.classList.contains('active');
+
+                            allVisBtns.forEach(b => {
+                                const type = b.getAttribute('data-type');
+                                if (type === rootType) return;
+
+                                if (targetActive) {
+                                    b.classList.add('active');
+                                    hiddenTypes.delete(type);
+                                } else {
+                                    b.classList.remove('active');
+                                    hiddenTypes.add(type);
+                                }
+                            });
+                            applyTimeFilter();
+                            return;
+                        }
+                    });
+
+                    const oosBtn = document.getElementById('toggle-oos-btn');
+                    if (oosBtn) {
+                        oosBtn.addEventListener('click', function() {
+                            this.classList.toggle('active');
+                            applyTimeFilter();
+                        });
+                    }
+
+                    function applyTimeFilter() {
+                        const showOOS = oosBtn ? oosBtn.classList.contains('active') : false;
+                        const activeNodes = new Set();
+                        const visibleNodes = new Set();
+
+                        const rootNode = initialNodes.find(n => n.shape === 'diamond') || initialNodes[0];
+                        if (rootNode) activeNodes.add(rootNode.id);
+
+                        const activeEdges = initialEdges.filter(e => e.firstSeen <= currentSliderTime);
+                        activeEdges.forEach(e => {
+                            activeNodes.add(e.from);
+                            activeNodes.add(e.to);
+                        });
+
+                        const nodeUpdates = [];
+                        nodes.forEach(n => {
+                            let hidden = !activeNodes.has(n.id);
+
+                            if (n.id !== rootNode.id) {
+                                if ((!showOOS && n.outOfScope) || hiddenTypes.has(n.group)) {
+                                    hidden = true;
+                                }
+                            }
+
+                            nodeUpdates.push({ id: n.id, hidden: hidden });
+                            if (!hidden) visibleNodes.add(n.id);
+                        });
+                        nodes.update(nodeUpdates);
+
+                        const adjOut = {};
+                        activeEdges.forEach(e => {
+                            if (!adjOut[e.from]) adjOut[e.from] = [];
+                            adjOut[e.from].push(e);
+                        });
+
+                        const virtualEdges = new Map();
+                        const edgeUpdates = [];
+
+                        function findTargets(startId) {
+                            const targets = [];
+                            const visited = new Set();
+                            function dfs(currId, currFn) {
+                                if (visited.has(currId)) return;
+                                visited.add(currId);
+                                (adjOut[currId] || []).forEach(e => {
+                                    const fn = e.function || currFn;
+                                    if (visibleNodes.has(e.to)) {
+                                        targets.push({ to: e.to, function: fn });
+                                    } else if (activeNodes.has(e.to)) {
+                                        dfs(e.to, fn);
+                                    }
+                                });
+                            }
+                            dfs(startId, null);
+                            return targets;
+                        }
+
+                        activeEdges.forEach(e => {
+                            const fromVis = visibleNodes.has(e.from);
+                            const toVis = visibleNodes.has(e.to);
+                            if (fromVis && toVis) {
+                                edgeUpdates.push({ id: e.id, hidden: false });
+                            } else if (fromVis && !toVis) {
+                                edgeUpdates.push({ id: e.id, hidden: true });
+                                findTargets(e.to).forEach(t => {
+                                    if (e.from === t.to) return;
+                                    const vId = 'v_' + e.from + '_' + t.to + '_' + t.function;
+                                    if (!virtualEdges.has(vId)) {
+                                        virtualEdges.set(vId, {
+                                            id: vId,
+                                            from: e.from,
+                                            to: t.to,
+                                            hidden: false,
+                                            color: { color: '#f59e0b', highlight: '#fbbf24', hover: '#fcd34d' },
+                                            dashes: false,
+                                            font: { size: edgeLabelBtn && edgeLabelBtn.classList.contains('active') ? 11 : 0, strokeWidth: edgeLabelBtn && edgeLabelBtn.classList.contains('active') ? 2 : 0 }
+                                        });
+                                    }
+                                });
+                            } else {
+                                edgeUpdates.push({ id: e.id, hidden: true });
+                            }
+                        });
+
+                        initialEdges.forEach(e => {
+                            if (e.firstSeen > currentSliderTime) {
+                                edgeUpdates.push({ id: e.id, hidden: true });
+                            }
+                        });
+
+                        edges.update(edgeUpdates);
+
+                        const oldV = edges.getIds({ filter: item => item.id.startsWith('v_') });
+                        edges.remove(oldV);
+                        if (virtualEdges.size > 0) {
+                            edges.add(Array.from(virtualEdges.values()));
+                        }
+                    }
+                    resizeCanvas();
+                    setTime(maxTime);
+
+                    // Force a robust recenter after initial data set updates and physics start to settle
+                    setTimeout(function() {
+                        network.fit({
+                            animation: {
+                                duration: 800,
+                                easingFunction: "easeOutQuart"
+                            }
+                        });
+                    }, 700);
+
+                    let currentModalId = null;
+
+                    function closeModal() {
+                        document.getElementById('modal').style.display = 'none';
+                        currentModalId = null;
+                    }
+
+                    function toggleSection(id) {
+                        const el = document.getElementById(id);
+                        const icon = document.getElementById(id + '-icon');
+                        if (el) {
+                            if (el.style.display === 'none') {
+                                el.style.display = 'block';
+                                if (icon) icon.innerText = '▼';
+                            } else {
+                                el.style.display = 'none';
+                                if (icon) icon.innerText = '▶';
+                            }
+                        }
+                    }
+
+                    let currentBlinkInterval = null;
+
+                    function focusNode(nodeId) {
+                        network.selectNodes([nodeId]);
+                        network.focus(nodeId, {
+                            scale: 1.2,
+                            animation: {
+                                duration: 800,
+                                easingFunction: "easeInOutQuad"
+                            }
+                        });
+
+                        const node = nodes.get(nodeId);
+                        if (!node) return;
+
+                        const originalColor = node.color || (originalColors[nodeId] ? originalColors[nodeId] : undefined);
+                        const originalBorderWidth = node.borderWidth || 2;
+                        const blinkColor = { border: '#fbbf24', background: '#f59e0b' };
+
+                        let isBlink = true;
+                        let count = 0;
+
+                        if (currentBlinkInterval) clearInterval(currentBlinkInterval);
+
+                        currentBlinkInterval = setInterval(() => {
+                            nodes.update({
+                                id: nodeId,
+                                color: isBlink ? blinkColor : originalColor,
+                                borderWidth: isBlink ? 4 : originalBorderWidth
+                            });
+                            isBlink = !isBlink;
+                            count++;
+                            if (count > 5) {
+                                clearInterval(currentBlinkInterval);
+                                nodes.update({
+                                    id: nodeId,
+                                    color: originalColor,
+                                    borderWidth: originalBorderWidth
+                                });
+                                network.selectNodes([nodeId]);
+                            }
+                        }, 250);
+                    }
+
+                    function getRawDataHTML(funcName, executions) {
+                        if (executions && executions[funcName]) {
+                            const rawId = 'raw-' + Math.random().toString(36).substr(2, 9);
+                            return {
+                                btn: '<button class="raw-data-btn" onclick="toggleRawData(\'' + rawId + '\')">Raw Data</button>',
+                                content: '<div id="' + rawId + '" class="raw-data-content">' + escapeHTML(executions[funcName]) + '</div>'
+                            };
+                        }
+                        return { btn: '', content: '' };
+                    }
+
+                    function renderProperties(props, executions, depth = 0) {
+                        let htmlStr = "";
+                        let propGroups = {};
+                        props.forEach(prop => {
+                            let fn = prop.function || 'unknown';
+                            if (!propGroups[fn]) propGroups[fn] = [];
+                            propGroups[fn].push(prop);
+                        });
+
+                        for (let fn in propGroups) {
+                            htmlStr += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
+                            htmlStr += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px;">';
+                            htmlStr += '<span class="prop-title" style="color: #a78bfa; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
+                            let rawHtml = getRawDataHTML(fn, executions);
+                            htmlStr += rawHtml.btn;
+                            htmlStr += '</div>';
+                            if (rawHtml.content) {
+                                htmlStr += rawHtml.content;
+                            }
+
+                            propGroups[fn].forEach((prop) => {
+                                htmlStr += '<div style="margin-bottom: 8px; padding: 8px; background: #1e293b; border-left: 3px solid #a78bfa; border-radius: 0 4px 4px 0;">';
+                                htmlStr += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
+                                htmlStr += '<span style="color: #38bdf8; font-weight: bold;">' + escapeHTML(prop.type) + '</span></div>';
+                                htmlStr += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all;">' + escapeHTML(prop.value) + '</div>';
+
+                                let metaHtml = '';
+                                if (prop.contexts && prop.contexts.length > 0) {
+                                    metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(prop.contexts.join(', ')) + '</div>';
+                                }
+                                if (prop.firstSeen) {
+                                    metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(prop.firstSeen) + '</div>';
+                                }
+                                if (metaHtml) {
+                                    htmlStr += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
+                                }
+
+                                if (prop.properties && prop.properties.length > 0) {
+                                    htmlStr += '<div style="margin-top: 10px;">';
+                                    htmlStr += renderProperties(prop.properties, executions, depth + 1);
+                                    htmlStr += '</div>';
+                                }
+                                htmlStr += "</div>";
+                            });
+                            htmlStr += "</div>";
+                        }
+                        return htmlStr;
+                    }
+
+                    document.getElementById('modalBody').addEventListener('click', function(e) {
+                        if (e.target && e.target.classList.contains('focus-btn')) {
+                            const nodeId = e.target.getAttribute('data-node-id');
+                            if (nodeId) {
+                                focusNode(nodeId);
+                            }
+                        }
+                    });
+
+                    network.on("click", function (params) {
+                        let clickedId = null;
+                        if (params.nodes.length > 0) {
+                            clickedId = 'n_' + params.nodes[0];
+                        } else if (params.edges.length > 0) {
+                            clickedId = 'e_' + params.edges[0];
+                        }
+
+                        const modal = document.getElementById('modal');
+                        if (!clickedId) {
+                            closeModal();
+                            return;
+                        }
+
+                        if (clickedId === currentModalId && modal.style.display === 'block') {
+                            closeModal();
+                            return;
+                        }
+
+                        currentModalId = clickedId;
+                        let content = '';
+
+                        if (params.nodes.length > 0) {
+                            const nodeId = params.nodes[0];
+                            const node = nodes.get(nodeId);
+                            if (node) {
+                                content += '<div class="prop-container" style="position: relative;">';
+                                content += '<button class="raw-data-btn focus-btn" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(nodeId) + '">Focus</button>';
+                                content += '<div class="prop-header" style="margin-right: 50px;"><span class="prop-title" style="font-size: 1rem;">' + escapeHTML(node.group) + '</span></div>';
+                                content += '<div class="prop-value" style="font-size: 1.1rem; color: #fff;">' + escapeHTML(node.label) + '</div>';
+                                if (node.outOfScope) {
+                                    content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
+                                    content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
+                                    content += '</div>';
+                                }
+                                content += '</div>';
+
+                                if (node.properties && node.properties.length > 0) {
+                                    const sectionId = 'props-' + Math.random().toString(36).substr(2, 9);
+                                    content += '<div class="detail-item" style="margin-top: 25px;">';
+                                    content += '<div class="detail-label" style="font-size: 0.9rem; color: #f1f5f9; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + sectionId + '\')">';
+                                    content += '<span>Properties</span><span id="' + sectionId + '-icon">▶</span></div>';
+                                    content += '<div id="' + sectionId + '" style="display: none;">';
+                                    content += renderProperties(node.properties, node.executions);
+                                    content += '</div></div>';
+                                }
+
+                                const outEdges = initialEdges.filter(item => item.from === nodeId && item.firstSeen <= currentSliderTime);
+                                let outgoingGroups = {};
+                                outEdges.forEach(e => {
+                                    let fn = e.function || 'unknown';
+                                    if (!outgoingGroups[fn]) outgoingGroups[fn] = [];
+                                    outgoingGroups[fn].push(e);
+                                });
+
+                                if (Object.keys(outgoingGroups).length > 0) {
+                                    const sectionId = 'out-' + Math.random().toString(36).substr(2, 9);
+                                    content += '<div class="detail-item" style="margin-top: 25px;">';
+                                    content += '<div class="detail-label" style="font-size: 0.9rem; color: #f1f5f9; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + sectionId + '\')">';
+                                    content += '<span>Outgoing Connections</span><span id="' + sectionId + '-icon">▶</span></div>';
+
+                                    content += '<div id="' + sectionId + '" style="display: none;">';
+                                    for (let fn in outgoingGroups) {
+                                        content += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
+                                        content += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px;">';
+                                        content += '<span class="prop-title" style="color: #10b981; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
+                                        let rawHtml = getRawDataHTML(fn, node.executions);
+                                        content += rawHtml.btn;
+                                        content += '</div>';
+                                        if (rawHtml.content) {
+                                            content += rawHtml.content;
+                                        }
+
+                                        outgoingGroups[fn].forEach(e => {
+                                            const targetNode = nodes.get(e.to);
+                                            const targetLabel = targetNode ? targetNode.label : e.to;
+                                            const targetGroup = targetNode ? targetNode.group : '';
+                                            const isOOS = targetNode ? targetNode.outOfScope : false;
+
+                                            content += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #10b981; border-radius: 0 4px 4px 0;">';
+                                            content += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
+                                            content += '<span>' + escapeHTML(targetGroup) + '</span>';
+                                            content += '<button class="raw-data-btn focus-btn" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.to) + '">Focus</button></div>';
+                                            content += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all;">' + escapeHTML(targetLabel) + '</div>';
+
+                                            let metaHtml = '';
+                                            if (isOOS) {
+                                                metaHtml += '<div style="color: #ef4444; font-weight: bold; margin-top: 4px;">⚠️ OUT OF SCOPE</div>';
+                                            }
+                                            if (e.contexts && e.contexts.length > 0) {
+                                                metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(e.contexts.join(', ')) + '</div>';
+                                            }
+                                            if (e.firstSeen) {
+                                                metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(e.firstSeen) + '</div>';
+                                            }
+                                            if (metaHtml) {
+                                                content += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
+                                            }
+                                            content += '</div>';
+                                        });
+                                        content += '</div>';
+                                    }
+                                    content += '</div></div>';
+                                }
+
+                                const inEdges = initialEdges.filter(item => item.to === nodeId && item.firstSeen <= currentSliderTime);
+                                let incomingGroups = {};
+                                inEdges.forEach(e => {
+                                    let fn = e.function || 'unknown';
+                                    if (!incomingGroups[fn]) incomingGroups[fn] = [];
+                                    incomingGroups[fn].push(e);
+                                });
+
+                                if (Object.keys(incomingGroups).length > 0) {
+                                    const sectionId = 'in-' + Math.random().toString(36).substr(2, 9);
+                                    content += '<div class="detail-item" style="margin-top: 25px;">';
+                                    content += '<div class="detail-label" style="font-size: 0.9rem; color: #f1f5f9; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + sectionId + '\')">';
+                                    content += '<span>Incoming Connections</span><span id="' + sectionId + '-icon">▶</span></div>';
+
+                                    content += '<div id="' + sectionId + '" style="display: none;">';
+                                    for (let fn in incomingGroups) {
+                                        content += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
+                                        content += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px;">';
+                                        content += '<span class="prop-title" style="color: #8b5cf6; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
+                                        const sourceNodeId = incomingGroups[fn][0].from;
+                                        const sourceNode = nodes.get(sourceNodeId);
+                                        let rawHtml = { btn: '', content: '' };
+                                        if (sourceNode) {
+                                             rawHtml = getRawDataHTML(fn, sourceNode.executions);
+                                             content += rawHtml.btn;
+                                        }
+                                        content += '</div>';
+                                        if (rawHtml.content) {
+                                            content += rawHtml.content;
+                                        }
+
+                                        incomingGroups[fn].forEach(e => {
+                                            const sourceNode2 = nodes.get(e.from);
+                                            const sourceLabel = sourceNode2 ? sourceNode2.label : e.from;
+                                            const sourceGroup = sourceNode2 ? sourceNode2.group : '';
+                                            const isOOS = sourceNode2 ? sourceNode2.outOfScope : false;
+
+                                            content += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #8b5cf6; border-radius: 0 4px 4px 0;">';
+                                            content += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
+                                            content += '<span>' + escapeHTML(sourceGroup) + '</span>';
+                                            content += '<button class="raw-data-btn focus-btn" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.from) + '">Focus</button></div>';
+                                            content += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all;">' + escapeHTML(sourceLabel) + '</div>';
+
+                                            let metaHtml = '';
+                                            if (isOOS) {
+                                                metaHtml += '<div style="color: #ef4444; font-weight: bold; margin-top: 4px;">⚠️ OUT OF SCOPE</div>';
+                                            }
+                                            if (e.contexts && e.contexts.length > 0) {
+                                                metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(e.contexts.join(', ')) + '</div>';
+                                            }
+                                            if (e.firstSeen) {
+                                                metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(e.firstSeen) + '</div>';
+                                            }
+                                            if (metaHtml) {
+                                                content += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
+                                            }
+                                            content += '</div>';
+                                        });
+                                        content += '</div>';
+                                    }
+                                    content += '</div></div>';
+                                }
+
+                                document.getElementById('modalBody').innerHTML = content;
+                                document.getElementById('modal').style.display = 'block';
+                            }
+                        }
+                        else if (params.edges.length > 0) {
+                            const edgeId = params.edges[0];
+                            const edge = edges.get(edgeId);
+                            if (edge) {
+                                if (edge.contexts && edge.contexts.length > 0) {
+                                    const contextsHtml = edge.contexts.map(c => escapeHTML(c)).join('<br>');
+                                    content += '<div class="detail-item"><div class="detail-label">Contexts</div><div class="detail-value code">' + contextsHtml + '</div></div>';
+                                }
+                                content += '<div class="detail-item"><div class="detail-label">Method</div><div class="detail-value">' + escapeHTML(edge.function) + '</div></div>';
+                                content += '<div class="detail-item"><div class="detail-label">Discovery Time</div><div class="detail-value">First Seen: ' + formatDateTime(edge.firstSeen) + '<br>Last Seen: ' + formatDateTime(edge.lastSeen) + '</div></div>';
+
+                                const sourceNode = nodes.get(edge.from);
+                                if (sourceNode && sourceNode.executions && sourceNode.executions[edge.function]) {
+                                    content += '<div class="detail-item"><div class="detail-label">Raw Data</div>';
+                                    const rawId = 'raw-edge-' + edge.id;
+                                    content += '<button class="raw-data-btn" style="margin-left:0; margin-top: 5px;" onclick="toggleRawData(\'' + rawId + '\')">Show Raw Data</button>';
+                                    content += '<div id="' + rawId + '" class="raw-data-content">' + escapeHTML(sourceNode.executions[edge.function]) + '</div></div>';
+                                }
+
+                                document.getElementById('modalBody').innerHTML = content;
+                                document.getElementById('modal').style.display = 'block';
+                            }
+                        } else {
+                            closeModal();
+                        }
+                    });
+        </script>
+    </body>
+</html>
+{{end}}
