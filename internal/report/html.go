@@ -350,6 +350,14 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		visEdges = append(visEdges, *e)
 	}
 
+	var initialTargetID string
+	for _, edge := range graph.Edges {
+		if edge.Source.Value == graph.InitialTarget {
+			initialTargetID = fmt.Sprintf("%s:%s", edge.Source.Type, edge.Source.Value)
+			break
+		}
+	}
+
 	visNodes := make([]interface{}, 0, len(nodesMap))
 	statsMap := make(map[string]int)
 	outOfScopeCount := 0
@@ -358,7 +366,15 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		if n.OutOfScope {
 			outOfScopeCount++
 		}
-		if n.Label == graph.InitialTarget {
+
+		isInitial := false
+		if initialTargetID != "" {
+			isInitial = n.ID == initialTargetID
+		} else {
+			isInitial = n.Label == graph.InitialTarget
+		}
+
+		if isInitial {
 			visNodes = append(visNodes, highlightedNode{
 				visNode: n,
 				Shape:   "diamond",
