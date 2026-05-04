@@ -1,0 +1,89 @@
+package dns
+
+import (
+	"context"
+	"encoding/hex"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"cdua-org/ReconSR/modules/utils/dnsutils"
+	"cdua-org/ReconSR/modules/utils/modutil"
+	"cdua-org/ReconSR/modules/utils/resolver"
+	"cdua-org/ReconSR/schema"
+)
+
+var dsDigestTypes = map[byte]string{
+	1: "SHA-1",
+	2: "SHA-256",
+	3: "GOST R 34.11-94",
+	4: "SHA-384",
+}
+
+func parseDS(raw string) string {
+	data, ok := dnsutils.DecodeWireFormat(raw, 5)
+	if !ok {
+		return raw
+	}
+
+	keyTag := uint16(data[0])<<8 | uint16(data[1])
+	alg := data[2]
+	digestType := data[3]
+	digest := hex.EncodeToString(data[4:])
+
+	return fmt.Sprintf("%d %d %d %s", keyTag, alg, digestType, strings.ToUpper(digest))
+}
+
+func getDSData(ctx context.Context, target string) schema.ModuleExecution {
+	exec := modutil.NewExecution("get_ds")
+
+	log.Printf("get_ds target=%q", target)
+
+	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
+	defer cancel()
+
+	records, raw, err := resolver.ResolveRecord(queryCtx, target, 43, nil)
+	if err != nil {
+		log.Printf("get_ds error: %v", err)
+		modutil.SetError(&exec, "ds lookup failed: %v", err)
+		return exec
+	}
+
+	modutil.SetRawFromBytes(&exec, raw)
+
+	log.Printf("get_ds target=%q records=%d", target, len(records))
+
+	for _, rec := range records {
+		parsed := parseDS(rec)
+
+		parts := strings.Fields(parsed)
+		if len(parts) < 4 {
+			continue
+		}
+
+		keyTag := parts[0]
+		algName := parts[1]
+		digestName := parts[2]
+
+		if algID, err := strconv.Atoi(parts[1]); err == nil && algID >= 0 && algID <= 255 {
+			if name, ok := dnskeyAlgorithms[byte(algID)]; ok {
+				algName = name
+			}
+		}
+
+		if dTypeID, err := strconv.Atoi(parts[2]); err == nil && dTypeID >= 0 && dTypeID <= 255 {
+			if name, ok := dsDigestTypes[byte(dTypeID)]; ok {
+				digestName = name
+			}
+		}
+
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     "ds",
+			Category: "property",
+			Value:    parts[3],
+			Context:  "DS Record, KeyTag: " + keyTag + ", Alg: " + algName + ", Hash: " + digestName,
+		})
+	}
+
+	return exec
+}

@@ -1,0 +1,148 @@
+package asn_metadata
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"cdua-org/ReconSR/modules/utils/modutil"
+	"cdua-org/ReconSR/modules/utils/resolver"
+	"cdua-org/ReconSR/modules/utils/ripestat"
+	"cdua-org/ReconSR/schema"
+)
+
+func getASNPeers(target string) (execution schema.ModuleExecution) {
+	execution = modutil.NewExecution("get_asn_peers")
+
+	dbg.Printf("getASNPeers target=%q", target)
+
+	originASN := target
+	if originASN == "" {
+		errMsg := errInvalidASNFormat
+		execution.Error = &errMsg
+		dbg.Printf("getASNPeers target=%q invalid_format", target)
+		return execution
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), resolver.TimeoutASNMeta)
+	defer cancel()
+
+	var rawBuffer strings.Builder
+	defer func() {
+		execution.RawData = rawBuffer.String()
+	}()
+
+	chain, err := buildTransitChain(ctx, originASN, &rawBuffer)
+	if err != nil {
+		dbg.Printf("getASNPeers target=%q build_chain_error=%v", target, err)
+		// Graceful degradation: instead of failing the entire function and marking it as an error,
+		// we assume a RIPEstat timeout/502 is due to massive peer counts (e.g., Tier-1 or huge ISP)
+		// and safely terminate the chain with a descriptive marker.
+		chain = append(chain, "[TOO_MANY_PEERS]")
+	}
+
+	dbg.Printf("getASNPeers target=%q chain_length=%d", target, len(chain))
+
+	if len(chain) == 0 {
+		return execution
+	}
+
+	execution.Results = append(execution.Results, schema.ModuleResult{
+		Type:     "asn",
+		Category: "node",
+		Value:    originASN,
+		Context:  "Origin AS",
+		Applied:  true,
+	})
+
+	chainLine := buildChainString(chain, originASN)
+	execution.Results = append(execution.Results, schema.ModuleResult{
+		Type:     "peers_chain",
+		Category: "property",
+		Value:    chainLine,
+		Context:  "ASN Peers",
+	})
+
+	return execution
+}
+
+func buildTransitChain(ctx context.Context, originASN string, rawOut *strings.Builder) ([]string, error) {
+	visited := make(map[string]bool)
+	var chain []string
+
+	if err := traverseUpstream(ctx, originASN, 0, visited, &chain, rawOut); err != nil {
+		return chain, err
+	}
+
+	return chain, nil
+}
+
+func extractLargestUpstreamASN(neighbours []ripestat.Neighbour, originASN string) string {
+	var largestASN string
+	var maxPeers int
+
+	for _, n := range neighbours {
+		if n.Position == "right" {
+			nASN := "AS" + strconv.Itoa(n.ASN)
+			if nASN != originASN && n.ASN != 0 {
+				if n.PeerCount > maxPeers {
+					maxPeers = n.PeerCount
+					largestASN = nASN
+				}
+			}
+		}
+	}
+	return largestASN
+}
+
+func traverseUpstream(ctx context.Context, asn string, depth int, visited map[string]bool, chain *[]string, rawOut *strings.Builder) error {
+	if depth >= resolver.MaxRecursionDepth {
+		dbg.Printf("traverseUpstream asn=%q depth=%d max_depth_reached", asn, depth)
+		return nil
+	}
+
+	if visited[asn] {
+		dbg.Printf("traverseUpstream asn=%q depth=%d already_visited", asn, depth)
+		return nil
+	}
+	visited[asn] = true
+
+	dbg.Printf("traverseUpstream asn=%q depth=%d querying_ripestat", asn, depth)
+
+	var resp ripestat.APIResponse
+	if err := ripestat.Query(ctx, asn, "asn-neighbours", &resp, resolver.MaxRetriesASNMeta); err != nil {
+		dbg.Printf("traverseUpstream asn=%q depth=%d ripestat_error=%v", asn, depth, err)
+		return fmt.Errorf("ripestat query: %w", err)
+	}
+
+	if rawOut != nil && resp.RawJSON != "" {
+		rawOut.WriteString(resp.RawJSON)
+		rawOut.WriteString("\n")
+	}
+
+	upstream := extractLargestUpstreamASN(resp.Data.Neighbours, asn)
+
+	dbg.Printf("traverseUpstream asn=%q depth=%d largest_upstream=%q", asn, depth, upstream)
+
+	if upstream != "" {
+		*chain = append(*chain, upstream)
+		return traverseUpstream(ctx, upstream, depth+1, visited, chain, rawOut)
+	}
+
+	return nil
+}
+
+func buildChainString(chain []string, originASN string) string {
+	if len(chain) == 0 {
+		return originASN
+	}
+
+	parts := make([]string, 0, len(chain)+1)
+	for i := len(chain) - 1; i >= 0; i-- {
+		parts = append(parts, chain[i])
+	}
+	parts = append(parts, originASN)
+
+	return strings.Join(parts, " <- ")
+}
