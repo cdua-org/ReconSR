@@ -11,21 +11,48 @@ import (
 func extractIPBanners(exec *schema.ModuleExecution, banners []shodanIPBanner, tags []string) {
 	for i := range banners {
 		banner := &banners[i]
-		portSrc := extractBannerPort(exec, banner, tags)
-		src := extractBannerSource(exec, banner, tags, portSrc)
-		extractBannerSSL(exec, banner, tags, src)
-		extractBannerCPEs(exec, banner, tags, src)
-		extractBannerVulns(exec, banner, tags, src)
+		serviceSrc := extractBannerServiceAndWeb(exec, banner, tags)
+		portSrc := extractBannerPort(exec, banner, tags, serviceSrc)
+
+		cveSrc := serviceSrc
+		if cveSrc == nil {
+			cveSrc = portSrc
+		}
+
+		extractBannerSSL(exec, banner, tags, portSrc)
+		extractBannerCPEs(exec, banner, tags, portSrc)
+		extractBannerVulns(exec, banner, tags, cveSrc)
 		extractBannerGeo(exec, banner, tags)
-		extractBannerHash(exec, banner, tags, src)
-		extractBannerTimestamp(exec, banner, tags, src)
-		extractBannerHeartbleed(exec, banner, tags, src)
+		extractBannerHash(exec, banner, tags, portSrc)
+		extractBannerTimestamp(exec, banner, tags, portSrc)
+		extractBannerHeartbleed(exec, banner, tags, portSrc)
 	}
 }
 
-func extractBannerPort(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string) *schema.EntityRef {
+func extractBannerServiceAndWeb(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string) *schema.EntityRef {
+	serviceValue := extractBannerServiceValue(banner)
+	webServerValue := extractBannerWebServerValue(banner)
+
+	var src *schema.EntityRef
+	if serviceValue != "" {
+		src = appendBannerSourceResult(exec, resultTypeService, serviceValue, tags, nil)
+	}
+
+	if webServerValue != "" {
+		if src != nil {
+			if serviceValue != webServerValue {
+				appendBannerSourceResult(exec, resultTypeWebServer, webServerValue, tags, src)
+			}
+		} else {
+			src = appendBannerSourceResult(exec, resultTypeWebServer, webServerValue, tags, nil)
+		}
+	}
+	return src
+}
+
+func extractBannerPort(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, parentSrc *schema.EntityRef) *schema.EntityRef {
 	if banner.Port == 0 {
-		return nil
+		return parentSrc
 	}
 
 	portValue := strconv.Itoa(banner.Port)
@@ -41,29 +68,10 @@ func extractBannerPort(exec *schema.ModuleExecution, banner *shodanIPBanner, tag
 		Category: resultCategoryProperty,
 		Value:    portValue,
 		Tags:     tags,
+		Source:   parentSrc,
 	})
 
 	return &schema.EntityRef{Type: resultTypePort, Value: portValue}
-}
-
-func extractBannerSource(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, portSrc *schema.EntityRef) *schema.EntityRef {
-	serviceValue := extractBannerServiceValue(banner)
-	webServerValue := extractBannerWebServerValue(banner)
-
-	switch {
-	case serviceValue != "" && webServerValue != "" && serviceValue == webServerValue:
-		return appendBannerSourceResult(exec, resultTypeWebServer, webServerValue, tags, portSrc)
-	case serviceValue != "":
-		src := appendBannerSourceResult(exec, resultTypeService, serviceValue, tags, portSrc)
-		if webServerValue != "" {
-			appendBannerSourceResult(exec, resultTypeWebServer, webServerValue, tags, src)
-		}
-		return src
-	case webServerValue != "":
-		return appendBannerSourceResult(exec, resultTypeWebServer, webServerValue, tags, portSrc)
-	default:
-		return portSrc
-	}
 }
 
 func extractBannerServiceValue(banner *shodanIPBanner) string {

@@ -80,27 +80,37 @@ func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult) {
 	if serviceResult.Category != resultCategoryProperty {
 		t.Fatalf("expected service to be a property, got %q", serviceResult.Category)
 	}
-	if serviceResult.Source == nil || serviceResult.Source.Type != resultTypePort || serviceResult.Source.Value != "443/tcp" {
-		t.Fatalf("expected service to be anchored to port 443/tcp, got %+v", serviceResult.Source)
+	if serviceResult.Source != nil {
+		t.Fatalf("expected service to be anchored directly to IP, got %+v", serviceResult.Source)
 	}
 
-	assertShodanIPServiceSource(t, results, "hash", testShodanServiceHash)
-	assertShodanIPServiceSource(t, results, resultTypeBannerTimestamp, testShodanBannerTimestamp)
-	assertShodanIPServiceSource(t, results, resultTypeCertFingerprint, testShodanCertFingerprintSHA1)
-	assertShodanIPServiceSource(t, results, resultTypeCertFingerprint, testShodanCertFingerprintSHA256)
-	assertShodanIPServiceSource(t, results, resultTypeJARM, testShodanJARM)
-	assertShodanIPServiceSource(t, results, resultTypeWebServer, "FakeHTTP")
-	assertShodanIPServiceSource(t, results, resultTypeCPE, "cpe:/a:fake:product:9.9")
-	assertShodanIPServiceSource(t, results, "cpe23", "cpe:2.3:a:fake:product:9.9")
-	assertShodanIPServiceSource(t, results, resultTypeCVE, "CVE-9999-9999 | Verified: true | Summary: Fake vulnerability")
+	assertShodanIPResultSource(t, results, resultTypeWebServer, "FakeHTTP", resultTypeService, testShodanService)
+
+	portResult := requireModuleResult(t, results, resultTypePort, "443/tcp")
+	if portResult.Source == nil || portResult.Source.Type != resultTypeService || portResult.Source.Value != testShodanService {
+		t.Fatalf("expected port to be chained to service, got %+v", portResult.Source)
+	}
+
+	assertShodanIPPortSource(t, results, "hash", testShodanServiceHash)
+	assertShodanIPPortSource(t, results, resultTypeBannerTimestamp, testShodanBannerTimestamp)
+	assertShodanIPPortSource(t, results, resultTypeCertFingerprint, testShodanCertFingerprintSHA1)
+	assertShodanIPPortSource(t, results, resultTypeCertFingerprint, testShodanCertFingerprintSHA256)
+	assertShodanIPPortSource(t, results, resultTypeJARM, testShodanJARM)
+	assertShodanIPPortSource(t, results, resultTypeCPE, "cpe:/a:fake:product:9.9")
+	assertShodanIPPortSource(t, results, "cpe23", "cpe:2.3:a:fake:product:9.9")
+
+	cveResult := requireModuleResult(t, results, resultTypeCVE, "CVE-9999-9999 | Verified: true | Summary: Fake vulnerability")
+	if cveResult.Source == nil || cveResult.Source.Type != resultTypeService || cveResult.Source.Value != testShodanService {
+		t.Fatalf("expected cve to be chained to service, got %+v", cveResult.Source)
+	}
 }
 
-func assertShodanIPServiceSource(t *testing.T, results []schema.ModuleResult, resultType, value string) {
+func assertShodanIPPortSource(t *testing.T, results []schema.ModuleResult, resultType, value string) {
 	t.Helper()
 
 	result := requireModuleResult(t, results, resultType, value)
-	if result.Source == nil || result.Source.Type != resultTypeService || result.Source.Value != testShodanService {
-		t.Fatalf("expected %s to be chained to service, got %+v", resultType, result.Source)
+	if result.Source == nil || result.Source.Type != resultTypePort || result.Source.Value != "443/tcp" {
+		t.Fatalf("expected %s to be chained to port, got %+v", resultType, result.Source)
 	}
 }
 
@@ -198,16 +208,21 @@ func TestParseShodanAPIIPSkipsDuplicateWebServerValue(t *testing.T) {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
 
-	if _, ok := findModuleResult(exec.Results, resultTypeService, "nginx"); ok {
-		t.Fatalf("expected duplicate service value to be skipped, got %+v", exec.Results)
+	serviceResult := requireModuleResult(t, exec.Results, resultTypeService, "nginx")
+	if serviceResult.Source != nil {
+		t.Fatalf("expected service to be anchored to IP, got %+v", serviceResult.Source)
 	}
-	webServerResult := requireModuleResult(t, exec.Results, resultTypeWebServer, "nginx")
-	if webServerResult.Source == nil || webServerResult.Source.Type != resultTypePort || webServerResult.Source.Value != "443/tcp https" {
-		t.Fatalf("expected duplicate web_server value to be anchored to port 443/tcp https, got %+v", webServerResult.Source)
+	if _, ok := findModuleResult(exec.Results, resultTypeWebServer, "nginx"); ok {
+		t.Fatalf("expected duplicate web_server value to be skipped, got %+v", exec.Results)
 	}
-	assertShodanIPResultSource(t, exec.Results, "hash", testShodanDuplicateHash, resultTypeWebServer, "nginx")
-	assertShodanIPResultSource(t, exec.Results, resultTypeCPE, "cpe:/a:f5:nginx", resultTypeWebServer, "nginx")
-	assertShodanIPResultSource(t, exec.Results, "cpe23", "cpe:2.3:a:f5:nginx", resultTypeWebServer, "nginx")
+	portResult := requireModuleResult(t, exec.Results, resultTypePort, "443/tcp https")
+	if portResult.Source == nil || portResult.Source.Type != resultTypeService || portResult.Source.Value != "nginx" {
+		t.Fatalf("expected port to be chained to service nginx, got %+v", portResult.Source)
+	}
+
+	assertShodanIPResultSource(t, exec.Results, "hash", testShodanDuplicateHash, resultTypePort, "443/tcp https")
+	assertShodanIPResultSource(t, exec.Results, resultTypeCPE, "cpe:/a:f5:nginx", resultTypePort, "443/tcp https")
+	assertShodanIPResultSource(t, exec.Results, "cpe23", "cpe:2.3:a:f5:nginx", resultTypePort, "443/tcp https")
 }
 
 func assertShodanIPResultSource(t *testing.T, results []schema.ModuleResult, resultType, value, sourceType, sourceValue string) {
