@@ -29,8 +29,6 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 		lastSeen  string
 	}
 
-	propToParent := make(map[string]string)
-
 	type propKey struct {
 		parentID string
 		propID   string
@@ -47,7 +45,6 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 		if edge.Target.Category == "property" {
 			srcID := edge.Source.Type + ":" + edge.Source.Value
 			dstID := edge.Target.Type + ":" + edge.Target.Value
-			propToParent[dstID] = srcID
 
 			key := propEdgeKey{
 				parentID: srcID,
@@ -181,14 +178,6 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 		srcID := edge.Source.Type + ":" + edge.Source.Value
 		dstID := edge.Target.Type + ":" + edge.Target.Value
 
-		for {
-			if parentID, isProp := propToParent[srcID]; isProp {
-				srcID = parentID
-			} else {
-				break
-			}
-		}
-
 		key := nodeEdgeGroupKey{
 			srcID: srcID,
 			dstID: dstID,
@@ -269,14 +258,6 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 		srcID := edge.Source.Type + ":" + edge.Source.Value
 		dstID := edge.Target.Type + ":" + edge.Target.Value
 
-		for {
-			if parentID, isProp := propToParent[srcID]; isProp {
-				srcID = parentID
-			} else {
-				break
-			}
-		}
-
 		nk := nodeEdgeKey{srcID: srcID, dstID: dstID}
 		if !addedEdges[nk] {
 			addedEdges[nk] = true
@@ -345,9 +326,75 @@ func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, 
 	children := adj[nodeID]
 	hasChildren := len(children) > 0
 
-	printProperties(nodeID, childPrefix, hasChildren, "", nodeProperties)
+	printProperties(nodeID, childPrefix, hasChildren, "", nodeProperties, adj, visited)
 
 	visited[nodeID] = true
+
+	printChildren(children, childPrefix, adj, visited, nodeProperties)
+
+	if prefix == "" && marker == "" {
+		fmt.Println()
+	}
+}
+
+func printProperties(nodeID string, basePrefix string, hasChildren bool, propIndent string, nodeProperties map[string][]propertyInfo, adj map[string][]schema.GraphEdge, visited map[string]bool) {
+	props := nodeProperties[nodeID]
+	if len(props) > 1 {
+		sort.Slice(props, func(i, j int) bool {
+			if !props[i].OutOfScope && props[j].OutOfScope {
+				return true
+			}
+			if props[i].OutOfScope && !props[j].OutOfScope {
+				return false
+			}
+			return props[i].Type+props[i].Value < props[j].Type+props[j].Value
+		})
+	}
+
+	for _, prop := range props {
+		contextStr := ""
+		if prop.Context != "" {
+			contextStr = fmt.Sprintf(" (%s%s%s)", colorMagenta, prop.Context, colorReset)
+		}
+
+		startChar := "  "
+		if hasChildren {
+			startChar = "│ "
+		}
+
+		valColor := ""
+		suffix := ""
+		if prop.OutOfScope {
+			valColor = colorBlue
+			suffix = " " + i18n.T["LBL_OUT_OF_SCOPE"]
+		}
+
+		typeColor := colorYellow
+		if prop.Type == "invalid" {
+			typeColor = colorRed
+		}
+
+		fmt.Printf("%s%s%s• [%s%s%s] [%s%s%s]%s%s\n", basePrefix, startChar, propIndent, typeColor, strings.ToUpper(prop.Type), colorReset, valColor, prop.Value, colorReset, contextStr, suffix)
+
+		propChildren := adj[prop.ID]
+		nextPropIndent := propIndent + "  "
+		if len(propChildren) > 0 {
+			nextPropIndent = propIndent + "  │ "
+		}
+
+		printProperties(prop.ID, basePrefix, hasChildren, nextPropIndent, nodeProperties, adj, visited)
+
+		if len(propChildren) > 0 {
+			propChildPrefix := basePrefix + startChar + propIndent + "  "
+			printChildren(propChildren, propChildPrefix, adj, visited, nodeProperties)
+		}
+	}
+}
+
+func printChildren(children []schema.GraphEdge, childPrefix string, adj map[string][]schema.GraphEdge, visited map[string]bool, nodeProperties map[string][]propertyInfo) {
+	if len(children) == 0 {
+		return
+	}
 
 	sort.Slice(children, func(i, j int) bool {
 		if !children[i].TargetOutOfScope && children[j].TargetOutOfScope {
@@ -397,51 +444,5 @@ func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, 
 		} else {
 			printNode(targetID, targetValue, targetType, child.TargetOutOfScope, childPrefix, childMarker, child.Context, isChildLast, adj, visited, nodeProperties)
 		}
-	}
-	if prefix == "" && marker == "" {
-		fmt.Println()
-	}
-}
-
-func printProperties(nodeID string, basePrefix string, hasChildren bool, propIndent string, nodeProperties map[string][]propertyInfo) {
-	props := nodeProperties[nodeID]
-	if len(props) > 1 {
-		sort.Slice(props, func(i, j int) bool {
-			if !props[i].OutOfScope && props[j].OutOfScope {
-				return true
-			}
-			if props[i].OutOfScope && !props[j].OutOfScope {
-				return false
-			}
-			return props[i].Type+props[i].Value < props[j].Type+props[j].Value
-		})
-	}
-
-	for _, prop := range props {
-		contextStr := ""
-		if prop.Context != "" {
-			contextStr = fmt.Sprintf(" (%s%s%s)", colorMagenta, prop.Context, colorReset)
-		}
-
-		startChar := "  "
-		if hasChildren {
-			startChar = "│ "
-		}
-
-		valColor := ""
-		suffix := ""
-		if prop.OutOfScope {
-			valColor = colorBlue
-			suffix = " " + i18n.T["LBL_OUT_OF_SCOPE"]
-		}
-
-		typeColor := colorYellow
-		if prop.Type == "invalid" {
-			typeColor = colorRed
-		}
-
-		fmt.Printf("%s%s%s• [%s%s%s] [%s%s%s]%s%s\n", basePrefix, startChar, propIndent, typeColor, strings.ToUpper(prop.Type), colorReset, valColor, prop.Value, colorReset, contextStr, suffix)
-
-		printProperties(prop.ID, basePrefix, hasChildren, propIndent+"  ", nodeProperties)
 	}
 }
