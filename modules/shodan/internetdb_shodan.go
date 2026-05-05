@@ -21,7 +21,7 @@ func getInternetDBCapabilities() schema.FunctionCapabilities {
 	return schema.FunctionCapabilities{
 		Limit:      2,
 		DelayMs:    1000,
-		InputTypes: []string{"ipv4", "ipv6"},
+		InputTypes: []string{entityTypeIPv4, entityTypeIPv6},
 	}
 }
 
@@ -37,7 +37,7 @@ type internetdbResponse struct {
 var internetDBHost = "https://internetdb.shodan.io"
 
 func getInternetDB(target schema.Entity) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_idb_shodan")
+	exec := modutil.NewExecution(functionInternetDB)
 	url := fmt.Sprintf("%s/%s", internetDBHost, target.Value)
 
 	ctx, cancel := context.WithTimeout(context.Background(), resolver.HTTPTimeout)
@@ -65,7 +65,7 @@ func getInternetDB(target schema.Entity) schema.ModuleExecution {
 	}
 
 	parseInternetDBResponse(&exec, rawBody, target.Value)
-	dbg.Printf("get_idb_shodan target=%q records=%d", target.Value, len(exec.Results))
+	dbg.Printf(functionInternetDB+" target=%q records=%d", target.Value, len(exec.Results))
 	return exec
 }
 
@@ -136,7 +136,7 @@ func fetchInternetDB(ctx context.Context, url, target string) (rawBody []byte, s
 func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, target string) {
 	var parsed internetdbResponse
 	if err := json.Unmarshal(rawBody, &parsed); err != nil {
-		dbg.Printf("get_idb_shodan target=%q unmarshal_err=%v", target, err)
+		dbg.Printf(functionInternetDB+" target=%q unmarshal_err=%v", target, err)
 		modutil.SetError(exec, "unmarshal json: %v", err)
 		return
 	}
@@ -144,35 +144,35 @@ func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, targe
 	for _, h := range parsed.Hostnames {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     "ptr",
-			Category: "property",
+			Category: resultCategoryProperty,
 			Value:    h,
 		})
 	}
 	for _, p := range parsed.Ports {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "port",
-			Category: "property",
+			Type:     resultTypePort,
+			Category: resultCategoryProperty,
 			Value:    strconv.Itoa(p),
 		})
 	}
 	for _, t := range parsed.Tags {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     "tag",
-			Category: "property",
+			Category: resultCategoryProperty,
 			Value:    t,
 		})
 	}
 	for _, v := range parsed.Vulns {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "cve",
-			Category: "property",
+			Type:     resultTypeCVE,
+			Category: resultCategoryProperty,
 			Value:    v,
 		})
 	}
 	for _, c := range parsed.Cpes {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "cpe",
-			Category: "property",
+			Type:     resultTypeCPE,
+			Category: resultCategoryProperty,
 			Value:    c,
 		})
 	}
