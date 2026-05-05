@@ -242,9 +242,9 @@
                 font-size: 0.95rem;
             }
             .detail-value.code {
-                color: #10b981;
+                color: #f1f5f9;
                 font-family: monospace;
-                background: #0f172a;
+                background: #1e293b;
                 padding: 10px;
                 border-radius: 4px;
                 display: block;
@@ -1238,20 +1238,18 @@
 
                         function findTargets(startId) {
                             const targets = [];
-                            const visited = new Set();
-                            function dfs(currId, currFn) {
-                                if (visited.has(currId)) return;
-                                visited.add(currId);
+
+                            function dfs(currId, currentPath) {
                                 (adjOut[currId] || []).forEach(e => {
-                                    const fn = e.function || currFn;
+                                    const nextPath = [...currentPath, e];
                                     if (visibleNodes.has(e.to)) {
-                                        targets.push({ to: e.to, function: fn });
-                                    } else if (activeNodes.has(e.to)) {
-                                        dfs(e.to, fn);
+                                        targets.push({ to: e.to, chain: nextPath });
+                                    } else if (activeNodes.has(e.to) && !currentPath.some(pe => pe.to === e.to)) {
+                                        dfs(e.to, nextPath);
                                     }
                                 });
                             }
-                            dfs(startId, null);
+                            dfs(startId, []);
                             return targets;
                         }
 
@@ -1264,7 +1262,8 @@
                                 edgeUpdates.push({ id: e.id, hidden: true });
                                 findTargets(e.to).forEach(t => {
                                     if (e.from === t.to) return;
-                                    const vId = 'v_' + e.from + '_' + t.to + '_' + t.function;
+                                    const fullChain = [e, ...t.chain];
+                                    const vId = 'v_' + e.from + '_' + t.to + '_' + fullChain.map(ce => ce.id).join('_');
                                     if (!virtualEdges.has(vId)) {
                                         virtualEdges.set(vId, {
                                             id: vId,
@@ -1273,7 +1272,9 @@
                                             hidden: false,
                                             color: { color: '#f59e0b', highlight: '#fbbf24', hover: '#fcd34d' },
                                             dashes: false,
-                                            font: { size: edgeLabelBtn && edgeLabelBtn.classList.contains('active') ? 11 : 0, strokeWidth: edgeLabelBtn && edgeLabelBtn.classList.contains('active') ? 2 : 0 }
+                                            font: { size: edgeLabelBtn && edgeLabelBtn.classList.contains('active') ? 11 : 0, strokeWidth: edgeLabelBtn && edgeLabelBtn.classList.contains('active') ? 2 : 0 },
+                                            isVirtual: true,
+                                            chain: fullChain
                                         });
                                     }
                                 });
@@ -1619,19 +1620,139 @@
                             const edgeId = params.edges[0];
                             const edge = edges.get(edgeId);
                             if (edge) {
-                                if (edge.contexts && edge.contexts.length > 0) {
-                                    const contextsHtml = edge.contexts.map(c => escapeHTML(c)).join('<br>');
-                                    content += '<div class="detail-item"><div class="detail-label">Contexts</div><div class="detail-value code">' + contextsHtml + '</div></div>';
-                                }
-                                content += '<div class="detail-item"><div class="detail-label">Method</div><div class="detail-value">' + escapeHTML(edge.function) + '</div></div>';
-                                content += '<div class="detail-item"><div class="detail-label">Discovery Time</div><div class="detail-value">First Seen: ' + formatDateTime(edge.firstSeen) + '<br>Last Seen: ' + formatDateTime(edge.lastSeen) + '</div></div>';
+                                if (edge.isVirtual && edge.chain) {
+                                    content += '<h3 style="color: #f59e0b; margin-bottom: 20px; font-size: 1.2rem;">DISCOVERY CHAIN</h3>';
 
-                                const sourceNode = nodes.get(edge.from);
-                                if (sourceNode && sourceNode.executions && sourceNode.executions[edge.function]) {
-                                    content += '<div class="detail-item"><div class="detail-label">Raw Data</div>';
-                                    const rawId = 'raw-edge-' + edge.id;
-                                    content += '<button class="raw-data-btn" style="margin-left:0; margin-top: 5px;" onclick="toggleRawData(\'' + rawId + '\')">Show Raw Data</button>';
-                                    content += '<div id="' + rawId + '" class="raw-data-content">' + escapeHTML(sourceNode.executions[edge.function]) + '</div></div>';
+                                    const sourceNode = nodes.get(edge.from);
+                                    if (sourceNode) {
+                                        const isHiddenSource = !sourceNode.hidden === false;
+                                        const focusBtnHtml = !isHiddenSource ? '<button class="raw-data-btn focus-btn" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(sourceNode.id) + '">Focus</button>' : '';
+                                        const opacityStyle = isHiddenSource ? 'opacity: 0.7;' : '';
+                                        const badgeHtml = isHiddenSource ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
+
+                                        content += '<div class="prop-container" style="position: relative; ' + opacityStyle + '">';
+                                        content += focusBtnHtml;
+                                        content += '<div class="prop-header" style="margin-right: 50px;"><span class="prop-title" style="font-size: 0.85rem;">' + escapeHTML(sourceNode.group) + badgeHtml + '</span></div>';
+                                        content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff;">' + escapeHTML(sourceNode.label) + '</div>';
+                                        if (sourceNode.outOfScope) {
+                                            content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
+                                            content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
+                                            content += '</div>';
+                                        }
+                                        content += '</div>';
+                                    }
+
+                                    edge.chain.forEach((chainEdge, index) => {
+                                        content += '<div style="text-align: center; color: #64748b; margin: 4px 0; font-size: 1.2rem;">↓</div>';
+
+                                        const sectionId = 'chain-' + Math.random().toString(36).substr(2, 9);
+                                        content += '<div class="prop-container" style="padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
+                                        content += '<div class="prop-header" style="margin-bottom: 0; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + sectionId + '\')">';
+
+                                        let functionTitleHtml = '<div><div class="prop-title" style="color: #10b981; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(chainEdge.function) + '</div>';
+                                        if (chainEdge.contexts && chainEdge.contexts.length > 0) {
+                                            functionTitleHtml += '<div style="margin-top: 4px; font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Context <span style="color: #f1f5f9; font-family: monospace; text-transform: none; margin-left: 4px;">' + escapeHTML(chainEdge.contexts.join(', ')) + '</span></div>';
+                                        }
+                                        functionTitleHtml += '</div>';
+
+                                        content += '<div style="display: flex; align-items: flex-start; flex-direction: column;">' + functionTitleHtml + '</div>';
+                                        content += '<span id="' + sectionId + '-icon" style="color: #94a3b8; font-size: 0.8rem;">▶</span>';
+                                        content += '</div>';
+
+                                        content += '<div id="' + sectionId + '" style="display: none; margin-top: 10px; border-top: 1px dashed #334155; padding-top: 10px;">';
+                                        content += '<div style="margin-bottom: 8px;"><div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Discovery Time</div><div style="color: #f1f5f9; font-size: 0.85rem;">First Seen: ' + formatDateTime(chainEdge.firstSeen) + '<br>Last Seen: ' + formatDateTime(chainEdge.lastSeen) + '</div></div>';
+
+                                        const chainSourceNode = nodes.get(chainEdge.from);
+                                        if (chainSourceNode && chainSourceNode.executions && chainSourceNode.executions[chainEdge.function]) {
+                                            const rawId = 'raw-chain-' + chainEdge.id;
+                                            content += '<div style="margin-top: 8px;">';
+                                            content += '<button class="raw-data-btn" style="margin-left:0;" onclick="toggleRawData(\'' + rawId + '\')">Show Raw Data</button>';
+                                            content += '<div id="' + rawId + '" class="raw-data-content">' + escapeHTML(chainSourceNode.executions[chainEdge.function]) + '</div></div>';
+                                        }
+                                        content += '</div></div>';
+
+                                        const targetNode = nodes.get(chainEdge.to);
+                                        if (targetNode) {
+                                            content += '<div style="text-align: center; color: #64748b; margin: 4px 0; font-size: 1.2rem;">↓</div>';
+
+                                            const isHiddenNode = !targetNode.hidden === false;
+                                            const badgeHtml = isHiddenNode ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
+                                            const focusBtnHtml = !isHiddenNode ? '<button class="raw-data-btn focus-btn" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(targetNode.id) + '">Focus</button>' : '';
+                                            const opacityStyle = isHiddenNode ? 'opacity: 0.7;' : '';
+
+                                            content += '<div class="prop-container" style="position: relative; ' + opacityStyle + '">';
+                                            content += focusBtnHtml;
+                                            content += '<div class="prop-header" style="margin-right: 50px;"><span class="prop-title" style="font-size: 0.85rem;">' + escapeHTML(targetNode.group) + badgeHtml + '</span></div>';
+                                            content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff;">' + escapeHTML(targetNode.label) + '</div>';
+                                            if (targetNode.outOfScope) {
+                                                content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
+                                                content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
+                                                content += '</div>';
+                                            }
+                                            content += '</div>';
+                                        }
+                                    });
+                                } else {
+                                    const sourceNode = nodes.get(edge.from);
+                                    if (sourceNode) {
+                                        const focusBtnHtml = '<button class="raw-data-btn focus-btn" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(sourceNode.id) + '">Focus</button>';
+
+                                        content += '<div class="prop-container" style="position: relative;">';
+                                        content += focusBtnHtml;
+                                        content += '<div class="prop-header" style="margin-right: 50px;"><span class="prop-title" style="font-size: 0.85rem;">' + escapeHTML(sourceNode.group) + '</span></div>';
+                                        content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff;">' + escapeHTML(sourceNode.label) + '</div>';
+                                        if (sourceNode.outOfScope) {
+                                            content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
+                                            content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
+                                            content += '</div>';
+                                        }
+                                        content += '</div>';
+                                    }
+
+                                    content += '<div style="text-align: center; color: #64748b; margin: 4px 0; font-size: 1.2rem;">↓</div>';
+
+                                    const sectionId = 'edge-' + Math.random().toString(36).substr(2, 9);
+                                    content += '<div class="prop-container" style="padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
+                                    content += '<div class="prop-header" style="margin-bottom: 0; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + sectionId + '\')">';
+
+                                    let functionTitleHtml = '<div><div class="prop-title" style="color: #10b981; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(edge.function) + '</div>';
+                                    if (edge.contexts && edge.contexts.length > 0) {
+                                        functionTitleHtml += '<div style="margin-top: 4px; font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Context <span style="color: #f1f5f9; font-family: monospace; text-transform: none; margin-left: 4px;">' + escapeHTML(edge.contexts.join(', ')) + '</span></div>';
+                                    }
+                                    functionTitleHtml += '</div>';
+
+                                    content += '<div style="display: flex; align-items: flex-start; flex-direction: column;">' + functionTitleHtml + '</div>';
+                                    content += '<span id="' + sectionId + '-icon" style="color: #94a3b8; font-size: 0.8rem;">▶</span>';
+                                    content += '</div>';
+
+                                    content += '<div id="' + sectionId + '" style="display: none; margin-top: 10px; border-top: 1px dashed #334155; padding-top: 10px;">';
+                                    content += '<div style="margin-bottom: 8px;"><div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Discovery Time</div><div style="color: #f1f5f9; font-size: 0.85rem;">First Seen: ' + formatDateTime(edge.firstSeen) + '<br>Last Seen: ' + formatDateTime(edge.lastSeen) + '</div></div>';
+
+                                    if (sourceNode && sourceNode.executions && sourceNode.executions[edge.function]) {
+                                        const rawId = 'raw-edge-' + edge.id;
+                                        content += '<div style="margin-top: 8px;">';
+                                        content += '<button class="raw-data-btn" style="margin-left:0;" onclick="toggleRawData(\'' + rawId + '\')">Show Raw Data</button>';
+                                        content += '<div id="' + rawId + '" class="raw-data-content">' + escapeHTML(sourceNode.executions[edge.function]) + '</div></div>';
+                                    }
+                                    content += '</div></div>';
+
+                                    const targetNode = nodes.get(edge.to);
+                                    if (targetNode) {
+                                        content += '<div style="text-align: center; color: #64748b; margin: 4px 0; font-size: 1.2rem;">↓</div>';
+
+                                        const focusBtnHtml = '<button class="raw-data-btn focus-btn" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(targetNode.id) + '">Focus</button>';
+
+                                        content += '<div class="prop-container" style="position: relative;">';
+                                        content += focusBtnHtml;
+                                        content += '<div class="prop-header" style="margin-right: 50px;"><span class="prop-title" style="font-size: 0.85rem;">' + escapeHTML(targetNode.group) + '</span></div>';
+                                        content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff;">' + escapeHTML(targetNode.label) + '</div>';
+                                        if (targetNode.outOfScope) {
+                                            content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
+                                            content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
+                                            content += '</div>';
+                                        }
+                                        content += '</div>';
+                                    }
                                 }
 
                                 document.getElementById('modalBody').innerHTML = content;
