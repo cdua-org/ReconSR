@@ -19,7 +19,7 @@ var (
 	shodanDomainPatternRegex   = regexp.MustCompile(`(?i)(?:\*\.)?(?:[a-z0-9-]+\.)+[a-z]{2,63}`)
 )
 
-func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string) {
+func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, source *schema.EntityRef) {
 	if banner.Details == nil || banner.Details.SSL == nil {
 		return
 	}
@@ -32,6 +32,8 @@ func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, tags
 		sources := parseSubjectAltName(exec, extension.Data, tags)
 		appendSubjectAltNameMetadata(exec, banner.Details.SSL, tags, sources)
 	}
+
+	appendBannerSSLProperties(exec, banner.Details.SSL, tags, source)
 }
 
 func parseSubjectAltName(exec *schema.ModuleExecution, value string, tags []string) []schema.EntityRef {
@@ -100,6 +102,31 @@ func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBa
 }
 
 func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, value string, tags []string, source *schema.EntityRef) {
+	if value == "" {
+		return
+	}
+
+	exec.Results = append(exec.Results, schema.ModuleResult{
+		Type:     resultType,
+		Category: resultCategoryProperty,
+		Value:    value,
+		Tags:     tags,
+		Source:   source,
+	})
+}
+
+func appendBannerSSLProperties(exec *schema.ModuleExecution, ssl *shodanSSLBanner, tags []string, source *schema.EntityRef) {
+	if ssl == nil {
+		return
+	}
+
+	for _, fingerprint := range ssl.CertFingerprintValues {
+		appendBannerSSLProperty(exec, resultTypeCertFingerprint, fingerprint, tags, source)
+	}
+	appendBannerSSLProperty(exec, resultTypeJARM, ssl.JARMValue, tags, source)
+}
+
+func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value string, tags []string, source *schema.EntityRef) {
 	if value == "" {
 		return
 	}

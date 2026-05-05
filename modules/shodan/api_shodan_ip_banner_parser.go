@@ -13,11 +13,13 @@ func extractIPBanners(exec *schema.ModuleExecution, banners []shodanIPBanner, ta
 		banner := &banners[i]
 		portSrc := extractBannerPort(exec, banner, tags)
 		src := extractBannerSource(exec, banner, tags, portSrc)
-		extractBannerSSL(exec, banner, tags)
+		extractBannerSSL(exec, banner, tags, src)
 		extractBannerCPEs(exec, banner, tags, src)
 		extractBannerVulns(exec, banner, tags, src)
 		extractBannerGeo(exec, banner, tags)
 		extractBannerHash(exec, banner, tags, src)
+		extractBannerTimestamp(exec, banner, tags, src)
+		extractBannerHeartbleed(exec, banner, tags, src)
 	}
 }
 
@@ -190,6 +192,34 @@ func extractBannerHash(exec *schema.ModuleExecution, banner *shodanIPBanner, tag
 		Type:     "hash",
 		Category: resultCategoryProperty,
 		Value:    strconv.FormatInt(banner.Hash, 10),
+		Tags:     tags,
+		Source:   src,
+	})
+}
+
+func extractBannerTimestamp(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef) {
+	if banner.Timestamp == "" {
+		return
+	}
+
+	exec.Results = append(exec.Results, schema.ModuleResult{
+		Type:     resultTypeBannerTimestamp,
+		Category: resultCategoryProperty,
+		Value:    banner.Timestamp,
+		Tags:     tags,
+		Source:   src,
+	})
+}
+
+func extractBannerHeartbleed(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef) {
+	if banner.Heartbleed == "" {
+		return
+	}
+
+	exec.Results = append(exec.Results, schema.ModuleResult{
+		Type:     resultTypeHeartbleed,
+		Category: resultCategoryProperty,
+		Value:    banner.Heartbleed,
 		Tags:     tags,
 		Source:   src,
 	})

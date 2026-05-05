@@ -3,6 +3,7 @@ package shodan
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -23,6 +24,8 @@ type shodanIPBanner struct {
 	Details      *shodanIPBannerDetails   `json:"-"`
 	ServiceValue *string                  `json:"-"`
 	ModuleLabel  string                   `json:"-"`
+	Heartbleed   string                   `json:"-"`
+	Timestamp    string                   `json:"-"`
 	Hash         int64                    `json:"hash"`
 	Port         int                      `json:"port"`
 	Transport    shodanTransport          `json:"transport"`
@@ -45,10 +48,12 @@ type shodanHTTPBanner struct {
 }
 
 type shodanSSLBanner struct {
-	CertIssuerValue   string               `json:"-"`
-	CertNotAfterValue string               `json:"-"`
-	TLSVersionsValue  string               `json:"-"`
-	Extensions        []shodanSSLExtension `json:"-"`
+	CertFingerprintValues []string             `json:"-"`
+	CertIssuerValue       string               `json:"-"`
+	CertNotAfterValue     string               `json:"-"`
+	JARMValue             string               `json:"-"`
+	TLSVersionsValue      string               `json:"-"`
+	Extensions            []shodanSSLExtension `json:"-"`
 }
 
 type shodanCertIssuer struct {
@@ -87,15 +92,6 @@ type shodanDomainRecord struct {
 
 type shodanTransport uint8
 
-type shodanRawBannerCore struct {
-	Vulns     map[string]shodanVuln `json:"vulns"`
-	CPE       []string              `json:"cpe"`
-	CPE23     []string              `json:"cpe23"`
-	Hash      int64                 `json:"hash"`
-	Port      int                   `json:"port"`
-	Transport shodanTransport       `json:"transport"`
-}
-
 type shodanRawBannerService struct {
 	Product *string `json:"product"`
 	Version *string `json:"version"`
@@ -106,13 +102,15 @@ type shodanRawBannerService struct {
 }
 
 type shodanRawBannerCert struct {
-	Expires    string               `json:"expires"`
-	Issuer     *shodanCertIssuer    `json:"issuer"`
-	Extensions []shodanSSLExtension `json:"extensions"`
+	Expires     string                          `json:"expires"`
+	Issuer      *shodanCertIssuer               `json:"issuer"`
+	Fingerprint *shodanRawBannerCertFingerprint `json:"fingerprint"`
+	Extensions  []shodanSSLExtension            `json:"extensions"`
 }
 
 type shodanRawBannerSSL struct {
 	Cert     *shodanRawBannerCert `json:"cert"`
+	JARM     string               `json:"jarm"`
 	Versions []string             `json:"versions"`
 }
 
@@ -122,6 +120,12 @@ type shodanRawBannerDetails struct {
 	Location *shodanBannerLocation `json:"location"`
 }
 
+type shodanRawBannerOpts struct {
+	Heartbleed string `json:"heartbleed"`
+}
+
+type shodanRawBannerCertFingerprint map[string]string
+
 const (
 	shodanTransportUnknown shodanTransport = iota
 	shodanTransportTCP
@@ -129,7 +133,12 @@ const (
 )
 
 func (b *shodanIPBanner) UnmarshalJSON(data []byte) error {
-	core, err := parseShodanRawBannerCore(data)
+	artifacts, hash, port, transport, err := parseShodanRawBannerCore(data)
+	if err != nil {
+		return err
+	}
+
+	heartbleed, timestamp, err := parseShodanRawBannerMeta(data)
 	if err != nil {
 		return err
 	}
@@ -144,7 +153,12 @@ func (b *shodanIPBanner) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	b.applyShodanRawBannerCore(core)
+	b.Artifacts = artifacts
+	b.Hash = hash
+	b.Port = port
+	b.Transport = transport
+	b.Heartbleed = heartbleed
+	b.Timestamp = timestamp
 	b.ServiceValue = joinBannerServiceValue(service.Product, service.Version, service.Info)
 	b.ModuleLabel = shodanRawBannerModule(service)
 	b.Details = mapShodanRawBannerDetails(details)
@@ -152,13 +166,92 @@ func (b *shodanIPBanner) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func parseShodanRawBannerCore(data []byte) (shodanRawBannerCore, error) {
-	var core shodanRawBannerCore
-	if err := json.Unmarshal(data, &core); err != nil {
-		return shodanRawBannerCore{}, fmt.Errorf("unmarshal banner core: %w", err)
+func parseShodanRawBannerCore(data []byte) (artifacts *shodanIPBannerArtifacts, hash int64, port int, transport shodanTransport, err error) {
+	fields, err := decodeShodanRawBannerObject(data)
+	if err != nil {
+		return nil, 0, 0, shodanTransportUnknown, fmt.Errorf("unmarshal banner core: %w", err)
 	}
 
-	return core, nil
+	var cpe []string
+	if err = unmarshalShodanBannerField(fields, "cpe", &cpe); err != nil {
+		return nil, 0, 0, shodanTransportUnknown, fmt.Errorf("unmarshal banner core: %w", err)
+	}
+
+	var cpe23 []string
+	if err = unmarshalShodanBannerField(fields, "cpe23", &cpe23); err != nil {
+		return nil, 0, 0, shodanTransportUnknown, fmt.Errorf("unmarshal banner core: %w", err)
+	}
+
+	var vulns map[string]shodanVuln
+	if err = unmarshalShodanBannerField(fields, "vulns", &vulns); err != nil {
+		return nil, 0, 0, shodanTransportUnknown, fmt.Errorf("unmarshal banner core: %w", err)
+	}
+
+	if err = unmarshalShodanBannerField(fields, "hash", &hash); err != nil {
+		return nil, 0, 0, shodanTransportUnknown, fmt.Errorf("unmarshal banner core: %w", err)
+	}
+
+	if err = unmarshalShodanBannerField(fields, "port", &port); err != nil {
+		return nil, 0, 0, shodanTransportUnknown, fmt.Errorf("unmarshal banner core: %w", err)
+	}
+
+	transport = shodanTransportUnknown
+	if err = unmarshalShodanBannerField(fields, "transport", &transport); err != nil {
+		return nil, 0, 0, shodanTransportUnknown, fmt.Errorf("unmarshal banner core: %w", err)
+	}
+
+	if vulns != nil || len(cpe) > 0 || len(cpe23) > 0 {
+		artifacts = &shodanIPBannerArtifacts{
+			Vulns: vulns,
+			CPE:   cpe,
+			CPE23: cpe23,
+		}
+	}
+
+	return artifacts, hash, port, transport, nil
+}
+
+func parseShodanRawBannerMeta(data []byte) (heartbleed, timestamp string, err error) {
+	fields, err := decodeShodanRawBannerObject(data)
+	if err != nil {
+		return "", "", fmt.Errorf("unmarshal banner meta: %w", err)
+	}
+
+	if err = unmarshalShodanBannerField(fields, "timestamp", &timestamp); err != nil {
+		return "", "", fmt.Errorf("unmarshal banner meta: %w", err)
+	}
+
+	var opts shodanRawBannerOpts
+	if err = unmarshalShodanBannerField(fields, "opts", &opts); err != nil {
+		return "", "", fmt.Errorf("unmarshal banner meta: %w", err)
+	}
+	if opts != (shodanRawBannerOpts{}) {
+		heartbleed = formatShodanHeartbleed(&opts)
+	}
+
+	return heartbleed, strings.TrimSpace(timestamp), nil
+}
+
+func decodeShodanRawBannerObject(data []byte) (fields map[string]json.RawMessage, err error) {
+	fields = make(map[string]json.RawMessage)
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return nil, err
+	}
+
+	return fields, nil
+}
+
+func unmarshalShodanBannerField(fields map[string]json.RawMessage, key string, target any) error {
+	rawValue, ok := fields[key]
+	if !ok || string(rawValue) == "null" {
+		return nil
+	}
+
+	if err := json.Unmarshal(rawValue, target); err != nil {
+		return fmt.Errorf("field %s: %w", key, err)
+	}
+
+	return nil
 }
 
 func parseShodanRawBannerService(data []byte) (shodanRawBannerService, error) {
@@ -179,19 +272,6 @@ func parseShodanRawBannerDetails(data []byte) (shodanRawBannerDetails, error) {
 	return details, nil
 }
 
-func (b *shodanIPBanner) applyShodanRawBannerCore(core shodanRawBannerCore) {
-	if core.Vulns != nil || len(core.CPE) > 0 || len(core.CPE23) > 0 {
-		b.Artifacts = &shodanIPBannerArtifacts{
-			Vulns: core.Vulns,
-			CPE:   core.CPE,
-			CPE23: core.CPE23,
-		}
-	}
-	b.Hash = core.Hash
-	b.Port = core.Port
-	b.Transport = core.Transport
-}
-
 func mapShodanRawBannerDetails(details shodanRawBannerDetails) *shodanIPBannerDetails {
 	mapped := shodanIPBannerDetails{
 		HTTP:     details.HTTP,
@@ -209,14 +289,16 @@ func mapShodanRawBannerDetails(details shodanRawBannerDetails) *shodanIPBannerDe
 
 func mapShodanRawBannerSSL(raw *shodanRawBannerSSL) *shodanSSLBanner {
 	mapped := shodanSSLBanner{
+		JARMValue:        strings.TrimSpace(raw.JARM),
 		TLSVersionsValue: formatShodanTLSVersions(raw.Versions),
 	}
 	if raw.Cert != nil {
 		mapped.CertIssuerValue = formatShodanCertIssuer(raw.Cert.Issuer)
 		mapped.CertNotAfterValue = formatShodanCertTime(raw.Cert.Expires)
+		mapped.CertFingerprintValues = formatShodanCertFingerprints(raw.Cert.Fingerprint)
 		mapped.Extensions = raw.Cert.Extensions
 	}
-	if mapped.CertIssuerValue == "" && mapped.CertNotAfterValue == "" && mapped.TLSVersionsValue == "" && len(mapped.Extensions) == 0 {
+	if len(mapped.CertFingerprintValues) == 0 && mapped.CertIssuerValue == "" && mapped.CertNotAfterValue == "" && mapped.JARMValue == "" && mapped.TLSVersionsValue == "" && len(mapped.Extensions) == 0 {
 		return nil
 	}
 
@@ -277,4 +359,71 @@ func formatShodanTransport(transport shodanTransport) string {
 	default:
 		return ""
 	}
+}
+
+func formatShodanCertFingerprints(fingerprint *shodanRawBannerCertFingerprint) []string {
+	if fingerprint == nil || len(*fingerprint) == 0 {
+		return nil
+	}
+
+	normalized := make(map[string]string, len(*fingerprint))
+	for algorithm, value := range *fingerprint {
+		algorithm = strings.ToLower(strings.TrimSpace(algorithm))
+		value = strings.TrimSpace(value)
+		if algorithm == "" || value == "" {
+			continue
+		}
+		normalized[algorithm] = value
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+
+	algorithms := make([]string, 0, len(normalized))
+	for algorithm := range normalized {
+		algorithms = append(algorithms, algorithm)
+	}
+	sort.Strings(algorithms)
+	formatted := make([]string, 0, len(algorithms))
+	seen := make(map[string]struct{}, len(algorithms))
+	for _, algorithm := range algorithms {
+		value := normalized[algorithm]
+		entry := algorithm + ":" + value
+		if _, exists := seen[entry]; exists {
+			continue
+		}
+		seen[entry] = struct{}{}
+		formatted = append(formatted, entry)
+	}
+	if len(formatted) == 0 {
+		return nil
+	}
+
+	return formatted
+}
+
+func formatShodanHeartbleed(opts *shodanRawBannerOpts) string {
+	if opts == nil {
+		return ""
+	}
+
+	value := strings.TrimSpace(opts.Heartbleed)
+	if value == "" {
+		return ""
+	}
+
+	status := value
+	if _, parsedStatus, ok := strings.Cut(value, " - "); ok {
+		parsedStatus = strings.TrimSpace(parsedStatus)
+		if parsedStatus != "" {
+			status = parsedStatus
+		}
+	}
+
+	upperStatus := strings.ToUpper(status)
+	if !strings.Contains(upperStatus, "VULNERABLE") || strings.Contains(upperStatus, "NOT VULNERABLE") || strings.Contains(upperStatus, "SAFE") {
+		return ""
+	}
+
+	return status
 }

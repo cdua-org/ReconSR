@@ -24,20 +24,24 @@ func TestParseShodanAPIIP(t *testing.T) {
 			{
 				"port": 443,
 				"transport": "tcp",
+				"timestamp": "2026-05-02T16:15:08.228066",
 				"product": "FakeProduct",
 				"version": "9.9",
 				"hash": 2222222,
 				"http": {"server": "FakeHTTP"},
 				"ssl": {
+					"jarm": "29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d",
 					"versions": ["-TLSv1", "TLSv1.2", "TLSv1.3"],
 					"cert": {
 						"expires": "20270720194415Z",
 						"issuer": {"O": "Example Test CA", "CN": "Example Issuer", "C": "ZZ"},
+						"fingerprint": {"sha1": "00112233445566778899aabbccddeeff00112233", "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
 						"extensions": [
 							{"name": "subjectAltName", "data": "DNS:tls.sandbox.example.com, DNS:alt.sandbox.example.com"}
 						]
 					}
 				},
+				"opts": {"heartbleed": "2026/05/02 16:15:14 198.51.100.1:443 - SAFE\n"},
 				"cpe": ["cpe:/a:fake:product:9.9"],
 				"cpe23": ["cpe:2.3:a:fake:product:9.9"],
 				"location": {
@@ -66,6 +70,7 @@ func TestParseShodanAPIIP(t *testing.T) {
 	requireTaggedResults(t, exec.Results, testShodanTag)
 	assertShodanIPServiceChain(t, exec.Results)
 	assertShodanIPCoreResults(t, exec.Results)
+	assertShodanIPResultTypeAbsent(t, exec.Results, resultTypeHeartbleed)
 }
 
 func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult) {
@@ -80,6 +85,10 @@ func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult) {
 	}
 
 	assertShodanIPServiceSource(t, results, "hash", testShodanServiceHash)
+	assertShodanIPServiceSource(t, results, resultTypeBannerTimestamp, testShodanBannerTimestamp)
+	assertShodanIPServiceSource(t, results, resultTypeCertFingerprint, testShodanCertFingerprintSHA1)
+	assertShodanIPServiceSource(t, results, resultTypeCertFingerprint, testShodanCertFingerprintSHA256)
+	assertShodanIPServiceSource(t, results, resultTypeJARM, testShodanJARM)
 	assertShodanIPServiceSource(t, results, resultTypeWebServer, "FakeHTTP")
 	assertShodanIPServiceSource(t, results, resultTypeCPE, "cpe:/a:fake:product:9.9")
 	assertShodanIPServiceSource(t, results, "cpe23", "cpe:2.3:a:fake:product:9.9")
@@ -134,6 +143,7 @@ func TestParseShodanAPIIPParsesEscapedSubjectAltName(t *testing.T) {
 					"cert": {
 						"expires": "20270720194415Z",
 						"issuer": {"O": "Example Test CA", "CN": "Example Issuer", "C": "ZZ"},
+						"fingerprint": {"sha1": "00112233445566778899aabbccddeeff00112233", "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
 						"extensions": [
 							{"name": "subjectAltName", "data": "0\\x25\\x82\\x19*.wild.sandbox.example.com\\x82\\x17wild.sandbox.example.com"}
 						]
@@ -153,6 +163,9 @@ func TestParseShodanAPIIPParsesEscapedSubjectAltName(t *testing.T) {
 	if wildcardResult.Source != nil {
 		t.Fatalf("expected wildcard SAN to be attached directly to target IP, got %+v", wildcardResult.Source)
 	}
+	requireModuleResult(t, exec.Results, resultTypePort, "443/tcp")
+	assertShodanIPResultSource(t, exec.Results, resultTypeCertFingerprint, testShodanCertFingerprintSHA1, resultTypePort, "443/tcp")
+	assertShodanIPResultSource(t, exec.Results, resultTypeCertFingerprint, testShodanCertFingerprintSHA256, resultTypePort, "443/tcp")
 	assertShodanIPResultSource(t, exec.Results, resultTypeCertIssuer, testShodanCertIssuer, resultTypeWildcardSANDomain, testShodanWildcardSAN)
 	assertShodanIPResultSource(t, exec.Results, resultTypeCertNotAfter, testShodanCertNotAfter, resultTypeWildcardSANDomain, testShodanWildcardSAN)
 	assertShodanIPResultSource(t, exec.Results, resultTypeTLSVersions, testShodanTLSVersions, resultTypeWildcardSANDomain, testShodanWildcardSAN)
@@ -206,6 +219,40 @@ func assertShodanIPResultSource(t *testing.T, results []schema.ModuleResult, res
 	}
 }
 
+func assertShodanIPResultTypeAbsent(t *testing.T, results []schema.ModuleResult, resultType string) {
+	t.Helper()
+
+	for _, result := range results {
+		if result.Type == resultType {
+			t.Fatalf("expected result type %s to be absent, got %+v", resultType, result)
+		}
+	}
+}
+
+func TestParseShodanAPIIPExtractsRiskyHeartbleed(t *testing.T) {
+	rawBody := []byte(`{
+		"tags": ["faketag"],
+		"data": [
+			{
+				"port": 443,
+				"transport": "tcp",
+				"hash": 4444444,
+				"opts": {"heartbleed": "2026/05/02 16:15:14 198.51.100.1:443 - VULNERABLE\n"},
+				"_shodan": {"module": "https"}
+			}
+		]
+	}`)
+
+	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
+	parseShodanAPIIP(&exec, rawBody)
+	if exec.Error != nil {
+		t.Fatalf("unexpected parser error: %v", *exec.Error)
+	}
+
+	requireModuleResult(t, exec.Results, resultTypePort, "443/tcp https")
+	assertShodanIPResultSource(t, exec.Results, resultTypeHeartbleed, testShodanHeartbleed, resultTypePort, "443/tcp https")
+}
+
 func TestParseShodanAPIIPFallsBackToPortSource(t *testing.T) {
 	rawBody := []byte(`{
 		"tags": ["faketag"],
@@ -213,6 +260,7 @@ func TestParseShodanAPIIPFallsBackToPortSource(t *testing.T) {
 			{
 				"port": 3478,
 				"transport": "udp",
+				"timestamp": "2026-05-04T18:19:25.001152",
 				"hash": 1111111,
 				"_shodan": {"module": "stun"}
 			}
@@ -230,6 +278,7 @@ func TestParseShodanAPIIPFallsBackToPortSource(t *testing.T) {
 	}
 	requireModuleResult(t, exec.Results, resultTypePort, "3478/udp stun")
 	assertShodanIPResultSource(t, exec.Results, "hash", testShodanRootHash, resultTypePort, "3478/udp stun")
+	assertShodanIPResultSource(t, exec.Results, resultTypeBannerTimestamp, "2026-05-04T18:19:25.001152", resultTypePort, "3478/udp stun")
 }
 
 func TestGetShodanAPIIP(t *testing.T) {
