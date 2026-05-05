@@ -9,6 +9,7 @@ import (
 )
 
 type propertyInfo struct {
+	ID         string
 	Type       string
 	Value      string
 	Context    string
@@ -31,28 +32,27 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	propToParent := make(map[string]string)
 
 	type propKey struct {
-		parent string
-		pType  string
-		pValue string
+		parentID string
+		propID   string
 	}
 	type propEdgeKey struct {
-		parent string
-		pType  string
-		pValue string
-		fn     string
+		parentID string
+		propID   string
+		fn       string
 	}
 	propEdgeGroups := make(map[propEdgeKey][]contextGroup)
 	propDetails := make(map[propKey][]string)
 
 	for _, edge := range graph.Edges {
 		if edge.Target.Category == "property" {
-			propToParent[edge.Target.Value] = edge.Source.Value
+			srcID := edge.Source.Type + ":" + edge.Source.Value
+			dstID := edge.Target.Type + ":" + edge.Target.Value
+			propToParent[dstID] = srcID
 
 			key := propEdgeKey{
-				parent: edge.Source.Value,
-				pType:  edge.Target.Type,
-				pValue: edge.Target.Value,
-				fn:     edge.FunctionName,
+				parentID: srcID,
+				propID:   dstID,
+				fn:       edge.FunctionName,
 			}
 			dateStr := edge.CreatedAt
 			if len(dateStr) >= 10 {
@@ -109,7 +109,7 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 			}
 		}
 
-		pk := propKey{parent: key.parent, pType: key.pType, pValue: key.pValue}
+		pk := propKey{parentID: key.parentID, propID: key.propID}
 		propDetails[pk] = append(propDetails[pk], formattedContexts...)
 	}
 
@@ -118,11 +118,14 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 
 	for _, edge := range graph.Edges {
 		if edge.Target.Category == "property" {
-			pk := propKey{parent: edge.Source.Value, pType: edge.Target.Type, pValue: edge.Target.Value}
+			srcID := edge.Source.Type + ":" + edge.Source.Value
+			dstID := edge.Target.Type + ":" + edge.Target.Value
+			pk := propKey{parentID: srcID, propID: dstID}
 			if !addedProps[pk] {
 				addedProps[pk] = true
 				details := propDetails[pk]
-				nodeProperties[edge.Source.Value] = append(nodeProperties[edge.Source.Value], propertyInfo{
+				nodeProperties[srcID] = append(nodeProperties[srcID], propertyInfo{
+					ID:         dstID,
 					Type:       edge.Target.Type,
 					Value:      edge.Target.Value,
 					Context:    strings.Join(details, " | "),
@@ -159,13 +162,13 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	adj := make(map[string][]schema.GraphEdge)
 
 	type nodeEdgeKey struct {
-		src string
-		dst string
+		srcID string
+		dstID string
 	}
 	type nodeEdgeGroupKey struct {
-		src string
-		dst string
-		fn  string
+		srcID string
+		dstID string
+		fn    string
 	}
 	nodeEdgeGroups := make(map[nodeEdgeGroupKey][]contextGroup)
 	edgeBase := make(map[nodeEdgeKey]schema.GraphEdge)
@@ -175,21 +178,24 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 			continue
 		}
 
+		srcID := edge.Source.Type + ":" + edge.Source.Value
+		dstID := edge.Target.Type + ":" + edge.Target.Value
+
 		for {
-			if parentVal, isProp := propToParent[edge.Source.Value]; isProp {
-				edge.Source.Value = parentVal
+			if parentID, isProp := propToParent[srcID]; isProp {
+				srcID = parentID
 			} else {
 				break
 			}
 		}
 
 		key := nodeEdgeGroupKey{
-			src: edge.Source.Value,
-			dst: edge.Target.Value,
-			fn:  edge.FunctionName,
+			srcID: srcID,
+			dstID: dstID,
+			fn:    edge.FunctionName,
 		}
 
-		nk := nodeEdgeKey{src: key.src, dst: key.dst}
+		nk := nodeEdgeKey{srcID: key.srcID, dstID: key.dstID}
 		if _, exists := edgeBase[nk]; !exists {
 			edgeBase[nk] = edge
 		}
@@ -250,7 +256,7 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 			}
 		}
 
-		nk := nodeEdgeKey{src: key.src, dst: key.dst}
+		nk := nodeEdgeKey{srcID: key.srcID, dstID: key.dstID}
 		nodeEdgeDetails[nk] = append(nodeEdgeDetails[nk], formattedContexts...)
 	}
 
@@ -260,34 +266,46 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 			continue
 		}
 
+		srcID := edge.Source.Type + ":" + edge.Source.Value
+		dstID := edge.Target.Type + ":" + edge.Target.Value
+
 		for {
-			if parentVal, isProp := propToParent[edge.Source.Value]; isProp {
-				edge.Source.Value = parentVal
+			if parentID, isProp := propToParent[srcID]; isProp {
+				srcID = parentID
 			} else {
 				break
 			}
 		}
 
-		nk := nodeEdgeKey{src: edge.Source.Value, dst: edge.Target.Value}
+		nk := nodeEdgeKey{srcID: srcID, dstID: dstID}
 		if !addedEdges[nk] {
 			addedEdges[nk] = true
 			baseEdge := edgeBase[nk]
 			baseEdge.Context = strings.Join(nodeEdgeDetails[nk], " | ")
-			adj[nk.src] = append(adj[nk.src], baseEdge)
+			adj[nk.srcID] = append(adj[nk.srcID], baseEdge)
 		}
 	}
 
-	nodeTypes := make(map[string]string)
+	var initialTargetID string
+	var initialTargetType string
 	for _, edge := range graph.Edges {
-		nodeTypes[edge.Source.Value] = edge.Source.Type
-		nodeTypes[edge.Target.Value] = edge.Target.Type
+		if edge.Source.Value == graph.InitialTarget {
+			initialTargetID = edge.Source.Type + ":" + edge.Source.Value
+			initialTargetType = edge.Source.Type
+			break
+		}
+	}
+
+	if initialTargetID == "" {
+		initialTargetID = "unknown:" + graph.InitialTarget
+		initialTargetType = "unknown"
 	}
 
 	visited := make(map[string]bool)
-	printNode(graph.InitialTarget, nodeTypes[graph.InitialTarget], false, "", "", "", true, adj, visited, nodeProperties)
+	printNode(initialTargetID, graph.InitialTarget, initialTargetType, false, "", "", "", true, adj, visited, nodeProperties)
 }
 
-func printNode(value string, nodeType string, isOutOfScope bool, prefix string, marker string, connInfo string, isLast bool, adj map[string][]schema.GraphEdge, visited map[string]bool, nodeProperties map[string][]propertyInfo) {
+func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, prefix string, marker string, connInfo string, isLast bool, adj map[string][]schema.GraphEdge, visited map[string]bool, nodeProperties map[string][]propertyInfo) {
 	nodeColor := colorGreen + colorBold
 	suffix := ""
 	if isOutOfScope {
@@ -312,7 +330,6 @@ func printNode(value string, nodeType string, isOutOfScope bool, prefix string, 
 	if marker != "" {
 		fmt.Printf("%s%s %s%s%s%s\n", prefix, marker, typeStr, nodeColor+value+colorReset, formattedConn, suffix)
 	} else {
-		// Root node
 		fmt.Printf("%s%s%s%s%s\n", prefix, typeStr, nodeColor+value+colorReset, formattedConn, suffix)
 	}
 
@@ -325,12 +342,12 @@ func printNode(value string, nodeType string, isOutOfScope bool, prefix string, 
 		}
 	}
 
-	children := adj[value]
+	children := adj[nodeID]
 	hasChildren := len(children) > 0
 
-	printProperties(value, childPrefix, hasChildren, "", nodeProperties)
+	printProperties(nodeID, childPrefix, hasChildren, "", nodeProperties)
 
-	visited[value] = true
+	visited[nodeID] = true
 
 	sort.Slice(children, func(i, j int) bool {
 		if !children[i].TargetOutOfScope && children[j].TargetOutOfScope {
@@ -350,8 +367,9 @@ func printNode(value string, nodeType string, isOutOfScope bool, prefix string, 
 			childMarker = "└──"
 		}
 
-		target := child.Target.Value
+		targetValue := child.Target.Value
 		targetType := child.Target.Type
+		targetID := targetType + ":" + targetValue
 
 		targetTypeStr := ""
 		if targetType != "" {
@@ -368,16 +386,16 @@ func printNode(value string, nodeType string, isOutOfScope bool, prefix string, 
 			if childConn != "" {
 				formattedChildConn = fmt.Sprintf(" (%s%s%s)", colorMagenta, childConn, colorReset)
 			}
-			fmt.Printf("%s%s %s%s%s %s\n", childPrefix, childMarker, targetTypeStr, colorBlue+target+colorReset, formattedChildConn, i18n.T["LBL_OUT_OF_SCOPE"])
-		} else if visited[target] {
+			fmt.Printf("%s%s %s%s%s %s\n", childPrefix, childMarker, targetTypeStr, colorBlue+targetValue+colorReset, formattedChildConn, i18n.T["LBL_OUT_OF_SCOPE"])
+		} else if visited[targetID] {
 			childConn := child.Context
 			formattedChildConn := ""
 			if childConn != "" {
 				formattedChildConn = fmt.Sprintf(" (%s%s%s)", colorMagenta, childConn, colorReset)
 			}
-			fmt.Printf("%s%s %s%s%s (seen)\n", childPrefix, childMarker, targetTypeStr, colorYellow+target+colorReset, formattedChildConn)
+			fmt.Printf("%s%s %s%s%s (seen)\n", childPrefix, childMarker, targetTypeStr, colorYellow+targetValue+colorReset, formattedChildConn)
 		} else {
-			printNode(target, targetType, child.TargetOutOfScope, childPrefix, childMarker, child.Context, isChildLast, adj, visited, nodeProperties)
+			printNode(targetID, targetValue, targetType, child.TargetOutOfScope, childPrefix, childMarker, child.Context, isChildLast, adj, visited, nodeProperties)
 		}
 	}
 	if prefix == "" && marker == "" {
@@ -385,8 +403,8 @@ func printNode(value string, nodeType string, isOutOfScope bool, prefix string, 
 	}
 }
 
-func printProperties(value string, basePrefix string, hasChildren bool, propIndent string, nodeProperties map[string][]propertyInfo) {
-	props := nodeProperties[value]
+func printProperties(nodeID string, basePrefix string, hasChildren bool, propIndent string, nodeProperties map[string][]propertyInfo) {
+	props := nodeProperties[nodeID]
 	if len(props) > 1 {
 		sort.Slice(props, func(i, j int) bool {
 			if !props[i].OutOfScope && props[j].OutOfScope {
@@ -423,6 +441,7 @@ func printProperties(value string, basePrefix string, hasChildren bool, propInde
 		}
 
 		fmt.Printf("%s%s%s• [%s%s%s] [%s%s%s]%s%s\n", basePrefix, startChar, propIndent, typeColor, strings.ToUpper(prop.Type), colorReset, valColor, prop.Value, colorReset, contextStr, suffix)
-		printProperties(prop.Value, basePrefix, hasChildren, propIndent+"  ", nodeProperties)
+
+		printProperties(prop.ID, basePrefix, hasChildren, propIndent+"  ", nodeProperties)
 	}
 }
