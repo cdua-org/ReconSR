@@ -62,7 +62,7 @@ func TestParseShodanAPIIP(t *testing.T) {
 	}`)
 
 	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, rawBody)
+	parseShodanAPIIP(&exec, rawBody, testShodanAPIIPv4)
 	if exec.Error != nil {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
@@ -164,7 +164,7 @@ func TestParseShodanAPIIPParsesEscapedSubjectAltName(t *testing.T) {
 	}`)
 
 	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, rawBody)
+	parseShodanAPIIP(&exec, rawBody, testShodanAPIIPv4)
 	if exec.Error != nil {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
@@ -203,7 +203,7 @@ func TestParseShodanAPIIPSkipsDuplicateWebServerValue(t *testing.T) {
 	}`)
 
 	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, rawBody)
+	parseShodanAPIIP(&exec, rawBody, testShodanAPIIPv4)
 	if exec.Error != nil {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
@@ -259,7 +259,7 @@ func TestParseShodanAPIIPExtractsRiskyHeartbleed(t *testing.T) {
 	}`)
 
 	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, rawBody)
+	parseShodanAPIIP(&exec, rawBody, testShodanAPIIPv4)
 	if exec.Error != nil {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
@@ -283,7 +283,7 @@ func TestParseShodanAPIIPFallsBackToPortSource(t *testing.T) {
 	}`)
 
 	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, rawBody)
+	parseShodanAPIIP(&exec, rawBody, testShodanAPIIPv4)
 	if exec.Error != nil {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
@@ -341,7 +341,7 @@ func TestGetShodanAPIIP(t *testing.T) {
 
 func TestParseShodanAPIIPInvalidJSON(t *testing.T) {
 	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, []byte(`{invalid json`))
+	parseShodanAPIIP(&exec, []byte(`{invalid json`), testShodanAPIIPv4)
 	if exec.Error == nil || !strings.Contains(*exec.Error, "unmarshal json") {
 		t.Fatalf("expected unmarshal error, got %+v", exec.Error)
 	}

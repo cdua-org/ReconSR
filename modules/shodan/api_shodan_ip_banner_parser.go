@@ -8,49 +8,49 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func extractIPBanners(exec *schema.ModuleExecution, banners []shodanIPBanner, tags []string) {
+func extractIPBanners(exec *schema.ModuleExecution, banners []shodanIPBanner, tags []string, target string) {
 	for i := range banners {
 		banner := &banners[i]
-		serviceSrc := extractBannerServiceAndWeb(exec, banner, tags)
-		portSrc := extractBannerPort(exec, banner, tags, serviceSrc)
+		serviceSrc := extractBannerServiceAndWeb(exec, banner, tags, target)
+		portSrc := extractBannerPort(exec, banner, tags, serviceSrc, target)
 
 		cveSrc := serviceSrc
 		if cveSrc == nil {
 			cveSrc = portSrc
 		}
 
-		extractBannerSSL(exec, banner, tags, portSrc)
-		extractBannerCPEs(exec, banner, tags, portSrc)
-		extractBannerVulns(exec, banner, tags, cveSrc)
-		extractBannerGeo(exec, banner, tags)
-		extractBannerHash(exec, banner, tags, portSrc)
-		extractBannerTimestamp(exec, banner, tags, portSrc)
-		extractBannerHeartbleed(exec, banner, tags, portSrc)
+		extractBannerSSL(exec, banner, tags, portSrc, target)
+		extractBannerCPEs(exec, banner, tags, portSrc, target)
+		extractBannerVulns(exec, banner, tags, cveSrc, target)
+		extractBannerGeo(exec, banner, tags, target)
+		extractBannerHash(exec, banner, tags, portSrc, target)
+		extractBannerTimestamp(exec, banner, tags, portSrc, target)
+		extractBannerHeartbleed(exec, banner, tags, portSrc, target)
 	}
 }
 
-func extractBannerServiceAndWeb(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string) *schema.EntityRef {
+func extractBannerServiceAndWeb(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, target string) *schema.EntityRef {
 	serviceValue := extractBannerServiceValue(banner)
 	webServerValue := extractBannerWebServerValue(banner)
 
 	var src *schema.EntityRef
 	if serviceValue != "" {
-		src = appendBannerSourceResult(exec, resultTypeService, serviceValue, tags, nil)
+		src = appendBannerSourceResult(exec, resultTypeService, serviceValue, tags, nil, "Service for "+target)
 	}
 
 	if webServerValue != "" {
 		if src != nil {
 			if serviceValue != webServerValue {
-				appendBannerSourceResult(exec, resultTypeWebServer, webServerValue, tags, src)
+				appendBannerSourceResult(exec, resultTypeWebServer, webServerValue, tags, src, "Web Server for "+target)
 			}
 		} else {
-			src = appendBannerSourceResult(exec, resultTypeWebServer, webServerValue, tags, nil)
+			src = appendBannerSourceResult(exec, resultTypeWebServer, webServerValue, tags, nil, "Web Server for "+target)
 		}
 	}
 	return src
 }
 
-func extractBannerPort(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, parentSrc *schema.EntityRef) *schema.EntityRef {
+func extractBannerPort(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, parentSrc *schema.EntityRef, target string) *schema.EntityRef {
 	if banner.Port == 0 {
 		return parentSrc
 	}
@@ -67,6 +67,7 @@ func extractBannerPort(exec *schema.ModuleExecution, banner *shodanIPBanner, tag
 		Type:     resultTypePort,
 		Category: resultCategoryProperty,
 		Value:    portValue,
+		Context:  "Port for " + target,
 		Tags:     tags,
 		Source:   parentSrc,
 	})
@@ -90,7 +91,7 @@ func extractBannerWebServerValue(banner *shodanIPBanner) string {
 	return strings.TrimSpace(banner.Details.HTTP.Server)
 }
 
-func appendBannerSourceResult(exec *schema.ModuleExecution, resultType, value string, tags []string, src *schema.EntityRef) *schema.EntityRef {
+func appendBannerSourceResult(exec *schema.ModuleExecution, resultType, value string, tags []string, src *schema.EntityRef, context string) *schema.EntityRef {
 	if value == "" {
 		return nil
 	}
@@ -99,6 +100,7 @@ func appendBannerSourceResult(exec *schema.ModuleExecution, resultType, value st
 		Type:     resultType,
 		Category: resultCategoryProperty,
 		Value:    value,
+		Context:  context,
 		Tags:     tags,
 		Source:   src,
 	})
@@ -106,16 +108,16 @@ func appendBannerSourceResult(exec *schema.ModuleExecution, resultType, value st
 	return &schema.EntityRef{Type: resultType, Value: value}
 }
 
-func extractBannerCPEs(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef) {
+func extractBannerCPEs(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef, target string) {
 	if banner.Artifacts == nil {
 		return
 	}
 
-	appendBannerStringResults(exec, resultTypeCPE, banner.Artifacts.CPE, tags, src)
-	appendBannerStringResults(exec, "cpe23", banner.Artifacts.CPE23, tags, src)
+	appendBannerStringResults(exec, resultTypeCPE, banner.Artifacts.CPE, tags, src, "CPE for "+target)
+	appendBannerStringResults(exec, "cpe23", banner.Artifacts.CPE23, tags, src, "CPE for "+target)
 }
 
-func appendBannerStringResults(exec *schema.ModuleExecution, resultType string, values, tags []string, src *schema.EntityRef) {
+func appendBannerStringResults(exec *schema.ModuleExecution, resultType string, values, tags []string, src *schema.EntityRef, context string) {
 	for _, value := range values {
 		if value == "" {
 			continue
@@ -125,13 +127,14 @@ func appendBannerStringResults(exec *schema.ModuleExecution, resultType string, 
 			Type:     resultType,
 			Category: resultCategoryProperty,
 			Value:    value,
+			Context:  context,
 			Tags:     tags,
 			Source:   src,
 		})
 	}
 }
 
-func extractBannerVulns(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef) {
+func extractBannerVulns(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef, target string) {
 	if banner.Artifacts == nil {
 		return
 	}
@@ -146,13 +149,14 @@ func extractBannerVulns(exec *schema.ModuleExecution, banner *shodanIPBanner, ta
 			Type:     resultTypeCVE,
 			Category: resultCategoryProperty,
 			Value:    value,
+			Context:  "Vulnerability for " + target,
 			Tags:     tags,
 			Source:   src,
 		})
 	}
 }
 
-func extractBannerGeo(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string) {
+func extractBannerGeo(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, target string) {
 	if banner.Details == nil || banner.Details.Location == nil {
 		return
 	}
@@ -176,6 +180,7 @@ func extractBannerGeo(exec *schema.ModuleExecution, banner *shodanIPBanner, tags
 		Type:     "geo",
 		Category: resultCategoryProperty,
 		Value:    strings.Join(geoParts, " | "),
+		Context:  "Location for " + target,
 		Tags:     tags,
 	})
 }
@@ -191,7 +196,7 @@ func formatShodanCountry(location *shodanBannerLocation) string {
 	}
 }
 
-func extractBannerHash(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef) {
+func extractBannerHash(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef, target string) {
 	if banner.Hash == 0 {
 		return
 	}
@@ -200,12 +205,13 @@ func extractBannerHash(exec *schema.ModuleExecution, banner *shodanIPBanner, tag
 		Type:     "hash",
 		Category: resultCategoryProperty,
 		Value:    strconv.FormatInt(banner.Hash, 10),
+		Context:  "Hash for " + target,
 		Tags:     tags,
 		Source:   src,
 	})
 }
 
-func extractBannerTimestamp(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef) {
+func extractBannerTimestamp(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef, target string) {
 	if banner.Timestamp == "" {
 		return
 	}
@@ -214,12 +220,13 @@ func extractBannerTimestamp(exec *schema.ModuleExecution, banner *shodanIPBanner
 		Type:     resultTypeBannerTimestamp,
 		Category: resultCategoryProperty,
 		Value:    banner.Timestamp,
+		Context:  "Banner Timestamp for " + target,
 		Tags:     tags,
 		Source:   src,
 	})
 }
 
-func extractBannerHeartbleed(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef) {
+func extractBannerHeartbleed(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, src *schema.EntityRef, target string) {
 	if banner.Heartbleed == "" {
 		return
 	}
@@ -228,6 +235,7 @@ func extractBannerHeartbleed(exec *schema.ModuleExecution, banner *shodanIPBanne
 		Type:     resultTypeHeartbleed,
 		Category: resultCategoryProperty,
 		Value:    banner.Heartbleed,
+		Context:  "Heartbleed for " + target,
 		Tags:     tags,
 		Source:   src,
 	})

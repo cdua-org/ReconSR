@@ -19,7 +19,7 @@ var (
 	shodanDomainPatternRegex   = regexp.MustCompile(`(?i)(?:\*\.)?(?:[a-z0-9-]+\.)+[a-z]{2,63}`)
 )
 
-func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, source *schema.EntityRef) {
+func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, source *schema.EntityRef, target string) {
 	if banner.Details == nil || banner.Details.SSL == nil {
 		return
 	}
@@ -30,10 +30,10 @@ func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, tags
 		}
 
 		sources := parseSubjectAltName(exec, extension.Data, tags)
-		appendSubjectAltNameMetadata(exec, banner.Details.SSL, tags, sources)
+		appendSubjectAltNameMetadata(exec, banner.Details.SSL, tags, sources, target)
 	}
 
-	appendBannerSSLProperties(exec, banner.Details.SSL, tags, source)
+	appendBannerSSLProperties(exec, banner.Details.SSL, tags, source, target)
 }
 
 func parseSubjectAltName(exec *schema.ModuleExecution, value string, tags []string) []schema.EntityRef {
@@ -84,7 +84,7 @@ func classifySubjectAltName(match string) (resultType, resultValue string, ok bo
 	return resultTypeWildcardSANDomain, "*." + validated.Value, true
 }
 
-func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBanner, tags []string, sources []schema.EntityRef) {
+func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBanner, tags []string, sources []schema.EntityRef, target string) {
 	if len(sources) == 0 {
 		return
 	}
@@ -95,13 +95,13 @@ func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBa
 
 	for i := range sources {
 		source := &sources[i]
-		appendSubjectAltNameProperty(exec, resultTypeCertIssuer, issuerValue, tags, source)
-		appendSubjectAltNameProperty(exec, resultTypeCertNotAfter, notAfterValue, tags, source)
-		appendSubjectAltNameProperty(exec, resultTypeTLSVersions, tlsVersionsValue, tags, source)
+		appendSubjectAltNameProperty(exec, resultTypeCertIssuer, issuerValue, tags, source, "Cert Issuer for "+target)
+		appendSubjectAltNameProperty(exec, resultTypeCertNotAfter, notAfterValue, tags, source, "Cert Expiration for "+target)
+		appendSubjectAltNameProperty(exec, resultTypeTLSVersions, tlsVersionsValue, tags, source, "TLS Versions for "+target)
 	}
 }
 
-func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, value string, tags []string, source *schema.EntityRef) {
+func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, value string, tags []string, source *schema.EntityRef, context string) {
 	if value == "" {
 		return
 	}
@@ -110,23 +110,24 @@ func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, valu
 		Type:     resultType,
 		Category: resultCategoryProperty,
 		Value:    value,
+		Context:  context,
 		Tags:     tags,
 		Source:   source,
 	})
 }
 
-func appendBannerSSLProperties(exec *schema.ModuleExecution, ssl *shodanSSLBanner, tags []string, source *schema.EntityRef) {
+func appendBannerSSLProperties(exec *schema.ModuleExecution, ssl *shodanSSLBanner, tags []string, source *schema.EntityRef, target string) {
 	if ssl == nil {
 		return
 	}
 
 	for _, fingerprint := range ssl.CertFingerprintValues {
-		appendBannerSSLProperty(exec, resultTypeCertFingerprint, fingerprint, tags, source)
+		appendBannerSSLProperty(exec, resultTypeCertFingerprint, fingerprint, tags, source, "Cert Fingerprint for "+target)
 	}
-	appendBannerSSLProperty(exec, resultTypeJARM, ssl.JARMValue, tags, source)
+	appendBannerSSLProperty(exec, resultTypeJARM, ssl.JARMValue, tags, source, "JARM for "+target)
 }
 
-func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value string, tags []string, source *schema.EntityRef) {
+func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value string, tags []string, source *schema.EntityRef, context string) {
 	if value == "" {
 		return
 	}
@@ -135,6 +136,7 @@ func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value str
 		Type:     resultType,
 		Category: resultCategoryProperty,
 		Value:    value,
+		Context:  context,
 		Tags:     tags,
 		Source:   source,
 	})

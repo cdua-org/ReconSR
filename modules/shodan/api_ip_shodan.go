@@ -65,7 +65,7 @@ func (m *shodanModule) getShodanAPIIP(target schema.Entity) schema.ModuleExecuti
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		parseShodanAPIIP(&exec, rawBody)
+		parseShodanAPIIP(&exec, rawBody, target.Value)
 	case http.StatusNotFound:
 		// ignore
 	case http.StatusTooManyRequests:
