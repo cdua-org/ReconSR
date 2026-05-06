@@ -81,13 +81,26 @@ type shodanBannerLocation struct {
 }
 
 type shodanDomainResponse struct {
+	Tags []string             `json:"tags"`
 	Data []shodanDomainRecord `json:"data"`
 }
 
 type shodanDomainRecord struct {
-	Subdomain string `json:"subdomain"`
-	Type      string `json:"type"`
-	Value     string `json:"value"`
+	Options   *shodanDomainRecordOptions `json:"options,omitempty"`
+	Subdomain string                     `json:"subdomain"`
+	Type      string                     `json:"type"`
+	Value     string                     `json:"value"`
+	LastSeen  string                     `json:"last_seen"`
+}
+
+type shodanDomainRecordOptions struct {
+	Hostmaster string `json:"hostmaster"`
+	Serial     uint64 `json:"serial"`
+	Refresh    uint64 `json:"refresh"`
+	Retry      uint64 `json:"retry"`
+	Expires    uint64 `json:"expires"`
+	MinTTL     uint64 `json:"minttl"`
+	Priority   uint16 `json:"priority"`
 }
 
 type shodanTransport uint8

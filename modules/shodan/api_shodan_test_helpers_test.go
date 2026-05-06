@@ -61,3 +61,38 @@ func requireTaggedResults(t *testing.T, results []schema.ModuleResult, expectedT
 		}
 	}
 }
+
+func requireModuleResultWithContext(t *testing.T, results []schema.ModuleResult, resultType, value, context string) schema.ModuleResult {
+	t.Helper()
+
+	for _, result := range results {
+		if result.Type == resultType && result.Value == value && result.Context == context {
+			return result
+		}
+	}
+
+	t.Fatalf("expected result %s=%q context=%q not found", resultType, value, context)
+	return schema.ModuleResult{}
+}
+
+func findModuleResultBySource(results []schema.ModuleResult, resultType, sourceType, sourceValue string) *schema.ModuleResult {
+	for i, result := range results {
+		if result.Type != resultType {
+			continue
+		}
+
+		if sourceType == "" && sourceValue == "" {
+			if result.Source == nil {
+				return &results[i]
+			}
+
+			continue
+		}
+
+		if result.Source != nil && result.Source.Type == sourceType && result.Source.Value == sourceValue {
+			return &results[i]
+		}
+	}
+
+	return nil
+}

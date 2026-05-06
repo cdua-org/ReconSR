@@ -37,6 +37,7 @@ const (
 	resultTypeLastUpdate        = "last_update"
 	resultTypePort              = "port"
 	resultTypeSANDomain         = "san_domain"
+	resultTypeSOA               = "soa"
 	resultTypeService           = "service"
 	resultTypeSubdomain         = "subdomain"
 	resultTypeTLSVersions       = "tls_versions"
