@@ -165,7 +165,7 @@ func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, targe
 	for _, v := range parsed.Vulns {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     resultTypeCVE,
-			Category: resultCategoryProperty,
+			Category: resultCategoryNode,
 			Value:    v,
 		})
 	}

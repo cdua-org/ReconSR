@@ -99,9 +99,30 @@ func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult) {
 	assertShodanIPPortSource(t, results, resultTypeCPE, "cpe:/a:fake:product:9.9")
 	assertShodanIPPortSource(t, results, "cpe23", "cpe:2.3:a:fake:product:9.9")
 
-	cveResult := requireModuleResult(t, results, resultTypeCVE, "CVE-9999-9999 | Verified: true | Summary: Fake vulnerability")
+	assertShodanIPCVEChain(t, results)
+}
+
+func assertShodanIPCVEChain(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	cveResult := requireModuleResult(t, results, resultTypeCVE, "CVE-9999-9999")
+	if cveResult.Category != resultCategoryNode {
+		t.Fatalf("expected cve to be a node, got %q", cveResult.Category)
+	}
 	if cveResult.Source == nil || cveResult.Source.Type != resultTypeService || cveResult.Source.Value != testShodanService {
 		t.Fatalf("expected cve to be chained to service, got %+v", cveResult.Source)
+	}
+
+	expectedVulnCtx := testShodanAPIIPv4 + ":443/tcp (" + testShodanService + ")"
+
+	verifiedResult := requireModuleResultWithContext(t, results, "verified", "true", expectedVulnCtx)
+	if verifiedResult.Source == nil || verifiedResult.Source.Type != resultTypeCVE || verifiedResult.Source.Value != "CVE-9999-9999" {
+		t.Fatalf("expected verified to be chained to cve, got %+v", verifiedResult.Source)
+	}
+
+	summaryResult := requireModuleResultWithContext(t, results, "summary", "Fake vulnerability", expectedVulnCtx)
+	if summaryResult.Source == nil || summaryResult.Source.Type != resultTypeCVE || summaryResult.Source.Value != "CVE-9999-9999" {
+		t.Fatalf("expected summary to be chained to cve, got %+v", summaryResult.Source)
 	}
 }
 

@@ -139,21 +139,66 @@ func extractBannerVulns(exec *schema.ModuleExecution, banner *shodanIPBanner, ta
 		return
 	}
 
+	vulnContext := buildVulnContext(banner, target)
+
 	for cveID, vuln := range banner.Artifacts.Vulns {
-		if vuln.Summary == "" {
+		if cveID == "" {
 			continue
 		}
 
-		value := fmt.Sprintf("%s | Verified: %t | Summary: %s", cveID, vuln.Verified, vuln.Summary)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     resultTypeCVE,
-			Category: resultCategoryProperty,
-			Value:    value,
-			Context:  "Vulnerability for " + target,
+			Category: resultCategoryNode,
+			Value:    cveID,
+			Context:  vulnContext,
 			Tags:     tags,
 			Source:   src,
 		})
+
+		cveRef := &schema.EntityRef{Type: resultTypeCVE, Value: cveID}
+
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     "verified",
+			Category: resultCategoryProperty,
+			Value:    strconv.FormatBool(vuln.Verified),
+			Context:  vulnContext,
+			Tags:     tags,
+			Source:   cveRef,
+		})
+
+		if vuln.Summary != "" {
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     "summary",
+				Category: resultCategoryProperty,
+				Value:    vuln.Summary,
+				Context:  vulnContext,
+				Tags:     tags,
+				Source:   cveRef,
+			})
+		}
 	}
+}
+
+func buildVulnContext(banner *shodanIPBanner, target string) string {
+	var b strings.Builder
+	b.WriteString(target)
+
+	if banner.Port != 0 {
+		b.WriteByte(':')
+		b.WriteString(strconv.Itoa(banner.Port))
+		if transport := formatShodanTransport(banner.Transport); transport != "" {
+			b.WriteByte('/')
+			b.WriteString(transport)
+		}
+	}
+
+	if svc := extractBannerServiceValue(banner); svc != "" {
+		b.WriteString(" (")
+		b.WriteString(svc)
+		b.WriteByte(')')
+	}
+
+	return b.String()
 }
 
 func extractBannerGeo(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, target string) {
