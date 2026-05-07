@@ -7,6 +7,7 @@ import (
 )
 
 func TestGetKey(t *testing.T) {
+	const shodan = "Shodan"
 	tests := []struct {
 		name         string
 		setupMock    func(mockPath string)
@@ -18,7 +19,7 @@ func TestGetKey(t *testing.T) {
 			name: "initial creation writes default and returns empty Shodan",
 			setupMock: func(_ string) {
 			},
-			serviceName:  "Shodan",
+			serviceName:  shodan,
 			expectedKey:  "",
 			expectedFile: true,
 		},
@@ -39,7 +40,7 @@ func TestGetKey(t *testing.T) {
 					t.Fatalf("failed to setup mock file: %v", err)
 				}
 			},
-			serviceName:  "Shodan",
+			serviceName:  shodan,
 			expectedKey:  "test_key_123",
 			expectedFile: true,
 		},
@@ -54,6 +55,29 @@ func TestGetKey(t *testing.T) {
 			},
 			serviceName:  "UnknownService",
 			expectedKey:  "",
+			expectedFile: true,
+		},
+		{
+			name: "env var takes precedence over file",
+			setupMock: func(mockPath string) {
+				content := []byte("[Keys]\nShodan=file_key\n")
+				err := os.WriteFile(mockPath, content, 0o600)
+				if err != nil {
+					t.Fatalf("failed to setup mock file: %v", err)
+				}
+				t.Setenv("RECONSR_SHODAN", "env_key")
+			},
+			serviceName:  shodan,
+			expectedKey:  "env_key",
+			expectedFile: true,
+		},
+		{
+			name: "env var works when file key is missing",
+			setupMock: func(_ string) {
+				t.Setenv("RECONSR_SHODAN", "env_key_only")
+			},
+			serviceName:  shodan,
+			expectedKey:  "env_key_only",
 			expectedFile: true,
 		},
 	}

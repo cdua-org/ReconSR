@@ -79,6 +79,10 @@ func parseConfig(content []byte) {
 // GetKey returns the configuration value for the given serviceName.
 func GetKey(serviceName string) string {
 	initOnce.Do(loadConfig)
+	envKey := "RECONSR_" + strings.ToUpper(serviceName)
+	if val := os.Getenv(envKey); val != "" {
+		return val
+	}
 	return keysMap[serviceName]
 }
 
