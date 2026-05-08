@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
@@ -26,10 +27,10 @@ func parseShodanAPIIP(exec *schema.ModuleExecution, rawBody []byte, target strin
 
 func extractIPDomains(exec *schema.ModuleExecution, domains, tags []string) {
 	for _, domain := range domains {
-		if val, err := validator.Validate(entityTypeDomain, domain); err == nil {
+		if val, err := validator.Validate(constants.TypeDomain, domain); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:     "shodan_domain",
-				Category: resultCategoryNode,
+				Type:     constants.TypeShodanDomain,
+				Category: constants.CategoryNode,
 				Value:    val.Value,
 				Tags:     tags,
 			})
@@ -44,19 +45,19 @@ func extractIPASN(exec *schema.ModuleExecution, asn string, tags []string) {
 
 	asnNumber := strings.TrimPrefix(strings.ToUpper(asn), "AS")
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     "asn",
-		Category: resultCategoryNode,
+		Type:     constants.TypeASN,
+		Category: constants.CategoryNode,
 		Value:    asnNumber,
 		Tags:     tags,
 	})
 }
 
 func extractIPProperties(exec *schema.ModuleExecution, payload *shodanIPResponse, tags []string, target string) {
-	appendIPProperty(exec, "org", payload.Org, tags, "Organization for "+target)
+	appendIPProperty(exec, constants.TypeOrg, payload.Org, tags, "Organization for "+target)
 	if !strings.EqualFold(payload.ISP, payload.Org) {
-		appendIPProperty(exec, "isp", payload.ISP, tags, "ISP for "+target)
+		appendIPProperty(exec, constants.TypeISP, payload.ISP, tags, "ISP for "+target)
 	}
-	appendIPProperty(exec, "os", payload.OS, tags, "OS for "+target)
+	appendIPProperty(exec, constants.TypeOS, payload.OS, tags, "OS for "+target)
 }
 
 func appendIPProperty(exec *schema.ModuleExecution, resultType, value string, tags []string, context string) {
@@ -66,7 +67,7 @@ func appendIPProperty(exec *schema.ModuleExecution, resultType, value string, ta
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
-		Category: resultCategoryProperty,
+		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  context,
 		Tags:     tags,
@@ -79,8 +80,8 @@ func extractIPLastUpdate(exec *schema.ModuleExecution, lastUpdate string, tags [
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     resultTypeLastUpdate,
-		Category: resultCategoryProperty,
+		Type:     constants.TypeLastUpdate,
+		Category: constants.CategoryProperty,
 		Value:    lastUpdate,
 		Context:  "Last Update for " + target,
 		Tags:     tags,
@@ -94,8 +95,8 @@ func extractIPHostnames(exec *schema.ModuleExecution, hostnames, tags []string) 
 		}
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "ptr",
-			Category: resultCategoryProperty,
+			Type:     constants.TypePTR,
+			Category: constants.CategoryProperty,
 			Value:    hostname,
 			Tags:     tags,
 		})

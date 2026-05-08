@@ -4,6 +4,7 @@ package asn_metadata
 import (
 	"context"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/modules/utils/ripestat"
@@ -11,7 +12,7 @@ import (
 )
 
 func getASNAbuseContacts(target string) (execution schema.ModuleExecution) {
-	execution = modutil.NewExecution("get_asn_abuse_contacts")
+	execution = modutil.NewExecution(constants.FuncGetASNAbuseContacts)
 
 	dbg.Printf("getASNAbuseContacts target=%q", target)
 
@@ -31,7 +32,7 @@ func getASNAbuseContacts(target string) (execution schema.ModuleExecution) {
 		execution.RawData = resp.RawJSON
 	}()
 
-	if err := ripestat.Query(ctx, originASN, "abuse-contact-finder", &resp, resolver.MaxRetriesASNMeta); err != nil {
+	if err := ripestat.Query(ctx, originASN, constants.RIPEstatEndpointAbuseContactFinder, &resp, resolver.MaxRetriesASNMeta); err != nil {
 		errMsg := "asn abuse lookup failed: " + err.Error()
 		execution.Error = &errMsg
 		dbg.Printf("getASNAbuseContacts target=%q lookup_error=%v", target, err)
@@ -41,8 +42,8 @@ func getASNAbuseContacts(target string) (execution schema.ModuleExecution) {
 	for _, contact := range resp.Data.AbuseContacts {
 		if contact != "" {
 			execution.Results = append(execution.Results, schema.ModuleResult{
-				Type:       "email",
-				Category:   "node",
+				Type:       constants.TypeEmail,
+				Category:   constants.CategoryNode,
 				Value:      contact,
 				Context:    "Abuse Contact",
 				OutOfScope: true,

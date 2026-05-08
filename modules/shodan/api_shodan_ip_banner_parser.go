@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -35,16 +36,16 @@ func extractBannerServiceAndWeb(exec *schema.ModuleExecution, banner *shodanIPBa
 
 	var src *schema.EntityRef
 	if serviceValue != "" {
-		src = appendBannerSourceResult(exec, resultTypeService, serviceValue, tags, nil, "Service for "+target)
+		src = appendBannerSourceResult(exec, constants.TypeService, serviceValue, tags, nil, "Service for "+target)
 	}
 
 	if webServerValue != "" {
 		if src != nil {
 			if serviceValue != webServerValue {
-				appendBannerSourceResult(exec, resultTypeWebServer, webServerValue, tags, src, "Web Server for "+target)
+				appendBannerSourceResult(exec, constants.TypeWebServer, webServerValue, tags, src, "Web Server for "+target)
 			}
 		} else {
-			src = appendBannerSourceResult(exec, resultTypeWebServer, webServerValue, tags, nil, "Web Server for "+target)
+			src = appendBannerSourceResult(exec, constants.TypeWebServer, webServerValue, tags, nil, "Web Server for "+target)
 		}
 	}
 	return src
@@ -64,15 +65,15 @@ func extractBannerPort(exec *schema.ModuleExecution, banner *shodanIPBanner, tag
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     resultTypePort,
-		Category: resultCategoryProperty,
+		Type:     constants.TypePort,
+		Category: constants.CategoryProperty,
 		Value:    portValue,
 		Context:  "Port for " + target,
 		Tags:     tags,
 		Source:   parentSrc,
 	})
 
-	return &schema.EntityRef{Type: resultTypePort, Value: portValue}
+	return &schema.EntityRef{Type: constants.TypePort, Value: portValue}
 }
 
 func extractBannerServiceValue(banner *shodanIPBanner) string {
@@ -98,7 +99,7 @@ func appendBannerSourceResult(exec *schema.ModuleExecution, resultType, value st
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
-		Category: resultCategoryProperty,
+		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  context,
 		Tags:     tags,
@@ -113,8 +114,8 @@ func extractBannerCPEs(exec *schema.ModuleExecution, banner *shodanIPBanner, tag
 		return
 	}
 
-	appendBannerStringResults(exec, resultTypeCPE, banner.Artifacts.CPE, tags, src, "CPE for "+target)
-	appendBannerStringResults(exec, "cpe23", banner.Artifacts.CPE23, tags, src, "CPE for "+target)
+	appendBannerStringResults(exec, constants.TypeCPE, banner.Artifacts.CPE, tags, src, "CPE for "+target)
+	appendBannerStringResults(exec, constants.TypeCPE23, banner.Artifacts.CPE23, tags, src, "CPE for "+target)
 }
 
 func appendBannerStringResults(exec *schema.ModuleExecution, resultType string, values, tags []string, src *schema.EntityRef, context string) {
@@ -125,7 +126,7 @@ func appendBannerStringResults(exec *schema.ModuleExecution, resultType string, 
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     resultType,
-			Category: resultCategoryProperty,
+			Category: constants.CategoryProperty,
 			Value:    value,
 			Context:  context,
 			Tags:     tags,
@@ -147,19 +148,19 @@ func extractBannerVulns(exec *schema.ModuleExecution, banner *shodanIPBanner, ta
 		}
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     resultTypeCVE,
-			Category: resultCategoryNode,
+			Type:     constants.TypeCVE,
+			Category: constants.CategoryNode,
 			Value:    cveID,
 			Context:  vulnContext,
 			Tags:     tags,
 			Source:   src,
 		})
 
-		cveRef := &schema.EntityRef{Type: resultTypeCVE, Value: cveID}
+		cveRef := &schema.EntityRef{Type: constants.TypeCVE, Value: cveID}
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "verified",
-			Category: resultCategoryProperty,
+			Type:     constants.TypeVerified,
+			Category: constants.CategoryProperty,
 			Value:    strconv.FormatBool(vuln.Verified),
 			Context:  vulnContext,
 			Tags:     tags,
@@ -168,8 +169,8 @@ func extractBannerVulns(exec *schema.ModuleExecution, banner *shodanIPBanner, ta
 
 		if vuln.Summary != "" {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:     "summary",
-				Category: resultCategoryProperty,
+				Type:     constants.TypeSummary,
+				Category: constants.CategoryProperty,
 				Value:    vuln.Summary,
 				Context:  vulnContext,
 				Tags:     tags,
@@ -222,8 +223,8 @@ func extractBannerGeo(exec *schema.ModuleExecution, banner *shodanIPBanner, tags
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     "geo",
-		Category: resultCategoryProperty,
+		Type:     constants.TypeGeo,
+		Category: constants.CategoryProperty,
 		Value:    strings.Join(geoParts, " | "),
 		Context:  "Location for " + target,
 		Tags:     tags,
@@ -247,8 +248,8 @@ func extractBannerHash(exec *schema.ModuleExecution, banner *shodanIPBanner, tag
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     "hash",
-		Category: resultCategoryProperty,
+		Type:     constants.TypeHash,
+		Category: constants.CategoryProperty,
 		Value:    strconv.FormatInt(banner.Hash, 10),
 		Context:  "Hash for " + target,
 		Tags:     tags,
@@ -262,8 +263,8 @@ func extractBannerTimestamp(exec *schema.ModuleExecution, banner *shodanIPBanner
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     resultTypeBannerTimestamp,
-		Category: resultCategoryProperty,
+		Type:     constants.TypeBannerTimestamp,
+		Category: constants.CategoryProperty,
 		Value:    banner.Timestamp,
 		Context:  "Banner Timestamp for " + target,
 		Tags:     tags,
@@ -277,8 +278,8 @@ func extractBannerHeartbleed(exec *schema.ModuleExecution, banner *shodanIPBanne
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     resultTypeHeartbleed,
-		Category: resultCategoryProperty,
+		Type:     constants.TypeHeartbleed,
+		Category: constants.CategoryProperty,
 		Value:    banner.Heartbleed,
 		Context:  "Heartbleed for " + target,
 		Tags:     tags,

@@ -103,7 +103,7 @@ Registrant:
 
 Administrative Contact:
 	Alice Tester
-	Testland University
+	Campus Governance Group
 	Admin Bldg Room 101, 42 Campus Drive
 	Testville, TS 99001-1234
 	US
@@ -112,7 +112,7 @@ Administrative Contact:
 
 Technical Contact:
 	NetOps Team
-	Testland University
+	Mock Network Services
 	NOC Room 202, 42 Campus Drive
 	Testville, TS 99001-1234
 	US
@@ -140,14 +140,14 @@ Domain expires:             31-Dec-2027
 	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"42 Campus Drive", "Testville, TS 99001", "US"})
 
 	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"Alice Tester"})
-	assertSlice(t, "Admin.Organization", got.Admin.Organization, []string{"Testland University"})
+	assertSlice(t, "Admin.Organization", got.Admin.Organization, []string{"Campus Governance Group"})
 	assertSlice(t, "Admin.Email", got.Admin.Email, []string{"alice@testuni.fake"})
 	assertSlice(t, "Admin.Phone", got.Admin.Phone, []string{"+1.5550001111"})
 	assertSlice(t, "Admin.Address", got.Admin.Address,
 		[]string{"Admin Bldg Room 101, 42 Campus Drive", "Testville, TS 99001-1234", "US"})
 
 	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"NetOps Team"})
-	assertSlice(t, "Tech.Organization", got.Tech.Organization, []string{"Testland University"})
+	assertSlice(t, "Tech.Organization", got.Tech.Organization, []string{"Mock Network Services"})
 	assertSlice(t, "Tech.Email", got.Tech.Email, []string{"noc@testuni.fake"})
 	assertSlice(t, "Tech.Phone", got.Tech.Phone, []string{"+1.5550002222"})
 }
@@ -164,32 +164,32 @@ Registrar:         FakeRegistrar
 URL:               http://www.fakeregistrar.example/
 
 Registrant:
-   Name:           Domain Ops
-   City:           Faketown
-   State:          Fakestate
-   Country:        Fakeland
+   Name:           Registry Desk Uno
+   City:           Faketown Norte
+   State:          Northstate Uno
+   Country:        Fakeland Norte
 
 Administrative Contact:
-   Name:           Domain Ops
-   City:           Faketown
-   State:          Fakestate
-   Country:        Fakeland
+   Name:           Admin Desk Dos
+   City:           Adminpolis Sur
+   State:          Southstate Dos
+   Country:        Fakeland Sur
 
 Technical Contact:
-   Name:           Domain Ops
-   City:           Faketown
-   State:          Fakestate
-   Country:        Fakeland
+   Name:           Tech Crew Tres
+   City:           Techvale Este
+   State:          Eaststate Tres
+   Country:        Fakeland Este
 
 Billing Contact:
    Name:           Billing Team
    City:           Otherville
    State:          Otherstate
-   Country:        Fakeland
+   Country:        Fakeland Oeste
 
 Name Servers:
-   DNS:            ns1.fakeshop.example
-   DNS:            ns2.fakeshop.example
+   DNS:            ns1.fakeshop.example.net
+   DNS:            ns2.fakeshop.example.net
 
 DNSSEC DS Records:
 `
@@ -202,20 +202,20 @@ DNSSEC DS Records:
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"FakeRegistrar"})
 	assertEq(t, "RegistrarURL", got.RegistrarURL, "http://www.fakeregistrar.example/")
 
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fakeshop.example", "ns2.fakeshop.example"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fakeshop.example.net", "ns2.fakeshop.example.net"})
 
-	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Domain Ops"})
-	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"Faketown", "Fakestate", "Fakeland"})
+	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Registry Desk Uno"})
+	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"Faketown Norte", "Northstate Uno", "Fakeland Norte"})
 
-	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"Domain Ops"})
-	assertSlice(t, "Admin.Address", got.Admin.Address, []string{"Faketown", "Fakestate", "Fakeland"})
+	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"Admin Desk Dos"})
+	assertSlice(t, "Admin.Address", got.Admin.Address, []string{"Adminpolis Sur", "Southstate Dos", "Fakeland Sur"})
 
-	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"Domain Ops"})
-	assertSlice(t, "Tech.Address", got.Tech.Address, []string{"Faketown", "Fakestate", "Fakeland"})
+	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"Tech Crew Tres"})
+	assertSlice(t, "Tech.Address", got.Tech.Address, []string{"Techvale Este", "Eaststate Tres", "Fakeland Este"})
 
 	// Billing Contact must not leak into other contacts.
 	assertSlice(t, "Billing.Name", got.Billing.Name, []string{"Billing Team"})
-	assertSlice(t, "Billing.Address", got.Billing.Address, []string{"Otherville", "Otherstate", "Fakeland"})
+	assertSlice(t, "Billing.Address", got.Billing.Address, []string{"Otherville", "Otherstate", "Fakeland Oeste"})
 }
 
 // TestParseWHOIS_NICIT validates Italian WHOIS format with bare-word headers,
@@ -303,7 +303,7 @@ Domain Name: fake.cn
 ROID: 20030312s10001s00062053-cn
 Domain Status: clientDeleteProhibited
 Domain Status: clientTransferProhibited
-Registrant: Fake LLC
+Registrant: Mock Registry Ltd
 Registrant Contact Email: fake@fake.cn
 Sponsoring Registrar: Fake Beijing Registrar Co. Ltd
 Name Server: ns1.fake.cn
@@ -324,7 +324,7 @@ DNSSEC: unsigned
 	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"clientDeleteProhibited", "clientTransferProhibited"})
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"Fake Beijing Registrar Co. Ltd"})
 
-	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake LLC"})
+	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Mock Registry Ltd"})
 	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"fake@fake.cn"})
 
 	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.cn", "ns2.fake.cn", "ns3.fake.cn", "ns4.fake.cn"})
@@ -375,30 +375,30 @@ domain:       FAKE
 organisation: Fake Registry Inc.
 address:      123 Fake Street
 address:      Faketown CA 99999
-address:      United States of America (the)
+address:      Example Republic
 
 contact:      administrative
 name:         Fake Admin
-organisation: Fake LLC
+organisation: Admin Relay Group
 address:      456 Admin Blvd
 address:      Adminville NY 10001
-address:      United States of America (the)
+address:      Fixture Federation
 phone:        +1 555 123 4567
 fax-no:       +1 555 123 4568
 e-mail:       admin@fake.example
 
 contact:      technical
 name:         Fake Tech
-organisation: Fake LLC
+organisation: Tech Transit Unit
 address:      789 Tech Lane
 address:      Techcity NY 10002
-address:      United States of America (the)
+address:      Sample Union
 phone:        +1 555 987 6543
 fax-no:       +1 555 987 6544
 e-mail:       tech@fake.example
 
-nserver:      NS1.FAKE.EXAMPLE 2001:db8::1 192.0.2.1
-nserver:      NS2.FAKE.EXAMPLE 2001:db8::2 192.0.2.2
+nserver:      ns1.root-fake.example.net 2001:db8::1 192.0.2.1
+nserver:      ns2.root-fake.example.net 2001:db8::2 192.0.2.2
 
 status:       ACTIVE
 remarks:      Registration information: https://www.fake.example
@@ -413,20 +413,20 @@ source:       IANA`
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "2025-04-11")
 
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake Registry Inc."})
-	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"123 Fake Street", "Faketown CA 99999", "United States of America (the)"})
+	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"123 Fake Street", "Faketown CA 99999", "Example Republic"})
 	assertSlice(t, "Registrant.Phone", got.Registrant.Phone, nil)
 
 	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"Fake Admin"})
-	assertSlice(t, "Admin.Organization", got.Admin.Organization, []string{"Fake LLC"})
-	assertSlice(t, "Admin.Address", got.Admin.Address, []string{"456 Admin Blvd", "Adminville NY 10001", "United States of America (the)"})
+	assertSlice(t, "Admin.Organization", got.Admin.Organization, []string{"Admin Relay Group"})
+	assertSlice(t, "Admin.Address", got.Admin.Address, []string{"456 Admin Blvd", "Adminville NY 10001", "Fixture Federation"})
 	assertSlice(t, "Admin.Phone", got.Admin.Phone, []string{"+1 555 123 4567"})
 
 	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"Fake Tech"})
-	assertSlice(t, "Tech.Organization", got.Tech.Organization, []string{"Fake LLC"})
-	assertSlice(t, "Tech.Address", got.Tech.Address, []string{"789 Tech Lane", "Techcity NY 10002", "United States of America (the)"})
+	assertSlice(t, "Tech.Organization", got.Tech.Organization, []string{"Tech Transit Unit"})
+	assertSlice(t, "Tech.Address", got.Tech.Address, []string{"789 Tech Lane", "Techcity NY 10002", "Sample Union"})
 	assertSlice(t, "Tech.Phone", got.Tech.Phone, []string{"+1 555 987 6543"})
 
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.example", "ns2.fake.example"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.root-fake.example.net", "ns2.root-fake.example.net"})
 	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"ACTIVE"})
 }
 
@@ -447,8 +447,8 @@ Registrant Contact ID: ce413d96bfdb-AU
 Registrant Contact Name: Fake Reg Contact
 Tech Contact ID: a49ec9b0b96a-AU
 Tech Contact Name: Fake Tech Contact
-Name Server: ns1.fake.example
-Name Server: ns2.fake.example
+Name Server: ns1.auda-fake.example.org
+Name Server: ns2.auda-fake.example.org
 DNSSEC: unsigned
 Registrant: FAKE COMPANY PTY LTD
 Registrant ID: ACN 123456789
@@ -463,7 +463,7 @@ Eligibility Type: Company`
 
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"Fake Registrar Pty Ltd"})
 	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"serverRenewProhibited https://identitydigital.au/whois-status-codes#serverRenewProhibited"})
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.example", "ns2.fake.example"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.auda-fake.example.org", "ns2.auda-fake.example.org"})
 
 	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Fake Reg Contact"})
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"FAKE COMPANY PTY LTD"})
@@ -732,7 +732,7 @@ organization:     Fake Registrar Inc.
 % ===========
 person:           n/a
 person-loc:       Domain Administrator
-organization-loc: Fake LLC
+organization-loc: Mock Privacy Shield LLC
 address:          n/a
 address-loc:      1600 Amphitheatre Parkway
 `
@@ -744,7 +744,7 @@ address-loc:      1600 Amphitheatre Parkway
 
 	// Placeholder values such as 'n/a' represent missing information and should be ignored during parsing to ensure only valid, actionable data is stored.
 	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Domain Administrator"})
-	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake LLC"})
+	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Mock Privacy Shield LLC"})
 	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"1600 Amphitheatre Parkway"})
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/modules/utils/ripestat"
@@ -11,7 +12,7 @@ import (
 )
 
 func getIPAbuseContacts(target string) (execution schema.ModuleExecution) {
-	execution = modutil.NewExecution("get_ip_abuse_contacts")
+	execution = modutil.NewExecution(constants.FuncGetIPAbuseContacts)
 
 	dbg.Printf("getIPAbuseContacts target=%q", target)
 
@@ -30,7 +31,7 @@ func getIPAbuseContacts(target string) (execution schema.ModuleExecution) {
 		execution.RawData = resp.RawJSON
 	}()
 
-	if err := ripestat.Query(ctx, target, "abuse-contact-finder", &resp, resolver.MaxRetriesIPMeta); err != nil {
+	if err := ripestatQueryFunc(ctx, target, "abuse-contact-finder", &resp, resolver.MaxRetriesIPMeta); err != nil {
 		errMsg := fmt.Errorf("ip abuse lookup failed after retries: %w", err).Error()
 		execution.Error = &errMsg
 		dbg.Printf("getIPAbuseContacts target=%q lookup_error=%v", target, err)
@@ -40,8 +41,8 @@ func getIPAbuseContacts(target string) (execution schema.ModuleExecution) {
 	for _, contact := range resp.Data.AbuseContacts {
 		if contact != "" {
 			execution.Results = append(execution.Results, schema.ModuleResult{
-				Type:       "email",
-				Category:   "node",
+				Type:       constants.TypeEmail,
+				Category:   constants.CategoryNode,
 				Value:      contact,
 				Context:    "Abuse Contact",
 				OutOfScope: true,

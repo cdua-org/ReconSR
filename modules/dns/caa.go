@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -17,7 +18,7 @@ import (
 var caaRegex = regexp.MustCompile(`(?i)^\d+\s+(issue|issuewild|iodef|issuemail)\s+"(.*)"$`)
 
 func getCAAData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_caa")
+	exec := modutil.NewExecution(constants.FuncGetCAA)
 
 	log.Printf("get_caa target=%q", target)
 
@@ -52,8 +53,8 @@ func parseCAARecord(data string) []schema.ModuleResult {
 
 	results := make([]schema.ModuleResult, 0, 2)
 	results = append(results, schema.ModuleResult{
-		Type:     "caa",
-		Category: "property",
+		Type:     constants.TypeCAA,
+		Category: constants.CategoryProperty,
 		Value:    data,
 	})
 
@@ -88,34 +89,32 @@ func buildCAAAuthorityResult(tag, val string) (schema.ModuleResult, bool) {
 		return schema.ModuleResult{}, false
 	}
 
-	res, err := validator.Validate("domain", domain)
+	res, err := validator.Validate(constants.TypeDomain, domain)
 	if err != nil {
 		log.Printf("get_caa skipping invalid authority tag=%q entity=%q err=%v", tag, domain, err)
 		return schema.ModuleResult{}, false
 	}
 
 	return schema.ModuleResult{
-		Type:       "cert_authority",
-		Category:   "node",
+		Type:       constants.TypeCertAuthority,
+		Category:   constants.CategoryNode,
 		Value:      res.Value,
-		Context:    "Authorized CA (" + tag + ")",
+		Context:    "Authorized CA" + " (" + tag + ")",
 		OutOfScope: true,
 	}, true
 }
 
 func buildCAAIodefEmailResult(val string) (schema.ModuleResult, bool) {
-	const mailtoPrefix = "mailto:"
-
-	if len(val) < len(mailtoPrefix) || !strings.EqualFold(val[:len(mailtoPrefix)], mailtoPrefix) {
+	if len(val) < len("mailto:") || !strings.EqualFold(val[:len("mailto:")], "mailto:") {
 		return schema.ModuleResult{}, false
 	}
 
-	email := strings.TrimSpace(strings.TrimPrefix(val[len(mailtoPrefix):], "//"))
+	email := strings.TrimSpace(strings.TrimPrefix(val[len("mailto:"):], "//"))
 	if email == "" {
 		return schema.ModuleResult{}, false
 	}
 
-	res, err := validator.Validate("email", email)
+	res, err := validator.Validate(constants.TypeEmail, email)
 	if err != nil {
 		log.Printf("get_caa skipping invalid iodef email entity=%q err=%v", email, err)
 		return schema.ModuleResult{}, false
@@ -123,7 +122,7 @@ func buildCAAIodefEmailResult(val string) (schema.ModuleResult, bool) {
 
 	return schema.ModuleResult{
 		Type:       res.Type,
-		Category:   "node",
+		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		Context:    "CAA Violation Report",
 		OutOfScope: true,

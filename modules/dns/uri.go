@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -26,7 +27,7 @@ func parseURI(raw string) string {
 }
 
 func getURIData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_uri")
+	exec := modutil.NewExecution(constants.FuncGetURI)
 
 	log.Printf("get_uri target=%q", target)
 
@@ -48,8 +49,8 @@ func getURIData(ctx context.Context, target string) schema.ModuleExecution {
 		parsed := parseURI(rec)
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "uri",
-			Category: "property",
+			Type:     constants.TypeURI,
+			Category: constants.CategoryProperty,
 			Value:    parsed,
 			Context:  "URI Record",
 		})
@@ -65,8 +66,8 @@ func getURIData(ctx context.Context, target string) schema.ModuleExecution {
 		}
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "url",
-			Category: "property",
+			Type:     constants.TypeURL,
+			Category: constants.CategoryProperty,
 			Value:    uri,
 			Context:  "URI Endpoint",
 		})

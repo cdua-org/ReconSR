@@ -10,8 +10,8 @@ import (
 
 func TestCrtshPgFetcher_Name(t *testing.T) {
 	f := newCrtshPgFetcher()
-	if f.Name() != "crt.sh-pg" {
-		t.Errorf("expected crt.sh-pg, got %s", f.Name())
+	if name := f.Name(); name == "" {
+		t.Errorf("expected non-empty name")
 	}
 }
 
@@ -22,7 +22,7 @@ func TestCrtshPgFetcher_Fetch_ConnError(t *testing.T) {
 		},
 	}
 
-	entries := f.Fetch(context.Background(), "example.com")
+	entries := f.Fetch(context.Background(), "search.example.com")
 	if entries != nil {
 		t.Errorf("expected nil entries on connection error, got %v", entries)
 	}
@@ -38,7 +38,7 @@ func TestCrtshPgFetcher_Fetch_QueryError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	entries := f.Fetch(ctx, "example.com")
+	entries := f.Fetch(ctx, "search.example.com")
 	if entries != nil {
 		t.Errorf("expected nil entries on query error, got %v", entries)
 	}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -43,7 +44,7 @@ func parseTLSA(raw string) string {
 }
 
 func getTLSAData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_tlsa")
+	exec := modutil.NewExecution(constants.FuncGetTLSA)
 	log.Printf("get_tlsa target=%q", target)
 
 	bruteCtx, cancel := context.WithTimeout(ctx, resolver.DNSBruteTimeout)
@@ -107,8 +108,8 @@ func getTLSAData(ctx context.Context, target string) schema.ModuleExecution {
 
 		parsed := parseTLSA(res.record)
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "tlsa",
-			Category: "property",
+			Type:     constants.TypeTLSA,
+			Category: constants.CategoryProperty,
 			Value:    parsed,
 			Context:  "TLSA Certificate Association (" + res.prefix + ")",
 		})

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
@@ -58,7 +59,7 @@ type srvResult struct {
 }
 
 func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_srv")
+	exec := modutil.NewExecution(constants.FuncGetSRV)
 	log.Printf("get_srv target=%q", target)
 
 	bruteCtx, cancel := context.WithTimeout(ctx, resolver.DNSBruteTimeout)
@@ -117,8 +118,8 @@ func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
 
 		exec.Results = append(exec.Results,
 			schema.ModuleResult{
-				Type:     "srv",
-				Category: "property",
+				Type:     constants.TypeSRV,
+				Category: constants.CategoryProperty,
 				Value:    res.record,
 			},
 		)

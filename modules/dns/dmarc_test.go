@@ -4,8 +4,43 @@ import (
 	"context"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
+
+func formatDMARCRecord(parsed map[string]string) string {
+	parts := make([]string, 0, len(parsed))
+	seen := make(map[string]struct{}, len(parsed))
+
+	for _, key := range []string{"v", "p", "sp", "aspf", "rua", "ruf"} {
+		value, ok := parsed[key]
+		if !ok {
+			continue
+		}
+
+		parts = append(parts, key+"="+value)
+		seen[key] = struct{}{}
+	}
+
+	if len(seen) == len(parsed) {
+		return strings.Join(parts, "; ")
+	}
+
+	extraParts := make([]string, 0, len(parsed)-len(seen))
+	for key, value := range parsed {
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		extraParts = append(extraParts, key+"="+value)
+	}
+
+	slices.Sort(extraParts)
+	parts = append(parts, extraParts...)
+
+	return strings.Join(parts, "; ")
+}
 
 func TestGetDMARCDataEmpty(t *testing.T) {
 	execution := getDMARCData(context.Background(), "nonexistent.domain.invalid")
@@ -37,12 +72,17 @@ func TestDMARCCapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_dmarc") {
+	if !slices.Contains(caps.Functions, constants.FuncGetDMARC) {
 		t.Error("expected get_dmarc in capabilities")
 	}
 }
 
 func TestFilterDMARC(t *testing.T) {
+	const (
+		quarantineRecord = "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"
+		noneRecord       = "v=DMARC1; p=none"
+	)
+
 	tests := []struct {
 		name     string
 		input    []string
@@ -50,13 +90,13 @@ func TestFilterDMARC(t *testing.T) {
 	}{
 		{
 			name:     "valid DMARC record",
-			input:    []string{"v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"},
-			expected: []string{"v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"},
+			input:    []string{quarantineRecord},
+			expected: []string{quarantineRecord},
 		},
 		{
 			name:     "multiple records with DMARC",
-			input:    []string{"v=DKIM1", "v=DMARC1; p=none", "v=SPF1"},
-			expected: []string{"v=DMARC1; p=none"},
+			input:    []string{"v=DKIM1", noneRecord, "v=SPF1"},
+			expected: []string{noneRecord},
 		},
 		{
 			name:     "no DMARC records",
@@ -86,38 +126,43 @@ func TestFilterDMARC(t *testing.T) {
 }
 
 func TestParseDMARC(t *testing.T) {
+	const (
+		quarantineRecord = "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"
+		noneRecord       = "v=DMARC1; p=none"
+	)
+
 	tests := []struct {
-		expected map[string]string
+		expected string
 		name     string
 		input    string
 	}{
 		{
-			expected: map[string]string{"v": "DMARC1", "p": "quarantine", "rua": "mailto:dmarc@example.com"},
+			expected: quarantineRecord,
 			name:     "full policy",
-			input:    "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com",
+			input:    quarantineRecord,
 		},
 		{
-			expected: map[string]string{"v": "DMARC1", "p": "none"},
+			expected: noneRecord,
 			name:     "minimal record",
-			input:    "v=DMARC1; p=none",
+			input:    noneRecord,
 		},
 		{
-			expected: map[string]string{"v": "DMARC1", "p": "reject", "sp": "quarantine", "aspf": "r"},
+			expected: "v=DMARC1; p=reject; sp=quarantine; aspf=r",
 			name:     "with sp and aspf",
 			input:    "v=DMARC1; p=reject; sp=quarantine; aspf=r",
 		},
 		{
-			expected: map[string]string{"v": "DMARC1", "p": ""},
+			expected: "v=DMARC1; p=",
 			name:     "empty value",
-			input:    "v=DMARC1; p=;",
+			input:    "v=DMARC1; p=",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := parseDMARC(tt.input)
-			if !reflect.DeepEqual(got, tt.expected) {
-				t.Errorf("parseDMARC() = %v, want %v", got, tt.expected)
+			got := formatDMARCRecord(parseDMARC(tt.input))
+			if got != tt.expected {
+				t.Errorf("parseDMARC() = %q, want %q", got, tt.expected)
 			}
 		})
 	}
@@ -136,18 +181,18 @@ func TestExtractEmails(t *testing.T) {
 		},
 		{
 			name:     "multiple emails comma separated",
-			input:    "mailto:email1@example.com,mailto:email2@example.com",
-			expected: []string{"email1@example.com", "email2@example.com"},
+			input:    "mailto:email1@example.com,mailto:email2@example.net",
+			expected: []string{"email1@example.com", "email2@example.net"},
 		},
 		{
 			name:     "multiple emails first with mailto",
-			input:    "mailto:email1@example.com,email2@example.com",
-			expected: []string{"email1@example.com", "email2@example.com"},
+			input:    "mailto:email1@example.com,email2@example.net",
+			expected: []string{"email1@example.com", "email2@example.net"},
 		},
 		{
 			name:     "real world multiple emails",
-			input:    "mailto:uuid@dmarc-reports.example.com,mailto:alert@example.tld",
-			expected: []string{"uuid@dmarc-reports.example.com", "alert@example.tld"},
+			input:    "mailto:uuid@dmarc-reports.example.com,mailto:alert@example.net",
+			expected: []string{"uuid@dmarc-reports.example.com", "alert@example.net"},
 		},
 		{
 			name:     "empty input",
@@ -167,15 +212,13 @@ func TestExtractEmails(t *testing.T) {
 }
 
 func TestProcessDMARCEmailsSkipsInvalidAndNormalizes(t *testing.T) {
-	results := processDMARCEmails("example.com", map[string]string{
-		"rua": "mailto:Admin@EXAMPLE.COM,mailto:bad@@example.com",
-	})
+	results := processDMARCEmails("rua.dmarc.example.com", parseDMARC("v=DMARC1; p=none; rua=mailto:Admin@EXAMPLE.COM,mailto:bad@@example.com"))
 
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
 
-	if results[0].Type != "email" {
+	if results[0].Type != constants.TypeEmail {
 		t.Fatalf("expected type email, got %q", results[0].Type)
 	}
 
@@ -193,19 +236,17 @@ func TestProcessDMARCEmailsSkipsInvalidAndNormalizes(t *testing.T) {
 }
 
 func TestProcessDMARCEmailsUsesValidatedType(t *testing.T) {
-	results := processDMARCEmails("example.com", map[string]string{
-		"ruf": "mailto:\"john\"@example.com",
-	})
+	results := processDMARCEmails("ruf.dmarc.example.com", parseDMARC(`v=DMARC1; p=none; ruf=mailto:"john"@example.com`))
 
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
 
-	if results[0].Type != "email-extra" {
+	if results[0].Type != constants.TypeEmailExtra {
 		t.Fatalf("expected type email-extra, got %q", results[0].Type)
 	}
 
-	if results[0].Value != "\"john\"@example.com" {
+	if results[0].Value != `"john"@example.com` {
 		t.Fatalf("expected validated email-extra value, got %q", results[0].Value)
 	}
 

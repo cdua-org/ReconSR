@@ -5,22 +5,6 @@ import (
 	"strings"
 )
 
-const (
-	roleRegistrar      = "registrar"
-	roleRegistrant     = "registrant"
-	roleAdministrative = "administrative"
-	roleTechnical      = "technical"
-	roleBilling        = "billing"
-	roleAbuse          = "abuse"
-	roleNameServers    = "nameservers"
-
-	fieldOrg        = "org"
-	fieldEmail      = "email"
-	fieldExpiration = "expiration"
-	fieldURL        = "url"
-	fieldStatus     = "status"
-)
-
 // Contact represents parsed contact information from WHOIS/RDAP data.
 type Contact struct {
 	Name         []string

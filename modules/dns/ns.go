@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -14,7 +15,7 @@ import (
 )
 
 func getNSData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_ns")
+	exec := modutil.NewExecution(constants.FuncGetNS)
 
 	log.Printf("get_ns starting query for target=%q", target)
 
@@ -66,7 +67,7 @@ func buildNSResult(rawNS, target string) (schema.ModuleResult, bool) {
 		return schema.ModuleResult{}, false
 	}
 
-	res, err := validator.Validate("domain", ns)
+	res, err := validator.Validate(constants.TypeDomain, ns)
 	if err != nil {
 		log.Printf("get_ns skipping invalid ns target=%q entity=%q err=%v", target, rawNS, err)
 		return schema.ModuleResult{}, false
@@ -74,8 +75,8 @@ func buildNSResult(rawNS, target string) (schema.ModuleResult, bool) {
 
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
 	return schema.ModuleResult{
-		Type:       "ns",
-		Category:   "node",
+		Type:       constants.TypeNS,
+		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		Context:    "NS Record",
 		OutOfScope: isOOS,

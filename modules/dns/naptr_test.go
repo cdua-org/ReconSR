@@ -6,10 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestParseNAPTRRecord(t *testing.T) {
+	const standardRecord = "100 10 \"s\" \"SIP+D2U\" \"!^.*$!sip:customer@example.com!\" _sip._udp.example.com."
+
 	tests := []struct {
 		name     string
 		input    string
@@ -17,8 +20,8 @@ func TestParseNAPTRRecord(t *testing.T) {
 	}{
 		{
 			"standard naptr",
-			"100 10 \"s\" \"SIP+D2U\" \"!^.*$!sip:customer@example.com!\" _sip._udp.example.com.",
-			"100 10 \"s\" \"SIP+D2U\" \"!^.*$!sip:customer@example.com!\" _sip._udp.example.com.",
+			standardRecord,
+			standardRecord,
 		},
 		{
 			"wire format passthrough",
@@ -86,12 +89,13 @@ func TestExtractNAPTRServiceAndReplacement(t *testing.T) {
 }
 
 func TestBuildNAPTRServiceResult(t *testing.T) {
-	parsed := "100 10 \"s\" \"SIP+D2U\" \"!^.*$!sip:customer@example.com!\" _sip._udp.example.com."
-	result := buildNAPTRServiceResult(parsed, "SIP+D2U")
-	if result.Type != "naptr" {
+	const parsedRecord = "100 10 \"s\" \"SIP+D2U\" \"!^.*$!sip:customer@example.com!\" _sip._udp.example.com."
+
+	result := buildNAPTRServiceResult(parsedRecord, "SIP+D2U")
+	if result.Type != constants.TypeNAPTR {
 		t.Fatalf("unexpected type: %s", result.Type)
 	}
-	if result.Category != "property" {
+	if result.Category != constants.CategoryProperty {
 		t.Fatalf("unexpected category: %s", result.Category)
 	}
 	if result.Value != "SIP+D2U" {
@@ -103,7 +107,7 @@ func TestBuildNAPTRServiceResult(t *testing.T) {
 	if result.Source == nil {
 		t.Fatal("expected source reference")
 	}
-	if result.Source.Type != "naptr" || result.Source.Value != parsed {
+	if result.Source.Type != constants.TypeNAPTR || result.Source.Value != parsedRecord {
 		t.Fatalf("unexpected source: %#v", result.Source)
 	}
 }
@@ -118,21 +122,21 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 	}{
 		{
 			name:        "normalizes regular domain replacement",
-			target:      "example.com",
-			replacement: "SIP.Example.COM.",
+			target:      "target.naptr.example.com",
+			replacement: "SIP.EXAMPLE.COM.",
 			wantValue:   "sip.example.com",
 			wantOOS:     false,
 		},
 		{
 			name:        "returns full service owner replacement after base-domain validation",
-			target:      "sip2sip.info",
-			replacement: "_sip._tcp.sip2sip.info.",
-			wantValue:   "_sip._tcp.sip2sip.info",
+			target:      "example.net",
+			replacement: "_sip._tcp.example.net.",
+			wantValue:   "_sip._tcp.example.net",
 			wantOOS:     false,
 		},
 		{
 			name:        "marks validated service owner replacement out of scope",
-			target:      "example.com",
+			target:      "target.naptr.example.com",
 			replacement: "_sips._tcp.voice.example.org.",
 			wantValue:   "_sips._tcp.voice.example.org",
 			wantOOS:     true,
@@ -141,12 +145,12 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source := &schema.EntityRef{Type: "naptr", Value: "SIP+D2U"}
+			source := &schema.EntityRef{Type: constants.TypeNAPTR, Value: "naptr-service"}
 			result := buildNAPTRTargetResult(source, tt.target, tt.replacement)
 			if result == nil {
 				t.Fatal("expected naptr target result")
 			}
-			if result.Type != "naptr_target" {
+			if result.Type != constants.TypeNAPTRTarget {
 				t.Fatalf("unexpected type: %s", result.Type)
 			}
 			if result.Value != tt.wantValue {
@@ -170,9 +174,9 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 
 func TestBuildNAPTRTargetResultInvalid(t *testing.T) {
 	tests := []string{".", "", "bad target", "\"quoted\"", "_sip.only-one-prefix.example.org.", "_sip._tcp.invalid_target"}
-	source := &schema.EntityRef{Type: "naptr", Value: "SIP+D2U"}
+	source := &schema.EntityRef{Type: constants.TypeNAPTR, Value: "naptr-service"}
 	for _, replacement := range tests {
-		if result := buildNAPTRTargetResult(source, "example.com", replacement); result != nil {
+		if result := buildNAPTRTargetResult(source, "invalid.naptr.example.com", replacement); result != nil {
 			t.Fatalf("expected nil result for replacement %q", replacement)
 		}
 	}
@@ -204,7 +208,7 @@ func TestNAPTRCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_naptr") {
+	if !slices.Contains(caps.Functions, constants.FuncGetNAPTR) {
 		t.Error("expected get_naptr in capabilities")
 	}
 }

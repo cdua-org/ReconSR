@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -24,7 +25,7 @@ type SOA struct {
 }
 
 func getSOAData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_soa")
+	exec := modutil.NewExecution(constants.FuncGetSOA)
 
 	log.Printf("get_soa query target=%q", target)
 
@@ -55,8 +56,8 @@ func getSOAData(ctx context.Context, target string) schema.ModuleExecution {
 	}
 
 	exec.Results = append(exec.Results,
-		schema.ModuleResult{Type: "soa", Category: "property", Value: soaRaw},
-		schema.ModuleResult{Type: "soa", Category: "property", Value: strconv.FormatUint(uint64(soa.Serial), 10), Context: "Serial"},
+		schema.ModuleResult{Type: constants.TypeSOA, Category: constants.CategoryProperty, Value: soaRaw},
+		schema.ModuleResult{Type: constants.TypeSOA, Category: constants.CategoryProperty, Value: strconv.FormatUint(uint64(soa.Serial), 10), Context: "Serial"},
 	)
 
 	if result := buildSOAPrimaryNSResult(soa.NS, target); result != nil {
@@ -107,7 +108,7 @@ func formatMbox(mbox string) string {
 
 func buildSOAPrimaryNSResult(rawNS, target string) *schema.ModuleResult {
 	primaryNS := strings.TrimSuffix(rawNS, ".")
-	res, err := validator.Validate("domain", primaryNS)
+	res, err := validator.Validate(constants.TypeDomain, primaryNS)
 	if err != nil {
 		log.Printf("get_soa skipping invalid primary ns target=%q entity=%q err=%v", target, primaryNS, err)
 		return nil
@@ -117,8 +118,8 @@ func buildSOAPrimaryNSResult(rawNS, target string) *schema.ModuleResult {
 	log.Printf("get_soa target=%q entity=%q oos=%v", target, res.Value, isOOS)
 
 	return &schema.ModuleResult{
-		Type:       "ns",
-		Category:   "node",
+		Type:       constants.TypeNS,
+		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		Context:    "Primary NS",
 		OutOfScope: isOOS,
@@ -127,7 +128,7 @@ func buildSOAPrimaryNSResult(rawNS, target string) *schema.ModuleResult {
 
 func buildSOAResponsibleEmailResult(rawMbox, target string) *schema.ModuleResult {
 	responsibleEmail := formatMbox(rawMbox)
-	res, err := validator.Validate("email", responsibleEmail)
+	res, err := validator.Validate(constants.TypeEmail, responsibleEmail)
 	if err != nil {
 		log.Printf("get_soa skipping invalid responsible email target=%q email=%q err=%v", target, responsibleEmail, err)
 		return nil
@@ -138,7 +139,7 @@ func buildSOAResponsibleEmailResult(rawMbox, target string) *schema.ModuleResult
 
 	return &schema.ModuleResult{
 		Type:       res.Type,
-		Category:   "node",
+		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		Context:    "Responsible Email",
 		OutOfScope: isOOS,

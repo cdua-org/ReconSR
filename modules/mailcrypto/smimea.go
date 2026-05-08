@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
@@ -80,7 +81,7 @@ func mapSMIMEAContext(usageStr, selectorStr, matchingTypeStr string) string {
 }
 
 func getSMIMEAData(localParts []string, domain string) schema.ModuleExecution {
-	execution := modutil.NewExecution("get_smimea")
+	execution := modutil.NewExecution(constants.FuncGetSmimea)
 
 	if len(localParts) == 1 {
 		dbg.Printf("get_smimea email=%q", localParts[0]+"@"+domain)
@@ -94,9 +95,9 @@ func getSMIMEAData(localParts []string, domain string) schema.ModuleExecution {
 
 	for _, user := range localParts {
 		reqCtx, cancel := context.WithTimeout(context.Background(), resolver.DNSBruteTimeout)
-		queryDomain := GenerateMailHashDomain(user, domain, "._smimecert.")
+		queryDomain := GenerateMailHashDomain(user, domain, hashPrefixSMIMEA)
 		dbg.Printf("get_smimea user=%q query=%q", user, queryDomain)
-		records, raw, err := resolver.ResolveRecord(reqCtx, queryDomain, 53, nil)
+		records, raw, err := resolveRecord(reqCtx, queryDomain, 53, nil)
 		cancel()
 		if err != nil {
 			dbg.Printf("get_smimea user=%q domain=%q error=%v", user, domain, err)
@@ -115,20 +116,20 @@ func getSMIMEAData(localParts []string, domain string) schema.ModuleExecution {
 			parts := strings.Fields(parsed)
 			if len(parts) >= 4 {
 				ctxParams := mapSMIMEAContext(parts[0], parts[1], parts[2])
-				ctxStr := fmt.Sprintf("SMIMEA (%s@%s) - %s", user, domain, ctxParams)
+				ctxStr := fmt.Sprintf("%s (%s@%s) - %s", ctxSMIMEA, user, domain, ctxParams)
 
 				execution.Results = append(execution.Results, schema.ModuleResult{
-					Type:     "smimea",
-					Category: "property",
+					Type:     constants.TypeSMIMEA,
+					Category: constants.CategoryProperty,
 					Value:    parts[3],
 					Context:  ctxStr,
 				})
 			} else {
 				execution.Results = append(execution.Results, schema.ModuleResult{
-					Type:     "smimea",
-					Category: "property",
+					Type:     constants.TypeSMIMEA,
+					Category: constants.CategoryProperty,
 					Value:    parsed,
-					Context:  fmt.Sprintf("SMIMEA (%s@%s)", user, domain),
+					Context:  fmt.Sprintf("%s (%s@%s)", ctxSMIMEA, user, domain),
 				})
 			}
 		}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
@@ -32,7 +33,7 @@ func parseOPENPGPKEY(raw string) string {
 }
 
 func getOPENPGPKEYData(localParts []string, domain string) schema.ModuleExecution {
-	execution := modutil.NewExecution("get_openpgpkey")
+	execution := modutil.NewExecution(constants.FuncGetOpenpgpkey)
 
 	if len(localParts) == 1 {
 		dbg.Printf("get_openpgpkey email=%q", localParts[0]+"@"+domain)
@@ -46,9 +47,9 @@ func getOPENPGPKEYData(localParts []string, domain string) schema.ModuleExecutio
 
 	for _, user := range localParts {
 		reqCtx, cancel := context.WithTimeout(context.Background(), resolver.DNSBruteTimeout)
-		queryDomain := GenerateMailHashDomain(user, domain, "._openpgpkey.")
+		queryDomain := GenerateMailHashDomain(user, domain, hashPrefixOpenPGPKey)
 		dbg.Printf("get_openpgpkey user=%q query=%q", user, queryDomain)
-		records, raw, err := resolver.ResolveRecord(reqCtx, queryDomain, 61, nil)
+		records, raw, err := resolveRecord(reqCtx, queryDomain, 61, nil)
 		cancel()
 		if err != nil {
 			dbg.Printf("get_openpgpkey user=%q domain=%q error=%v", user, domain, err)
@@ -63,10 +64,10 @@ func getOPENPGPKEYData(localParts []string, domain string) schema.ModuleExecutio
 
 		for _, rec := range records {
 			execution.Results = append(execution.Results, schema.ModuleResult{
-				Type:     "openpgpkey",
-				Category: "property",
+				Type:     constants.TypeOpenPGPKey,
+				Category: constants.CategoryProperty,
 				Value:    parseOPENPGPKEY(rec),
-				Context:  fmt.Sprintf("OPENPGPKEY (%s@%s)", user, domain),
+				Context:  fmt.Sprintf("%s (%s@%s)", ctxOpenPGPKey, user, domain),
 			})
 		}
 	}

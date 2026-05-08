@@ -1,8 +1,19 @@
 package orgdomain
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestIsOutOfScope(t *testing.T) {
+	const (
+		baseDomain      = "example.com"
+		baseSubdomain   = "ns1.example.com"
+		altSubdomain    = "ns1.example.org"
+		scopedSubdomain = "sub.example.com"
+		singleLabel     = "com"
+	)
+
 	tests := []struct {
 		name   string
 		entity string
@@ -11,50 +22,50 @@ func TestIsOutOfScope(t *testing.T) {
 	}{
 		{
 			name:   "same org",
-			entity: "ns1.example.com",
-			target: "example.com",
+			entity: baseSubdomain,
+			target: baseDomain,
 			want:   false,
 		},
 		{
 			name:   "different org",
-			entity: "ns1.cloudflare.com",
-			target: "example.com",
+			entity: altSubdomain,
+			target: baseDomain,
 			want:   true,
 		},
 		{
 			name:   "exact match",
-			entity: "example.com",
-			target: "example.com",
+			entity: baseDomain,
+			target: baseDomain,
 			want:   false,
 		},
 		{
 			name:   "trailing dot stripped",
-			entity: "ns1.example.com.",
-			target: "example.com.",
+			entity: baseSubdomain + ".",
+			target: baseDomain + ".",
 			want:   false,
 		},
 		{
 			name:   "case insensitive",
-			entity: "NS1.Example.COM",
-			target: "example.com",
+			entity: strings.ToUpper(baseSubdomain),
+			target: baseDomain,
 			want:   false,
 		},
 		{
 			name:   "empty entity",
 			entity: "",
-			target: "example.com",
+			target: baseDomain,
 			want:   false,
 		},
 		{
 			name:   "empty target",
-			entity: "ns1.example.com",
+			entity: baseSubdomain,
 			target: "",
 			want:   false,
 		},
 		{
 			name:   "subdomain of target when org domain fails",
-			entity: "sub.test",
-			target: "test",
+			entity: scopedSubdomain,
+			target: singleLabel,
 			want:   false,
 		},
 	}
@@ -70,6 +81,13 @@ func TestIsOutOfScope(t *testing.T) {
 }
 
 func TestIsEmailOutOfScope(t *testing.T) {
+	const (
+		baseDomain         = "example.com"
+		adminEmail         = "ops@example.com"
+		adminAltEmail      = "ops@example.org"
+		mailSubdomainEmail = "admin@mail.example.com"
+	)
+
 	tests := []struct {
 		name   string
 		email  string
@@ -78,38 +96,38 @@ func TestIsEmailOutOfScope(t *testing.T) {
 	}{
 		{
 			name:   "same org email",
-			email:  "admin@example.com",
-			target: "example.com",
+			email:  adminEmail,
+			target: baseDomain,
 			want:   false,
 		},
 		{
 			name:   "different org email",
-			email:  "admin@external.com",
-			target: "example.com",
+			email:  adminAltEmail,
+			target: baseDomain,
 			want:   true,
 		},
 		{
 			name:   "subdomain email",
-			email:  "admin@mail.example.com",
-			target: "example.com",
+			email:  mailSubdomainEmail,
+			target: baseDomain,
 			want:   false,
 		},
 		{
 			name:   "no at sign",
 			email:  "noemail",
-			target: "example.com",
+			target: baseDomain,
 			want:   false,
 		},
 		{
 			name:   "empty email",
 			email:  "",
-			target: "example.com",
+			target: baseDomain,
 			want:   false,
 		},
 		{
 			name:   "at sign but empty domain",
 			email:  "user@",
-			target: "example.com",
+			target: baseDomain,
 			want:   false,
 		},
 	}

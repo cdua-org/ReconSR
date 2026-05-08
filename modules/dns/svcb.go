@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -119,7 +120,7 @@ func decodeSVCBParam(key uint16, val []byte) string {
 }
 
 func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_svcb")
+	exec := modutil.NewExecution(constants.FuncGetSVCB)
 	log.Printf("get_svcb target=%q", target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
@@ -165,8 +166,8 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 
 			if !decoded {
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     "svcb",
-					Category: "property",
+					Type:     constants.TypeSVCB,
+					Category: constants.CategoryProperty,
 					Value:    rec,
 					Context:  res.qtype + " Record",
 				})
@@ -180,8 +181,8 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 			}
 
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:     "svcb",
-				Category: "property",
+				Type:     constants.TypeSVCB,
+				Category: constants.CategoryProperty,
 				Value:    sb.String(),
 				Context:  res.qtype + " Record",
 			})
@@ -189,8 +190,8 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 			if v, ok := params["ipv4hint"]; ok {
 				for ip := range strings.SplitSeq(v, ",") {
 					exec.Results = append(exec.Results, schema.ModuleResult{
-						Type:     "ipv4",
-						Category: "node",
+						Type:     constants.TypeIPv4,
+						Category: constants.CategoryNode,
 						Value:    ip,
 						Context:  res.qtype + " IPv4 Hint",
 					})
@@ -199,8 +200,8 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 			if v, ok := params["ipv6hint"]; ok {
 				for ip := range strings.SplitSeq(v, ",") {
 					exec.Results = append(exec.Results, schema.ModuleResult{
-						Type:     "ipv6",
-						Category: "node",
+						Type:     constants.TypeIPv6,
+						Category: constants.CategoryNode,
 						Value:    ip,
 						Context:  res.qtype + " IPv6 Hint",
 					})
@@ -209,8 +210,8 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 
 			if v, ok := params["alpn"]; ok {
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     "svcb",
-					Category: "property",
+					Type:     constants.TypeSVCB,
+					Category: constants.CategoryProperty,
 					Value:    v,
 					Context:  res.qtype + " ALPN Protocols",
 				})
@@ -218,8 +219,8 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 
 			if v, ok := params["ech"]; ok {
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     "svcb",
-					Category: "property",
+					Type:     constants.TypeSVCB,
+					Category: constants.CategoryProperty,
 					Value:    v,
 					Context:  res.qtype + " ECH Config",
 				})

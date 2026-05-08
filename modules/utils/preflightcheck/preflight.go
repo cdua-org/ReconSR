@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -87,7 +88,7 @@ func PreFlightCheck(ctx context.Context, target string) error {
 }
 
 func doPreFlightCheck(ctx context.Context, target string) error {
-	if _, err := validator.Validate("domain", target); err != nil {
+	if _, err := validator.Validate(constants.TypeDomain, target); err != nil {
 		return ErrZoneBroken
 	}
 

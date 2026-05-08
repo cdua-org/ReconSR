@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -12,16 +13,16 @@ import (
 )
 
 var sshfpAlgorithm = map[byte]string{
-	1: "RSA",
-	2: "DSA",
-	3: "ECDSA",
-	4: "Ed25519",
-	6: "Ed448",
+	1: constants.AlgRSA,
+	2: constants.AlgDSA,
+	3: constants.AlgECDSA,
+	4: constants.AlgEd25519SSH,
+	6: constants.AlgEd448SSH,
 }
 
 var sshfpFPType = map[byte]string{
-	1: "SHA-1",
-	2: "SHA-256",
+	1: constants.DigestSHA1,
+	2: constants.DigestSHA256,
 }
 
 func parseSSHFP(raw string) string {
@@ -48,7 +49,7 @@ func parseSSHFP(raw string) string {
 }
 
 func getSSHFPData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_sshfp")
+	exec := modutil.NewExecution(constants.FuncGetSSHFP)
 	log.Printf("get_sshfp target=%q", target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
@@ -67,8 +68,8 @@ func getSSHFPData(ctx context.Context, target string) schema.ModuleExecution {
 		parsed := parseSSHFP(rec)
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "sshfp",
-			Category: "property",
+			Type:     constants.TypeSSHFP,
+			Category: constants.CategoryProperty,
 			Value:    parsed,
 		})
 	}

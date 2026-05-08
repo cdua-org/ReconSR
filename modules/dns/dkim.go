@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"context"
@@ -21,7 +22,7 @@ var commonSelectors = []string{
 }
 
 func getDKIMData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_dkim")
+	exec := modutil.NewExecution(constants.FuncGetDKIM)
 	log.Printf("get_dkim target=%q", target)
 
 	bruteCtx, cancel := context.WithTimeout(ctx, resolver.DNSBruteTimeout)
@@ -59,7 +60,7 @@ func getDKIMData(ctx context.Context, target string) schema.ModuleExecution {
 			}
 			defer func() { <-sem }()
 
-			domain := fmt.Sprintf("%s._domainkey.%s", sel, target)
+			domain := fmt.Sprintf("%s.%s.%s", sel, domainKeyLabel, target)
 
 			plainFallback := func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {
 				txts, err := r.LookupTXT(fallbackCtx, domain)
@@ -95,14 +96,16 @@ func getDKIMData(ctx context.Context, target string) schema.ModuleExecution {
 			rawDataBuilder.WriteString("\n")
 		}
 		rawDataBuilder.WriteString(res.selector)
-		rawDataBuilder.WriteString("._domainkey.")
+		rawDataBuilder.WriteString(".")
+		rawDataBuilder.WriteString(domainKeyLabel)
+		rawDataBuilder.WriteString(".")
 		rawDataBuilder.WriteString(target)
 		rawDataBuilder.WriteString(": ")
 		rawDataBuilder.WriteString(res.record)
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "dkim",
-			Category: "property",
+			Type:     constants.TypeDKIM,
+			Category: constants.CategoryProperty,
 			Value:    res.record,
 			Context:  "DKIM Selector: " + res.selector,
 		})

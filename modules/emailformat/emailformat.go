@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
@@ -19,9 +20,9 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-var dbg = debuglog.New("emailformat")
-
 const moduleName = "emailformat"
+
+var dbg = debuglog.New(moduleName)
 
 var baseURL = "https://www.email-format.com"
 
@@ -29,7 +30,7 @@ var cfEmailRegex = regexp.MustCompile(`data-cfemail="([0-9a-fA-F]+)"`)
 
 type emailformatModule struct{}
 
-// New returns a new instance of the emailformat module.
+// New creates a new module instance.
 func New() schema.Module {
 	return &emailformatModule{}
 }
@@ -41,10 +42,10 @@ func (m *emailformatModule) Name() string {
 func (m *emailformatModule) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
 		CustomFunctions: map[string]schema.FunctionCapabilities{
-			"get_emails": {
+			constants.FuncGetEmails: {
 				Limit:      1,
 				DelayMs:    3000,
-				InputTypes: []string{"domain", "subdomain"},
+				InputTypes: []string{constants.TypeDomain, constants.TypeSubdomain},
 			},
 		},
 	}, nil
@@ -54,7 +55,7 @@ func (m *emailformatModule) Exec(data schema.ModuleInput) (schema.ModuleOutput, 
 	var execs []schema.ModuleExecution
 
 	for _, fn := range data.Functions {
-		if fn == "get_emails" {
+		if fn == constants.FuncGetEmails {
 			execs = append(execs, getEmails(data.Target))
 		}
 	}
@@ -63,7 +64,7 @@ func (m *emailformatModule) Exec(data schema.ModuleInput) (schema.ModuleOutput, 
 }
 
 func getEmails(target schema.Entity) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_emails")
+	exec := modutil.NewExecution(constants.FuncGetEmails)
 
 	reqURL := fmt.Sprintf("%s/d/%s/", baseURL, url.PathEscape(target.Value))
 
@@ -177,7 +178,7 @@ func parseEmails(exec *schema.ModuleExecution, rawBody []byte, target string) {
 			continue
 		}
 
-		validRes, err := validator.Validate("email", email)
+		validRes, err := validator.Validate(constants.TypeEmail, email)
 		if err != nil {
 			continue
 		}
@@ -190,7 +191,7 @@ func parseEmails(exec *schema.ModuleExecution, rawBody []byte, target string) {
 			uniqueEmails[validRes.Value] = true
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     validRes.Type,
-				Category: "node",
+				Category: constants.CategoryNode,
 				Value:    validRes.Value,
 				Context:  "email-format.com",
 			})

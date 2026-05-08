@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseSSHFP(t *testing.T) {
@@ -24,7 +26,7 @@ func TestParseSSHFP(t *testing.T) {
 			"Ed25519 SHA-256 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 		},
 		{
-			"passthrough non-wire",
+			"passthrough sshfp text",
 			"1 2 abcdef0123456789",
 			"1 2 abcdef0123456789",
 		},
@@ -66,7 +68,7 @@ func TestSSHFPCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_sshfp") {
+	if !slices.Contains(caps.Functions, constants.FuncGetSSHFP) {
 		t.Error("expected get_sshfp in capabilities")
 	}
 }

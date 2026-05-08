@@ -7,7 +7,8 @@ import (
 )
 
 func TestGetKey(t *testing.T) {
-	const shodan = "Shodan"
+	const shodanService = "Shodan"
+
 	tests := []struct {
 		name         string
 		setupMock    func(mockPath string)
@@ -19,7 +20,7 @@ func TestGetKey(t *testing.T) {
 			name: "initial creation writes default and returns empty Shodan",
 			setupMock: func(_ string) {
 			},
-			serviceName:  shodan,
+			serviceName:  shodanService,
 			expectedKey:  "",
 			expectedFile: true,
 		},
@@ -40,7 +41,7 @@ func TestGetKey(t *testing.T) {
 					t.Fatalf("failed to setup mock file: %v", err)
 				}
 			},
-			serviceName:  shodan,
+			serviceName:  shodanService,
 			expectedKey:  "test_key_123",
 			expectedFile: true,
 		},
@@ -67,7 +68,7 @@ func TestGetKey(t *testing.T) {
 				}
 				t.Setenv("RECONSR_SHODAN", "env_key")
 			},
-			serviceName:  shodan,
+			serviceName:  shodanService,
 			expectedKey:  "env_key",
 			expectedFile: true,
 		},
@@ -76,7 +77,7 @@ func TestGetKey(t *testing.T) {
 			setupMock: func(_ string) {
 				t.Setenv("RECONSR_SHODAN", "env_key_only")
 			},
-			serviceName:  shodan,
+			serviceName:  shodanService,
 			expectedKey:  "env_key_only",
 			expectedFile: true,
 		},

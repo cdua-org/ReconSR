@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"slices"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseSOA(t *testing.T) {
@@ -61,9 +63,9 @@ func TestFormatMbox(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"hostmaster.example.com.", "hostmaster@example.com"},
-		{"admin.example.com.", "admin@example.com"},
-		{"dns.cloudflare.com.", "dns@cloudflare.com"},
+		{"opsmail.example.com.", "opsmail@example.com"},
+		{"adminbox.example.com.", "adminbox@example.com"},
+		{"dnsbox.example.net.", "dnsbox@example.net"},
 		{"no.dot.email", "no@dot.email"},
 		{"single.word", "single@word"},
 		{"nodotsatall", "nodotsatall"},
@@ -102,12 +104,12 @@ func TestParseUint(t *testing.T) {
 }
 
 func TestBuildSOAPrimaryNSResultSkipsInvalidAndNormalizes(t *testing.T) {
-	result := buildSOAPrimaryNSResult("NS1.EXAMPLE.COM.", "example.com")
+	result := buildSOAPrimaryNSResult("NS1.EXAMPLE.COM.", "primary.soa.example.com")
 	if result == nil {
 		t.Fatal("expected primary NS result")
 	}
 
-	if result.Type != "ns" {
+	if result.Type != constants.TypeNS {
 		t.Fatalf("expected type ns, got %q", result.Type)
 	}
 
@@ -123,22 +125,22 @@ func TestBuildSOAPrimaryNSResultSkipsInvalidAndNormalizes(t *testing.T) {
 		t.Fatal("expected in-scope NS")
 	}
 
-	if buildSOAPrimaryNSResult(".bad.example.com.", "example.com") != nil {
+	if buildSOAPrimaryNSResult(".bad.example.com.", "primary.soa.example.com") != nil {
 		t.Fatal("expected invalid primary NS to be skipped")
 	}
 }
 
 func TestBuildSOAResponsibleEmailResultSkipsInvalidAndUsesValidatedType(t *testing.T) {
-	result := buildSOAResponsibleEmailResult("\"john\".example.com.", "example.com")
+	result := buildSOAResponsibleEmailResult(`"john".example.com.`, "responsible.soa.example.com")
 	if result == nil {
 		t.Fatal("expected responsible email result")
 	}
 
-	if result.Type != "email-extra" {
+	if result.Type != constants.TypeEmailExtra {
 		t.Fatalf("expected type email-extra, got %q", result.Type)
 	}
 
-	if result.Value != "\"john\"@example.com" {
+	if result.Value != `"john"@example.com` {
 		t.Fatalf("expected validated responsible email value, got %q", result.Value)
 	}
 
@@ -150,7 +152,7 @@ func TestBuildSOAResponsibleEmailResultSkipsInvalidAndUsesValidatedType(t *testi
 		t.Fatal("expected in-scope responsible email")
 	}
 
-	if buildSOAResponsibleEmailResult("bad..example.com.", "example.com") != nil {
+	if buildSOAResponsibleEmailResult("bad..example.com.", "responsible.soa.example.com") != nil {
 		t.Fatal("expected invalid responsible email to be skipped")
 	}
 }
@@ -177,7 +179,7 @@ func TestSOACapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_soa") {
+	if !slices.Contains(caps.Functions, constants.FuncGetSOA) {
 		t.Error("expected get_soa in capabilities")
 	}
 }

@@ -9,22 +9,17 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
 const (
-	timeFormatRFC3339       = "2006-01-02T15:04:05Z07:00"
-	timeFormatDateTime      = "2006-01-02T15:04:05"
-	timeFormatDate          = "2006-01-02 15:04:05"
-	resultTypeSubdomain     = "subdomain"
-	resultTypeWildcard      = "wildcard_subdomain"
-	resultTypeEmail         = "email"
-	resultTypeStatus        = "status"
-	resultTypeCertNotAfter  = "cert_not_after"
-	resultTypeEmailNotAfter = "domain_cert_not_after"
-	identityKindTarget      = "target"
+	timeFormatRFC3339  = "2006-01-02T15:04:05Z07:00"
+	timeFormatDateTime = "2006-01-02T15:04:05"
+	timeFormatDate     = "2006-01-02 15:04:05"
+	identityKindTarget = "target"
 )
 
 type module struct{}
@@ -40,10 +35,10 @@ func (m *module) Name() string {
 
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
-		Functions:  []string{"get_domains"},
-		InputTypes: []string{"domain"},
+		Functions:  []string{constants.FuncGetDomains},
+		InputTypes: []string{constants.TypeDomain},
 		CustomFunctions: map[string]schema.FunctionCapabilities{
-			"get_domains": {
+			constants.FuncGetDomains: {
 				Limit:   3,
 				DelayMs: 2000,
 			},
@@ -58,7 +53,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		var execution schema.ModuleExecution
 
 		switch f {
-		case "get_domains":
+		case constants.FuncGetDomains:
 			execution = getDomains(data.Target.Value)
 		default:
 			errMsg := "unsupported function: " + f
@@ -77,7 +72,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 }
 
 func getDomains(target string) schema.ModuleExecution {
-	execution := modutil.NewExecution("get_domains")
+	execution := modutil.NewExecution(constants.FuncGetDomains)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -238,7 +233,7 @@ func classifyIdentities(identities []certificateIdentitySource, target string) c
 				result.targetMaxExpiry = identity.NotAfter
 				result.targetSource = identity.source
 			}
-		case resultTypeSubdomain:
+		case constants.TypeSubdomain:
 			subdomainCount++
 			if identity.NotAfter.After(result.subdomains[matched.value].notAfter) {
 				result.subdomains[matched.value] = classifiedIdentity{
@@ -246,7 +241,7 @@ func classifyIdentities(identities []certificateIdentitySource, target string) c
 					source:   identity.source,
 				}
 			}
-		case resultTypeEmail:
+		case constants.TypeEmail:
 			emailCount++
 			if identity.NotAfter.After(result.emails[matched.value].notAfter) {
 				result.emails[matched.value] = classifiedIdentity{
@@ -270,8 +265,8 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 
 	if !classified.targetMaxExpiry.IsZero() && classified.targetMaxExpiry.After(now) {
 		results = append(results, schema.ModuleResult{
-			Type:     resultTypeCertNotAfter,
-			Category: "property",
+			Type:     constants.TypeCertNotAfter,
+			Category: constants.CategoryProperty,
 			Value:    classified.targetMaxExpiry.Format(time.RFC3339),
 			Context:  classified.targetSource,
 		})
@@ -285,14 +280,14 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 			continue
 		}
 
-		resultType := resultTypeSubdomain
+		resultType := constants.TypeSubdomain
 		if strings.HasPrefix(subdomain, "*.") {
-			resultType = resultTypeWildcard
+			resultType = constants.TypeWildcardSubdomain
 		}
 
 		results = append(results, schema.ModuleResult{
 			Type:     resultType,
-			Category: "node",
+			Category: constants.CategoryNode,
 			Value:    subdomain,
 			Context:  identity.source,
 			Applied:  true,
@@ -304,8 +299,8 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 
 		dateVal := identity.notAfter.Format(time.RFC3339)
 		results = append(results, schema.ModuleResult{
-			Type:     resultTypeCertNotAfter,
-			Category: "property",
+			Type:     constants.TypeCertNotAfter,
+			Category: constants.CategoryProperty,
 			Value:    dateVal,
 			Source: &schema.EntityRef{
 				Type:  resultType,
@@ -315,11 +310,11 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 
 		if isExpired {
 			results = append(results, schema.ModuleResult{
-				Type:     resultTypeStatus,
-				Category: "property",
-				Value:    "expired",
+				Type:     constants.TypeStatus,
+				Category: constants.CategoryProperty,
+				Value:    constants.StatusExpired,
 				Source: &schema.EntityRef{
-					Type:  resultTypeCertNotAfter,
+					Type:  constants.TypeCertNotAfter,
 					Value: dateVal,
 				},
 			})
@@ -330,8 +325,8 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 		isExpired := !identity.notAfter.IsZero() && !identity.notAfter.After(now)
 
 		results = append(results, schema.ModuleResult{
-			Type:     resultTypeEmail,
-			Category: "node",
+			Type:     constants.TypeEmail,
+			Category: constants.CategoryNode,
 			Value:    email,
 			Context:  identity.source,
 			Applied:  true,
@@ -343,22 +338,22 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 
 		dateVal := identity.notAfter.Format(time.RFC3339)
 		results = append(results, schema.ModuleResult{
-			Type:     resultTypeEmailNotAfter,
-			Category: "property",
+			Type:     constants.TypeDomainCertNotAfter,
+			Category: constants.CategoryProperty,
 			Value:    dateVal,
 			Source: &schema.EntityRef{
-				Type:  resultTypeEmail,
+				Type:  constants.TypeEmail,
 				Value: email,
 			},
 		})
 
 		if isExpired {
 			results = append(results, schema.ModuleResult{
-				Type:     resultTypeStatus,
-				Category: "property",
-				Value:    "expired",
+				Type:     constants.TypeStatus,
+				Category: constants.CategoryProperty,
+				Value:    constants.StatusExpired,
 				Source: &schema.EntityRef{
-					Type:  resultTypeEmailNotAfter,
+					Type:  constants.TypeDomainCertNotAfter,
 					Value: dateVal,
 				},
 			})
@@ -368,8 +363,8 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 	if len(expiredDomains) > 0 {
 		sort.Strings(expiredDomains)
 		results = append(results, schema.ModuleResult{
-			Type:     "cert_expired_subdomains",
-			Category: "property",
+			Type:     constants.TypeCertExpiredSubdomains,
+			Category: constants.CategoryProperty,
 			Value:    strings.Join(expiredDomains, ", "),
 			Context:  "Expired Certificates",
 		})
@@ -412,8 +407,8 @@ func classifyMatchedIdentity(value, target string) (matchedIdentity, bool) {
 }
 
 func classifyEmailIdentity(value, target string) (matchedIdentity, bool) {
-	validated, err := validator.Validate(resultTypeEmail, strings.TrimSpace(value))
-	if err != nil || validated.Type != resultTypeEmail {
+	validated, err := validator.Validate(constants.TypeEmail, strings.TrimSpace(value))
+	if err != nil || validated.Type != constants.TypeEmail {
 		return matchedIdentity{}, false
 	}
 
@@ -422,7 +417,7 @@ func classifyEmailIdentity(value, target string) (matchedIdentity, bool) {
 		return matchedIdentity{}, false
 	}
 
-	return matchedIdentity{kind: resultTypeEmail, value: validated.Value}, true
+	return matchedIdentity{kind: constants.TypeEmail, value: validated.Value}, true
 }
 
 func classifyDomainIdentity(value, target string) (matchedIdentity, bool) {
@@ -430,7 +425,7 @@ func classifyDomainIdentity(value, target string) (matchedIdentity, bool) {
 	isWildcard := strings.HasPrefix(trimmedValue, "*.")
 	validatedValue := strings.TrimPrefix(trimmedValue, "*.")
 
-	validated, err := validator.Validate("domain", validatedValue)
+	validated, err := validator.Validate(constants.TypeDomain, validatedValue)
 	if err != nil || !matchesTargetDomain(validated.Value, target) {
 		return matchedIdentity{}, false
 	}
@@ -444,7 +439,7 @@ func classifyDomainIdentity(value, target string) (matchedIdentity, bool) {
 		resultValue = "*." + validated.Value
 	}
 
-	return matchedIdentity{kind: resultTypeSubdomain, value: resultValue}, true
+	return matchedIdentity{kind: constants.TypeSubdomain, value: resultValue}, true
 }
 
 func parseCertTimestamp(ts string) time.Time {

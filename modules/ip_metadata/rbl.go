@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
 func checkRBLZone(target, query string, rawBuffer *strings.Builder) (isHit, isBlocked bool, err error) {
-	ips, lookupErr := performAQuery(target, query, "get_rbl")
+	ips, lookupErr := aQueryFunc(target, query, constants.FuncGetRBL)
 	if lookupErr != nil {
 		return false, false, lookupErr
 	}
@@ -32,7 +33,7 @@ func checkRBLZone(target, query string, rawBuffer *strings.Builder) (isHit, isBl
 }
 
 func getRBLData(target string) (execution schema.ModuleExecution) {
-	execution = modutil.NewExecution("get_rbl")
+	execution = modutil.NewExecution(constants.FuncGetRBL)
 
 	dbg.Printf("getRBLData target=%q", target)
 
@@ -92,9 +93,9 @@ func getRBLData(target string) (execution schema.ModuleExecution) {
 
 	if isListed {
 		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:     typeTag,
-			Category: "property",
-			Value:    "spam_botnet",
+			Type:     constants.TypeTag,
+			Category: constants.CategoryProperty,
+			Value:    constants.TagSpamBotnet,
 			Context:  detectedContext,
 		})
 	}

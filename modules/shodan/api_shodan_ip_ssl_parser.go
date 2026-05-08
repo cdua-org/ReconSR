@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -55,7 +56,7 @@ func parseSubjectAltName(exec *schema.ModuleExecution, value string, tags []stri
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     resultType,
-			Category: resultCategoryNode,
+			Category: constants.CategoryNode,
 			Value:    resultValue,
 			Tags:     tags,
 		})
@@ -72,16 +73,16 @@ func classifySubjectAltName(match string) (resultType, resultValue string, ok bo
 		return "", "", false
 	}
 
-	validated, err := validator.Validate(entityTypeDomain, candidate)
+	validated, err := validator.Validate(constants.TypeDomain, candidate)
 	if err != nil {
 		return "", "", false
 	}
 
 	if !isWildcard {
-		return resultTypeSANDomain, validated.Value, true
+		return constants.TypeSANDomain, validated.Value, true
 	}
 
-	return resultTypeWildcardSANDomain, "*." + validated.Value, true
+	return constants.TypeWildcardSANDomain, "*." + validated.Value, true
 }
 
 func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBanner, tags []string, sources []schema.EntityRef, target string) {
@@ -95,9 +96,9 @@ func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBa
 
 	for i := range sources {
 		source := &sources[i]
-		appendSubjectAltNameProperty(exec, resultTypeCertIssuer, issuerValue, tags, source, "Cert Issuer for "+target)
-		appendSubjectAltNameProperty(exec, resultTypeCertNotAfter, notAfterValue, tags, source, "Cert Expiration for "+target)
-		appendSubjectAltNameProperty(exec, resultTypeTLSVersions, tlsVersionsValue, tags, source, "TLS Versions for "+target)
+		appendSubjectAltNameProperty(exec, constants.TypeCertIssuer, issuerValue, tags, source, "Cert Issuer for "+target)
+		appendSubjectAltNameProperty(exec, constants.TypeCertNotAfter, notAfterValue, tags, source, "Cert Expiration for "+target)
+		appendSubjectAltNameProperty(exec, constants.TypeTLSVersions, tlsVersionsValue, tags, source, "TLS Versions for "+target)
 	}
 }
 
@@ -108,7 +109,7 @@ func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, valu
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
-		Category: resultCategoryProperty,
+		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  context,
 		Tags:     tags,
@@ -122,9 +123,9 @@ func appendBannerSSLProperties(exec *schema.ModuleExecution, ssl *shodanSSLBanne
 	}
 
 	for _, fingerprint := range ssl.CertFingerprintValues {
-		appendBannerSSLProperty(exec, resultTypeCertFingerprint, fingerprint, tags, source, "Cert Fingerprint for "+target)
+		appendBannerSSLProperty(exec, constants.TypeCertFingerprint, fingerprint, tags, source, "Cert Fingerprint for "+target)
 	}
-	appendBannerSSLProperty(exec, resultTypeJARM, ssl.JARMValue, tags, source, "JARM for "+target)
+	appendBannerSSLProperty(exec, constants.TypeJARM, ssl.JARMValue, tags, source, "JARM for "+target)
 }
 
 func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value string, tags []string, source *schema.EntityRef, context string) {
@@ -134,7 +135,7 @@ func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value str
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
-		Category: resultCategoryProperty,
+		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  context,
 		Tags:     tags,

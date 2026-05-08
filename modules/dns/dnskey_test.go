@@ -4,6 +4,8 @@ import (
 	"context"
 	"slices"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseDNSKEY(t *testing.T) {
@@ -20,7 +22,7 @@ func TestParseDNSKEY(t *testing.T) {
 		{
 			name:     "wire format hex",
 			record:   "\\# 6 01 01 03 08 01 02",
-			expected: "257 3 RSASHA256 AQI=",
+			expected: "257 3 " + constants.AlgRSASHA256 + " AQI=",
 		},
 		{
 			name:     "unknown algorithm fallback",
@@ -40,17 +42,17 @@ func TestParseDNSKEY(t *testing.T) {
 }
 
 func TestGetDNSKEYData(t *testing.T) {
-	res := getDNSKEYData(context.Background(), "cloudflare.com")
+	res := getDNSKEYData(context.Background(), "example.com")
 
 	switch {
 	case res.Error != nil:
 		t.Logf("Network resolution error: %v", *res.Error)
 	case len(res.Results) == 0:
-		t.Log("No DNSKEY records found for cloudflare.com")
+		t.Log("No DNSKEY records found for example.com")
 	default:
 		found := false
 		for _, r := range res.Results {
-			if r.Type == "dnskey" {
+			if r.Type == constants.TypeDNSKEY {
 				found = true
 				break
 			}
@@ -68,7 +70,7 @@ func TestDNSKEYCapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_dnskey") {
+	if !slices.Contains(caps.Functions, constants.FuncGetDNSKEY) {
 		t.Error("expected get_dnskey in capabilities")
 	}
 }

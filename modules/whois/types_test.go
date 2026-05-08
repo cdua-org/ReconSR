@@ -10,23 +10,23 @@ func TestSafeString(t *testing.T) {
 	}{
 		{
 			name:     "string",
-			input:    "hello",
-			expected: "hello",
+			input:    "amber",
+			expected: "amber",
 		},
 		{
 			name:     "list of strings",
-			input:    []any{"hello", "world"},
-			expected: "hello, world",
+			input:    []any{"river", "stone"},
+			expected: "river, stone",
 		},
 		{
 			name:     "list with empty strings",
-			input:    []any{"hello", "", "world"},
-			expected: "hello, world",
+			input:    []any{"maple", "", "cedar"},
+			expected: "maple, cedar",
 		},
 		{
 			name:     "list with non-strings",
-			input:    []any{"hello", 123, "world"},
-			expected: "hello, world",
+			input:    []any{"falcon", 123, "otter"},
+			expected: "falcon, otter",
 		},
 		{
 			name:     "invalid type",

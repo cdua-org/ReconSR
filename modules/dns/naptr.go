@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -64,7 +65,7 @@ func normalizeNAPTRTarget(replacement string) (normalizedTarget, scopeTarget str
 		return "", "", false
 	}
 
-	if res, err := validator.Validate("domain", replacement); err == nil {
+	if res, err := validator.Validate(constants.TypeDomain, replacement); err == nil {
 		return res.Value, res.Value, true
 	}
 
@@ -74,7 +75,7 @@ func normalizeNAPTRTarget(replacement string) (normalizedTarget, scopeTarget str
 	}
 
 	baseDomain := strings.Join(labels[2:], ".")
-	res, err := validator.Validate("domain", baseDomain)
+	res, err := validator.Validate(constants.TypeDomain, baseDomain)
 	if err != nil {
 		return "", "", false
 	}
@@ -84,12 +85,12 @@ func normalizeNAPTRTarget(replacement string) (normalizedTarget, scopeTarget str
 
 func buildNAPTRServiceResult(parsed, service string) schema.ModuleResult {
 	return schema.ModuleResult{
-		Type:     "naptr",
-		Category: "property",
+		Type:     constants.TypeNAPTR,
+		Category: constants.CategoryProperty,
 		Value:    service,
 		Context:  "NAPTR Service",
 		Source: &schema.EntityRef{
-			Type:  "naptr",
+			Type:  constants.TypeNAPTR,
 			Value: parsed,
 		},
 	}
@@ -105,8 +106,8 @@ func buildNAPTRTargetResult(source *schema.EntityRef, target, replacement string
 	isOOS := orgdomain.IsOutOfScope(scopeTarget, target)
 
 	return &schema.ModuleResult{
-		Type:       "naptr_target",
-		Category:   "node",
+		Type:       constants.TypeNAPTRTarget,
+		Category:   constants.CategoryNode,
 		Value:      normalizedTarget,
 		Context:    "Replacement Target",
 		OutOfScope: isOOS,
@@ -115,7 +116,7 @@ func buildNAPTRTargetResult(source *schema.EntityRef, target, replacement string
 }
 
 func getNAPTRData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_naptr")
+	exec := modutil.NewExecution(constants.FuncGetNAPTR)
 
 	log.Printf("get_naptr starting query for target=%q", target)
 
@@ -134,8 +135,8 @@ func getNAPTRData(ctx context.Context, target string) schema.ModuleExecution {
 	for _, rec := range records {
 		parsed := parseNAPTRRecord(rec)
 		rawResult := schema.ModuleResult{
-			Type:     "naptr",
-			Category: "property",
+			Type:     constants.TypeNAPTR,
+			Category: constants.CategoryProperty,
 			Value:    parsed,
 			Context:  "NAPTR Record",
 		}

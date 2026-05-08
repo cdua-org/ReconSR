@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -19,7 +20,7 @@ func TestModuleCapabilities(t *testing.T) {
 		t.Fatal("expected functions, got none")
 	}
 
-	if !slices.Contains(caps.Functions, "get_ip") {
+	if !slices.Contains(caps.Functions, constants.FuncGetIP) {
 		t.Error("expected get_ip in capabilities")
 	}
 }
@@ -27,7 +28,7 @@ func TestModuleCapabilities(t *testing.T) {
 func TestExecUnsupported(t *testing.T) {
 	mod := New()
 	in := schema.ModuleInput{
-		Target:    schema.Entity{Type: "domain", Value: "test.invalid"},
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "test.invalid"},
 		Functions: []string{"unknown_func"},
 	}
 
@@ -53,7 +54,7 @@ func TestGetIPData(t *testing.T) {
 		t.Logf("Network resolution error: %v", *res.Error)
 	case len(res.Results) == 0:
 		t.Error("expected at least one IP for example.com")
-	case res.Results[0].Type != "ip":
+	case res.Results[0].Type != constants.TypeIP:
 		t.Errorf("expected type 'ip', got '%s'", res.Results[0].Type)
 	}
 }

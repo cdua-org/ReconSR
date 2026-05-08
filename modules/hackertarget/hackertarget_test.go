@@ -6,23 +6,24 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestModuleInterface(t *testing.T) {
 	m := New()
-	if m.Name() != "hackertarget" {
-		t.Errorf("expected name 'hackertarget', got '%s'", m.Name())
+	if m.Name() != moduleName {
+		t.Errorf("expected name %q, got %q", moduleName, m.Name())
 	}
 
 	caps, err := m.Capabilities()
 	if err != nil {
 		t.Errorf("Capabilities() returned error: %v", err)
 	}
-	if len(caps.Functions) != 1 || caps.Functions[0] != "get_hosts" {
+	if len(caps.Functions) != 1 || caps.Functions[0] != constants.FuncGetHosts {
 		t.Errorf("expected Functions ['get_hosts'], got %v", caps.Functions)
 	}
-	if len(caps.InputTypes) != 1 || caps.InputTypes[0] != "domain" {
+	if len(caps.InputTypes) != 1 || caps.InputTypes[0] != constants.TypeDomain {
 		t.Errorf("expected InputTypes ['domain'], got %v", caps.InputTypes)
 	}
 }
@@ -30,7 +31,7 @@ func TestModuleInterface(t *testing.T) {
 func TestExecUnsupportedFunction(t *testing.T) {
 	m := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "domain", Value: "example.com"},
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "example.com"},
 		Functions: []string{"unsupported"},
 	}
 
@@ -45,7 +46,7 @@ func TestExecUnsupportedFunction(t *testing.T) {
 
 	exec := output.Executions[0]
 	if exec.Function != "unsupported" {
-		t.Errorf("expected Function 'unsupported', got '%s'", exec.Function)
+		t.Errorf("expected Function %q, got %q", "unsupported", exec.Function)
 	}
 	if exec.Error == nil {
 		t.Error("expected Error to be set for unsupported function")
@@ -53,18 +54,7 @@ func TestExecUnsupportedFunction(t *testing.T) {
 }
 
 func TestGetHostsSuccess(t *testing.T) {
-	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "domain", Value: "test.example.com"},
-		Functions: []string{"get_hosts"},
-	}
-
-	results := parseHostSearch("sub1.test.example.com,192.168.1.1\nsub2.test.example.com,192.168.1.2\n", "example.com")
-
-	if len(results) != 4 {
-		t.Errorf("expected 4 results, got %d", len(results))
-	}
-
-	_ = input
+	results := parseHostSearch("sub1.tenant.example.com,192.0.2.1\nsub2.tenant.example.com,198.51.100.2\n", "tenant.example.com")
 
 	if len(results) != 4 {
 		t.Errorf("expected 4 results, got %d", len(results))
@@ -72,19 +62,15 @@ func TestGetHostsSuccess(t *testing.T) {
 }
 
 func TestGetHostsCSVFormat(t *testing.T) {
-	const subdomainType = "subdomain"
-	const ipv4Type = "ipv4"
-
-	body := "domain1.example.com,1.2.3.4\ndomain2.example.com,5.6.7.8\n"
-	results := parseHostSearch(body, "example.com")
+	results := parseHostSearch("domain1.example.com,192.0.2.1\ndomain2.example.com,198.51.100.2\n", "example.com")
 
 	hasSubdomain := false
 	hasIP := false
 	for _, r := range results {
-		if r.Type == subdomainType {
+		if r.Type == constants.TypeSubdomain {
 			hasSubdomain = true
 		}
-		if r.Type == ipv4Type {
+		if r.Type == constants.TypeIPv4 {
 			hasIP = true
 		}
 	}
@@ -123,8 +109,8 @@ func TestIsQuotaExceeded(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			header := http.Header{}
-			header.Set("X-Api-Count", tt.count)
-			header.Set("X-Api-Quota", tt.quota)
+			header.Set(quotaCountHeader, tt.count)
+			header.Set(quotaLimitHeader, tt.quota)
 
 			result := isQuotaExceeded(header)
 			if result != tt.expected {
@@ -140,12 +126,12 @@ func TestIsValidCSVFormat(t *testing.T) {
 		body     string
 		expected bool
 	}{
-		{"valid single line", "domain.example.com,1.2.3.4", true},
-		{"valid multiple lines", "a.example.com,1.1.1.1\nb.example.com,2.2.2.2", true},
+		{"valid single line", "example.com,192.0.2.1", true},
+		{"valid multiple lines", "a.example.com,192.0.2.1\nb.example.com,198.51.100.2", true},
 		{"empty body", "", true},
 		{"no comma", "domain.example.com", false},
-		{"invalid ip", "domain.example.com,not.an.ip", false},
-		{"empty lines", "domain.example.com,1.2.3.4\n\n", true},
+		{"invalid ip", "example.com,not.an.ip", false},
+		{"empty lines", "example.com,192.0.2.1\n\n", true},
 	}
 
 	for _, tt := range tests {
@@ -159,26 +145,23 @@ func TestIsValidCSVFormat(t *testing.T) {
 }
 
 func TestParseHostSearch(t *testing.T) {
-	const ipv4Type = "ipv4"
-	body := "sub1.example.com,192.168.1.1\nsub2.example.com,192.168.1.2\n"
-
-	results := parseHostSearch(body, "example.com")
+	results := parseHostSearch("sub1.example.com,192.0.2.1\nsub2.example.com,198.51.100.2\n", "example.com")
 
 	if len(results) != 4 {
 		t.Fatalf("expected 4 results, got %d", len(results))
 	}
 
-	if results[0].Type != "subdomain" || results[0].Value != "sub1.example.com" {
-		t.Errorf("first result: expected {subdomain, sub1.example.com}, got %+v", results[0])
+	if results[0].Type != constants.TypeSubdomain || results[0].Value != "sub1.example.com" {
+		t.Errorf("first result: expected {%s, %s}, got %+v", constants.TypeSubdomain, "sub1.example.com", results[0])
 	}
-	if results[1].Type != ipv4Type || results[1].Value != "192.168.1.1" {
-		t.Errorf("second result: expected {ipv4, 192.168.1.1}, got %+v", results[1])
+	if results[1].Type != constants.TypeIPv4 || results[1].Value != "192.0.2.1" {
+		t.Errorf("second result: expected {%s, %s}, got %+v", constants.TypeIPv4, "192.0.2.1", results[1])
 	}
-	if results[2].Type != "subdomain" || results[2].Value != "sub2.example.com" {
-		t.Errorf("third result: expected {subdomain, sub2.example.com}, got %+v", results[2])
+	if results[2].Type != constants.TypeSubdomain || results[2].Value != "sub2.example.com" {
+		t.Errorf("third result: expected {%s, %s}, got %+v", constants.TypeSubdomain, "sub2.example.com", results[2])
 	}
-	if results[3].Type != ipv4Type || results[3].Value != "192.168.1.2" {
-		t.Errorf("fourth result: expected {ipv4, 192.168.1.2}, got %+v", results[3])
+	if results[3].Type != constants.TypeIPv4 || results[3].Value != "198.51.100.2" {
+		t.Errorf("fourth result: expected {%s, %s}, got %+v", constants.TypeIPv4, "198.51.100.2", results[3])
 	}
 }
 
@@ -187,7 +170,7 @@ func TestDoRequestWithAPIKey(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedURL = r.URL.String()
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte("test.example.com,1.2.3.4\n")); err != nil {
+		if _, err := w.Write([]byte("tenant.example.com,192.0.2.1\n")); err != nil {
 			t.Errorf("test server write error: %v", err)
 		}
 	}))
@@ -197,9 +180,9 @@ func TestDoRequestWithAPIKey(t *testing.T) {
 	apiBaseURL = server.URL
 	defer func() { apiBaseURL = originalBaseURL }()
 
-	_, _, _, _ = doRequest(context.Background(), "example.com", "mock_api_key")
+	_, _, _, _ = doRequest(context.Background(), "example.com", "demo-value")
 
-	expectedURL := "/hostsearch/?q=example.com&apikey=mock_api_key"
+	expectedURL := hostSearchPath + "example.com" + "&apikey=demo-value"
 	if capturedURL != expectedURL {
 		t.Errorf("expected request URL to be %q, got %q", expectedURL, capturedURL)
 	}
@@ -210,7 +193,7 @@ func TestDoRequestWithoutAPIKey(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedURL = r.URL.String()
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte("test.example.com,1.2.3.4\n")); err != nil {
+		if _, err := w.Write([]byte("tenant.example.com,192.0.2.1\n")); err != nil {
 			t.Errorf("test server write error: %v", err)
 		}
 	}))
@@ -222,7 +205,7 @@ func TestDoRequestWithoutAPIKey(t *testing.T) {
 
 	_, _, _, _ = doRequest(context.Background(), "example.com", "")
 
-	expectedURL := "/hostsearch/?q=example.com"
+	expectedURL := hostSearchPath + "example.com"
 	if capturedURL != expectedURL {
 		t.Errorf("expected request URL to be %q, got %q", expectedURL, capturedURL)
 	}
@@ -230,10 +213,10 @@ func TestDoRequestWithoutAPIKey(t *testing.T) {
 
 func TestDoRequestQuotaExceeded(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("X-Api-Count", "100")
-		w.Header().Set("X-Api-Quota", "100")
+		w.Header().Set(quotaCountHeader, "100")
+		w.Header().Set(quotaLimitHeader, "100")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte("test.example.com,1.2.3.4\n")); err != nil {
+		if _, err := w.Write([]byte("tenant.example.com,192.0.2.1\n")); err != nil {
 			t.Errorf("test server write error: %v", err)
 		}
 	}))

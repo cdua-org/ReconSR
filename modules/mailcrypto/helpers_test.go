@@ -6,10 +6,11 @@ import (
 )
 
 func TestGenerateMailHashDomain(t *testing.T) {
-	hashDomain := GenerateMailHashDomain("Admin", "example.com", "._openpgpkey.")
+	hashDomain := GenerateMailHashDomain("Admin", "example.org", hashPrefixOpenPGPKey)
 
-	if !strings.HasSuffix(hashDomain, "._openpgpkey.example.com") {
-		t.Errorf("Expected suffix '._openpgpkey.example.com', got %s", hashDomain)
+	expectedSuffix := hashPrefixOpenPGPKey + "example.org"
+	if !strings.HasSuffix(hashDomain, expectedSuffix) {
+		t.Errorf("Expected suffix %q, got %s", expectedSuffix, hashDomain)
 	}
 
 	if strings.ContainsAny(hashDomain, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {

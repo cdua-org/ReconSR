@@ -7,11 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
-
-const testIPv4Target = "192.0.2.1"
 
 func writeTestResponse(t *testing.T, w http.ResponseWriter, data string) {
 	t.Helper()
@@ -60,7 +59,7 @@ func TestShodanModule_CapabilitiesWithoutAPIKey(t *testing.T) {
 		t.Fatalf("expected 1 custom function, got %d", len(caps.CustomFunctions))
 	}
 
-	fnCaps, ok := caps.CustomFunctions[functionInternetDB]
+	fnCaps, ok := caps.CustomFunctions[constants.FuncGetIDBShodan]
 	if !ok {
 		t.Fatal("expected 'get_idb_shodan' capability")
 	}
@@ -71,16 +70,16 @@ func TestShodanModule_CapabilitiesWithoutAPIKey(t *testing.T) {
 	if fnCaps.DelayMs != 1000 {
 		t.Errorf("expected delay 1000, got %d", fnCaps.DelayMs)
 	}
-	if _, ok := caps.CustomFunctions[functionShodanAPIIP]; ok {
+	if _, ok := caps.CustomFunctions[constants.FuncGetShodanAPIIP]; ok {
 		t.Fatal("did not expect 'get_shodan_api_ip' capability without API key")
 	}
-	if _, ok := caps.CustomFunctions[functionShodanAPIDomain]; ok {
+	if _, ok := caps.CustomFunctions[constants.FuncGetShodanAPIDomain]; ok {
 		t.Fatal("did not expect 'get_shodan_api_domain' capability without API key")
 	}
 }
 
 func TestShodanModule_CapabilitiesWithAPIKey(t *testing.T) {
-	m := &shodanModule{apiKey: testShodanAPIKey}
+	m := &shodanModule{apiKey: shodanTestAPIKey()}
 	caps, err := m.Capabilities()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -90,40 +89,40 @@ func TestShodanModule_CapabilitiesWithAPIKey(t *testing.T) {
 		t.Fatalf("expected 2 custom functions, got %d", len(caps.CustomFunctions))
 	}
 
-	if _, ok := caps.CustomFunctions[functionInternetDB]; ok {
+	if _, ok := caps.CustomFunctions[constants.FuncGetIDBShodan]; ok {
 		t.Fatal("did not expect 'get_idb_shodan' capability with API key")
 	}
 
-	ipCaps, ok := caps.CustomFunctions[functionShodanAPIIP]
+	ipCaps, ok := caps.CustomFunctions[constants.FuncGetShodanAPIIP]
 	if !ok {
 		t.Fatal("expected 'get_shodan_api_ip' capability")
 	}
 	if ipCaps.Limit != 1 {
 		t.Errorf("expected IP limit 1, got %d", ipCaps.Limit)
 	}
-	if len(ipCaps.InputTypes) != 2 || ipCaps.InputTypes[0] != entityTypeIPv4 || ipCaps.InputTypes[1] != entityTypeIPv6 {
+	if len(ipCaps.InputTypes) != 2 || ipCaps.InputTypes[0] != constants.TypeIPv4 || ipCaps.InputTypes[1] != constants.TypeIPv6 {
 		t.Errorf("unexpected IP input types: %v", ipCaps.InputTypes)
 	}
 
-	domainCaps, ok := caps.CustomFunctions[functionShodanAPIDomain]
+	domainCaps, ok := caps.CustomFunctions[constants.FuncGetShodanAPIDomain]
 	if !ok {
 		t.Fatal("expected 'get_shodan_api_domain' capability")
 	}
 	if domainCaps.Limit != 1 {
 		t.Errorf("expected domain limit 1, got %d", domainCaps.Limit)
 	}
-	if len(domainCaps.InputTypes) != 1 || domainCaps.InputTypes[0] != entityTypeDomain {
+	if len(domainCaps.InputTypes) != 1 || domainCaps.InputTypes[0] != constants.TypeDomain {
 		t.Errorf("unexpected domain input types: %v", domainCaps.InputTypes)
 	}
 }
 
 func TestShodanModule_Exec_UnsupportedFunction(t *testing.T) {
-	m := &shodanModule{}
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "ip", Value: testIPv4Target},
+		Target:    schema.Entity{Type: constants.TypeIP, Value: internetDBTestIPv4()},
 		Functions: []string{"unsupported_function"},
 	}
 
+	m := &shodanModule{}
 	output, err := m.Exec(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -143,8 +142,8 @@ func TestShodanModule_Exec_UnsupportedFunction(t *testing.T) {
 func TestShodanModule_Exec_APIKeyGatesFunctions(t *testing.T) {
 	keylessModule := &shodanModule{}
 	keylessOutput, err := keylessModule.Exec(schema.ModuleInput{
-		Target:    schema.Entity{Type: "ip", Value: testIPv4Target},
-		Functions: []string{functionShodanAPIIP},
+		Target:    schema.Entity{Type: constants.TypeIP, Value: internetDBTestIPv4()},
+		Functions: []string{constants.FuncGetShodanAPIIP},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error for keyless module: %v", err)
@@ -156,10 +155,10 @@ func TestShodanModule_Exec_APIKeyGatesFunctions(t *testing.T) {
 		t.Fatalf("expected unsupported function error for keyless API call, got %+v", keylessOutput.Executions[0])
 	}
 
-	apiModule := &shodanModule{apiKey: testShodanAPIKey}
+	apiModule := &shodanModule{apiKey: shodanTestAPIKey()}
 	apiOutput, err := apiModule.Exec(schema.ModuleInput{
-		Target:    schema.Entity{Type: "ip", Value: testIPv4Target},
-		Functions: []string{functionInternetDB},
+		Target:    schema.Entity{Type: constants.TypeIP, Value: internetDBTestIPv4()},
+		Functions: []string{constants.FuncGetIDBShodan},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error for API module: %v", err)
@@ -189,8 +188,8 @@ func TestGetInternetDB_Success(t *testing.T) {
 
 	m := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "ip", Value: testIPv4Target},
-		Functions: []string{functionInternetDB},
+		Target:    schema.Entity{Type: constants.TypeIP, Value: internetDBTestIPv4()},
+		Functions: []string{constants.FuncGetIDBShodan},
 	}
 
 	output, err := m.Exec(input)
@@ -216,20 +215,20 @@ func TestGetInternetDB_Success(t *testing.T) {
 		typesCount[res.Type]++
 	}
 
-	if typesCount["ptr"] != 1 {
-		t.Errorf("expected 1 ptr result, got %d", typesCount["ptr"])
+	if typesCount[constants.TypePTR] != 1 {
+		t.Errorf("expected 1 ptr result, got %d", typesCount[constants.TypePTR])
 	}
 	if typesCount["port"] != 3 {
 		t.Errorf("expected 3 port results, got %d", typesCount["port"])
 	}
-	if typesCount["tag"] != 1 {
-		t.Errorf("expected 1 tag result, got %d", typesCount["tag"])
+	if typesCount[constants.TypeTag] != 1 {
+		t.Errorf("expected 1 tag result, got %d", typesCount[constants.TypeTag])
 	}
-	if typesCount[resultTypeCVE] != 1 {
-		t.Errorf("expected 1 cve result, got %d", typesCount[resultTypeCVE])
+	if typesCount[constants.TypeCVE] != 1 {
+		t.Errorf("expected 1 cve result, got %d", typesCount[constants.TypeCVE])
 	}
-	if typesCount[resultTypeCPE] != 1 {
-		t.Errorf("expected 1 cpe result, got %d", typesCount[resultTypeCPE])
+	if typesCount[constants.TypeCPE] != 1 {
+		t.Errorf("expected 1 cpe result, got %d", typesCount[constants.TypeCPE])
 	}
 }
 
@@ -243,8 +242,8 @@ func TestGetInternetDB_NotFound(t *testing.T) {
 
 	m := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "ip", Value: "192.0.2.2"},
-		Functions: []string{functionInternetDB},
+		Target:    schema.Entity{Type: constants.TypeIP, Value: "192.0.2.2"},
+		Functions: []string{constants.FuncGetIDBShodan},
 	}
 
 	output, err := m.Exec(input)
@@ -275,8 +274,8 @@ func TestGetInternetDB_HTTPError(t *testing.T) {
 
 	m := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "ip", Value: "192.0.2.3"},
-		Functions: []string{functionInternetDB},
+		Target:    schema.Entity{Type: constants.TypeIP, Value: "192.0.2.3"},
+		Functions: []string{constants.FuncGetIDBShodan},
 	}
 
 	output, err := m.Exec(input)
@@ -305,8 +304,8 @@ func TestGetInternetDB_AbortStatus(t *testing.T) {
 
 	m := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "ip", Value: "192.0.2.4"},
-		Functions: []string{functionInternetDB},
+		Target:    schema.Entity{Type: constants.TypeIP, Value: "192.0.2.4"},
+		Functions: []string{constants.FuncGetIDBShodan},
 	}
 
 	output, err := m.Exec(input)
@@ -333,8 +332,8 @@ func TestGetInternetDB_InvalidJSON(t *testing.T) {
 
 	m := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "ip", Value: "192.0.2.5"},
-		Functions: []string{functionInternetDB},
+		Target:    schema.Entity{Type: constants.TypeIP, Value: "192.0.2.5"},
+		Functions: []string{constants.FuncGetIDBShodan},
 	}
 
 	output, err := m.Exec(input)

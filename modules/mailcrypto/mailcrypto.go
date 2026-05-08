@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/preflightcheck"
@@ -15,7 +16,16 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
+const (
+	hashPrefixOpenPGPKey = "._openpgpkey."
+	hashPrefixSMIMEA     = "._smimecert."
+	ctxOpenPGPKey        = "OPENPGPKEY"
+	ctxSMIMEA            = "SMIMEA"
+)
+
 var dbg = debuglog.New("mailcrypto")
+
+var resolveRecord = resolver.ResolveRecord
 
 // CommonEmailLocalParts are standard infrastructure email aliases used for discovery.
 var CommonEmailLocalParts = []string{
@@ -38,13 +48,13 @@ func (m *module) Name() string {
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	var inputTypes []string
 	if resolver.DisableMailcryptoBruteForce {
-		inputTypes = []string{"email"}
+		inputTypes = []string{constants.TypeEmail}
 	} else {
-		inputTypes = []string{"domain", "subdomain", "email"}
+		inputTypes = []string{constants.TypeDomain, constants.TypeSubdomain, constants.TypeEmail}
 	}
 
 	return schema.ModuleCapabilities{
-		Functions:  []string{"get_openpgpkey", "get_smimea", "preflight_dns"},
+		Functions:  []string{constants.FuncGetOpenpgpkey, constants.FuncGetSmimea, constants.FuncPreflightDNS},
 		InputTypes: inputTypes,
 		ModuleConfig: &schema.FunctionCapabilities{
 			Limit:   5,
@@ -54,12 +64,12 @@ func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 			},
 		},
 		CustomFunctions: map[string]schema.FunctionCapabilities{
-			"preflight_dns": {},
-			"get_openpgpkey": {
-				RequiredTags: [][]string{{"dns_ok"}},
+			constants.FuncPreflightDNS: {},
+			constants.FuncGetOpenpgpkey: {
+				RequiredTags: [][]string{{constants.TagDNSOK}},
 			},
-			"get_smimea": {
-				RequiredTags: [][]string{{"dns_ok"}},
+			constants.FuncGetSmimea: {
+				RequiredTags: [][]string{{constants.TagDNSOK}},
 			},
 		},
 	}, nil
@@ -87,11 +97,11 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		var execution schema.ModuleExecution
 
 		switch f {
-		case "preflight_dns":
+		case constants.FuncPreflightDNS:
 			execution = handlePreflightDNS(ctx, domain, data.Target)
-		case "get_openpgpkey":
+		case constants.FuncGetOpenpgpkey:
 			execution = getOPENPGPKEYData(localParts, domain)
-		case "get_smimea":
+		case constants.FuncGetSmimea:
 			execution = getSMIMEAData(localParts, domain)
 		default:
 			execution = modutil.NewExecution(f)
@@ -108,16 +118,16 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 }
 
 func handlePreflightDNS(ctx context.Context, domain string, target schema.Entity) schema.ModuleExecution {
-	execution := modutil.NewExecution("preflight_dns")
+	execution := modutil.NewExecution(constants.FuncPreflightDNS)
 	dbg.Printf("preflight_dns target=%q domain=%q", target.Value, domain)
 	err := preflightcheck.PreFlightCheck(ctx, domain)
 	if err != nil {
 		if errors.Is(err, preflightcheck.ErrZoneBroken) {
 			execution.Results = append(execution.Results, schema.ModuleResult{
-				Type:     "status",
-				Category: "property",
-				Value:    "Broken DNS Zone",
-				Tags:     []string{"dns_bad"},
+				Type:     constants.TypeStatus,
+				Category: constants.CategoryProperty,
+				Value:    constants.StatusBrokenDNSZone,
+				Tags:     []string{constants.TagDNSBad},
 			})
 		} else {
 			errMsg := err.Error()
@@ -127,7 +137,7 @@ func handlePreflightDNS(ctx context.Context, domain string, target schema.Entity
 		execution.Results = append(execution.Results, schema.ModuleResult{
 			Type:  target.Type,
 			Value: target.Value,
-			Tags:  []string{"dns_ok"},
+			Tags:  []string{constants.TagDNSOK},
 		})
 	}
 	return execution

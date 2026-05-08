@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
@@ -21,11 +22,6 @@ import (
 )
 
 var dbg = debuglog.New("whois")
-
-const (
-	nodeCategory     = "node"
-	propertyCategory = "property"
-)
 
 type module struct{}
 
@@ -40,8 +36,8 @@ func (m *module) Name() string {
 
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
-		Functions:  []string{"get_whois"},
-		InputTypes: []string{"domain"},
+		Functions:  []string{constants.FuncGetWhois},
+		InputTypes: []string{constants.TypeDomain},
 		ModuleConfig: &schema.FunctionCapabilities{
 			Limit:   5,
 			DelayMs: 2000,
@@ -55,7 +51,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	for _, f := range data.Functions {
 		var execution schema.ModuleExecution
 
-		if f == "get_whois" {
+		if f == constants.FuncGetWhois {
 			execution = m.getWhoisData(data.Target.Value)
 		} else {
 			execution = modutil.NewExecution(f)
@@ -73,7 +69,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 
 func (m *module) getWhoisData(target string) schema.ModuleExecution {
 	execution := schema.ModuleExecution{
-		Function: "get_whois",
+		Function: constants.FuncGetWhois,
 		Results:  make([]schema.ModuleResult, 0, 35),
 	}
 
@@ -156,12 +152,12 @@ func (m *module) buildResults(metadata *Metadata, target, methodUsed string) []s
 	results = append(results, regrResults...)
 
 	m.appendContact(&results, &metadata.Registrar, "Registrar", "", true, registrarAnchor, sourceCtx, target)
-	m.appendContact(&results, &metadata.Abuse, "Abuse", "whois_abuse", true, registrarAnchor, sourceCtx, target)
+	m.appendContact(&results, &metadata.Abuse, "Abuse", constants.TypeWhoisAbuse, true, registrarAnchor, sourceCtx, target)
 
 	m.appendContact(&results, &metadata.Registrant, "Registrant", "", false, registrantAnchor, sourceCtx, target)
-	m.appendContact(&results, &metadata.Admin, "Admin", "whois_admin", false, registrantAnchor, sourceCtx, target)
-	m.appendContact(&results, &metadata.Tech, "Tech", "whois_tech", false, registrantAnchor, sourceCtx, target)
-	m.appendContact(&results, &metadata.Billing, "Billing", "whois_billing", false, registrantAnchor, sourceCtx, target)
+	m.appendContact(&results, &metadata.Admin, "Admin", constants.TypeWhoisAdmin, false, registrantAnchor, sourceCtx, target)
+	m.appendContact(&results, &metadata.Tech, "Tech", constants.TypeWhoisTech, false, registrantAnchor, sourceCtx, target)
+	m.appendContact(&results, &metadata.Billing, "Billing", constants.TypeWhoisBilling, false, registrantAnchor, sourceCtx, target)
 
 	results = append(results, m.buildMetadataResults(metadata, target, sourceCtx, registrarAnchor)...)
 	return results
@@ -171,13 +167,13 @@ func (m *module) appendSlice(results *[]schema.ModuleResult, arr []string, typ, 
 	for _, v := range arr {
 		v = strings.TrimSpace(v)
 		if v != "" {
-			category := propertyCategory
+			category := constants.CategoryProperty
 			resolvedType := typ
-			if typ == "person" || typ == "organization" || typ == "email" {
-				category = nodeCategory
+			if typ == "person" || typ == constants.TypeOrganization || typ == constants.TypeEmail {
+				category = constants.CategoryNode
 			}
-			if typ == "email" {
-				res, err := validator.Validate("email", v)
+			if typ == constants.TypeEmail {
+				res, err := validator.Validate(constants.TypeEmail, v)
 				if err != nil {
 					continue
 				}
@@ -215,7 +211,7 @@ func (m *module) appendAddress(results *[]schema.ModuleResult, arr []string, typ
 			return strings.Compare(strings.ToLower(a), strings.ToLower(b))
 		})
 		mergedAddress := strings.Join(uniqueParts, ", ")
-		*results = append(*results, m.result(typ, nodeCategory, mergedAddress, prefix+" Address ("+sourceCtx+")", isOOS, anchor))
+		*results = append(*results, m.result(typ, constants.CategoryNode, mergedAddress, prefix+" Address ("+sourceCtx+")", isOOS, anchor))
 	}
 }
 
@@ -232,19 +228,19 @@ func (m *module) appendContact(results *[]schema.ModuleResult, c *Contact, roleN
 	currentAnchor := anchor
 	if roleType != "" {
 		roleValue := roleName + " Contact of " + target
-		*results = append(*results, m.result(roleType, nodeCategory, roleValue, roleName+" Contact ("+sourceCtx+")", isOOS, anchor))
+		*results = append(*results, m.result(roleType, constants.CategoryNode, roleValue, roleName+" Contact ("+sourceCtx+")", isOOS, anchor))
 		currentAnchor = &schema.EntityRef{Type: roleType, Value: roleValue}
 	}
 
 	m.appendSlice(results, c.Name, "person", roleName+" Name", isOOS, currentAnchor, sourceCtx)
-	m.appendSlice(results, c.Organization, "organization", roleName+" Organization", isOOS, currentAnchor, sourceCtx)
-	m.appendSlice(results, c.Email, "email", roleName+" Email", isOOS, currentAnchor, sourceCtx)
+	m.appendSlice(results, c.Organization, constants.TypeOrganization, roleName+" Organization", isOOS, currentAnchor, sourceCtx)
+	m.appendSlice(results, c.Email, constants.TypeEmail, roleName+" Email", isOOS, currentAnchor, sourceCtx)
 	m.appendAddress(results, c.Address, "address", roleName, isOOS, currentAnchor, sourceCtx)
 
 	for _, p := range c.Phone {
 		cleanPhone := normalizePhone(p)
 		if cleanPhone != "" {
-			*results = append(*results, m.result("tel", nodeCategory, cleanPhone, roleName+" Phone ("+sourceCtx+")", isOOS, currentAnchor))
+			*results = append(*results, m.result(constants.TypePhone, constants.CategoryNode, cleanPhone, roleName+" Phone ("+sourceCtx+")", isOOS, currentAnchor))
 		}
 	}
 }
@@ -253,13 +249,13 @@ func (m *module) getRegistrantAnchor(metadata *Metadata, target, sourceCtx strin
 	if hasContactData(&metadata.Registrant) || hasContactData(&metadata.Admin) || hasContactData(&metadata.Tech) || hasContactData(&metadata.Billing) {
 		regValue := "Registrant of " + target
 		res := []schema.ModuleResult{{
-			Type:     "whois_registrant",
-			Category: nodeCategory,
+			Type:     constants.TypeWhoisRegistrant,
+			Category: constants.CategoryNode,
 			Value:    regValue,
 			Context:  "Domain Registrant (" + sourceCtx + ")",
 			Applied:  true,
 		}}
-		return &schema.EntityRef{Type: "whois_registrant", Value: regValue}, res
+		return &schema.EntityRef{Type: constants.TypeWhoisRegistrant, Value: regValue}, res
 	}
 	return nil, nil
 }
@@ -268,13 +264,13 @@ func (m *module) getRegistrarAnchor(metadata *Metadata, target, sourceCtx string
 	if hasContactData(&metadata.Registrar) || hasContactData(&metadata.Abuse) || metadata.RegistrarURL != "" || metadata.WhoisServer != "" || metadata.IANAID != "" {
 		regValue := "Registrar of " + target
 		res := []schema.ModuleResult{{
-			Type:     "whois_registrar",
-			Category: nodeCategory,
+			Type:     constants.TypeWhoisRegistrar,
+			Category: constants.CategoryNode,
 			Value:    regValue,
 			Context:  "Domain Registrar (" + sourceCtx + ")",
 			Applied:  true,
 		}}
-		return &schema.EntityRef{Type: "whois_registrar", Value: regValue}, res
+		return &schema.EntityRef{Type: constants.TypeWhoisRegistrar, Value: regValue}, res
 	}
 	return nil, nil
 }
@@ -302,38 +298,38 @@ func (m *module) buildMetadataResults(metadata *Metadata, target, sourceCtx stri
 	results := make([]schema.ModuleResult, 0, 15)
 
 	if metadata.RegistrarURL != "" {
-		results = append(results, m.result("url", propertyCategory, metadata.RegistrarURL, "Registrar URL ("+sourceCtx+")", true, registrarAnchor))
+		results = append(results, m.result(constants.TypeURL, constants.CategoryProperty, metadata.RegistrarURL, "Registrar URL ("+sourceCtx+")", true, registrarAnchor))
 	}
 	if metadata.WhoisServer != "" {
-		if res, err := validator.Validate("domain", metadata.WhoisServer); err == nil {
-			results = append(results, m.result("whois_server", nodeCategory, res.Value, "Whois Server ("+sourceCtx+")", true, registrarAnchor))
+		if res, err := validator.Validate(constants.TypeDomain, metadata.WhoisServer); err == nil {
+			results = append(results, m.result(constants.TypeWhoisServer, constants.CategoryNode, res.Value, "Whois Server ("+sourceCtx+")", true, registrarAnchor))
 		}
 	}
 	if metadata.IANAID != "" {
-		results = append(results, m.result("iana_id", propertyCategory, metadata.IANAID, "IANA ID ("+sourceCtx+")", true, registrarAnchor))
+		results = append(results, m.result(constants.TypeIANAID, constants.CategoryProperty, metadata.IANAID, "IANA ID ("+sourceCtx+")", true, registrarAnchor))
 	}
 
 	if metadata.DNSSEC != "" {
-		results = append(results, m.result("dnssec", propertyCategory, metadata.DNSSEC, "DNSSEC Status ("+sourceCtx+")", false, nil))
+		results = append(results, m.result(constants.TypeDNSSEC, constants.CategoryProperty, metadata.DNSSEC, "DNSSEC Status ("+sourceCtx+")", false, nil))
 	}
 	if metadata.CreationDate != "" {
-		results = append(results, m.result("date", propertyCategory, metadata.CreationDate, "Creation Date ("+sourceCtx+")", false, nil))
+		results = append(results, m.result(constants.TypeDate, constants.CategoryProperty, metadata.CreationDate, "Creation Date ("+sourceCtx+")", false, nil))
 	}
 	if metadata.UpdatedDate != "" {
-		results = append(results, m.result("date", propertyCategory, metadata.UpdatedDate, "Updated Date ("+sourceCtx+")", false, nil))
+		results = append(results, m.result(constants.TypeDate, constants.CategoryProperty, metadata.UpdatedDate, "Updated Date ("+sourceCtx+")", false, nil))
 	}
 	if metadata.ExpirationDate != "" {
-		results = append(results, m.result("date", propertyCategory, metadata.ExpirationDate, "Expiration Date ("+sourceCtx+")", false, nil))
+		results = append(results, m.result(constants.TypeDate, constants.CategoryProperty, metadata.ExpirationDate, "Expiration Date ("+sourceCtx+")", false, nil))
 	}
 	for _, ns := range metadata.NameServers {
 		oos := !strings.HasSuffix(strings.ToLower(ns), "."+strings.ToLower(target))
-		typ := "ns"
-		category := nodeCategory
+		typ := constants.TypeNS
+		category := constants.CategoryNode
 		if !strings.Contains(ns, ".") {
-			typ = "handle"
-			category = propertyCategory
+			typ = constants.TypeHandle
+			category = constants.CategoryProperty
 		} else {
-			if res, err := validator.Validate("domain", ns); err == nil {
+			if res, err := validator.Validate(constants.TypeDomain, ns); err == nil {
 				ns = res.Value
 			} else {
 				continue
@@ -342,7 +338,7 @@ func (m *module) buildMetadataResults(metadata *Metadata, target, sourceCtx stri
 		results = append(results, m.result(typ, category, ns, "Name Server ("+sourceCtx+")", oos, nil))
 	}
 	for _, st := range metadata.DomainStatus {
-		results = append(results, m.result("status", "property", st, "Domain Status ("+sourceCtx+")", false, nil))
+		results = append(results, m.result(constants.TypeStatus, constants.CategoryProperty, st, "Domain Status ("+sourceCtx+")", false, nil))
 	}
 	return results
 }

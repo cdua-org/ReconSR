@@ -4,6 +4,8 @@ import (
 	"context"
 	"slices"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestGetNSDataEmpty(t *testing.T) {
@@ -27,17 +29,17 @@ func TestGetNSData(t *testing.T) {
 		t.Logf("Network resolution error: %v", *res.Error)
 	case len(res.Results) == 0:
 		t.Error("expected at least one NS for example.com")
-	case res.Results[0].Type != "ns":
+	case res.Results[0].Type != constants.TypeNS:
 		t.Errorf("unexpected type: %s", res.Results[0].Type)
 	}
 }
 
 func TestBuildNSResultInScope(t *testing.T) {
-	result, ok := buildNSResult("Ns1.Example.com.", "example.com")
+	result, ok := buildNSResult("ns1.example.com.", "example.com")
 	if !ok {
 		t.Fatal("expected valid NS result")
 	}
-	if result.Type != "ns" {
+	if result.Type != constants.TypeNS {
 		t.Fatalf("expected ns type, got %q", result.Type)
 	}
 	if result.Value != "ns1.example.com" {
@@ -52,11 +54,11 @@ func TestBuildNSResultInScope(t *testing.T) {
 }
 
 func TestBuildNSResultOutOfScope(t *testing.T) {
-	result, ok := buildNSResult("ns1.vendor.net.", "example.com")
+	result, ok := buildNSResult("ns1.example.net.", "example.com")
 	if !ok {
 		t.Fatal("expected valid NS result")
 	}
-	if result.Value != "ns1.vendor.net" {
+	if result.Value != "ns1.example.net" {
 		t.Fatalf("expected normalized value, got %q", result.Value)
 	}
 	if !result.OutOfScope {
@@ -78,7 +80,7 @@ func TestNSCapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_ns") {
+	if !slices.Contains(caps.Functions, constants.FuncGetNS) {
 		t.Error("expected get_ns in capabilities")
 	}
 }

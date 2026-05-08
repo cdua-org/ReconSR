@@ -4,6 +4,8 @@ import (
 	"context"
 	"slices"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestGetDKIMDataEmpty(t *testing.T) {
@@ -36,7 +38,7 @@ func TestDKIMCapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_dkim") {
+	if !slices.Contains(caps.Functions, constants.FuncGetDKIM) {
 		t.Error("expected get_dkim in capabilities")
 	}
 }

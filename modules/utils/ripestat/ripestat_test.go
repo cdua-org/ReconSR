@@ -12,8 +12,6 @@ import (
 	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
-const testJSONPayload = `{"test":"data"}`
-
 // writeTestResponse writes data to the ResponseWriter and reports
 // a test error if the write fails. Safe from handler goroutines.
 func writeTestResponse(t *testing.T, w http.ResponseWriter, data string) {
@@ -343,6 +341,8 @@ func TestQuery_SingleAttempt_NoRetry(t *testing.T) {
 }
 
 func TestModels_SetRawJSON(t *testing.T) {
+	const rawJSON = `{"test":"data"}`
+
 	tests := []struct {
 		target rawResponse
 		name   string
@@ -356,27 +356,27 @@ func TestModels_SetRawJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.target.setRawJSON(testJSONPayload)
+			tt.target.setRawJSON(rawJSON)
 
 			switch v := tt.target.(type) {
 			case *APIResponse:
-				if v.RawJSON != testJSONPayload {
+				if v.RawJSON != rawJSON {
 					t.Errorf("RawJSON = %q", v.RawJSON)
 				}
 			case *AnnouncedPrefixesResponse:
-				if v.RawJSON != testJSONPayload {
+				if v.RawJSON != rawJSON {
 					t.Errorf("RawJSON = %q", v.RawJSON)
 				}
 			case *ASOverviewResponse:
-				if v.RawJSON != testJSONPayload {
+				if v.RawJSON != rawJSON {
 					t.Errorf("RawJSON = %q", v.RawJSON)
 				}
 			case *AbuseContactResponse:
-				if v.RawJSON != testJSONPayload {
+				if v.RawJSON != rawJSON {
 					t.Errorf("RawJSON = %q", v.RawJSON)
 				}
 			case *WhoisResponse:
-				if v.RawJSON != testJSONPayload {
+				if v.RawJSON != rawJSON {
 					t.Errorf("RawJSON = %q", v.RawJSON)
 				}
 			}

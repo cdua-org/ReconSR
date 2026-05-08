@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/modules/utils/ripestat"
@@ -12,7 +13,7 @@ import (
 )
 
 func getIPInfo(target string) (execution schema.ModuleExecution) {
-	execution = modutil.NewExecution("get_ip_info")
+	execution = modutil.NewExecution(constants.FuncGetIPInfo)
 	dbg.Printf("getIPInfo target=%q", target)
 
 	if target == "" {
@@ -30,7 +31,7 @@ func getIPInfo(target string) (execution schema.ModuleExecution) {
 		execution.RawData = resp.RawJSON
 	}()
 
-	if err := ripestat.Query(ctx, target, "whois", &resp, resolver.MaxRetriesIPMeta); err != nil {
+	if err := ripestatQueryFunc(ctx, target, "whois", &resp, resolver.MaxRetriesIPMeta); err != nil {
 		errMsg := fmt.Errorf("ip info lookup failed after retries: %w", err).Error()
 		execution.Error = &errMsg
 		dbg.Printf("getIPInfo target=%q lookup_error=%v", target, err)
@@ -43,7 +44,7 @@ func getIPInfo(target string) (execution schema.ModuleExecution) {
 	for _, records := range resp.Data.Records {
 		for _, record := range records {
 			key := strings.ToLower(record.Key)
-			if key == "netname" && netname == "" {
+			if key == constants.TypeNetName && netname == "" {
 				netname = strings.TrimSpace(record.Value)
 			} else if key == "descr" {
 				val := strings.TrimSpace(record.Value)
@@ -56,8 +57,8 @@ func getIPInfo(target string) (execution schema.ModuleExecution) {
 
 	if netname != "" {
 		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:       "netname",
-			Category:   "property",
+			Type:       constants.TypeNetName,
+			Category:   constants.CategoryProperty,
 			Value:      netname,
 			Context:    "Network Name",
 			OutOfScope: true,
@@ -67,8 +68,8 @@ func getIPInfo(target string) (execution schema.ModuleExecution) {
 	if len(descr) > 0 {
 		description := strings.Join(descr, " | ")
 		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:       "description",
-			Category:   "property",
+			Type:       constants.TypeDescription,
+			Category:   constants.CategoryProperty,
 			Value:      description,
 			Context:    "Network Description",
 			OutOfScope: true,

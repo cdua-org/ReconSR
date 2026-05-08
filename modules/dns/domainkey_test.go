@@ -4,6 +4,8 @@ import (
 	"context"
 	"slices"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestGetDomainKeyDataEmpty(t *testing.T) {
@@ -36,7 +38,7 @@ func TestDomainKeyCapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_domainkey") {
+	if !slices.Contains(caps.Functions, constants.FuncGetDomainKey) {
 		t.Error("expected get_domainkey in capabilities")
 	}
 }

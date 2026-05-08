@@ -7,10 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestParseShodanAPIIP(t *testing.T) {
+	targetIP := shodanTestAPIIPv4()
+	service := "FakeProduct 9.9"
 	rawBody := []byte(`{
 		"asn": "AS99999",
 		"domains": ["fake.example.com"],
@@ -61,67 +64,67 @@ func TestParseShodanAPIIP(t *testing.T) {
 		]
 	}`)
 
-	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, rawBody, testShodanAPIIPv4)
+	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
+	parseShodanAPIIP(&exec, rawBody, targetIP)
 	if exec.Error != nil {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
 
-	requireTaggedResults(t, exec.Results, testShodanTag)
-	assertShodanIPServiceChain(t, exec.Results)
+	requireTaggedResults(t, exec.Results, "faketag")
+	assertShodanIPServiceChain(t, exec.Results, targetIP, service)
 	assertShodanIPCoreResults(t, exec.Results)
-	assertShodanIPResultTypeAbsent(t, exec.Results, resultTypeHeartbleed)
+	assertShodanIPResultTypeAbsent(t, exec.Results, constants.TypeHeartbleed)
 }
 
-func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult) {
+func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult, targetIP, service string) {
 	t.Helper()
 
-	serviceResult := requireModuleResult(t, results, resultTypeService, testShodanService)
-	if serviceResult.Category != resultCategoryProperty {
+	serviceResult := requireModuleResult(t, results, constants.TypeService, service)
+	if serviceResult.Category != constants.CategoryProperty {
 		t.Fatalf("expected service to be a property, got %q", serviceResult.Category)
 	}
 	if serviceResult.Source != nil {
 		t.Fatalf("expected service to be anchored directly to IP, got %+v", serviceResult.Source)
 	}
 
-	assertShodanIPResultSource(t, results, resultTypeWebServer, "FakeHTTP", resultTypeService, testShodanService)
+	assertShodanIPResultSource(t, results, constants.TypeWebServer, "FakeHTTP", constants.TypeService, service)
 
-	portResult := requireModuleResult(t, results, resultTypePort, "443/tcp")
-	if portResult.Source == nil || portResult.Source.Type != resultTypeService || portResult.Source.Value != testShodanService {
+	portResult := requireModuleResult(t, results, constants.TypePort, "443/tcp")
+	if portResult.Source == nil || portResult.Source.Type != constants.TypeService || portResult.Source.Value != service {
 		t.Fatalf("expected port to be chained to service, got %+v", portResult.Source)
 	}
 
-	assertShodanIPPortSource(t, results, "hash", testShodanServiceHash)
-	assertShodanIPPortSource(t, results, resultTypeBannerTimestamp, testShodanBannerTimestamp)
-	assertShodanIPPortSource(t, results, resultTypeCertFingerprint, testShodanCertFingerprintSHA1)
-	assertShodanIPPortSource(t, results, resultTypeCertFingerprint, testShodanCertFingerprintSHA256)
-	assertShodanIPPortSource(t, results, resultTypeJARM, testShodanJARM)
-	assertShodanIPPortSource(t, results, resultTypeCPE, "cpe:/a:fake:product:9.9")
-	assertShodanIPPortSource(t, results, "cpe23", "cpe:2.3:a:fake:product:9.9")
+	assertShodanIPPortSource(t, results, constants.TypeHash, "2222222")
+	assertShodanIPPortSource(t, results, constants.TypeBannerTimestamp, "2026-05-02T16:15:08.228066")
+	assertShodanIPPortSource(t, results, constants.TypeCertFingerprint, "sha1:00112233445566778899aabbccddeeff00112233")
+	assertShodanIPPortSource(t, results, constants.TypeCertFingerprint, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+	assertShodanIPPortSource(t, results, constants.TypeJARM, "29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d")
+	assertShodanIPPortSource(t, results, constants.TypeCPE, "cpe:/a:fake:product:9.9")
+	assertShodanIPPortSource(t, results, constants.TypeCPE23, "cpe:2.3:a:fake:product:9.9")
 
-	assertShodanIPCVEChain(t, results)
+	assertShodanIPCVEChain(t, results, targetIP, service)
 }
 
-func assertShodanIPCVEChain(t *testing.T, results []schema.ModuleResult) {
+func assertShodanIPCVEChain(t *testing.T, results []schema.ModuleResult, targetIP, service string) {
 	t.Helper()
 
-	cveResult := requireModuleResult(t, results, resultTypeCVE, "CVE-9999-9999")
-	if cveResult.Category != resultCategoryNode {
+	cveResult := requireModuleResult(t, results, constants.TypeCVE, "CVE-9999-9999")
+	if cveResult.Category != constants.CategoryNode {
 		t.Fatalf("expected cve to be a node, got %q", cveResult.Category)
 	}
-	if cveResult.Source == nil || cveResult.Source.Type != resultTypeService || cveResult.Source.Value != testShodanService {
+	if cveResult.Source == nil || cveResult.Source.Type != constants.TypeService || cveResult.Source.Value != service {
 		t.Fatalf("expected cve to be chained to service, got %+v", cveResult.Source)
 	}
 
-	expectedVulnCtx := testShodanAPIIPv4 + ":443/tcp (" + testShodanService + ")"
+	expectedVulnCtx := targetIP + ":443/tcp (" + service + ")"
 
-	verifiedResult := requireModuleResultWithContext(t, results, "verified", "true", expectedVulnCtx)
-	if verifiedResult.Source == nil || verifiedResult.Source.Type != resultTypeCVE || verifiedResult.Source.Value != "CVE-9999-9999" {
+	verifiedResult := requireModuleResultWithContext(t, results, constants.TypeVerified, "true", expectedVulnCtx)
+	if verifiedResult.Source == nil || verifiedResult.Source.Type != constants.TypeCVE || verifiedResult.Source.Value != "CVE-9999-9999" {
 		t.Fatalf("expected verified to be chained to cve, got %+v", verifiedResult.Source)
 	}
 
-	summaryResult := requireModuleResultWithContext(t, results, "summary", "Fake vulnerability", expectedVulnCtx)
-	if summaryResult.Source == nil || summaryResult.Source.Type != resultTypeCVE || summaryResult.Source.Value != "CVE-9999-9999" {
+	summaryResult := requireModuleResultWithContext(t, results, constants.TypeSummary, "Fake vulnerability", expectedVulnCtx)
+	if summaryResult.Source == nil || summaryResult.Source.Type != constants.TypeCVE || summaryResult.Source.Value != "CVE-9999-9999" {
 		t.Fatalf("expected summary to be chained to cve, got %+v", summaryResult.Source)
 	}
 }
@@ -130,7 +133,7 @@ func assertShodanIPPortSource(t *testing.T, results []schema.ModuleResult, resul
 	t.Helper()
 
 	result := requireModuleResult(t, results, resultType, value)
-	if result.Source == nil || result.Source.Type != resultTypePort || result.Source.Value != "443/tcp" {
+	if result.Source == nil || result.Source.Type != constants.TypePort || result.Source.Value != "443/tcp" {
 		t.Fatalf("expected %s to be chained to port, got %+v", resultType, result.Source)
 	}
 }
@@ -138,31 +141,33 @@ func assertShodanIPPortSource(t *testing.T, results []schema.ModuleResult, resul
 func assertShodanIPCoreResults(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	sanResult := requireModuleResult(t, results, resultTypeSANDomain, testShodanSAN)
+	sanResult := requireModuleResult(t, results, constants.TypeSANDomain, "tls.sandbox.example.com")
 	if sanResult.Source != nil {
 		t.Fatalf("expected SAN to be attached directly to target IP, got %+v", sanResult.Source)
 	}
-	assertShodanIPResultSource(t, results, resultTypeCertIssuer, testShodanCertIssuer, resultTypeSANDomain, testShodanSAN)
-	assertShodanIPResultSource(t, results, resultTypeCertNotAfter, testShodanCertNotAfter, resultTypeSANDomain, testShodanSAN)
-	assertShodanIPResultSource(t, results, resultTypeTLSVersions, testShodanTLSVersions, resultTypeSANDomain, testShodanSAN)
+	assertShodanIPResultSource(t, results, constants.TypeCertIssuer, "O: Example Test CA | CN: Example Issuer | C: ZZ", constants.TypeSANDomain, "tls.sandbox.example.com")
+	assertShodanIPResultSource(t, results, constants.TypeCertNotAfter, "2027-07-20T19:44:15Z", constants.TypeSANDomain, "tls.sandbox.example.com")
+	assertShodanIPResultSource(t, results, constants.TypeTLSVersions, "TLSv1.2, TLSv1.3", constants.TypeSANDomain, "tls.sandbox.example.com")
 
-	requireModuleResult(t, results, resultTypeSANDomain, testShodanAltSAN)
-	requireModuleResult(t, results, "shodan_domain", "fake.example.com")
-	requireModuleResult(t, results, "asn", "99999")
-	requireModuleResult(t, results, "ptr", "ptr.fake.example.com")
-	requireModuleResult(t, results, "isp", "Fake ISP")
-	requireModuleResult(t, results, "org", "Fake Org")
-	requireModuleResult(t, results, "os", "FakeOS")
-	requireModuleResult(t, results, resultTypePort, "443/tcp")
-	requireModuleResult(t, results, resultTypeLastUpdate, testShodanLastUpdate)
+	requireModuleResult(t, results, constants.TypeSANDomain, "alt.sandbox.example.com")
+	requireModuleResult(t, results, constants.TypeShodanDomain, "fake.example.com")
+	requireModuleResult(t, results, constants.TypeASN, "99999")
+	requireModuleResult(t, results, constants.TypePTR, "ptr.fake.example.com")
+	requireModuleResult(t, results, constants.TypeISP, "Fake ISP")
+	requireModuleResult(t, results, constants.TypeOrg, "Fake Org")
+	requireModuleResult(t, results, constants.TypeOS, "FakeOS")
+	requireModuleResult(t, results, constants.TypePort, "443/tcp")
+	requireModuleResult(t, results, constants.TypeLastUpdate, "2027-05-05T16:15:08Z")
 
-	geoResult := requireModuleResult(t, results, "geo", testShodanGeo)
-	if geoResult.Category != resultCategoryProperty {
+	geoResult := requireModuleResult(t, results, constants.TypeGeo, "City: FakeCity | Country: Fakeland (FC) | Lat/Lon: 10.123400, 20.567800")
+	if geoResult.Category != constants.CategoryProperty {
 		t.Fatalf("expected geo to be a property, got %q", geoResult.Category)
 	}
 }
 
 func TestParseShodanAPIIPParsesEscapedSubjectAltName(t *testing.T) {
+	targetIP := shodanTestAPIIPv4()
+	wildcardSAN := "*.wild.sandbox.example.com"
 	rawBody := []byte(`{
 		"tags": ["faketag"],
 		"data": [
@@ -184,29 +189,30 @@ func TestParseShodanAPIIPParsesEscapedSubjectAltName(t *testing.T) {
 		]
 	}`)
 
-	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, rawBody, testShodanAPIIPv4)
+	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
+	parseShodanAPIIP(&exec, rawBody, targetIP)
 	if exec.Error != nil {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
 
-	wildcardResult := requireModuleResult(t, exec.Results, resultTypeWildcardSANDomain, testShodanWildcardSAN)
+	wildcardResult := requireModuleResult(t, exec.Results, constants.TypeWildcardSANDomain, wildcardSAN)
 	if wildcardResult.Source != nil {
 		t.Fatalf("expected wildcard SAN to be attached directly to target IP, got %+v", wildcardResult.Source)
 	}
-	requireModuleResult(t, exec.Results, resultTypePort, "443/tcp")
-	assertShodanIPResultSource(t, exec.Results, resultTypeCertFingerprint, testShodanCertFingerprintSHA1, resultTypePort, "443/tcp")
-	assertShodanIPResultSource(t, exec.Results, resultTypeCertFingerprint, testShodanCertFingerprintSHA256, resultTypePort, "443/tcp")
-	assertShodanIPResultSource(t, exec.Results, resultTypeCertIssuer, testShodanCertIssuer, resultTypeWildcardSANDomain, testShodanWildcardSAN)
-	assertShodanIPResultSource(t, exec.Results, resultTypeCertNotAfter, testShodanCertNotAfter, resultTypeWildcardSANDomain, testShodanWildcardSAN)
-	assertShodanIPResultSource(t, exec.Results, resultTypeTLSVersions, testShodanTLSVersions, resultTypeWildcardSANDomain, testShodanWildcardSAN)
-	requireModuleResult(t, exec.Results, resultTypeSANDomain, "wild.sandbox.example.com")
-	if _, ok := findModuleResult(exec.Results, resultTypeSANDomain, "twild.sandbox.example.com"); ok {
+	requireModuleResult(t, exec.Results, constants.TypePort, "443/tcp")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeCertFingerprint, "sha1:00112233445566778899aabbccddeeff00112233", constants.TypePort, "443/tcp")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeCertFingerprint, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", constants.TypePort, "443/tcp")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeCertIssuer, "O: Example Test CA | CN: Example Issuer | C: ZZ", constants.TypeWildcardSANDomain, wildcardSAN)
+	assertShodanIPResultSource(t, exec.Results, constants.TypeCertNotAfter, "2027-07-20T19:44:15Z", constants.TypeWildcardSANDomain, wildcardSAN)
+	assertShodanIPResultSource(t, exec.Results, constants.TypeTLSVersions, "TLSv1.2, TLSv1.3", constants.TypeWildcardSANDomain, wildcardSAN)
+	requireModuleResult(t, exec.Results, constants.TypeSANDomain, "wild.sandbox.example.com")
+	if _, ok := findModuleResult(exec.Results, constants.TypeSANDomain, "twild.sandbox.example.com"); ok {
 		t.Fatalf("expected escaped SAN data to avoid bogus tnewton.ua result, got %+v", exec.Results)
 	}
 }
 
 func TestParseShodanAPIIPSkipsDuplicateWebServerValue(t *testing.T) {
+	targetIP := shodanTestAPIIPv4()
 	rawBody := []byte(`{
 		"tags": ["faketag"],
 		"data": [
@@ -223,27 +229,27 @@ func TestParseShodanAPIIPSkipsDuplicateWebServerValue(t *testing.T) {
 		]
 	}`)
 
-	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, rawBody, testShodanAPIIPv4)
+	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
+	parseShodanAPIIP(&exec, rawBody, targetIP)
 	if exec.Error != nil {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
 
-	serviceResult := requireModuleResult(t, exec.Results, resultTypeService, "nginx")
+	serviceResult := requireModuleResult(t, exec.Results, constants.TypeService, "nginx")
 	if serviceResult.Source != nil {
 		t.Fatalf("expected service to be anchored to IP, got %+v", serviceResult.Source)
 	}
-	if _, ok := findModuleResult(exec.Results, resultTypeWebServer, "nginx"); ok {
+	if _, ok := findModuleResult(exec.Results, constants.TypeWebServer, "nginx"); ok {
 		t.Fatalf("expected duplicate web_server value to be skipped, got %+v", exec.Results)
 	}
-	portResult := requireModuleResult(t, exec.Results, resultTypePort, "443/tcp https")
-	if portResult.Source == nil || portResult.Source.Type != resultTypeService || portResult.Source.Value != "nginx" {
+	portResult := requireModuleResult(t, exec.Results, constants.TypePort, "443/tcp https")
+	if portResult.Source == nil || portResult.Source.Type != constants.TypeService || portResult.Source.Value != "nginx" {
 		t.Fatalf("expected port to be chained to service nginx, got %+v", portResult.Source)
 	}
 
-	assertShodanIPResultSource(t, exec.Results, "hash", testShodanDuplicateHash, resultTypePort, "443/tcp https")
-	assertShodanIPResultSource(t, exec.Results, resultTypeCPE, "cpe:/a:f5:nginx", resultTypePort, "443/tcp https")
-	assertShodanIPResultSource(t, exec.Results, "cpe23", "cpe:2.3:a:f5:nginx", resultTypePort, "443/tcp https")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeHash, "3333333", constants.TypePort, "443/tcp https")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeCPE, "cpe:/a:f5:nginx", constants.TypePort, "443/tcp https")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeCPE23, "cpe:2.3:a:f5:nginx", constants.TypePort, "443/tcp https")
 }
 
 func assertShodanIPResultSource(t *testing.T, results []schema.ModuleResult, resultType, value, sourceType, sourceValue string) {
@@ -266,6 +272,7 @@ func assertShodanIPResultTypeAbsent(t *testing.T, results []schema.ModuleResult,
 }
 
 func TestParseShodanAPIIPExtractsRiskyHeartbleed(t *testing.T) {
+	targetIP := shodanTestAPIIPv4()
 	rawBody := []byte(`{
 		"tags": ["faketag"],
 		"data": [
@@ -279,17 +286,18 @@ func TestParseShodanAPIIPExtractsRiskyHeartbleed(t *testing.T) {
 		]
 	}`)
 
-	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, rawBody, testShodanAPIIPv4)
+	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
+	parseShodanAPIIP(&exec, rawBody, targetIP)
 	if exec.Error != nil {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
 
-	requireModuleResult(t, exec.Results, resultTypePort, "443/tcp https")
-	assertShodanIPResultSource(t, exec.Results, resultTypeHeartbleed, testShodanHeartbleed, resultTypePort, "443/tcp https")
+	requireModuleResult(t, exec.Results, constants.TypePort, "443/tcp https")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeHeartbleed, "VULNERABLE", constants.TypePort, "443/tcp https")
 }
 
 func TestParseShodanAPIIPFallsBackToPortSource(t *testing.T) {
+	targetIP := shodanTestAPIIPv4()
 	rawBody := []byte(`{
 		"tags": ["faketag"],
 		"data": [
@@ -303,21 +311,25 @@ func TestParseShodanAPIIPFallsBackToPortSource(t *testing.T) {
 		]
 	}`)
 
-	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, rawBody, testShodanAPIIPv4)
+	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
+	parseShodanAPIIP(&exec, rawBody, targetIP)
 	if exec.Error != nil {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
 
-	if _, ok := findModuleResult(exec.Results, resultTypeService, testShodanFallbackSvc); ok {
+	if _, ok := findModuleResult(exec.Results, constants.TypeService, "stun"); ok {
 		t.Fatalf("expected module label to stay on port instead of creating service node, got %+v", exec.Results)
 	}
-	requireModuleResult(t, exec.Results, resultTypePort, "3478/udp stun")
-	assertShodanIPResultSource(t, exec.Results, "hash", testShodanRootHash, resultTypePort, "3478/udp stun")
-	assertShodanIPResultSource(t, exec.Results, resultTypeBannerTimestamp, "2026-05-04T18:19:25.001152", resultTypePort, "3478/udp stun")
+	requireModuleResult(t, exec.Results, constants.TypePort, "3478/udp stun")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeHash, "1111111", constants.TypePort, "3478/udp stun")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeBannerTimestamp, "2026-05-04T18:19:25.001152", constants.TypePort, "3478/udp stun")
 }
 
 func TestGetShodanAPIIP(t *testing.T) {
+	targetIP := shodanTestAPIIPv4()
+	apiKey := shodanTestAPIKey()
+	service := "FakeProduct 9.9"
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api-info":
@@ -325,7 +337,7 @@ func TestGetShodanAPIIP(t *testing.T) {
 			if _, err := w.Write([]byte(`{"query_credits":100}`)); err != nil {
 				t.Errorf("write error: %v", err)
 			}
-		case "/shodan/host/" + testShodanAPIIPv4:
+		case "/shodan/host/" + targetIP:
 			w.WriteHeader(http.StatusOK)
 			if _, err := w.Write([]byte(`{
 				"asn": "AS99999",
@@ -344,10 +356,10 @@ func TestGetShodanAPIIP(t *testing.T) {
 	shodanAPIBaseURL = server.URL
 	defer func() { shodanAPIBaseURL = originalBaseURL }()
 
-	module := &shodanModule{apiKey: testShodanAPIKey}
+	module := &shodanModule{apiKey: apiKey}
 	module.lastReqTime = time.Now().Add(-2 * time.Second)
 
-	exec := module.getShodanAPIIP(schema.Entity{Type: entityTypeIP, Value: testShodanAPIIPv4})
+	exec := module.getShodanAPIIP(schema.Entity{Type: constants.TypeIP, Value: targetIP})
 	if exec.Error != nil {
 		t.Fatalf("unexpected error: %v", *exec.Error)
 	}
@@ -355,14 +367,16 @@ func TestGetShodanAPIIP(t *testing.T) {
 		t.Fatal("expected raw data to be preserved")
 	}
 
-	requireModuleResult(t, exec.Results, "asn", "99999")
-	requireModuleResult(t, exec.Results, resultTypeService, testShodanService)
-	requireModuleResult(t, exec.Results, "hash", testShodanServiceHash)
+	requireModuleResult(t, exec.Results, constants.TypeASN, "99999")
+	requireModuleResult(t, exec.Results, constants.TypeService, service)
+	requireModuleResult(t, exec.Results, constants.TypeHash, "2222222")
 }
 
 func TestParseShodanAPIIPInvalidJSON(t *testing.T) {
-	exec := schema.ModuleExecution{Function: functionShodanAPIIP}
-	parseShodanAPIIP(&exec, []byte(`{invalid json`), testShodanAPIIPv4)
+	targetIP := shodanTestAPIIPv4()
+
+	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
+	parseShodanAPIIP(&exec, []byte(`{invalid json`), targetIP)
 	if exec.Error == nil || !strings.Contains(*exec.Error, "unmarshal json") {
 		t.Fatalf("expected unmarshal error, got %+v", exec.Error)
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -69,7 +70,7 @@ func parseLOC(raw string) string {
 }
 
 func getLOCData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_loc")
+	exec := modutil.NewExecution(constants.FuncGetLOC)
 
 	log.Printf("get_loc target=%q", target)
 
@@ -89,8 +90,8 @@ func getLOCData(ctx context.Context, target string) schema.ModuleExecution {
 
 	for _, rec := range records {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "loc",
-			Category: "property",
+			Type:     constants.TypeLOC,
+			Category: constants.CategoryProperty,
 			Value:    parseLOC(rec),
 			Context:  "Geographic Location",
 		})

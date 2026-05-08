@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -21,7 +22,7 @@ type nsecQuery struct {
 }
 
 func getNSECData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_nsec")
+	exec := modutil.NewExecution(constants.FuncGetNSEC)
 	log.Printf("get_nsec target=%q", target)
 
 	bruteCtx, cancel := context.WithTimeout(ctx, resolver.DNSBruteTimeout)
@@ -108,8 +109,8 @@ func collectNSECRecords(records []resolver.DoHDnsRecord, target, nxTarget, conte
 func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.ModuleResult {
 	results := []schema.ModuleResult{
 		{
-			Type:     "nsec",
-			Category: "property",
+			Type:     constants.TypeNSEC,
+			Category: constants.CategoryProperty,
 			Value:    rec.Name + " NSEC3 " + rec.Data,
 			Context:  contextDesc,
 		},
@@ -117,8 +118,8 @@ func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.Mo
 
 	hashPart, _, _ := strings.Cut(rec.Name, ".")
 	results = append(results, schema.ModuleResult{
-		Type:     "nsec",
-		Category: "property",
+		Type:     constants.TypeNSEC,
+		Category: constants.CategoryProperty,
 		Value:    hashPart,
 		Context:  "NSEC3 Hash",
 	})
@@ -126,8 +127,8 @@ func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.Mo
 	parts := strings.Fields(rec.Data)
 	if len(parts) >= 5 {
 		results = append(results, schema.ModuleResult{
-			Type:     "nsec",
-			Category: "property",
+			Type:     constants.TypeNSEC,
+			Category: constants.CategoryProperty,
 			Value:    parts[4],
 			Context:  "NSEC3 Next Hash",
 		})
@@ -139,8 +140,8 @@ func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.Mo
 func parseNSECRecord(rec resolver.DoHDnsRecord, target, nxTarget, contextDesc string) []schema.ModuleResult {
 	results := []schema.ModuleResult{
 		{
-			Type:     "nsec",
-			Category: "property",
+			Type:     constants.TypeNSEC,
+			Category: constants.CategoryProperty,
 			Value:    rec.Name + " NSEC " + rec.Data,
 			Context:  contextDesc,
 		},
@@ -168,7 +169,7 @@ func extractNSECDomain(raw, target, nxTarget, contextDesc string) *schema.Module
 		return nil
 	}
 
-	if _, err := validator.Validate("domain", domain); err != nil {
+	if _, err := validator.Validate(constants.TypeDomain, domain); err != nil {
 		return nil
 	}
 
@@ -191,22 +192,22 @@ func extractNSECDomain(raw, target, nxTarget, contextDesc string) *schema.Module
 		org = cleanDomain
 	}
 
-	resType := "subdomain"
+	resType := constants.TypeSubdomain
 	if strings.EqualFold(cleanDomain, org) {
-		resType = "domain"
+		resType = constants.TypeDomain
 	}
 
 	if isWildcard {
-		if resType == "domain" {
-			resType = "wildcard_domain"
+		if resType == constants.TypeDomain {
+			resType = constants.TypeWildcardDomain
 		} else {
-			resType = "wildcard_subdomain"
+			resType = constants.TypeWildcardSubdomain
 		}
 	}
 
 	return &schema.ModuleResult{
 		Type:       resType,
-		Category:   "node",
+		Category:   constants.CategoryNode,
 		Value:      domain,
 		Context:    contextDesc,
 		OutOfScope: orgdomain.IsOutOfScope(domain, target),

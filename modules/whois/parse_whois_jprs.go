@@ -1,6 +1,8 @@
 package whois
 
-import "slices"
+import (
+	"slices"
+)
 
 func applyJPMatch(m *Metadata, key, val string) {
 	if applyJPDomainMatch(m, key, val) {
@@ -49,7 +51,7 @@ func applyJPContactMatch(m *Metadata, key, val string) {
 		m.Registrant.Name = appendUnique(m.Registrant.Name, val)
 	case "jp2_contact_email":
 		m.Registrant.Email = appendUnique(m.Registrant.Email, val)
-	case "jp2_postal_code", "jp2_address":
+	case whoisFieldJP2PostalCode, whoisFieldJP2Address:
 		m.Registrant.Address = appendUnique(m.Registrant.Address, val)
 	case "jp2_phone":
 		m.Registrant.Phone = appendUnique(m.Registrant.Phone, val)

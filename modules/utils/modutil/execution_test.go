@@ -74,9 +74,8 @@ func TestSetRawFallback_FallsBackToRecords(t *testing.T) {
 	exec := NewExecution("get_ns")
 	SetRawFallback(&exec, nil, []string{"ns1.example.com", "ns2.example.com"}, ", ")
 
-	want := "ns1.example.com, ns2.example.com"
-	if exec.RawData != want {
-		t.Errorf("RawData = %q, want %q", exec.RawData, want)
+	if exec.RawData != "ns1.example.com, ns2.example.com" {
+		t.Errorf("RawData = %q, want %q", exec.RawData, "ns1.example.com, ns2.example.com")
 	}
 }
 

@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"slices"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseMX(t *testing.T) {
@@ -22,8 +24,8 @@ func TestParseMX(t *testing.T) {
 		},
 		{
 			name:     "MX with high priority",
-			input:    "1 aspmx.l.google.com.",
-			expected: mxRecord{host: "aspmx.l.google.com", pref: 1},
+			input:    "1 mx.example.net.",
+			expected: mxRecord{host: "mx.example.net", pref: 1},
 			wantErr:  false,
 		},
 		{
@@ -52,15 +54,13 @@ func TestBuildMXHostResult(t *testing.T) {
 	tests := []struct {
 		name      string
 		host      string
-		target    string
 		wantValue string
 		wantOK    bool
 		wantOOS   bool
 	}{
 		{
 			name:      "valid host gets normalized",
-			host:      "MAIL.Example.COM",
-			target:    "example.com",
+			host:      "MAIL.EXAMPLE.COM",
 			wantOK:    true,
 			wantValue: "mail.example.com",
 			wantOOS:   false,
@@ -68,22 +68,21 @@ func TestBuildMXHostResult(t *testing.T) {
 		{
 			name:   "invalid host is skipped",
 			host:   "bad host",
-			target: "example.com",
 			wantOK: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, ok := buildMXHostResult(tt.host, tt.target)
+			result, ok := buildMXHostResult(tt.host, "host.mx.example.com")
 			if ok != tt.wantOK {
 				t.Fatalf("buildMXHostResult() ok = %v, want %v", ok, tt.wantOK)
 			}
 			if !tt.wantOK {
 				return
 			}
-			if result.Type != "mx_host" {
-				t.Fatalf("buildMXHostResult() type = %q, want %q", result.Type, "mx_host")
+			if result.Type != constants.TypeMXHost {
+				t.Fatalf("buildMXHostResult() type = %q, want %q", result.Type, constants.TypeMXHost)
 			}
 			if result.Value != tt.wantValue {
 				t.Fatalf("buildMXHostResult() value = %q, want %q", result.Value, tt.wantValue)
@@ -125,7 +124,7 @@ func TestMXCapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_mx") {
+	if !slices.Contains(caps.Functions, constants.FuncGetMX) {
 		t.Error("expected get_mx in capabilities")
 	}
 }

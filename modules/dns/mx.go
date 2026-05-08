@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -22,7 +23,7 @@ type mxRecord struct {
 }
 
 func getMXData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_mx")
+	exec := modutil.NewExecution(constants.FuncGetMX)
 
 	log.Printf("get_mx starting query for target=%q", target)
 
@@ -68,8 +69,8 @@ func getMXData(ctx context.Context, target string) schema.ModuleExecution {
 
 	for _, mx := range mxs {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "mx",
-			Category: "property",
+			Type:     constants.TypeMX,
+			Category: constants.CategoryProperty,
 			Value:    fmt.Sprintf("%d %s", mx.pref, mx.host),
 		})
 
@@ -85,7 +86,7 @@ func getMXData(ctx context.Context, target string) schema.ModuleExecution {
 }
 
 func buildMXHostResult(host, target string) (schema.ModuleResult, bool) {
-	res, err := validator.Validate("domain", host)
+	res, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
 		log.Printf("get_mx skipping invalid mx_host target=%q entity=%q err=%v", target, host, err)
 		return schema.ModuleResult{}, false
@@ -95,8 +96,8 @@ func buildMXHostResult(host, target string) (schema.ModuleResult, bool) {
 	log.Printf("get_mx target=%q entity=%q oos=%v", target, res.Value, isOOS)
 
 	return schema.ModuleResult{
-		Type:       "mx_host",
-		Category:   "node",
+		Type:       constants.TypeMXHost,
+		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		OutOfScope: isOOS,
 	}, true

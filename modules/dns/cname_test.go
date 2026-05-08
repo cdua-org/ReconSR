@@ -4,6 +4,8 @@ import (
 	"context"
 	"slices"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestGetCNAMEDataEmpty(t *testing.T) {
@@ -28,11 +30,11 @@ func TestGetCNAMEData(t *testing.T) {
 }
 
 func TestBuildCNAMEResultInScopeSubdomain(t *testing.T) {
-	result, ok := buildCNAMEResult("cdn.example.com.", "example.com", "CNAME Record")
+	result, ok := buildCNAMEResult("cdn.example.com.", "cname-scope.example.com", "CNAME Record")
 	if !ok {
 		t.Fatal("expected valid CNAME result")
 	}
-	if result.Type != "subdomain" {
+	if result.Type != constants.TypeSubdomain {
 		t.Fatalf("expected subdomain type, got %q", result.Type)
 	}
 	if result.Value != "cdn.example.com" {
@@ -44,14 +46,14 @@ func TestBuildCNAMEResultInScopeSubdomain(t *testing.T) {
 }
 
 func TestBuildCNAMEResultOutOfScope(t *testing.T) {
-	result, ok := buildCNAMEResult("foo.vendor.example.net.", "example.com", "CNAME Record")
+	result, ok := buildCNAMEResult("vendor.foo.example.net.", "cname-oos.example.com", "CNAME Record")
 	if !ok {
 		t.Fatal("expected valid CNAME result")
 	}
-	if result.Type != "cname_target" {
+	if result.Type != constants.TypeCNAMETarget {
 		t.Fatalf("expected cname_target type, got %q", result.Type)
 	}
-	if result.Value != "foo.vendor.example.net" {
+	if result.Value != "vendor.foo.example.net" {
 		t.Fatalf("expected normalized value, got %q", result.Value)
 	}
 	if !result.OutOfScope {
@@ -60,7 +62,7 @@ func TestBuildCNAMEResultOutOfScope(t *testing.T) {
 }
 
 func TestBuildCNAMEResultInvalid(t *testing.T) {
-	_, ok := buildCNAMEResult("bad target", "example.com", "CNAME Record")
+	_, ok := buildCNAMEResult("bad target", "cname-invalid.example.com", "CNAME Record")
 	if ok {
 		t.Fatal("expected invalid CNAME target to be skipped")
 	}
@@ -73,7 +75,7 @@ func TestCNAMECapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_cname") {
+	if !slices.Contains(caps.Functions, constants.FuncGetCNAME) {
 		t.Error("expected get_cname in capabilities")
 	}
 }

@@ -1,50 +1,30 @@
 package ip_metadata
 
 import (
-	"io"
-	"net/http"
+	"context"
 	"slices"
-	"strings"
+	"strconv"
 	"testing"
-	"time"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
-type mockTransport struct {
-	oldTransport http.RoundTripper
-}
+func TestGetPTRDataMockedResult(t *testing.T) {
+	setPTRQueryMock(t, func(string) ([]string, error) {
+		return []string{"ptr1.example.com."}, nil
+	})
 
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.URL.Query().Get("type") == "12" && strings.Contains(req.URL.Query().Get("name"), "1.2.3.4.in-addr.arpa.") {
-		body := `{"Status": 0, "Answer": [{"name": "1.2.3.4.in-addr.arpa.", "type": 12, "data": "*.invalid.name.com."}]}`
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(body)),
-			Header:     make(http.Header),
-		}, nil
-	}
-	if m.oldTransport != nil {
-		return m.oldTransport.RoundTrip(req)
-	}
-	return http.DefaultTransport.RoundTrip(req)
-}
-
-func TestGetPTRDataInvalidNameMock(t *testing.T) {
-	oldTransport := http.DefaultTransport
-	http.DefaultTransport = &mockTransport{oldTransport: oldTransport}
-	defer func() { http.DefaultTransport = oldTransport }()
-
-	res := getPTRData("4.3.2.1")
+	res := getPTRData("198.51.100.2")
 	if res.Error != nil {
 		t.Fatalf("expected no error, got: %v", *res.Error)
 	}
 	if len(res.Results) == 0 {
 		t.Fatal("expected results, got none")
 	}
-	if res.Results[0].Value != "*.invalid.name.com" {
-		t.Errorf("expected '*.invalid.name.com', got '%s'", res.Results[0].Value)
+	if res.Results[0].Value != "ptr1.example.com" {
+		t.Errorf("expected %q, got %q", "ptr1.example.com", res.Results[0].Value)
 	}
 }
 
@@ -59,7 +39,7 @@ func TestModuleCapabilities(t *testing.T) {
 		t.Fatal("expected functions, got none")
 	}
 
-	if !slices.Contains(caps.Functions, "get_ptr") {
+	if !slices.Contains(caps.Functions, constants.FuncGetPTR) {
 		t.Error("expected get_ptr in capabilities")
 	}
 }
@@ -67,7 +47,7 @@ func TestModuleCapabilities(t *testing.T) {
 func TestExecUnsupported(t *testing.T) {
 	mod := New()
 	in := schema.ModuleInput{
-		Target:    schema.Entity{Type: "ipv4", Value: "8.8.8.8"},
+		Target:    schema.Entity{Type: constants.TypeIPv4, Value: "198.51.100.2"},
 		Functions: []string{"unknown_func"},
 	}
 
@@ -93,10 +73,14 @@ func TestModuleName(t *testing.T) {
 }
 
 func TestExecSupported(t *testing.T) {
+	setPTRQueryMock(t, func(string) ([]string, error) {
+		return []string{"ptr2.example.com."}, nil
+	})
+
 	mod := New()
 	in := schema.ModuleInput{
-		Target:    schema.Entity{Type: "ipv4", Value: "8.8.8.8"},
-		Functions: []string{"get_ptr"},
+		Target:    schema.Entity{Type: constants.TypeIPv4, Value: "198.51.100.2"},
+		Functions: []string{constants.FuncGetPTR},
 	}
 
 	out, err := mod.Exec(in)
@@ -107,22 +91,33 @@ func TestExecSupported(t *testing.T) {
 	if len(out.Executions) != 1 {
 		t.Fatalf("expected 1 execution, got %d", len(out.Executions))
 	}
+	if out.Executions[0].Error != nil {
+		t.Fatalf("expected no execution error, got: %v", *out.Executions[0].Error)
+	}
 }
 
 func TestGetPTRData(t *testing.T) {
-	res := getPTRData("8.8.8.8")
+	setPTRQueryMock(t, func(string) ([]string, error) {
+		return []string{"ptr3.example.com."}, nil
+	})
 
-	switch {
-	case res.Error != nil:
-		t.Logf("Network resolution error: %v", *res.Error)
-	case len(res.Results) == 0:
-		t.Error("expected at least one PTR record for 8.8.8.8")
-	case res.Results[0].Type != "ptr":
-		t.Errorf("expected type 'ptr', got '%s'", res.Results[0].Type)
+	res := getPTRData("198.51.100.2")
+	if res.Error != nil {
+		t.Fatalf("expected no error, got: %v", *res.Error)
+	}
+	if len(res.Results) == 0 {
+		t.Fatal("expected at least one PTR record")
+	}
+	if res.Results[0].Type != constants.TypePTR {
+		t.Errorf("expected type %q, got %q", constants.TypePTR, res.Results[0].Type)
 	}
 }
 
 func TestGetPTRDataNoHost(t *testing.T) {
+	setPTRQueryMock(t, func(string) ([]string, error) {
+		return nil, nil
+	})
+
 	res := getPTRData("192.0.2.1")
 	if res.Error != nil {
 		t.Errorf("expected no error for non-existent PTR, got: %v", *res.Error)
@@ -141,23 +136,25 @@ func TestGetPTRDataInvalidIP(t *testing.T) {
 
 func TestGetPTRDataDebug(t *testing.T) {
 	t.Log("Testing debug output")
-	const debugStr = "true"
-	const debugFalse = "false"
-	resolver.Options["Debug"] = debugStr
-	defer func() { resolver.Options["Debug"] = debugFalse }()
+	resolver.Options["Debug"] = strconv.FormatBool(true)
+	defer func() { resolver.Options["Debug"] = strconv.FormatBool(false) }()
 
-	getPTRData("8.8.8.8")
+	setPTRQueryMock(t, func(string) ([]string, error) {
+		return nil, nil
+	})
+
+	getPTRData("198.51.100.2")
 	getPTRData("192.0.2.1")
 	getPTRData("invalid")
 }
 
 func TestGetPTRDataTimeout(t *testing.T) {
-	oldTimeout := resolver.Timeout
-	resolver.Timeout = 1 * time.Nanosecond
-	defer func() { resolver.Timeout = oldTimeout }()
+	setPTRQueryMock(t, func(string) ([]string, error) {
+		return nil, context.DeadlineExceeded
+	})
 
-	res := getPTRData("8.8.8.8")
+	res := getPTRData("198.51.100.2")
 	if res.Error == nil {
-		t.Error("expected network error/timeout with 1ns timeout, got nil")
+		t.Error("expected timeout error, got nil")
 	}
 }

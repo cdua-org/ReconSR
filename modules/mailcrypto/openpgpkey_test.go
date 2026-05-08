@@ -1,7 +1,8 @@
 package mailcrypto
 
 import (
-	"strings"
+	"context"
+	"net"
 	"testing"
 )
 
@@ -34,11 +35,30 @@ func TestParseOPENPGPKEY(t *testing.T) {
 }
 
 func TestGetOPENPGPKEYDataEmptyTarget(t *testing.T) {
-	execution := getOPENPGPKEYData([]string{"testuser"}, "example.com")
+	originalResolveRecord := resolveRecord
+	t.Cleanup(func() {
+		resolveRecord = originalResolveRecord
+	})
 
-	if len(execution.Results) > 0 {
-		t.Logf("Found %d results for testing domain example.com", len(execution.Results))
-	} else if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
-		t.Logf("Expected clean exit or NXDOMAIN, got: %s", *execution.Error)
+	resolveRecord = func(_ context.Context, target string, qtype int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		expectedTarget := GenerateMailHashDomain("testuser", "openpgp.example.net", hashPrefixOpenPGPKey)
+		if target != expectedTarget {
+			t.Fatalf("unexpected target: got %q want %q", target, expectedTarget)
+		}
+		if qtype != 61 {
+			t.Fatalf("unexpected qtype: got %d want 61", qtype)
+		}
+		return nil, nil, nil
+	}
+
+	execution := getOPENPGPKEYData([]string{"testuser"}, "openpgp.example.net")
+	if len(execution.Results) != 0 {
+		t.Fatalf("expected no results, got %d", len(execution.Results))
+	}
+	if execution.Error != nil {
+		t.Fatalf("expected no error, got %s", *execution.Error)
+	}
+	if execution.RawData != "" {
+		t.Fatalf("expected empty raw data, got %q", execution.RawData)
 	}
 }

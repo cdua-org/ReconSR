@@ -6,44 +6,12 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/apiconfig"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
-const (
-	moduleName = "shodan"
-
-	functionInternetDB      = "get_idb_shodan"
-	functionShodanAPIIP     = "get_shodan_api_ip"
-	functionShodanAPIDomain = "get_shodan_api_domain"
-
-	entityTypeDomain = "domain"
-	entityTypeIP     = "ip"
-	entityTypeIPv4   = "ipv4"
-	entityTypeIPv6   = "ipv6"
-
-	resultCategoryNode     = "node"
-	resultCategoryProperty = "property"
-
-	resultTypeBannerTimestamp   = "banner_timestamp"
-	resultTypeCertFingerprint   = "cert_fingerprint"
-	resultTypeCertIssuer        = "cert_issuer"
-	resultTypeCertNotAfter      = "cert_not_after"
-	resultTypeCPE               = "cpe"
-	resultTypeCVE               = "cve"
-	resultTypeHeartbleed        = "heartbleed"
-	resultTypeInfo              = "info"
-	resultTypeJARM              = "jarm"
-	resultTypeLastUpdate        = "last_update"
-	resultTypePort              = "port"
-	resultTypeSANDomain         = "san_domain"
-	resultTypeSOA               = "soa"
-	resultTypeService           = "service"
-	resultTypeSubdomain         = "subdomain"
-	resultTypeTLSVersions       = "tls_versions"
-	resultTypeWebServer         = "web_server"
-	resultTypeWildcardSANDomain = "wildcard_san_domain"
-)
+const moduleName = "shodan"
 
 type shodanModule struct {
 	lastReqTime   time.Time
@@ -69,17 +37,17 @@ func (m *shodanModule) Capabilities() (schema.ModuleCapabilities, error) {
 	customFns := make(map[string]schema.FunctionCapabilities, 2)
 
 	if m.apiKey == "" {
-		customFns[functionInternetDB] = getInternetDBCapabilities()
+		customFns[constants.FuncGetIDBShodan] = getInternetDBCapabilities()
 	} else {
-		customFns[functionShodanAPIIP] = schema.FunctionCapabilities{
+		customFns[constants.FuncGetShodanAPIIP] = schema.FunctionCapabilities{
 			Limit:      1,
 			DelayMs:    0,
-			InputTypes: []string{entityTypeIPv4, entityTypeIPv6},
+			InputTypes: []string{constants.TypeIPv4, constants.TypeIPv6},
 		}
-		customFns[functionShodanAPIDomain] = schema.FunctionCapabilities{
+		customFns[constants.FuncGetShodanAPIDomain] = schema.FunctionCapabilities{
 			Limit:      1,
 			DelayMs:    0,
-			InputTypes: []string{entityTypeDomain},
+			InputTypes: []string{constants.TypeDomain},
 		}
 	}
 
@@ -93,17 +61,17 @@ func (m *shodanModule) Exec(data schema.ModuleInput) (schema.ModuleOutput, error
 
 	for _, fn := range data.Functions {
 		switch fn {
-		case functionInternetDB:
+		case constants.FuncGetIDBShodan:
 			if m.apiKey == "" {
 				execs = append(execs, getInternetDB(data.Target))
 				continue
 			}
-		case functionShodanAPIIP:
+		case constants.FuncGetShodanAPIIP:
 			if m.apiKey != "" {
 				execs = append(execs, m.getShodanAPIIP(data.Target))
 				continue
 			}
-		case functionShodanAPIDomain:
+		case constants.FuncGetShodanAPIDomain:
 			if m.apiKey != "" {
 				execs = append(execs, m.getShodanAPIDomain(data.Target))
 				continue

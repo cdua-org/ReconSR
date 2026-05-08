@@ -6,10 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestParseShodanAPIDomain(t *testing.T) {
+	rootDomainValue := "example.com"
 	rawBody := []byte(`{
 		"tags": ["tag1", "tag2"],
 		"data": [
@@ -31,10 +33,10 @@ func TestParseShodanAPIDomain(t *testing.T) {
 		]
 	}`)
 
-	exec := schema.ModuleExecution{Function: functionShodanAPIDomain}
-	parseShodanAPIDomain(&exec, rawBody, testShodanAPIDomain)
+	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIDomain}
+	parseShodanAPIDomain(&exec, rawBody, rootDomainValue)
 
-	assertShodanDomainTags(t, exec.Results)
+	assertShodanDomainTags(t, exec.Results, rootDomainValue)
 	assertShodanDomainSubdomainChain(t, exec.Results)
 	assertShodanDomainRootRecords(t, exec.Results)
 	assertShodanDomainMXRecords(t, exec.Results)
@@ -43,13 +45,13 @@ func TestParseShodanAPIDomain(t *testing.T) {
 	assertShodanDomainSOA(t, exec.Results)
 	assertShodanDomainAdvancedRecords1(t, exec.Results)
 	assertShodanDomainAdvancedRecords2(t, exec.Results)
-	assertShodanDomainLastSeen(t, exec.Results)
+	assertShodanDomainLastSeen(t, exec.Results, rootDomainValue)
 }
 
-func assertShodanDomainTags(t *testing.T, results []schema.ModuleResult) {
+func assertShodanDomainTags(t *testing.T, results []schema.ModuleResult, rootDomainValue string) {
 	t.Helper()
 
-	domainResult := requireModuleResult(t, results, entityTypeDomain, testShodanAPIDomain)
+	domainResult := requireModuleResult(t, results, constants.TypeDomain, rootDomainValue)
 	if len(domainResult.Tags) != 2 || domainResult.Tags[0] != "tag1" || domainResult.Tags[1] != "tag2" {
 		t.Fatalf("expected tags [tag1, tag2], got %v", domainResult.Tags)
 	}
@@ -58,24 +60,25 @@ func assertShodanDomainTags(t *testing.T, results []schema.ModuleResult) {
 func assertShodanDomainSubdomainChain(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	wwwSubdomain := requireModuleResult(t, results, resultTypeSubdomain, "www."+testShodanAPIDomain)
+	wwwSubdomainValue := "www.example.com"
+	wwwSubdomain := requireModuleResult(t, results, constants.TypeSubdomain, wwwSubdomainValue)
 	if wwwSubdomain.Source != nil {
 		t.Fatalf("expected direct subdomain relation, got %+v", wwwSubdomain.Source)
 	}
 
-	wwwIPv4 := requireModuleResult(t, results, entityTypeIPv4, "198.51.100.25")
-	if wwwIPv4.Source == nil || wwwIPv4.Source.Type != resultTypeSubdomain || wwwIPv4.Source.Value != "www."+testShodanAPIDomain {
+	wwwIPv4 := requireModuleResult(t, results, constants.TypeIPv4, "198.51.100.25")
+	if wwwIPv4.Source == nil || wwwIPv4.Source.Type != constants.TypeSubdomain || wwwIPv4.Source.Value != wwwSubdomainValue {
 		t.Fatalf("expected A record linked to www subdomain, got %+v", wwwIPv4.Source)
 	}
 	if wwwIPv4.Context != "A/AAAA Record" {
 		t.Fatalf("expected A/AAAA Record context, got %q", wwwIPv4.Context)
 	}
 
-	wwwSPF := requireModuleResult(t, results, "spf", "v=spf1 -all")
-	if wwwSPF.Source == nil || wwwSPF.Source.Type != resultTypeSubdomain || wwwSPF.Source.Value != "www."+testShodanAPIDomain {
+	wwwSPF := requireModuleResult(t, results, constants.TypeSPF, "v=spf1 -all")
+	if wwwSPF.Source == nil || wwwSPF.Source.Type != constants.TypeSubdomain || wwwSPF.Source.Value != wwwSubdomainValue {
 		t.Fatalf("expected SPF record linked to www subdomain, got %+v", wwwSPF.Source)
 	}
-	if wwwSPF.Category != resultCategoryProperty {
+	if wwwSPF.Category != constants.CategoryProperty {
 		t.Fatalf("expected SPF category to be property, got %q", wwwSPF.Category)
 	}
 }
@@ -83,13 +86,13 @@ func assertShodanDomainSubdomainChain(t *testing.T, results []schema.ModuleResul
 func assertShodanDomainRootRecords(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	rootIPv6 := requireModuleResult(t, results, entityTypeIPv6, "2001:db8::10")
+	rootIPv6 := requireModuleResult(t, results, constants.TypeIPv6, "2001:db8::10")
 	if rootIPv6.Source != nil {
 		t.Fatalf("expected root AAAA record linked to target, got %+v", rootIPv6.Source)
 	}
 
-	nsResult := requireModuleResultWithContext(t, results, "ns", "ns1.example.com", "NS Record")
-	if nsResult.Source == nil || nsResult.Source.Type != resultTypeSubdomain || nsResult.Source.Value != "ns1."+testShodanAPIDomain {
+	nsResult := requireModuleResultWithContext(t, results, constants.TypeNS, "ns1.example.com", "NS Record")
+	if nsResult.Source == nil || nsResult.Source.Type != constants.TypeSubdomain || nsResult.Source.Value != "ns1.example.com" {
 		t.Fatalf("expected NS record linked to ns1 subdomain, got %+v", nsResult.Source)
 	}
 }
@@ -97,16 +100,16 @@ func assertShodanDomainRootRecords(t *testing.T, results []schema.ModuleResult) 
 func assertShodanDomainMXRecords(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	mxProp := requireModuleResult(t, results, "mx", "10 mx.example.com")
-	if mxProp.Category != resultCategoryProperty {
+	mxProp := requireModuleResult(t, results, constants.TypeMX, "10 mx.example.com")
+	if mxProp.Category != constants.CategoryProperty {
 		t.Fatalf("expected MX category to be property, got %q", mxProp.Category)
 	}
-	if mxProp.Source == nil || mxProp.Source.Type != resultTypeSubdomain || mxProp.Source.Value != "mail."+testShodanAPIDomain {
+	if mxProp.Source == nil || mxProp.Source.Type != constants.TypeSubdomain || mxProp.Source.Value != "mail.example.com" {
 		t.Fatalf("expected MX property linked to mail subdomain, got %+v", mxProp.Source)
 	}
 
-	mxHost := requireModuleResult(t, results, "mx_host", "mx.example.com")
-	if mxHost.Category != resultCategoryNode {
+	mxHost := requireModuleResult(t, results, constants.TypeMXHost, "mx.example.com")
+	if mxHost.Category != constants.CategoryNode {
 		t.Fatalf("expected mx_host category to be node, got %q", mxHost.Category)
 	}
 	if mxHost.OutOfScope {
@@ -117,7 +120,7 @@ func assertShodanDomainMXRecords(t *testing.T, results []schema.ModuleResult) {
 func assertShodanDomainCNAMERecords(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	cnameResult := requireModuleResult(t, results, "cname_target", "edge.example.net")
+	cnameResult := requireModuleResult(t, results, constants.TypeCNAMETarget, "edge.example.net")
 	if !cnameResult.OutOfScope {
 		t.Fatal("expected external CNAME target to be out of scope")
 	}
@@ -129,17 +132,17 @@ func assertShodanDomainCNAMERecords(t *testing.T, results []schema.ModuleResult)
 func assertShodanDomainWildcards(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	wildcardDomain := requireModuleResult(t, results, "wildcard_domain", "*."+testShodanAPIDomain)
+	wildcardDomain := requireModuleResult(t, results, constants.TypeWildcardDomain, "*.example.com")
 	if wildcardDomain.Source != nil {
 		t.Fatalf("expected direct wildcard domain relation, got %+v", wildcardDomain.Source)
 	}
 
-	wildcardIP := requireModuleResult(t, results, entityTypeIPv4, "198.51.100.26")
-	if wildcardIP.Source == nil || wildcardIP.Source.Type != "wildcard_domain" || wildcardIP.Source.Value != "*."+testShodanAPIDomain {
+	wildcardIP := requireModuleResult(t, results, constants.TypeIPv4, "198.51.100.26")
+	if wildcardIP.Source == nil || wildcardIP.Source.Type != constants.TypeWildcardDomain || wildcardIP.Source.Value != "*.example.com" {
 		t.Fatalf("expected wildcard A record linked to wildcard_domain, got %+v", wildcardIP.Source)
 	}
 
-	wildcardSubdomain := requireModuleResult(t, results, "wildcard_subdomain", "*.dev."+testShodanAPIDomain)
+	wildcardSubdomain := requireModuleResult(t, results, constants.TypeWildcardSubdomain, "*.dev.example.com")
 	if wildcardSubdomain.Source != nil {
 		t.Fatalf("expected direct wildcard subdomain relation, got %+v", wildcardSubdomain.Source)
 	}
@@ -148,25 +151,25 @@ func assertShodanDomainWildcards(t *testing.T, results []schema.ModuleResult) {
 func assertShodanDomainSOA(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	soaRaw := requireModuleResult(t, results, "soa", "ns1.example.com dns.example.net 1234567890 10000 2400 604800 1800")
+	soaRaw := requireModuleResult(t, results, constants.TypeSOA, "ns1.example.com dns.example.net 1234567890 10000 2400 604800 1800")
 	if soaRaw.Source != nil {
 		t.Fatalf("expected root SOA linked to target, got %+v", soaRaw.Source)
 	}
-	if soaRaw.Category != resultCategoryProperty {
+	if soaRaw.Category != constants.CategoryProperty {
 		t.Fatalf("expected SOA category to be property, got %q", soaRaw.Category)
 	}
 
-	soaSerial := requireModuleResultWithContext(t, results, "soa", "1234567890", "Serial")
+	soaSerial := requireModuleResultWithContext(t, results, constants.TypeSOA, "1234567890", "Serial")
 	if soaSerial.Source != nil {
 		t.Fatalf("expected root SOA serial linked to target, got %+v", soaSerial.Source)
 	}
 
-	primaryNS := requireModuleResultWithContext(t, results, "ns", "ns1.example.com", "Primary NS")
+	primaryNS := requireModuleResultWithContext(t, results, constants.TypeNS, "ns1.example.com", "Primary NS")
 	if primaryNS.Source != nil {
 		t.Fatalf("expected SOA primary NS linked to target, got %+v", primaryNS.Source)
 	}
 
-	email := requireModuleResultWithContext(t, results, "email", "dns@example.net", "Responsible Email")
+	email := requireModuleResultWithContext(t, results, constants.TypeEmail, "dns@example.net", "Responsible Email")
 	if email.Source != nil {
 		t.Fatalf("expected SOA email linked to target, got %+v", email.Source)
 	}
@@ -178,21 +181,18 @@ func assertShodanDomainSOA(t *testing.T, results []schema.ModuleResult) {
 func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	// SRV
-	srvHost := requireModuleResult(t, results, "srv_host", "sip.example.com")
-	if srvHost.Category != resultCategoryNode || srvHost.OutOfScope {
+	srvHost := requireModuleResult(t, results, constants.TypeSRVHost, "sip.example.com")
+	if srvHost.Category != constants.CategoryNode || srvHost.OutOfScope {
 		t.Fatal("expected in-scope srv_host node")
 	}
 
-	// CAA
-	caaAuth := requireModuleResultWithContext(t, results, "cert_authority", "letsencrypt.org", "CAA Record")
-	if caaAuth.Category != resultCategoryNode || !caaAuth.OutOfScope {
+	caaAuth := requireModuleResultWithContext(t, results, constants.TypeCertAuthority, "letsencrypt.org", "CAA Record")
+	if caaAuth.Category != constants.CategoryNode || !caaAuth.OutOfScope {
 		t.Fatal("expected out-of-scope cert_authority node")
 	}
 
-	// URI
-	uriEndpoint := requireModuleResultWithContext(t, results, "url", "https://example.com/api", "URI Endpoint")
-	if uriEndpoint.Category != resultCategoryProperty {
+	uriEndpoint := requireModuleResultWithContext(t, results, constants.TypeURL, "https://example.com/api", "URI Endpoint")
+	if uriEndpoint.Category != constants.CategoryProperty {
 		t.Fatal("expected url property")
 	}
 }
@@ -200,71 +200,74 @@ func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleRes
 func assertShodanDomainAdvancedRecords2(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	// NAPTR
-	naptrTarget := requireModuleResultWithContext(t, results, "naptr_target", "_sip._udp.example.com", "NAPTR Target")
-	if naptrTarget.Category != resultCategoryNode || naptrTarget.OutOfScope {
+	naptrTarget := requireModuleResultWithContext(t, results, constants.TypeNAPTRTarget, "_sip._udp.example.com", "NAPTR Target")
+	if naptrTarget.Category != constants.CategoryNode || naptrTarget.OutOfScope {
 		t.Fatal("expected in-scope naptr_target node")
 	}
 
-	// RP
-	rpEmail := requireModuleResultWithContext(t, results, "email", "admin@example.com", "RP Administrator Email")
-	if rpEmail.Category != resultCategoryNode || rpEmail.OutOfScope {
+	rpEmail := requireModuleResultWithContext(t, results, constants.TypeEmail, "admin@example.com", "RP Administrator Email")
+	if rpEmail.Category != constants.CategoryNode || rpEmail.OutOfScope {
 		t.Fatal("expected in-scope email node for RP")
 	}
-	rpDomain := requireModuleResultWithContext(t, results, "rp_domain", "admin-txt.example.com", "RP TXT Reference Domain")
-	if rpDomain.Category != resultCategoryNode || rpDomain.OutOfScope {
+	rpDomain := requireModuleResultWithContext(t, results, constants.TypeRPDomain, "admin-txt.example.com", "RP TXT Reference Domain")
+	if rpDomain.Category != constants.CategoryNode || rpDomain.OutOfScope {
 		t.Fatal("expected in-scope rp_domain node")
 	}
 
-	// HIP
-	hipServer1 := requireModuleResultWithContext(t, results, "hip_server", "rv1.example.net", "HIP Rendezvous Server")
-	if hipServer1.Category != resultCategoryNode || !hipServer1.OutOfScope {
+	hipServer1 := requireModuleResultWithContext(t, results, constants.TypeHIPServer, "rv1.example.net", "HIP Rendezvous Server")
+	if hipServer1.Category != constants.CategoryNode || !hipServer1.OutOfScope {
 		t.Fatal("expected out-of-scope hip_server node")
 	}
-	hipServer2 := requireModuleResultWithContext(t, results, "hip_server", "rv2.example.com", "HIP Rendezvous Server")
-	if hipServer2.Category != resultCategoryNode || hipServer2.OutOfScope {
+	hipServer2 := requireModuleResultWithContext(t, results, constants.TypeHIPServer, "rv2.example.com", "HIP Rendezvous Server")
+	if hipServer2.Category != constants.CategoryNode || hipServer2.OutOfScope {
 		t.Fatal("expected in-scope hip_server node")
 	}
 }
 
-func assertShodanDomainLastSeen(t *testing.T, results []schema.ModuleResult) {
+func assertShodanDomainLastSeen(t *testing.T, results []schema.ModuleResult, rootDomainValue string) {
 	t.Helper()
 
-	wwwIPLastSeen := findModuleResultBySource(results, "last_seen", entityTypeIPv4, "198.51.100.25")
+	wwwSubdomainValue := "www.example.com"
+	mailSubdomainValue := "mail.example.com"
+
+	wwwIPLastSeen := findModuleResultBySource(results, constants.TypeLastSeen, constants.TypeIPv4, "198.51.100.25")
 	if wwwIPLastSeen == nil {
 		t.Fatal("expected last_seen for www A record")
 	}
 	if wwwIPLastSeen.Value != "2026-05-02T12:30:00.000000" {
 		t.Fatalf("expected www IP last_seen 2026-05-02T12:30:00.000000, got %q", wwwIPLastSeen.Value)
 	}
-	if wwwIPLastSeen.Context != "www."+testShodanAPIDomain {
-		t.Fatalf("expected last_seen context www.%s, got %q", testShodanAPIDomain, wwwIPLastSeen.Context)
+	if wwwIPLastSeen.Context != wwwSubdomainValue {
+		t.Fatalf("expected last_seen context %s, got %q", wwwSubdomainValue, wwwIPLastSeen.Context)
 	}
 
-	mxLastSeen := findModuleResultBySource(results, "last_seen", "mx", "10 mx.example.com")
+	mxLastSeen := findModuleResultBySource(results, constants.TypeLastSeen, constants.TypeMX, "10 mx.example.com")
 	if mxLastSeen == nil {
 		t.Fatal("expected last_seen for MX record")
 	}
 	if mxLastSeen.Value != "2026-05-02T12:32:00.000000" {
 		t.Fatalf("expected MX last_seen 2026-05-02T12:32:00.000000, got %q", mxLastSeen.Value)
 	}
-	if mxLastSeen.Context != "mail."+testShodanAPIDomain {
-		t.Fatalf("expected last_seen context mail.%s, got %q", testShodanAPIDomain, mxLastSeen.Context)
+	if mxLastSeen.Context != mailSubdomainValue {
+		t.Fatalf("expected last_seen context %s, got %q", mailSubdomainValue, mxLastSeen.Context)
 	}
 
-	soaLastSeen := findModuleResultBySource(results, "last_seen", resultTypeSOA, "ns1.example.com dns.example.net 1234567890 10000 2400 604800 1800")
+	soaLastSeen := findModuleResultBySource(results, constants.TypeLastSeen, constants.TypeSOA, "ns1.example.com dns.example.net 1234567890 10000 2400 604800 1800")
 	if soaLastSeen == nil {
 		t.Fatal("expected last_seen for SOA record")
 	}
 	if soaLastSeen.Value != "2026-05-02T12:38:00.000000" {
 		t.Fatalf("expected SOA last_seen 2026-05-02T12:38:00.000000, got %q", soaLastSeen.Value)
 	}
-	if soaLastSeen.Context != testShodanAPIDomain {
-		t.Fatalf("expected last_seen context %s, got %q", testShodanAPIDomain, soaLastSeen.Context)
+	if soaLastSeen.Context != rootDomainValue {
+		t.Fatalf("expected last_seen context %s, got %q", rootDomainValue, soaLastSeen.Context)
 	}
 }
 
 func TestGetShodanAPIDomain(t *testing.T) {
+	rootDomainValue := "example.com"
+	apiKey := shodanTestAPIKey()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api-info":
@@ -272,7 +275,7 @@ func TestGetShodanAPIDomain(t *testing.T) {
 			if _, err := w.Write([]byte(`{"query_credits":1}`)); err != nil {
 				t.Errorf("write error: %v", err)
 			}
-		case "/dns/domain/" + testShodanAPIDomain:
+		case "/dns/domain/" + rootDomainValue:
 			w.WriteHeader(http.StatusOK)
 			if _, err := w.Write([]byte(`{"data":[{"subdomain":"www","type":"A","value":"198.51.100.25"}]}`)); err != nil {
 				t.Errorf("write error: %v", err)
@@ -287,10 +290,10 @@ func TestGetShodanAPIDomain(t *testing.T) {
 	shodanAPIBaseURL = server.URL
 	defer func() { shodanAPIBaseURL = originalBaseURL }()
 
-	module := &shodanModule{apiKey: testShodanAPIKey}
+	module := &shodanModule{apiKey: apiKey}
 	module.lastReqTime = time.Now().Add(-2 * time.Second)
 
-	exec := module.getShodanAPIDomain(schema.Entity{Type: entityTypeDomain, Value: testShodanAPIDomain})
+	exec := module.getShodanAPIDomain(schema.Entity{Type: constants.TypeDomain, Value: rootDomainValue})
 	if exec.Error != nil {
 		t.Fatalf("unexpected error: %v", *exec.Error)
 	}
@@ -301,13 +304,13 @@ func TestGetShodanAPIDomain(t *testing.T) {
 		t.Fatalf("expected credits to be decremented to 0, got %d", module.queryCredits)
 	}
 
-	requireModuleResult(t, exec.Results, resultTypeSubdomain, "www."+testShodanAPIDomain)
-	requireModuleResult(t, exec.Results, entityTypeIPv4, "198.51.100.25")
+	requireModuleResult(t, exec.Results, constants.TypeSubdomain, "www.example.com")
+	requireModuleResult(t, exec.Results, constants.TypeIPv4, "198.51.100.25")
 
 	module.lastReqTime = time.Now().Add(-2 * time.Second)
-	exhaustedExec := module.getShodanAPIDomain(schema.Entity{Type: entityTypeDomain, Value: testShodanAPIDomain})
-	infoResult := requireModuleResult(t, exhaustedExec.Results, resultTypeInfo, "Shodan API key is invalid or query credits exhausted")
-	if infoResult.Category != resultCategoryProperty {
+	exhaustedExec := module.getShodanAPIDomain(schema.Entity{Type: constants.TypeDomain, Value: rootDomainValue})
+	infoResult := requireModuleResult(t, exhaustedExec.Results, constants.TypeInfo, "Shodan API key is invalid or query credits exhausted")
+	if infoResult.Category != constants.CategoryProperty {
 		t.Fatalf("expected info result to be property, got %q", infoResult.Category)
 	}
 }

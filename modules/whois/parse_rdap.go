@@ -59,17 +59,17 @@ func parseRDAPEntities(m *Metadata, entities []any) {
 func extractVCardProps(m *Metadata, role string, props []any) {
 	var targetContact *Contact
 	switch role {
-	case roleRegistrar:
+	case whoisRoleRegistrar:
 		targetContact = &m.Registrar
-	case roleRegistrant:
+	case whoisRoleRegistrant:
 		targetContact = &m.Registrant
-	case roleAdministrative:
+	case whoisRoleAdministrative:
 		targetContact = &m.Admin
-	case roleTechnical:
+	case whoisRoleTechnical:
 		targetContact = &m.Tech
-	case roleBilling:
+	case whoisRoleBilling:
 		targetContact = &m.Billing
-	case roleAbuse:
+	case whoisRoleAbuse:
 		targetContact = &m.Abuse
 	default:
 		return
@@ -91,16 +91,16 @@ func applyVCardProp(m *Metadata, c *Contact, role string, p any) {
 	switch name {
 	case "fn":
 		c.Name = appendUnique(c.Name, value)
-	case fieldOrg:
+	case whoisFieldOrg:
 		c.Organization = appendUnique(c.Organization, value)
-	case fieldEmail:
+	case whoisFieldEmail:
 		c.Email = appendUnique(c.Email, value)
 	case "adr":
 		c.Address = appendUnique(c.Address, value)
 	case "tel":
 		c.Phone = appendUnique(c.Phone, value)
-	case "url":
-		if role == roleRegistrar {
+	case whoisFieldURL:
+		if role == whoisRoleRegistrar {
 			m.RegistrarURL = value
 		}
 	}
@@ -118,7 +118,7 @@ func parseRDAPEvents(m *Metadata, events []any) {
 		switch action {
 		case "registration":
 			m.CreationDate = date
-		case "expiration":
+		case whoisFieldExpiration:
 			m.ExpirationDate = date
 		case "last changed":
 			m.UpdatedDate = date

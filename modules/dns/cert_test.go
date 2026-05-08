@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseCERT(t *testing.T) {
@@ -19,7 +21,7 @@ func TestParseCERT(t *testing.T) {
 			"3 12345 0 QVFJPQo=",
 		},
 		{
-			"passthrough non-wire",
+			"passthrough cert text",
 			"3 12345 0 Base64Data",
 			"3 12345 0 Base64Data",
 		},
@@ -61,7 +63,7 @@ func TestCERTCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_cert") {
+	if !slices.Contains(caps.Functions, constants.FuncGetCERT) {
 		t.Error("expected get_cert in capabilities")
 	}
 }

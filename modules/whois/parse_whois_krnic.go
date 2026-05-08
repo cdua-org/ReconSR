@@ -12,7 +12,7 @@ func applyKRMatch(m *Metadata, key, val string) {
 		m.Admin.Email = appendUnique(m.Admin.Email, val)
 	case "kr_ac_phone":
 		m.Admin.Phone = appendUnique(m.Admin.Phone, val)
-	case "kr_reg_zip":
+	case whoisFieldKRRegZip:
 		m.Registrant.Address = appendUnique(m.Registrant.Address, val)
 	}
 }

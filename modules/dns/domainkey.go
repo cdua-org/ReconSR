@@ -6,18 +6,19 @@ import (
 	"net"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
 func getDomainKeyData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_domainkey")
+	exec := modutil.NewExecution(constants.FuncGetDomainKey)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
 
-	domainkeyTarget := "_domainkey." + target
+	domainkeyTarget := domainKeyLabel + "." + target
 
 	plainFallback := func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {
 		txts, err := r.LookupTXT(fallbackCtx, domainkeyTarget)
@@ -43,8 +44,8 @@ func getDomainKeyData(ctx context.Context, target string) schema.ModuleExecution
 	for _, rec := range records {
 		rec = strings.Trim(strings.TrimSpace(rec), "\"")
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "domainkey",
-			Category: "property",
+			Type:     constants.TypeDomainKey,
+			Category: constants.CategoryProperty,
 			Value:    rec,
 			Context:  "Old DomainKey Record: " + domainkeyTarget,
 		})

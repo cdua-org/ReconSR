@@ -5,10 +5,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseSVCBWire(t *testing.T) {
-	raw := "\\# 61 00 01 00 00 01 00 06 02 68 33 02 68 32 00 04 00 08 68 10 84 e5 68 10 85 e5 00 06 00 20 26 06 47 00 00 00 00 00 00 00 00 00 68 10 84 e5 26 06 47 00 00 00 00 00 00 00 00 00 68 10 85 e5"
+	raw := "\\# 61 00 01 00 00 01 00 06 02 68 33 02 68 32 00 04 00 08 c0 00 02 01 c6 33 64 02 00 06 00 20 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02"
 
 	priority, target, params, ok := parseSVCBWire(raw)
 	if !ok {
@@ -27,12 +29,12 @@ func TestParseSVCBWire(t *testing.T) {
 		t.Errorf("expected alpn to contain h3,h2, got %q", v)
 	}
 
-	if v, exists := params["ipv4hint"]; !exists || !strings.Contains(v, "104.16.") {
-		t.Errorf("expected ipv4hint with 104.16.x.x, got %q", v)
+	if v, exists := params["ipv4hint"]; !exists || !strings.Contains(v, "192.0.2.1") || !strings.Contains(v, "198.51.100.2") {
+		t.Errorf("expected ipv4hint with reserved test IPv4 addresses, got %q", v)
 	}
 
-	if v, exists := params["ipv6hint"]; !exists || !strings.Contains(v, "2606:4700") {
-		t.Errorf("expected ipv6hint with 2606:4700, got %q", v)
+	if v, exists := params["ipv6hint"]; !exists || !strings.Contains(v, "2001:db8::1") {
+		t.Errorf("expected ipv6hint with reserved test IPv6 addresses, got %q", v)
 	}
 }
 
@@ -67,7 +69,7 @@ func TestSVCBCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_svcb") {
+	if !slices.Contains(caps.Functions, constants.FuncGetSVCB) {
 		t.Error("expected get_svcb in capabilities")
 	}
 }

@@ -2,6 +2,7 @@
 package anubis
 
 import (
+	"cdua-org/ReconSR/modules/utils/constants"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,9 +19,15 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-var dbg = debuglog.New("anubis")
+const (
+	moduleName    = "anubis"
+	baseURL       = "https://jldc.me/anubis/subdomains/"
+	acceptJSON    = "application/json"
+	anubisContext = "Anubis DB"
+	anubisLimit   = 1000
+)
 
-const baseURL = "https://jldc.me/anubis/subdomains/"
+var dbg = debuglog.New(moduleName)
 
 type module struct{}
 
@@ -30,16 +37,16 @@ func New() schema.Module {
 }
 
 func (m *module) Name() string {
-	return "anubis"
+	return moduleName
 }
 
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
 		CustomFunctions: map[string]schema.FunctionCapabilities{
-			"get_domains": {
+			constants.FuncGetDomains: {
 				Limit:      3,
 				DelayMs:    2000,
-				InputTypes: []string{"domain"},
+				InputTypes: []string{constants.TypeDomain},
 			},
 		},
 	}, nil
@@ -52,7 +59,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		var execution schema.ModuleExecution
 
 		switch f {
-		case "get_domains":
+		case constants.FuncGetDomains:
 			execution = getDomains(data.Target.Value)
 		default:
 			execution = modutil.NewExecution(f)
@@ -76,7 +83,7 @@ func fetchAnubisData(ctx context.Context, target string) ([]byte, error) {
 		}
 
 		req.Header.Set("User-Agent", resolver.GetRandomUserAgent())
-		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Accept", acceptJSON)
 
 		client := &http.Client{Timeout: resolver.HTTPTimeout}
 		resp, err := client.Do(req)
@@ -125,7 +132,7 @@ func fetchAnubisData(ctx context.Context, target string) ([]byte, error) {
 }
 
 func getDomains(target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_domains")
+	exec := modutil.NewExecution(constants.FuncGetDomains)
 
 	ctx, cancel := context.WithTimeout(context.Background(), resolver.HTTPTimeout*2)
 	defer cancel()
@@ -147,7 +154,7 @@ func getDomains(target string) schema.ModuleExecution {
 
 	limit := resolver.AnubisLimit
 	if limit <= 0 {
-		limit = 1000
+		limit = anubisLimit
 	}
 
 	seen := make(map[string]bool)
@@ -178,7 +185,7 @@ func getDomains(target string) schema.ModuleExecution {
 			cleanDomain = strings.TrimPrefix(domain, "*.")
 		}
 
-		if _, err := validator.Validate("domain", cleanDomain); err != nil {
+		if _, err := validator.Validate(constants.TypeDomain, cleanDomain); err != nil {
 			dbg.Printf("skipped invalid domain %q: %v", domain, err)
 			continue
 		}
@@ -189,16 +196,16 @@ func getDomains(target string) schema.ModuleExecution {
 		seen[domain] = true
 		processedCount++
 
-		resType := "subdomain"
+		resType := constants.TypeSubdomain
 		if isWildcard {
-			resType = "wildcard_subdomain"
+			resType = constants.TypeWildcardSubdomain
 		}
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     resType,
-			Category: "node",
+			Category: constants.CategoryNode,
 			Value:    domain,
-			Context:  "Anubis DB",
+			Context:  anubisContext,
 			Applied:  true,
 		})
 	}

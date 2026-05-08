@@ -3,6 +3,7 @@ package asn_metadata
 import (
 	"context"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/modules/utils/ripestat"
@@ -10,7 +11,7 @@ import (
 )
 
 func getASNPrefixes(target string) (execution schema.ModuleExecution) {
-	execution = modutil.NewExecution("get_asn_prefixes")
+	execution = modutil.NewExecution(constants.FuncGetASNPrefixes)
 
 	dbg.Printf("getASNPrefixes target=%q", target)
 
@@ -30,7 +31,7 @@ func getASNPrefixes(target string) (execution schema.ModuleExecution) {
 		execution.RawData = resp.RawJSON
 	}()
 
-	if err := ripestat.Query(ctx, originASN, "announced-prefixes", &resp, resolver.MaxRetriesASNMeta); err != nil {
+	if err := ripestat.Query(ctx, originASN, constants.RIPEstatEndpointAnnouncedPrefixes, &resp, resolver.MaxRetriesASNMeta); err != nil {
 		errMsg := "asn prefixes lookup failed: " + err.Error()
 		execution.Error = &errMsg
 		dbg.Printf("getASNPrefixes target=%q lookup_error=%v", target, err)
@@ -38,8 +39,8 @@ func getASNPrefixes(target string) (execution schema.ModuleExecution) {
 	}
 
 	execution.Results = append(execution.Results, schema.ModuleResult{
-		Type:     "asn",
-		Category: "node",
+		Type:     constants.TypeASN,
+		Category: constants.CategoryNode,
 		Value:    originASN,
 		Context:  "Origin AS",
 		Applied:  true,
@@ -48,8 +49,8 @@ func getASNPrefixes(target string) (execution schema.ModuleExecution) {
 	for _, p := range resp.Data.Prefixes {
 		if p.Prefix != "" {
 			execution.Results = append(execution.Results, schema.ModuleResult{
-				Type:     "cidr",
-				Category: "property",
+				Type:     constants.TypeCIDR,
+				Category: constants.CategoryProperty,
 				Value:    p.Prefix,
 				Context:  "Announced Prefix",
 			})

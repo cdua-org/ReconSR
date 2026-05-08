@@ -1,10 +1,10 @@
 package mailcrypto
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestParseSMIMEA(t *testing.T) {
+	const smimeaRecord = "3 0 1 010203"
+
 	tests := []struct {
 		name     string
 		input    string
@@ -13,12 +13,12 @@ func TestParseSMIMEA(t *testing.T) {
 		{
 			"standard wire format",
 			"\\# 6 030001010203",
-			"3 0 1 010203",
+			smimeaRecord,
 		},
 		{
 			"passthrough non-wire",
-			"3 0 1 010203",
-			"3 0 1 010203",
+			smimeaRecord,
+			smimeaRecord,
 		},
 	}
 

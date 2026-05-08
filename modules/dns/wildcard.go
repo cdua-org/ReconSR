@@ -5,13 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
 func checkWildcard(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("check_wildcard")
+	exec := modutil.NewExecution(constants.FuncCheckWildcard)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
@@ -38,8 +39,8 @@ func checkWildcard(ctx context.Context, target string) schema.ModuleExecution {
 
 	for _, ipStr := range ips {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "ip",
-			Category: "node",
+			Type:     constants.TypeIP,
+			Category: constants.CategoryNode,
 			Value:    ipStr,
 			Context:  "Wildcard Record",
 		})

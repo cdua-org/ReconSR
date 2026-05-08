@@ -6,13 +6,14 @@ import (
 	"net"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
 func getTXTData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_txt")
+	exec := modutil.NewExecution(constants.FuncGetTXT)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
@@ -55,16 +56,16 @@ func getTXTData(ctx context.Context, target string) schema.ModuleExecution {
 
 	for _, spf := range spfRecords {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "spf",
-			Category: "property",
+			Type:     constants.TypeSPF,
+			Category: constants.CategoryProperty,
 			Value:    spf,
 		})
 	}
 
 	for _, txt := range generalRecords {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "txt",
-			Category: "property",
+			Type:     constants.TypeTXT,
+			Category: constants.CategoryProperty,
 			Value:    txt,
 		})
 	}

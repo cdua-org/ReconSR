@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -41,7 +42,7 @@ func parseCERT(raw string) string {
 }
 
 func getCERTData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_cert")
+	exec := modutil.NewExecution(constants.FuncGetCERT)
 
 	log.Printf("get_cert target=%q", target)
 
@@ -84,8 +85,8 @@ func getCERTData(ctx context.Context, target string) schema.ModuleExecution {
 		}
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "cert",
-			Category: "property",
+			Type:     constants.TypeCert,
+			Category: constants.CategoryProperty,
 			Value:    parts[3],
 			Context:  "CERT Record, Type: " + cTypeName + ", KeyTag: " + keyTag + ", Alg: " + algName,
 		})

@@ -1,12 +1,16 @@
 package asn_metadata
 
 import (
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
-const errInvalidASNFormat = "invalid asn format"
+const (
+	errInvalidASNFormat = "invalid asn format"
+	moduleName          = "asn_metadata"
+)
 
 var dbg = debuglog.New("asn_meta")
 
@@ -18,13 +22,13 @@ func New() schema.Module {
 }
 
 func (m *module) Name() string {
-	return "asn_metadata"
+	return moduleName
 }
 
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
-		Functions:  []string{"get_asn_peers", "get_asn_prefixes", "get_asn_info", "get_asn_abuse_contacts"},
-		InputTypes: []string{"asn"},
+		Functions:  []string{constants.FuncGetASNPeers, constants.FuncGetASNPrefixes, constants.FuncGetASNInfo, constants.FuncGetASNAbuseContacts},
+		InputTypes: []string{constants.TypeASN},
 		ModuleConfig: &schema.FunctionCapabilities{
 			Limit:   10,
 			DelayMs: 500,
@@ -39,13 +43,13 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		var execution schema.ModuleExecution
 
 		switch f {
-		case "get_asn_peers":
+		case constants.FuncGetASNPeers:
 			execution = getASNPeers(data.Target.Value)
-		case "get_asn_prefixes":
+		case constants.FuncGetASNPrefixes:
 			execution = getASNPrefixes(data.Target.Value)
-		case "get_asn_info":
+		case constants.FuncGetASNInfo:
 			execution = getASNInfo(data.Target.Value)
-		case "get_asn_abuse_contacts":
+		case constants.FuncGetASNAbuseContacts:
 			execution = getASNAbuseContacts(data.Target.Value)
 		default:
 			execution = modutil.NewExecution(f)

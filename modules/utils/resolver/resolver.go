@@ -20,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/httputil"
 )
 
@@ -171,10 +172,31 @@ func parseConfig(content string) {
 	plainServers = plain
 
 	if len(dohServers) == 0 {
-		dohServers = []string{"https://dns.cloudflare.com/dns-query", "https://dns.google/resolve"}
+		dohServers = []string{
+			constants.DNSResolverDoHCloudflare,
+			constants.DNSResolverDoHGoogle,
+			constants.DNSResolverDoHAdGuard,
+			constants.DNSResolverDoHMozillaCloudflare,
+			constants.DNSResolverDoHSB,
+		}
 	}
 	if len(plainServers) == 0 {
-		plainServers = []string{"1.1.1.1", "8.8.8.8"}
+		plainServers = []string{
+			constants.DNSResolverCloudflarePrimary,
+			constants.DNSResolverGooglePrimary,
+			constants.DNSResolverQuad9Primary,
+			constants.DNSResolverAdGuardPrimary,
+			constants.DNSResolverDNSWatchPrimary,
+			constants.DNSResolverResolver19318398154,
+			constants.DNSResolverLevel3Primary,
+			constants.DNSResolverCloudflareSecondary,
+			constants.DNSResolverGoogleSecondary,
+			constants.DNSResolverQuad9Secondary,
+			constants.DNSResolverAdGuardSecondary,
+			constants.DNSResolverDNSWatchSecondary,
+			constants.DNSResolverResolver185121177177,
+			constants.DNSResolverLevel3Secondary,
+		}
 	}
 }
 

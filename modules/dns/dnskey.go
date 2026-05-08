@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -14,22 +15,22 @@ import (
 )
 
 var dnskeyAlgorithms = map[byte]string{
-	1:   "RSAMD5",
-	2:   "DH",
-	3:   "DSA",
-	5:   "RSASHA1",
-	6:   "DSA-NSEC3-SHA1",
-	7:   "RSASHA1-NSEC3-SHA1",
-	8:   "RSASHA256",
-	10:  "RSASHA512",
-	12:  "ECC-GOST",
-	13:  "ECDSAP256SHA256",
-	14:  "ECDSAP384SHA384",
-	15:  "ED25519",
-	16:  "ED448",
-	252: "INDIRECT",
-	253: "PRIVATEDNS",
-	254: "PRIVATEOID",
+	1:   constants.AlgRSAMD5,
+	2:   constants.AlgDH,
+	3:   constants.AlgDSA,
+	5:   constants.AlgRSASHA1,
+	6:   constants.AlgDSANSEC3SHA1,
+	7:   constants.AlgRSASHA1NSEC3SHA1,
+	8:   constants.AlgRSASHA256,
+	10:  constants.AlgRSASHA512,
+	12:  constants.AlgECCGOST,
+	13:  constants.AlgECDSAP256SHA256,
+	14:  constants.AlgECDSAP384SHA384,
+	15:  constants.AlgED25519,
+	16:  constants.AlgED448,
+	252: constants.AlgIndirect,
+	253: constants.AlgPrivateDNS,
+	254: constants.AlgPrivateOID,
 }
 
 func parseDNSKEY(raw string) string {
@@ -52,7 +53,7 @@ func parseDNSKEY(raw string) string {
 }
 
 func getDNSKEYData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_dnskey")
+	exec := modutil.NewExecution(constants.FuncGetDNSKEY)
 
 	log.Printf("get_dnskey target=%q", target)
 
@@ -88,15 +89,15 @@ func getDNSKEYData(ctx context.Context, target string) schema.ModuleExecution {
 			switch flagsStr {
 			case "257":
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     "dnskey",
-					Category: "property",
+					Type:     constants.TypeDNSKEY,
+					Category: constants.CategoryProperty,
 					Value:    parts[3],
 					Context:  "DNSKEY KSK, Alg: " + algName,
 				})
 			case "256":
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     "dnskey",
-					Category: "property",
+					Type:     constants.TypeDNSKEY,
+					Category: constants.CategoryProperty,
 					Value:    parts[3],
 					Context:  "DNSKEY ZSK, Alg: " + algName,
 				})

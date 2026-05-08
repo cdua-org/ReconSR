@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
@@ -17,15 +18,12 @@ import (
 )
 
 var ipseckeyAlgorithms = map[byte]string{
-	1: "DSA",
-	2: "RSA",
-	3: "ECDSA",
+	1: constants.AlgDSA,
+	2: constants.AlgRSA,
+	3: constants.AlgECDSA,
 }
 
-const (
-	ipsecGatewayType             = "ipsec_gateway"
-	ipsecGatewayDomainValidation = "domain"
-)
+const ipsecGatewayDomainValidation = constants.TypeDomain
 
 var ipseckeyGatewayTypes = map[byte]string{
 	0: "None",
@@ -136,15 +134,15 @@ func mapIPSECKEYContext(precedence, gwTypeStr, algStr string) (ctx, gwTypeName s
 
 func classifyIPSECKEYGateway(gwTypeStr, gateway, target string) (schema.ModuleResult, bool) {
 	var validationType string
-	emittedType := ipsecGatewayType
+	emittedType := constants.TypeIPSECGateway
 
 	switch gwTypeStr {
 	case "1":
-		validationType = "ipv4"
-		emittedType = "ip"
+		validationType = constants.TypeIPv4
+		emittedType = constants.TypeIP
 	case "2":
-		validationType = "ipv6"
-		emittedType = "ip"
+		validationType = constants.TypeIPv6
+		emittedType = constants.TypeIP
 	case "3":
 		validationType = ipsecGatewayDomainValidation
 	default:
@@ -156,18 +154,18 @@ func classifyIPSECKEYGateway(gwTypeStr, gateway, target string) (schema.ModuleRe
 		return schema.ModuleResult{}, false
 	}
 
-	if (validationType == "ipv4" || validationType == "ipv6") && res.Type != validationType {
+	if (validationType == constants.TypeIPv4 || validationType == constants.TypeIPv6) && res.Type != validationType {
 		return schema.ModuleResult{}, false
 	}
 
 	isOOS := false
-	if emittedType == ipsecGatewayType {
+	if emittedType == constants.TypeIPSECGateway {
 		isOOS = orgdomain.IsOutOfScope(res.Value, target)
 	}
 
 	return schema.ModuleResult{
 		Type:       emittedType,
-		Category:   "node",
+		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		OutOfScope: isOOS,
 	}, true
@@ -188,8 +186,8 @@ func buildIPSECKEYResults(parsed, target string) []schema.ModuleResult {
 	ctxStr, gwTypeName := mapIPSECKEYContext(precedence, gwTypeStr, algStr)
 	results := make([]schema.ModuleResult, 0, 2)
 	results = append(results, schema.ModuleResult{
-		Type:     "ipseckey",
-		Category: "property",
+		Type:     constants.TypeIPSECKEY,
+		Category: constants.CategoryProperty,
 		Value:    pubKey,
 		Context:  ctxStr,
 	})
@@ -210,7 +208,7 @@ func buildIPSECKEYResults(parsed, target string) []schema.ModuleResult {
 }
 
 func getIPSECKEYData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_ipseckey")
+	exec := modutil.NewExecution(constants.FuncGetIPSECKEY)
 	log.Printf("get_ipseckey target=%q", target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)

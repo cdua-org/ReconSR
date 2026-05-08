@@ -4,6 +4,8 @@ import (
 	"context"
 	"slices"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestGetTXTDataEmpty(t *testing.T) {
@@ -36,7 +38,7 @@ func TestTXTCapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_txt") {
+	if !slices.Contains(caps.Functions, constants.FuncGetTXT) {
 		t.Error("expected get_txt in capabilities")
 	}
 }

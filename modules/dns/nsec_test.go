@@ -5,10 +5,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestGetNSECData(t *testing.T) {
-	execution := getNSECData(context.Background(), "isc.org")
+	execution := getNSECData(context.Background(), "example.com")
 
 	if execution.Error != nil {
 		t.Logf("nsec lookup failed (this can vary by network): %v", *execution.Error)
@@ -24,7 +26,7 @@ func TestGetNSECData(t *testing.T) {
 	}
 
 	if !foundNsec {
-		t.Logf("Expected some NSEC/NSEC3 records for isc.org, got none. This can happen on some networks.")
+		t.Logf("Expected some NSEC/NSEC3 records for example.com, got none. This can happen on some networks.")
 	}
 }
 
@@ -50,7 +52,7 @@ func TestNSECCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_nsec") {
+	if !slices.Contains(caps.Functions, constants.FuncGetNSEC) {
 		t.Error("expected get_nsec in capabilities")
 	}
 }

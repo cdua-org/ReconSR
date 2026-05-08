@@ -1,0 +1,27 @@
+package whois
+
+const (
+	whoisRoleRegistrar          = "registrar"
+	whoisRoleRegistrant         = "registrant"
+	whoisRoleAdministrative     = "administrative"
+	whoisRoleTechnical          = "technical"
+	whoisRoleBilling            = "billing"
+	whoisRoleAbuse              = "abuse"
+	whoisRoleNameServers        = "nameservers"
+	whoisFieldOrg               = "org"
+	whoisFieldEmail             = "email"
+	whoisFieldExpiration        = "expiration"
+	whoisFieldURL               = "url"
+	whoisFieldStatus            = "status"
+	whoisFieldWhoisServer       = "whoisserver"
+	whoisFieldIANAID            = "ianaid"
+	whoisFieldDNSSEC            = "dnssec"
+	whoisFieldCreation          = "creation"
+	whoisFieldUpdated           = "updated"
+	whoisFieldRPSLAddr          = "rpsl_addr"
+	whoisFieldCNRegistrant      = "cn_registrant"
+	whoisFieldCNRegistrantEmail = "cn_registrant_email"
+	whoisFieldJP2PostalCode     = "jp2_postal_code"
+	whoisFieldJP2Address        = "jp2_address"
+	whoisFieldKRRegZip          = "kr_reg_zip"
+)

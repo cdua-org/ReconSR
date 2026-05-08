@@ -4,6 +4,7 @@ import (
 	"slices"
 	"testing"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
@@ -15,46 +16,46 @@ func TestModuleCapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_asn_peers") {
+	if !slices.Contains(caps.Functions, constants.FuncGetASNPeers) {
 		t.Error("expected get_asn_peers in capabilities")
 	}
-	if !slices.Contains(caps.Functions, "get_asn_prefixes") {
+	if !slices.Contains(caps.Functions, constants.FuncGetASNPrefixes) {
 		t.Error("expected get_asn_prefixes in capabilities")
 	}
-	if !slices.Contains(caps.Functions, "get_asn_info") {
+	if !slices.Contains(caps.Functions, constants.FuncGetASNInfo) {
 		t.Error("expected get_asn_info in capabilities")
 	}
-	if !slices.Contains(caps.Functions, "get_asn_abuse_contacts") {
+	if !slices.Contains(caps.Functions, constants.FuncGetASNAbuseContacts) {
 		t.Error("expected get_asn_abuse_contacts in capabilities")
 	}
-	if !slices.Contains(caps.InputTypes, "asn") {
+	if !slices.Contains(caps.InputTypes, constants.TypeASN) {
 		t.Error("expected asn in input types")
 	}
 }
 
 func TestGetASNPeersClean(t *testing.T) {
-	res := getASNPeers("8.8.8.8")
+	res := getASNPeers("AS64512")
 	if res.Error == nil {
 		t.Log("network error may occur, skipping test")
 	}
 }
 
 func TestGetASNPrefixesClean(t *testing.T) {
-	res := getASNPrefixes("8.8.8.8")
+	res := getASNPrefixes("AS64513")
 	if res.Error == nil {
 		t.Log("network error may occur, skipping test")
 	}
 }
 
 func TestGetASNInfoClean(t *testing.T) {
-	res := getASNInfo("8.8.8.8")
+	res := getASNInfo("AS64514")
 	if res.Error == nil {
 		t.Log("network error may occur, skipping test")
 	}
 }
 
 func TestGetASNAbuseContactsClean(t *testing.T) {
-	res := getASNAbuseContacts("8.8.8.8")
+	res := getASNAbuseContacts("AS64515")
 	if res.Error == nil {
 		t.Log("network error may occur, skipping test")
 	}
@@ -90,47 +91,39 @@ func TestGetASNAbuseContactsInvalid(t *testing.T) {
 
 func TestGetASNPeersDebug(t *testing.T) {
 	t.Log("Testing debug output for ASN peers")
-	const debugStr = "true"
-	const debugFalse = "false"
-	resolver.Options["Debug"] = debugStr
-	defer func() { resolver.Options["Debug"] = debugFalse }()
+	resolver.Options["Debug"] = "true"
+	defer func() { resolver.Options["Debug"] = "false" }()
 
-	getASNPeers("AS3333")
-	getASNPrefixes("AS3333")
-	getASNInfo("AS3333")
-	getASNAbuseContacts("AS3333")
+	getASNPeers("AS64516")
+	getASNPrefixes("AS64516")
+	getASNInfo("AS64516")
+	getASNAbuseContacts("AS64516")
 }
 
-const testASN = "AS3333"
-
 func TestBuildChainString(t *testing.T) {
-	chain := []string{"AS174", "AS3356"}
-	origin := testASN
+	const (
+		leftASN   = "AS64518"
+		rightASN  = "AS64519"
+		originASN = "AS64517"
+	)
 
-	result := buildChainString(chain, origin)
-	expected := "AS3356 <- AS174 <- " + testASN
-
-	if result != expected {
-		t.Errorf("buildChainString() = %q, want %q", result, expected)
+	result := buildChainString([]string{leftASN, rightASN}, originASN)
+	if result != rightASN+chainSeparator+leftASN+chainSeparator+originASN {
+		t.Errorf("buildChainString() = %q, want %q", result, rightASN+chainSeparator+leftASN+chainSeparator+originASN)
 	}
 }
 
 func TestBuildChainStringEmpty(t *testing.T) {
-	chain := []string{}
-	origin := testASN
-
-	result := buildChainString(chain, origin)
-	expected := testASN
-
-	if result != expected {
-		t.Errorf("buildChainString() = %q, want %q", result, expected)
+	result := buildChainString([]string{}, "AS64520")
+	if result != "AS64520" {
+		t.Errorf("buildChainString() = %q, want %q", result, "AS64520")
 	}
 }
 
 func TestModuleName(t *testing.T) {
 	mod := New()
-	if mod.Name() != "asn_metadata" {
-		t.Errorf("expected module name 'asn_metadata', got %q", mod.Name())
+	if mod.Name() != moduleName {
+		t.Errorf("expected module name %q, got %q", moduleName, mod.Name())
 	}
 }
 
@@ -138,10 +131,10 @@ func TestModuleExec(t *testing.T) {
 	mod := New()
 	input := schema.ModuleInput{
 		Target: schema.Entity{
-			Type:  "asn",
-			Value: testASN,
+			Type:  constants.TypeASN,
+			Value: "AS64521",
 		},
-		Functions: []string{"get_asn_peers", "get_asn_prefixes", "get_asn_info", "get_asn_abuse_contacts", "invalid_func"},
+		Functions: []string{constants.FuncGetASNPeers, constants.FuncGetASNPrefixes, constants.FuncGetASNInfo, constants.FuncGetASNAbuseContacts, "invalid_func"},
 	}
 
 	out, err := mod.Exec(input)
@@ -155,16 +148,16 @@ func TestModuleExec(t *testing.T) {
 
 	var foundPeers, foundPrefixes, foundInfo, foundAbuse, foundInvalid bool
 	for _, exec := range out.Executions {
-		if exec.Function == "get_asn_peers" {
+		if exec.Function == constants.FuncGetASNPeers {
 			foundPeers = true
 		}
-		if exec.Function == "get_asn_prefixes" {
+		if exec.Function == constants.FuncGetASNPrefixes {
 			foundPrefixes = true
 		}
-		if exec.Function == "get_asn_info" {
+		if exec.Function == constants.FuncGetASNInfo {
 			foundInfo = true
 		}
-		if exec.Function == "get_asn_abuse_contacts" {
+		if exec.Function == constants.FuncGetASNAbuseContacts {
 			foundAbuse = true
 		}
 		if exec.Function == "invalid_func" {

@@ -3,17 +3,25 @@ package asn_metadata
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/modules/utils/ripestat"
 	"cdua-org/ReconSR/schema"
 )
 
+const (
+	chainSeparator         = " <- "
+	chainTooManyPeers      = "[TOO_MANY_PEERS]"
+	neighbourPositionRight = "right"
+)
+
 func getASNPeers(target string) (execution schema.ModuleExecution) {
-	execution = modutil.NewExecution("get_asn_peers")
+	execution = modutil.NewExecution(constants.FuncGetASNPeers)
 
 	dbg.Printf("getASNPeers target=%q", target)
 
@@ -36,10 +44,7 @@ func getASNPeers(target string) (execution schema.ModuleExecution) {
 	chain, err := buildTransitChain(ctx, originASN, &rawBuffer)
 	if err != nil {
 		dbg.Printf("getASNPeers target=%q build_chain_error=%v", target, err)
-		// Graceful degradation: instead of failing the entire function and marking it as an error,
-		// we assume a RIPEstat timeout/502 is due to massive peer counts (e.g., Tier-1 or huge ISP)
-		// and safely terminate the chain with a descriptive marker.
-		chain = append(chain, "[TOO_MANY_PEERS]")
+		chain = append(chain, chainTooManyPeers)
 	}
 
 	dbg.Printf("getASNPeers target=%q chain_length=%d", target, len(chain))
@@ -49,8 +54,8 @@ func getASNPeers(target string) (execution schema.ModuleExecution) {
 	}
 
 	execution.Results = append(execution.Results, schema.ModuleResult{
-		Type:     "asn",
-		Category: "node",
+		Type:     constants.TypeASN,
+		Category: constants.CategoryNode,
 		Value:    originASN,
 		Context:  "Origin AS",
 		Applied:  true,
@@ -58,8 +63,8 @@ func getASNPeers(target string) (execution schema.ModuleExecution) {
 
 	chainLine := buildChainString(chain, originASN)
 	execution.Results = append(execution.Results, schema.ModuleResult{
-		Type:     "peers_chain",
-		Category: "property",
+		Type:     constants.TypePeersChain,
+		Category: constants.CategoryProperty,
 		Value:    chainLine,
 		Context:  "ASN Peers",
 	})
@@ -83,7 +88,7 @@ func extractLargestUpstreamASN(neighbours []ripestat.Neighbour, originASN string
 	var maxPeers int
 
 	for _, n := range neighbours {
-		if n.Position == "right" {
+		if n.Position == neighbourPositionRight {
 			nASN := "AS" + strconv.Itoa(n.ASN)
 			if nASN != originASN && n.ASN != 0 {
 				if n.PeerCount > maxPeers {
@@ -111,7 +116,7 @@ func traverseUpstream(ctx context.Context, asn string, depth int, visited map[st
 	dbg.Printf("traverseUpstream asn=%q depth=%d querying_ripestat", asn, depth)
 
 	var resp ripestat.APIResponse
-	if err := ripestat.Query(ctx, asn, "asn-neighbours", &resp, resolver.MaxRetriesASNMeta); err != nil {
+	if err := ripestat.Query(ctx, asn, constants.RIPEstatEndpointASNNeighbours, &resp, resolver.MaxRetriesASNMeta); err != nil {
 		dbg.Printf("traverseUpstream asn=%q depth=%d ripestat_error=%v", asn, depth, err)
 		return fmt.Errorf("ripestat query: %w", err)
 	}
@@ -139,10 +144,10 @@ func buildChainString(chain []string, originASN string) string {
 	}
 
 	parts := make([]string, 0, len(chain)+1)
-	for i := len(chain) - 1; i >= 0; i-- {
+	for i := range slices.Backward(chain) {
 		parts = append(parts, chain[i])
 	}
 	parts = append(parts, originASN)
 
-	return strings.Join(parts, " <- ")
+	return strings.Join(parts, chainSeparator)
 }

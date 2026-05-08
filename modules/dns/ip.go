@@ -3,13 +3,14 @@ package dns
 import (
 	"context"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
 func getIPData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_ip")
+	exec := modutil.NewExecution(constants.FuncGetIP)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
@@ -27,8 +28,8 @@ func getIPData(ctx context.Context, target string) schema.ModuleExecution {
 
 	for _, ipStr := range ips {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "ip",
-			Category: "node",
+			Type:     constants.TypeIP,
+			Category: constants.CategoryNode,
 			Value:    ipStr,
 			Context:  "A/AAAA Record",
 		})

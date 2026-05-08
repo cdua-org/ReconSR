@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -15,7 +16,7 @@ import (
 )
 
 func getCNAMEData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_cname")
+	exec := modutil.NewExecution(constants.FuncGetCNAME)
 
 	log.Printf("get_cname starting query for target=%q", target)
 
@@ -85,7 +86,7 @@ func getCNAMEData(ctx context.Context, target string) schema.ModuleExecution {
 }
 
 func buildCNAMEResult(cname, target, relationContext string) (schema.ModuleResult, bool) {
-	res, err := validator.Validate("domain", cname)
+	res, err := validator.Validate(constants.TypeDomain, cname)
 	if err != nil {
 		log.Printf("get_cname skipping invalid cname target=%q entity=%q err=%v", target, cname, err)
 		return schema.ModuleResult{}, false
@@ -94,12 +95,12 @@ func buildCNAMEResult(cname, target, relationContext string) (schema.ModuleResul
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
 	resultType := res.Type
 	if isOOS {
-		resultType = "cname_target"
+		resultType = constants.TypeCNAMETarget
 	}
 
 	return schema.ModuleResult{
 		Type:       resultType,
-		Category:   "node",
+		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		Context:    relationContext,
 		OutOfScope: isOOS,

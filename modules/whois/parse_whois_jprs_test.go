@@ -14,8 +14,8 @@ l. [Organization Type]          Corporation
 m. [Administrative Contact]     AB12345JP
 n. [Technical Contact]          CD67890JP
 n. [Technical Contact]          EF11111JP
-p. [Name Server]                ns1.fake.example
-p. [Name Server]                ns2.fake.example
+p. [Name Server]                ns1.jpns-alpha.example.net
+p. [Name Server]                ns2.jpns-alpha.example.net
 s. [Signing Key]
 [State]                         Connected (2028/06/30)
 [Registered Date]
@@ -28,7 +28,7 @@ s. [Signing Key]
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake Corporation"})
 	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"AB12345JP"})
 	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"CD67890JP", "EF11111JP"})
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.example", "ns2.fake.example"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.jpns-alpha.example.net", "ns2.jpns-alpha.example.net"})
 	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"Connected (2028/06/30)"})
 	assertEq(t, "CreationDate", got.CreationDate, "2015/07/01")
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "2026/03/15 10:30:00 (JST)")
@@ -42,8 +42,8 @@ func TestParseWHOIS_JPRS2(t *testing.T) {
 
 [Registrant]                    Fake Store Inc.
 
-[Name Server]                   ns1.fakecdn.example
-[Name Server]                   ns2.fakecdn.example
+[Name Server]                   ns1.jpns-beta.example.org
+[Name Server]                   ns2.jpns-beta.example.org
 [Signing Key]
 
 [Created on]                    2005/04/10
@@ -72,7 +72,7 @@ Contact Information:
 	assertSlice(t, "Registrant.Address", got.Registrant.Address,
 		[]string{"100-0001", "Fake Tower 5F, 1-2-3 Marunouchi", "Chiyoda-ku, Tokyo"})
 
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fakecdn.example", "ns2.fakecdn.example"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.jpns-beta.example.org", "ns2.jpns-beta.example.org"})
 	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"Active", "DomainTransferLocked"})
 	assertEq(t, "CreationDate", got.CreationDate, "2005/04/10")
 	assertEq(t, "ExpirationDate", got.ExpirationDate, "2028/04/10")

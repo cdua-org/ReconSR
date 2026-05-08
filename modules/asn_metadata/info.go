@@ -3,6 +3,7 @@ package asn_metadata
 import (
 	"context"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/modules/utils/ripestat"
@@ -10,7 +11,7 @@ import (
 )
 
 func getASNInfo(target string) (execution schema.ModuleExecution) {
-	execution = modutil.NewExecution("get_asn_info")
+	execution = modutil.NewExecution(constants.FuncGetASNInfo)
 
 	dbg.Printf("getASNInfo target=%q", target)
 
@@ -30,7 +31,7 @@ func getASNInfo(target string) (execution schema.ModuleExecution) {
 		execution.RawData = resp.RawJSON
 	}()
 
-	if err := ripestat.Query(ctx, originASN, "as-overview", &resp, resolver.MaxRetriesASNMeta); err != nil {
+	if err := ripestat.Query(ctx, originASN, constants.RIPEstatEndpointASOverview, &resp, resolver.MaxRetriesASNMeta); err != nil {
 		errMsg := "asn info lookup failed: " + err.Error()
 		execution.Error = &errMsg
 		dbg.Printf("getASNInfo target=%q lookup_error=%v", target, err)
@@ -39,8 +40,8 @@ func getASNInfo(target string) (execution schema.ModuleExecution) {
 
 	if resp.Data.Holder != "" {
 		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:       "organization",
-			Category:   "node",
+			Type:       constants.TypeOrganization,
+			Category:   constants.CategoryNode,
 			Value:      resp.Data.Holder,
 			Context:    "ASN Holder",
 			OutOfScope: true,

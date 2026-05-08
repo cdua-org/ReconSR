@@ -4,13 +4,14 @@ import (
 	"context"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
 func getHINFOData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_hinfo")
+	exec := modutil.NewExecution(constants.FuncGetHINFO)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
@@ -30,8 +31,8 @@ func getHINFOData(ctx context.Context, target string) schema.ModuleExecution {
 
 	for _, rec := range records {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "hinfo",
-			Category: "property",
+			Type:     constants.TypeHINFO,
+			Category: constants.CategoryProperty,
 			Value:    rec,
 			Context:  "Hardware & OS Info (HINFO)",
 		})
@@ -43,16 +44,16 @@ func getHINFOData(ctx context.Context, target string) schema.ModuleExecution {
 
 			if cpu != "" && cpu != "ANY" && !strings.Contains(cpu, "cloudflare") {
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     "hinfo",
-					Category: "property",
+					Type:     constants.TypeHINFO,
+					Category: constants.CategoryProperty,
 					Value:    cpu,
 					Context:  "HINFO Extracted CPU",
 				})
 			}
 			if osStr != "" && osStr != "ANY" && !strings.Contains(osStr, "cloudflare") {
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     "hinfo",
-					Category: "property",
+					Type:     constants.TypeHINFO,
+					Category: constants.CategoryProperty,
 					Value:    osStr,
 					Context:  "HINFO Extracted OS",
 				})

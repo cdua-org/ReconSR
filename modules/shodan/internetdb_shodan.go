@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
@@ -21,7 +22,7 @@ func getInternetDBCapabilities() schema.FunctionCapabilities {
 	return schema.FunctionCapabilities{
 		Limit:      2,
 		DelayMs:    1000,
-		InputTypes: []string{entityTypeIPv4, entityTypeIPv6},
+		InputTypes: []string{constants.TypeIPv4, constants.TypeIPv6},
 	}
 }
 
@@ -37,7 +38,7 @@ type internetdbResponse struct {
 var internetDBHost = "https://internetdb.shodan.io"
 
 func getInternetDB(target schema.Entity) schema.ModuleExecution {
-	exec := modutil.NewExecution(functionInternetDB)
+	exec := modutil.NewExecution(constants.FuncGetIDBShodan)
 	url := fmt.Sprintf("%s/%s", internetDBHost, target.Value)
 
 	ctx, cancel := context.WithTimeout(context.Background(), resolver.HTTPTimeout)
@@ -65,7 +66,7 @@ func getInternetDB(target schema.Entity) schema.ModuleExecution {
 	}
 
 	parseInternetDBResponse(&exec, rawBody, target.Value)
-	dbg.Printf(functionInternetDB+" target=%q records=%d", target.Value, len(exec.Results))
+	dbg.Printf(constants.FuncGetIDBShodan+" target=%q records=%d", target.Value, len(exec.Results))
 	return exec
 }
 
@@ -136,43 +137,43 @@ func fetchInternetDB(ctx context.Context, url, target string) (rawBody []byte, s
 func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, target string) {
 	var parsed internetdbResponse
 	if err := json.Unmarshal(rawBody, &parsed); err != nil {
-		dbg.Printf(functionInternetDB+" target=%q unmarshal_err=%v", target, err)
+		dbg.Printf(constants.FuncGetIDBShodan+" target=%q unmarshal_err=%v", target, err)
 		modutil.SetError(exec, "unmarshal json: %v", err)
 		return
 	}
 
 	for _, h := range parsed.Hostnames {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "ptr",
-			Category: resultCategoryProperty,
+			Type:     constants.TypePTR,
+			Category: constants.CategoryProperty,
 			Value:    h,
 		})
 	}
 	for _, p := range parsed.Ports {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     resultTypePort,
-			Category: resultCategoryProperty,
+			Type:     constants.TypePort,
+			Category: constants.CategoryProperty,
 			Value:    strconv.Itoa(p),
 		})
 	}
 	for _, t := range parsed.Tags {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "tag",
-			Category: resultCategoryProperty,
+			Type:     constants.TypeTag,
+			Category: constants.CategoryProperty,
 			Value:    t,
 		})
 	}
 	for _, v := range parsed.Vulns {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     resultTypeCVE,
-			Category: resultCategoryNode,
+			Type:     constants.TypeCVE,
+			Category: constants.CategoryNode,
 			Value:    v,
 		})
 	}
 	for _, c := range parsed.Cpes {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     resultTypeCPE,
-			Category: resultCategoryProperty,
+			Type:     constants.TypeCPE,
+			Category: constants.CategoryProperty,
 			Value:    c,
 		})
 	}

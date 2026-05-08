@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
@@ -17,15 +18,15 @@ import (
 )
 
 var hipAlgorithms = map[byte]string{
-	1: "DSA",
-	2: "RSA",
-	3: "ECDSA",
-	4: "ECDSA_LOW",
-	5: "DSA_LOW",
-	6: "RSA_LOW",
-	7: "EDDSA",
-	8: "EDDSA_LOW",
-	9: "PQC",
+	1: constants.AlgDSA,
+	2: constants.AlgRSA,
+	3: constants.AlgECDSA,
+	4: constants.AlgECDSALow,
+	5: constants.AlgDSALow,
+	6: constants.AlgRSALow,
+	7: constants.AlgEdDSA,
+	8: constants.AlgEdDSALow,
+	9: constants.AlgPQC,
 }
 
 func parseHIP(raw string) string {
@@ -49,7 +50,7 @@ func parseHIP(raw string) string {
 }
 
 func getHIPData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_hip")
+	exec := modutil.NewExecution(constants.FuncGetHIP)
 	log.Printf("get_hip target=%q", target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
@@ -90,13 +91,13 @@ func buildHIPResults(parsed, target string) []schema.ModuleResult {
 
 	ctxStr := "HIP Record, Alg: " + algName + ", HIT: " + hit
 	results := []schema.ModuleResult{{
-		Type:     "hip",
-		Category: "property",
+		Type:     constants.TypeHIP,
+		Category: constants.CategoryProperty,
 		Value:    pubKey,
 		Context:  ctxStr,
 	}}
 
-	hipSource := &schema.EntityRef{Type: "hip", Value: pubKey}
+	hipSource := &schema.EntityRef{Type: constants.TypeHIP, Value: pubKey}
 	for _, rv := range parts[3:] {
 		result := buildHIPRendezvousResult(rv, target, hipSource)
 		if result == nil {
@@ -114,7 +115,7 @@ func buildHIPRendezvousResult(rawRV, target string, hipSource *schema.EntityRef)
 		return nil
 	}
 
-	res, err := validator.Validate("domain", rv)
+	res, err := validator.Validate(constants.TypeDomain, rv)
 	if err != nil {
 		log.Printf("get_hip skipping invalid rendezvous target=%q rv=%q err=%v", target, rv, err)
 		return nil
@@ -124,8 +125,8 @@ func buildHIPRendezvousResult(rawRV, target string, hipSource *schema.EntityRef)
 	log.Printf("get_hip target=%q rv=%q oos=%v", target, res.Value, isOOS)
 
 	return &schema.ModuleResult{
-		Type:       "hip_server",
-		Category:   "node",
+		Type:       constants.TypeHIPServer,
+		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		Context:    "HIP Rendezvous Server",
 		OutOfScope: isOOS,

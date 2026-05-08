@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/preflightcheck"
@@ -15,37 +16,40 @@ import (
 
 var log = debuglog.New("dns")
 
-const parentTimeout = 120 * time.Second
+const (
+	parentTimeout  = 120 * time.Second
+	domainKeyLabel = "_domainkey"
+)
 
 type handlerFunc func(ctx context.Context, target string) schema.ModuleExecution
 
 var handlers = map[string]handlerFunc{
-	"get_ip":         getIPData,
-	"get_caa":        getCAAData,
-	"get_ns":         getNSData,
-	"get_soa":        getSOAData,
-	"get_cname":      getCNAMEData,
-	"check_wildcard": checkWildcard,
-	"get_domainkey":  getDomainKeyData,
-	"get_dmarc":      getDMARCData,
-	"get_dkim":       getDKIMData,
-	"get_mx":         getMXData,
-	"get_txt":        getTXTData,
-	"get_srv":        getSRVData,
-	"get_nsec":       getNSECData,
-	"get_loc":        getLOCData,
-	"get_hinfo":      getHINFOData,
-	"get_rp":         getRPData,
-	"get_uri":        getURIData,
-	"get_svcb":       getSVCBData,
-	"get_sshfp":      getSSHFPData,
-	"get_naptr":      getNAPTRData,
-	"get_tlsa":       getTLSAData,
-	"get_dnskey":     getDNSKEYData,
-	"get_ds":         getDSData,
-	"get_cert":       getCERTData,
-	"get_hip":        getHIPData,
-	"get_ipseckey":   getIPSECKEYData,
+	constants.FuncGetIP:         getIPData,
+	constants.FuncGetCAA:        getCAAData,
+	constants.FuncGetNS:         getNSData,
+	constants.FuncGetSOA:        getSOAData,
+	constants.FuncGetCNAME:      getCNAMEData,
+	constants.FuncCheckWildcard: checkWildcard,
+	constants.FuncGetDomainKey:  getDomainKeyData,
+	constants.FuncGetDMARC:      getDMARCData,
+	constants.FuncGetDKIM:       getDKIMData,
+	constants.FuncGetMX:         getMXData,
+	constants.FuncGetTXT:        getTXTData,
+	constants.FuncGetSRV:        getSRVData,
+	constants.FuncGetNSEC:       getNSECData,
+	constants.FuncGetLOC:        getLOCData,
+	constants.FuncGetHINFO:      getHINFOData,
+	constants.FuncGetRP:         getRPData,
+	constants.FuncGetURI:        getURIData,
+	constants.FuncGetSVCB:       getSVCBData,
+	constants.FuncGetSSHFP:      getSSHFPData,
+	constants.FuncGetNAPTR:      getNAPTRData,
+	constants.FuncGetTLSA:       getTLSAData,
+	constants.FuncGetDNSKEY:     getDNSKEYData,
+	constants.FuncGetDS:         getDSData,
+	constants.FuncGetCERT:       getCERTData,
+	constants.FuncGetHIP:        getHIPData,
+	constants.FuncGetIPSECKEY:   getIPSECKEYData,
 }
 
 type module struct{}
@@ -64,24 +68,24 @@ func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	for name := range handlers {
 		functions = append(functions, name)
 	}
-	functions = append(functions, "preflight_dns")
+	functions = append(functions, constants.FuncPreflightDNS)
 
 	customFuncs := map[string]schema.FunctionCapabilities{
-		"get_dkim":      {Limit: 1},
-		"get_srv":       {Limit: 1},
-		"get_tlsa":      {Limit: 1},
-		"preflight_dns": {},
+		constants.FuncGetDKIM:      {Limit: 1},
+		constants.FuncGetSRV:       {Limit: 1},
+		constants.FuncGetTLSA:      {Limit: 1},
+		constants.FuncPreflightDNS: {},
 	}
 
 	for name := range handlers {
 		c := customFuncs[name]
-		c.RequiredTags = [][]string{{"dns_ok"}}
+		c.RequiredTags = [][]string{{constants.TagDNSOK}}
 		customFuncs[name] = c
 	}
 
 	return schema.ModuleCapabilities{
 		Functions:  functions,
-		InputTypes: []string{"domain", "subdomain"},
+		InputTypes: []string{constants.TypeDomain, constants.TypeSubdomain},
 		ModuleConfig: &schema.FunctionCapabilities{
 			Limit:   2,
 			DelayMs: 50,
@@ -101,7 +105,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	for _, f := range data.Functions {
 		var execution schema.ModuleExecution
 
-		if f == "preflight_dns" {
+		if f == constants.FuncPreflightDNS {
 			execution = handlePreflightDNS(ctx, data.Target)
 		} else if handler, ok := handlers[f]; ok {
 			execution = handler(ctx, data.Target.Value)
@@ -120,15 +124,15 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 }
 
 func handlePreflightDNS(ctx context.Context, target schema.Entity) schema.ModuleExecution {
-	execution := modutil.NewExecution("preflight_dns")
+	execution := modutil.NewExecution(constants.FuncPreflightDNS)
 	err := preflightcheck.PreFlightCheck(ctx, target.Value)
 	if err != nil {
 		if errors.Is(err, preflightcheck.ErrZoneBroken) {
 			execution.Results = append(execution.Results, schema.ModuleResult{
-				Type:     "status",
-				Category: "property",
-				Value:    "Broken DNS Zone",
-				Tags:     []string{"dns_bad"},
+				Type:     constants.TypeStatus,
+				Category: constants.CategoryProperty,
+				Value:    constants.StatusBrokenDNSZone,
+				Tags:     []string{constants.TagDNSBad},
 			})
 		} else {
 			errMsg := err.Error()
@@ -138,7 +142,7 @@ func handlePreflightDNS(ctx context.Context, target schema.Entity) schema.Module
 		execution.Results = append(execution.Results, schema.ModuleResult{
 			Type:  target.Type,
 			Value: target.Value,
-			Tags:  []string{"dns_ok"},
+			Tags:  []string{constants.TagDNSOK},
 		})
 	}
 	return execution

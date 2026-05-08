@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 var postalCodeRe = regexp.MustCompile(`^\d{4,6}$`)
@@ -20,48 +22,48 @@ type roleMarker struct {
 // roleMarkers defines section headers in priority order.
 var roleMarkers = []roleMarker{
 	// Contains: generic ICANN / RPSL / EDUCAUSE
-	{"registrar:", roleRegistrar, false},
-	{"registrant:", roleRegistrant, false},
-	{"administrative contact:", roleAdministrative, false},
-	{"billing contact:", roleBilling, false},
-	{"admin:", roleAdministrative, false},
-	{"administrative:", roleAdministrative, false},
-	{"technical contact:", roleTechnical, false},
-	{"tech:", roleTechnical, false},
-	{"technical:", roleTechnical, false},
-	{"abuse:", roleAbuse, false},
-	{"abuse contact:", roleAbuse, false},
-	{"name servers:", roleNameServers, false},
-	{"domain nameservers:", roleNameServers, false},
-	{"domain servers in listed order:", roleNameServers, false},
+	{"registrar:", whoisRoleRegistrar, false},
+	{"registrant:", whoisRoleRegistrant, false},
+	{"administrative contact:", whoisRoleAdministrative, false},
+	{"billing contact:", whoisRoleBilling, false},
+	{"admin:", whoisRoleAdministrative, false},
+	{"administrative:", whoisRoleAdministrative, false},
+	{"technical contact:", whoisRoleTechnical, false},
+	{"tech:", whoisRoleTechnical, false},
+	{"technical:", whoisRoleTechnical, false},
+	{"abuse:", whoisRoleAbuse, false},
+	{"abuse contact:", whoisRoleAbuse, false},
+	{"name servers:", whoisRoleNameServers, false},
+	{"domain nameservers:", whoisRoleNameServers, false},
+	{"domain servers in listed order:", whoisRoleNameServers, false},
 
 	// Prefix: Italian/generic bare-word sections
-	{"holder", roleRegistrant, true},
-	{"admin contact", roleAdministrative, true},
-	{"technical", roleTechnical, true},
-	{"registrant", roleRegistrant, true},
-	{"registrar", roleRegistrar, true},
-	{"nameservers", roleNameServers, true},
+	{"holder", whoisRoleRegistrant, true},
+	{"admin contact", whoisRoleAdministrative, true},
+	{"technical", whoisRoleTechnical, true},
+	{"registrant", whoisRoleRegistrant, true},
+	{whoisRoleRegistrar, whoisRoleRegistrar, true},
+	{"nameservers", whoisRoleNameServers, true},
 
 	// Prefix: Korean name server sections
-	{"primary name server", roleNameServers, true},
-	{"secondary name server", roleNameServers, true},
+	{"primary name server", whoisRoleNameServers, true},
+	{"secondary name server", whoisRoleNameServers, true},
 
 	// Prefix: Austrian RPSL-style sections
-	{"tech-c:", roleTechnical, true},
-	{"admin-c:", roleAdministrative, true},
+	{"tech-c:", whoisRoleTechnical, true},
+	{"admin-c:", whoisRoleAdministrative, true},
 }
 
 func updateRoleContext(lineLower, currentRole string) string {
 	if strings.HasPrefix(lineLower, "contact:") {
 		if strings.Contains(lineLower, "administrative") {
-			return roleAdministrative
+			return whoisRoleAdministrative
 		}
 		if strings.Contains(lineLower, "technical") {
-			return roleTechnical
+			return whoisRoleTechnical
 		}
 		if strings.Contains(lineLower, "billing") {
-			return roleBilling
+			return whoisRoleBilling
 		}
 	}
 
@@ -88,17 +90,17 @@ func updateRoleContext(lineLower, currentRole string) string {
 
 var whoisPatterns = map[string]*regexp.Regexp{
 	// Generic ICANN
-	"registrar":   regexp.MustCompile(`(?i)Registrar(?:\s+Name)?\s*:\s+(.*)`),
-	"url":         regexp.MustCompile(`(?i)(?:Registrar\s+)?(?:URL|Web)\s*:\s+(.*)`),
-	"url_bare":    regexp.MustCompile(`(?i)^\s*(https?://[^\s<>]+)\s*$`),
-	"whoisserver": regexp.MustCompile(`(?i)Registrar\s+WHOIS\s+Server\s*:\s+(.*)`),
-	"ianaid":      regexp.MustCompile(`(?i)Registrar\s+IANA\s+ID\s*:\s+(.*)`),
-	"dnssec":      regexp.MustCompile(`(?i)DNSSEC\s*:\s*(.*)`),
-	"creation":    regexp.MustCompile(`(?i)(Creation|Created(?:\s+On)?|Registered(?:\s+on)?|Activated|Registration\s+Time|Registered\s+Time)(?:\s+Date)?\s*:\s+(.*)`),
-	"updated":     regexp.MustCompile(`(?i)(Updated|Last[\s-]+Updated|Last[\s-]+Update|Last\s+Modified|Modified|Changed)(?:\s+(?:Date|On))?(?:\s*:\s*|\s+)(.*)`),
-	"expiration":  regexp.MustCompile(`(?i)(Registry\s+Expiry|Expiration|Expiry|Expire|Expires|Expiration\s+Time|paid-till|Renewal\s+Date)(?:\s+Date)?\s*:\s+(.*)`),
-	"ns":          regexp.MustCompile(`(?i)(Name\s+Server|nserver|nameservers?|DNS)\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
-	"status":      regexp.MustCompile(`(?i)(Domain\s+)?(Status|State)\s*:\s+(.*)`),
+	whoisRoleRegistrar:    regexp.MustCompile(`(?i)Registrar(?:\s+Name)?\s*:\s+(.*)`),
+	constants.TypeURL:     regexp.MustCompile(`(?i)(?:Registrar\s+)?(?:URL|Web)\s*:\s+(.*)`),
+	"url_bare":            regexp.MustCompile(`(?i)^\s*(https?://[^\s<>]+)\s*$`),
+	whoisFieldWhoisServer: regexp.MustCompile(`(?i)Registrar\s+WHOIS\s+Server\s*:\s+(.*)`),
+	whoisFieldIANAID:      regexp.MustCompile(`(?i)Registrar\s+IANA\s+ID\s*:\s+(.*)`),
+	whoisFieldDNSSEC:      regexp.MustCompile(`(?i)DNSSEC\s*:\s*(.*)`),
+	whoisFieldCreation:    regexp.MustCompile(`(?i)(Creation|Created(?:\s+On)?|Registered(?:\s+on)?|Activated|Registration\s+Time|Registered\s+Time)(?:\s+Date)?\s*:\s+(.*)`),
+	whoisFieldUpdated:     regexp.MustCompile(`(?i)(Updated|Last[\s-]+Updated|Last[\s-]+Update|Last\s+Modified|Modified|Changed)(?:\s+(?:Date|On))?(?:\s*:\s*|\s+)(.*)`),
+	whoisFieldExpiration:  regexp.MustCompile(`(?i)(Registry\s+Expiry|Expiration|Expiry|Expire|Expires|Expiration\s+Time|paid-till|Renewal\s+Date)(?:\s+Date)?\s*:\s+(.*)`),
+	constants.TypeNS:      regexp.MustCompile(`(?i)(Name\s+Server|nserver|nameservers?|DNS)\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
+	whoisFieldStatus:      regexp.MustCompile(`(?i)(Domain\s+)?(Status|State)\s*:\s+(.*)`),
 
 	// Registrant contact (ICANN standard)
 	"reg_name":  regexp.MustCompile(`(?i)Registrant\s+(?:Contact\s+)?Name\s*:\s+(.*)`),
@@ -149,16 +151,16 @@ var whoisPatterns = map[string]*regexp.Regexp{
 	"no_tech":      regexp.MustCompile(`(?i)Tech-c\s+Handle\s*:\s+(.*)`),
 
 	// RPSL / generic unstructured
-	"rpsl_name":  regexp.MustCompile(`(?i)^\s*(?:person(?:name)?|name)(?:-loc)?\s*:\s+(.*)`),
-	"rpsl_org":   regexp.MustCompile(`(?i)^\s*(?:organi[zs]ation|org)(?:-loc)?\s*:\s+(.*)`),
-	"rpsl_email": regexp.MustCompile(`(?i)^\s*(?:e-mail|email|abuse-email|holder\s+email)\s*:\s+(.*)`),
-	"rpsl_addr":  regexp.MustCompile(`(?i)^\s*(?:address|street(?:\s+address)?|city|state|postal(?:\s*-?code)?|country|abuse-postal)(?:-loc)?\s*:\s+(.*)`),
-	"rpsl_phone": regexp.MustCompile(`(?i)^\s*(?:phone|tel|abuse-phone)(?:-loc)?\s*:\s+(.*)`),
-	"rpsl_fax":   regexp.MustCompile(`(?i)^\s*(?:fax(?:-no)?)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_name":        regexp.MustCompile(`(?i)^\s*(?:person(?:name)?|name)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_org":         regexp.MustCompile(`(?i)^\s*(?:organi[zs]ation|org)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_email":       regexp.MustCompile(`(?i)^\s*(?:e-mail|email|abuse-email|holder\s+email)\s*:\s+(.*)`),
+	whoisFieldRPSLAddr: regexp.MustCompile(`(?i)^\s*(?:address|street(?:\s+address)?|city|state|postal(?:\s*-?code)?|country|abuse-postal)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_phone":       regexp.MustCompile(`(?i)^\s*(?:phone|tel|abuse-phone)(?:-loc)?\s*:\s+(.*)`),
+	"rpsl_fax":         regexp.MustCompile(`(?i)^\s*(?:fax(?:-no)?)(?:-loc)?\s*:\s+(.*)`),
 
 	// Chinese WHOIS
-	"cn_registrant":       regexp.MustCompile(`(?i)Registrant\s*:\s+(.+)`),
-	"cn_registrant_email": regexp.MustCompile(`(?i)Registrant\s+Contact\s+Email\s*:\s+(.+)`),
+	whoisFieldCNRegistrant:      regexp.MustCompile(`(?i)Registrant\s*:\s+(.+)`),
+	whoisFieldCNRegistrantEmail: regexp.MustCompile(`(?i)Registrant\s+Contact\s+Email\s*:\s+(.+)`),
 
 	// Japanese WHOIS (JPRS format 1)
 	"jp_domain":      regexp.MustCompile(`(?i)a\.\s*\[Domain\s+Name\]\s+(.+)`),
@@ -174,19 +176,19 @@ var whoisPatterns = map[string]*regexp.Regexp{
 	"ns_jp":          regexp.MustCompile(`(?i)p\.\s*\[Name\s+Server\]\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
 
 	// Japanese WHOIS (JPRS format 2 — bracket style)
-	"jp2_ns":            regexp.MustCompile(`(?i)\[Name\s+Server\]\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
-	"jp2_created":       regexp.MustCompile(`(?i)\[Created\s+on\]\s+(.+)`),
-	"jp2_expires":       regexp.MustCompile(`(?i)\[Expires\s+on\]\s+(.+)`),
-	"jp2_status":        regexp.MustCompile(`(?i)\[Status\]\s+(.+)`),
-	"jp2_registrant":    regexp.MustCompile(`(?i)\[Registrant\]\s+(.+)`),
-	"jp2_lock":          regexp.MustCompile(`(?i)\[Lock\s+Status\]\s+(.+)`),
-	"jp2_updated":       regexp.MustCompile(`(?i)\[Last\s+Updated\]\s+(.+)`),
-	"jp2_contact_name":  regexp.MustCompile(`(?i)\[Name\]\s+(.+)`),
-	"jp2_contact_email": regexp.MustCompile(`(?i)\[Email\]\s+(.+)`),
-	"jp2_postal_code":   regexp.MustCompile(`(?i)\[Postal\s+code\]\s+(.+)`),
-	"jp2_address":       regexp.MustCompile(`(?i)\[Postal\s+Address\]\s+(.+)`),
-	"jp2_phone":         regexp.MustCompile(`(?i)\[Phone\]\s+(.+)`),
-	"jp2_fax":           regexp.MustCompile(`(?i)\[Fax\]\s+(.+)`),
+	"jp2_ns":                regexp.MustCompile(`(?i)\[Name\s+Server\]\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
+	"jp2_created":           regexp.MustCompile(`(?i)\[Created\s+on\]\s+(.+)`),
+	"jp2_expires":           regexp.MustCompile(`(?i)\[Expires\s+on\]\s+(.+)`),
+	"jp2_status":            regexp.MustCompile(`(?i)\[Status\]\s+(.+)`),
+	"jp2_registrant":        regexp.MustCompile(`(?i)\[Registrant\]\s+(.+)`),
+	"jp2_lock":              regexp.MustCompile(`(?i)\[Lock\s+Status\]\s+(.+)`),
+	"jp2_updated":           regexp.MustCompile(`(?i)\[Last\s+Updated\]\s+(.+)`),
+	"jp2_contact_name":      regexp.MustCompile(`(?i)\[Name\]\s+(.+)`),
+	"jp2_contact_email":     regexp.MustCompile(`(?i)\[Email\]\s+(.+)`),
+	whoisFieldJP2PostalCode: regexp.MustCompile(`(?i)\[Postal\s+code\]\s+(.+)`),
+	whoisFieldJP2Address:    regexp.MustCompile(`(?i)\[Postal\s+Address\]\s+(.+)`),
+	"jp2_phone":             regexp.MustCompile(`(?i)\[Phone\]\s+(.+)`),
+	"jp2_fax":               regexp.MustCompile(`(?i)\[Fax\]\s+(.+)`),
 
 	// Austrian .at WHOIS
 	"at_changed": regexp.MustCompile(`(?i)^\s*changed\s*:\s+(.*)`),
@@ -195,12 +197,12 @@ var whoisPatterns = map[string]*regexp.Regexp{
 	"at_nserver": regexp.MustCompile(`(?i)^\s*nserver\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
 
 	// Korean .kr WHOIS
-	"kr_hostname": regexp.MustCompile(`(?i)Host\s+Name\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
-	"kr_agency":   regexp.MustCompile(`(?i)Authorized\s+Agency\s*:\s+(.*)`),
-	"kr_ac_name":  regexp.MustCompile(`(?i)Administrative\s+Contact\(AC\)\s*:\s+(.*)`),
-	"kr_ac_email": regexp.MustCompile(`(?i)AC\s+E-Mail\s*:\s+(.*)`),
-	"kr_ac_phone": regexp.MustCompile(`(?i)AC\s+Phone\s+Number\s*:\s+(.*)`),
-	"kr_reg_zip":  regexp.MustCompile(`(?i)Registrant\s+Zip\s+Code\s*:\s+(.*)`),
+	"kr_hostname":      regexp.MustCompile(`(?i)Host\s+Name\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
+	"kr_agency":        regexp.MustCompile(`(?i)Authorized\s+Agency\s*:\s+(.*)`),
+	"kr_ac_name":       regexp.MustCompile(`(?i)Administrative\s+Contact\(AC\)\s*:\s+(.*)`),
+	"kr_ac_email":      regexp.MustCompile(`(?i)AC\s+E-Mail\s*:\s+(.*)`),
+	"kr_ac_phone":      regexp.MustCompile(`(?i)AC\s+Phone\s+Number\s*:\s+(.*)`),
+	whoisFieldKRRegZip: regexp.MustCompile(`(?i)Registrant\s+Zip\s+Code\s*:\s+(.*)`),
 
 	// Brazilian .br WHOIS
 	"br_owner":   regexp.MustCompile(`(?i)^owner\s*:\s+(.*)`),
@@ -264,7 +266,7 @@ func parseWHOIS(raw string) Metadata {
 			continue
 		}
 
-		if currentRole == roleNameServers {
+		if currentRole == whoisRoleNameServers {
 			addNameServer(&m, strings.Fields(line)[0])
 		} else if isFreeformLine(rawLine, line, currentRole) {
 			classifyIndentedLine(&m, currentRole, line, indentedIndex)
@@ -310,8 +312,8 @@ func isFooterMarker(line string) bool {
 
 func isDomainLevelKey(key string) bool {
 	switch key {
-	case "domain", fieldStatus, "ns", "dnssec", "creation", "updated", fieldExpiration,
-		"whoisserver", "ianaid", fieldURL:
+	case constants.TypeDomain, whoisFieldStatus, constants.TypeNS, whoisFieldDNSSEC, whoisFieldCreation, whoisFieldUpdated, whoisFieldExpiration,
+		whoisFieldWhoisServer, whoisFieldIANAID, whoisFieldURL:
 		return true
 	}
 	return false
@@ -327,17 +329,17 @@ func processHandles(parts []string, handleRoles map[string]string, currentRole *
 	switch k {
 	case "registrant":
 		if registryType == "cz" || registryType == "ar" {
-			handleRoles[v] = roleRegistrant
+			handleRoles[v] = whoisRoleRegistrant
 			return true // Skip parsing handle as Name/Org
 		}
 	case "admin-c":
-		handleRoles[v] = roleAdministrative
+		handleRoles[v] = whoisRoleAdministrative
 		return registryType == "cz" || registryType == "br"
 	case "tech-c":
-		handleRoles[v] = roleTechnical
+		handleRoles[v] = whoisRoleTechnical
 		return registryType == "cz" || registryType == "br"
 	case "owner-c":
-		handleRoles[v] = roleAdministrative
+		handleRoles[v] = whoisRoleAdministrative
 		return registryType == "br"
 	case "nic-hdl-br", "nic-hdl", "contact":
 		if r, ok := handleRoles[v]; ok {
@@ -345,7 +347,7 @@ func processHandles(parts []string, handleRoles map[string]string, currentRole *
 			return true
 		}
 	case "nsset":
-		*currentRole = roleNameServers
+		*currentRole = whoisRoleNameServers
 		return true
 	}
 	return false
@@ -354,10 +356,10 @@ func processHandles(parts []string, handleRoles map[string]string, currentRole *
 func matchPatterns(m *Metadata, currentRole, line, lineLower, registryType string) (matched bool, matchedKey string) {
 	for key, re := range whoisPatterns {
 		if strings.HasPrefix(lineLower, "state:") {
-			if key == "status" && currentRole != "" {
+			if key == whoisFieldStatus && currentRole != "" {
 				continue
 			}
-			if key == "rpsl_addr" && currentRole == "" {
+			if key == whoisFieldRPSLAddr && currentRole == "" {
 				continue
 			}
 		}
@@ -398,7 +400,7 @@ func leadingSpaces(rawLine string) int {
 
 func applyContinuation(m *Metadata, lastKey, currentRole, val string) {
 	switch lastKey {
-	case "rpsl_addr":
+	case whoisFieldRPSLAddr:
 		if target := contactByRole(m, currentRole); target != nil {
 			target.Address = appendUnique(target.Address, val)
 		}
@@ -410,26 +412,26 @@ func applyContinuation(m *Metadata, lastKey, currentRole, val string) {
 		m.Tech.Address = appendUnique(m.Tech.Address, val)
 	case "billing_addr":
 		m.Billing.Address = appendUnique(m.Billing.Address, val)
-	case "jp2_address", "jp2_postal_code", "kr_reg_zip":
+	case whoisFieldJP2Address, whoisFieldJP2PostalCode, whoisFieldKRRegZip:
 		m.Registrant.Address = appendUnique(m.Registrant.Address, val)
-	case "ns":
+	case constants.TypeNS:
 		addNameServer(m, strings.Fields(val)[0])
 	}
 }
 
 func contactByRole(m *Metadata, role string) *Contact {
 	switch role {
-	case roleRegistrar:
+	case whoisRoleRegistrar:
 		return &m.Registrar
-	case roleRegistrant:
+	case whoisRoleRegistrant:
 		return &m.Registrant
-	case roleAdministrative:
+	case whoisRoleAdministrative:
 		return &m.Admin
-	case roleTechnical:
+	case whoisRoleTechnical:
 		return &m.Tech
-	case roleBilling:
+	case whoisRoleBilling:
 		return &m.Billing
-	case roleAbuse:
+	case whoisRoleAbuse:
 		return &m.Abuse
 	}
 	return nil
@@ -443,15 +445,15 @@ func applyRPSLMatch(m *Metadata, currentRole, lineLower, field, val, registryTyp
 
 	var target *Contact
 	switch currentRole {
-	case roleRegistrar:
+	case whoisRoleRegistrar:
 		target = &m.Registrar
-	case roleAdministrative:
+	case whoisRoleAdministrative:
 		target = &m.Admin
-	case roleTechnical:
+	case whoisRoleTechnical:
 		target = &m.Tech
-	case roleBilling:
+	case whoisRoleBilling:
 		target = &m.Billing
-	case roleAbuse:
+	case whoisRoleAbuse:
 		target = &m.Abuse
 	default:
 		target = &m.Registrant
@@ -465,9 +467,9 @@ func applyRPSLMatch(m *Metadata, currentRole, lineLower, field, val, registryTyp
 			} else {
 				target.Name = appendUnique(target.Name, val)
 			}
-		case fieldOrg:
+		case whoisFieldOrg:
 			target.Organization = appendUnique(target.Organization, val)
-		case fieldEmail:
+		case whoisFieldEmail:
 			target.Email = appendUnique(target.Email, val)
 		case "addr":
 			target.Address = appendUnique(target.Address, val)
@@ -480,24 +482,24 @@ func applyRPSLMatch(m *Metadata, currentRole, lineLower, field, val, registryTyp
 }
 
 func classifyIndentedLine(m *Metadata, role, line string, lineIndex int) {
-	if role == roleNameServers {
+	if role == whoisRoleNameServers {
 		addNameServer(m, strings.Fields(line)[0])
 		return
 	}
 
 	var target *Contact
 	switch role {
-	case roleRegistrar:
+	case whoisRoleRegistrar:
 		target = &m.Registrar
-	case roleRegistrant:
+	case whoisRoleRegistrant:
 		target = &m.Registrant
-	case roleAdministrative:
+	case whoisRoleAdministrative:
 		target = &m.Admin
-	case roleTechnical:
+	case whoisRoleTechnical:
 		target = &m.Tech
-	case roleAbuse:
+	case whoisRoleAbuse:
 		target = &m.Abuse
-	case roleBilling:
+	case whoisRoleBilling:
 		target = &m.Billing
 	default:
 		return
@@ -633,9 +635,9 @@ func applyBRMatch(m *Metadata, key, val string) {
 
 func applyCNMatch(m *Metadata, key, val string) {
 	switch key {
-	case "cn_registrant":
+	case whoisFieldCNRegistrant:
 		m.Registrant.Organization = appendUnique(m.Registrant.Organization, val)
-	case "cn_registrant_email":
+	case whoisFieldCNRegistrantEmail:
 		m.Registrant.Email = appendUnique(m.Registrant.Email, val)
 	}
 }
@@ -648,25 +650,25 @@ func cleanWhoisServer(val string) string {
 
 func applyRegistrarMatch(m *Metadata, key, val string) bool {
 	switch key {
-	case "registrar":
+	case whoisRoleRegistrar:
 		m.Registrar.Name = appendUnique(m.Registrar.Name, val)
 		return true
-	case "url", "url_bare":
+	case constants.TypeURL, "url_bare":
 		if m.RegistrarURL == "" {
 			m.RegistrarURL = val
 		}
 		return true
-	case "whoisserver":
+	case whoisFieldWhoisServer:
 		if m.WhoisServer == "" {
 			m.WhoisServer = cleanWhoisServer(val)
 		}
 		return true
-	case "ianaid":
+	case whoisFieldIANAID:
 		if m.IANAID == "" {
 			m.IANAID = val
 		}
 		return true
-	case "dnssec":
+	case whoisFieldDNSSEC:
 		m.DNSSEC = val
 		return true
 	}
@@ -679,13 +681,13 @@ func applyContactMatch(c *Contact, key, prefix, val string) bool {
 	}
 	field := strings.TrimPrefix(key, prefix)
 	switch field {
-	case fieldOrg:
+	case whoisFieldOrg:
 		c.Organization = appendUnique(c.Organization, val)
 		return true
 	case "name":
 		c.Name = appendUnique(c.Name, val)
 		return true
-	case fieldEmail:
+	case whoisFieldEmail:
 		c.Email = appendUnique(c.Email, val)
 		return true
 	case "addr":
@@ -703,27 +705,27 @@ func applyContactMatch(c *Contact, key, prefix, val string) bool {
 
 func applyDomainMatch(m *Metadata, key, val string) {
 	switch key {
-	case "creation":
+	case whoisFieldCreation:
 		if m.CreationDate == "" {
 			m.CreationDate = val
 		}
-	case "updated":
+	case whoisFieldUpdated:
 		if m.UpdatedDate == "" {
 			m.UpdatedDate = val
 		}
-	case "expiration":
+	case whoisFieldExpiration:
 		if m.ExpirationDate == "" {
 			m.ExpirationDate = val
 		}
-	case "ns":
+	case constants.TypeNS:
 		addNameServer(m, val)
-	case "status":
+	case whoisFieldStatus:
 		if !slices.Contains(m.DomainStatus, val) {
 			m.DomainStatus = append(m.DomainStatus, val)
 		}
-	case "cn_registrant":
+	case whoisFieldCNRegistrant:
 		m.Registrant.Organization = appendUnique(m.Registrant.Organization, val)
-	case "cn_registrant_email":
+	case whoisFieldCNRegistrantEmail:
 		m.Registrant.Email = appendUnique(m.Registrant.Email, val)
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestGetHINFODataEmpty(t *testing.T) {
@@ -35,7 +37,7 @@ func TestHINFOCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_hinfo") {
+	if !slices.Contains(caps.Functions, constants.FuncGetHINFO) {
 		t.Error("expected get_hinfo in capabilities")
 	}
 }

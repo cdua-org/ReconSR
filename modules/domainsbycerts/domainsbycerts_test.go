@@ -1,8 +1,17 @@
 package domainsbycerts
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	"cdua-org/ReconSR/modules/utils/constants"
+)
+
+const (
+	srcCrtsh   = "src_crtsh"
+	srcCrtshPG = "src_crtsh_pg"
+	srcSpotter = "src_spotter"
 )
 
 func TestNormalizeDomain(t *testing.T) {
@@ -10,10 +19,10 @@ func TestNormalizeDomain(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"Example.COM", "example.com"},
+		{strings.ToUpper("example.com"), "example.com"},
 		{"*.example.com", "*.example.com"},
 		{"  A.example.com  ", "a.example.com"},
-		{"*.SUB.example.com", "*.sub.example.com"},
+		{strings.ToUpper("*.sub.example.com"), "*.sub.example.com"},
 		{"", ""},
 	}
 
@@ -26,19 +35,27 @@ func TestNormalizeDomain(t *testing.T) {
 }
 
 func TestMatchesTargetIdentity(t *testing.T) {
+	const (
+		targetDomain  = "example.org"
+		subdomain     = "a.example.org"
+		wildcard      = "*.example.org"
+		scopedEmail   = "user@alum.example.org"
+		offTargetHost = "sub.example.net"
+		offTargetMail = "admin@certmail.example.net"
+	)
+
 	tests := []struct {
 		value    string
 		target   string
 		expected bool
 	}{
-		{"a.example.com", "example.com", true},
-		{"*.example.com", "example.com", true},
-		{"user@example.com", "example.com", true},
-		{"dove@alum.mit.edu", "mit.edu", true},
-		{"example.com", "example.com", true},
-		{"sub.notexample.com", "example.com", false},
-		{"user@gmail.com", "example.com", false},
-		{"", "example.com", false},
+		{subdomain, targetDomain, true},
+		{wildcard, targetDomain, true},
+		{scopedEmail, targetDomain, true},
+		{targetDomain, targetDomain, true},
+		{offTargetHost, targetDomain, false},
+		{offTargetMail, targetDomain, false},
+		{"", targetDomain, false},
 	}
 
 	for _, tt := range tests {
@@ -50,6 +67,15 @@ func TestMatchesTargetIdentity(t *testing.T) {
 }
 
 func TestClassifyMatchedIdentity(t *testing.T) {
+	const (
+		targetDomain   = "example.net"
+		wildcardDomain = "*.example.net"
+		deepSubdomain  = "deep.sub.example.net"
+		scopedEmail    = "user@alum.example.net"
+		quotedEmail    = "\"quoted\"@alum.example.net"
+		invalidDomain  = "bad host.example.net"
+	)
+
 	tests := []struct {
 		name         string
 		value        string
@@ -60,46 +86,46 @@ func TestClassifyMatchedIdentity(t *testing.T) {
 	}{
 		{
 			name:         "target domain",
-			value:        "example.com",
-			target:       "example.com",
+			value:        targetDomain,
+			target:       targetDomain,
 			wantKind:     identityKindTarget,
-			wantValue:    "example.com",
+			wantValue:    targetDomain,
 			wantAccepted: true,
 		},
 		{
 			name:         "wildcard subdomain",
-			value:        "*.example.com",
-			target:       "example.com",
-			wantKind:     resultTypeSubdomain,
-			wantValue:    "*.example.com",
+			value:        wildcardDomain,
+			target:       targetDomain,
+			wantKind:     constants.TypeSubdomain,
+			wantValue:    wildcardDomain,
 			wantAccepted: true,
 		},
 		{
 			name:         "regular subdomain",
-			value:        "Deep.Sub.Example.com",
-			target:       "example.com",
-			wantKind:     resultTypeSubdomain,
-			wantValue:    "deep.sub.example.com",
+			value:        strings.ToUpper(deepSubdomain),
+			target:       targetDomain,
+			wantKind:     constants.TypeSubdomain,
+			wantValue:    deepSubdomain,
 			wantAccepted: true,
 		},
 		{
 			name:         "valid email",
-			value:        "dove@alum.mit.edu",
-			target:       "mit.edu",
-			wantKind:     resultTypeEmail,
-			wantValue:    "dove@alum.mit.edu",
+			value:        scopedEmail,
+			target:       targetDomain,
+			wantKind:     constants.TypeEmail,
+			wantValue:    scopedEmail,
 			wantAccepted: true,
 		},
 		{
 			name:         "invalid email extra is rejected",
-			value:        "\"dove\"@alum.mit.edu",
-			target:       "mit.edu",
+			value:        quotedEmail,
+			target:       targetDomain,
 			wantAccepted: false,
 		},
 		{
 			name:         "invalid domain is rejected",
-			value:        "bad host.example.com",
-			target:       "example.com",
+			value:        invalidDomain,
+			target:       targetDomain,
 			wantAccepted: false,
 		},
 	}
@@ -145,26 +171,39 @@ func TestParseCertTimestamp(t *testing.T) {
 }
 
 func TestClassifyIdentities(t *testing.T) {
+	const (
+		targetDomain    = "example.com"
+		wildcardDomain  = "*.example.com"
+		subdomainA      = "a.example.com"
+		subdomainB      = "b.example.com"
+		deepSubdomain   = "deep.sub.example.com"
+		offTargetDomain = "example.net"
+		offTargetHost   = "sub.example.net"
+		scopedEmail     = "user@alum.example.com"
+		quotedEmail     = "\"quoted\"@alum.example.com"
+		offTargetEmail  = "admin@certmail.example.org"
+	)
+
 	now := time.Now()
 	future := now.Add(30 * 24 * time.Hour)
 	past := now.Add(-30 * 24 * time.Hour)
 
 	identities := []certificateIdentitySource{
-		{value: "example.com", source: "crt.sh", NotAfter: future},
-		{value: "example.com", source: "crt.sh", NotAfter: past},
-		{value: "*.example.com", source: "crt.sh", NotAfter: future},
-		{value: "a.example.com", source: "crt.sh", NotAfter: future},
-		{value: "B.example.com", source: "Certspotter", NotAfter: past},
-		{value: "a.example.com", source: "Certspotter", NotAfter: past},
-		{value: "notexample.com", source: "crt.sh", NotAfter: future},
-		{value: "sub.notexample.com", source: "crt.sh", NotAfter: future},
-		{value: "deep.sub.example.com", source: "crt.sh", NotAfter: future},
-		{value: "dove@alum.example.com", source: "crt.sh-pg", NotAfter: future},
-		{value: "\"quoted\"@alum.example.com", source: "crt.sh-pg", NotAfter: future},
-		{value: "user@gmail.com", source: "crt.sh-pg", NotAfter: future},
+		{value: targetDomain, source: srcCrtsh, NotAfter: future},
+		{value: targetDomain, source: srcCrtsh, NotAfter: past},
+		{value: wildcardDomain, source: srcCrtsh, NotAfter: future},
+		{value: subdomainA, source: srcCrtsh, NotAfter: future},
+		{value: strings.ToUpper(subdomainB), source: srcSpotter, NotAfter: past},
+		{value: subdomainA, source: srcSpotter, NotAfter: past},
+		{value: offTargetDomain, source: srcCrtsh, NotAfter: future},
+		{value: offTargetHost, source: srcCrtsh, NotAfter: future},
+		{value: deepSubdomain, source: srcCrtsh, NotAfter: future},
+		{value: scopedEmail, source: srcCrtshPG, NotAfter: future},
+		{value: quotedEmail, source: srcCrtshPG, NotAfter: future},
+		{value: offTargetEmail, source: srcCrtshPG, NotAfter: future},
 	}
 
-	classified := classifyIdentities(identities, "example.com")
+	classified := classifyIdentities(identities, targetDomain)
 
 	if classified.targetMaxExpiry.Before(now) {
 		t.Error("targetMaxExpiry should be in the future")
@@ -174,28 +213,28 @@ func TestClassifyIdentities(t *testing.T) {
 		t.Errorf("expected 4 unique subdomains, got %d", len(classified.subdomains))
 	}
 
-	if got, ok := classified.subdomains["*.example.com"]; !ok || !got.notAfter.Equal(future) {
-		t.Errorf("*.example.com: expected future timestamp, got %+v", got)
+	if got, ok := classified.subdomains[wildcardDomain]; !ok || !got.notAfter.Equal(future) {
+		t.Errorf("%s: expected future timestamp, got %+v", wildcardDomain, got)
 	}
 
-	if got, ok := classified.subdomains["a.example.com"]; !ok || !got.notAfter.Equal(future) {
-		t.Errorf("a.example.com: expected future timestamp, got %+v", got)
+	if got, ok := classified.subdomains[subdomainA]; !ok || !got.notAfter.Equal(future) {
+		t.Errorf("%s: expected future timestamp, got %+v", subdomainA, got)
 	}
 
-	if got, ok := classified.subdomains["b.example.com"]; !ok || !got.notAfter.Equal(past) {
-		t.Errorf("b.example.com: expected past timestamp, got %+v", got)
+	if got, ok := classified.subdomains[subdomainB]; !ok || !got.notAfter.Equal(past) {
+		t.Errorf("%s: expected past timestamp, got %+v", subdomainB, got)
 	}
 
-	if _, ok := classified.subdomains["notexample.com"]; ok {
-		t.Error("notexample.com should not be classified as a subdomain")
+	if _, ok := classified.subdomains[offTargetDomain]; ok {
+		t.Error("off-target domain should not be classified as a subdomain")
 	}
 
 	if len(classified.emails) != 1 {
 		t.Errorf("expected 1 valid email, got %d", len(classified.emails))
 	}
 
-	if got, ok := classified.emails["dove@alum.example.com"]; !ok || !got.notAfter.Equal(future) {
-		t.Errorf("dove@alum.example.com: expected future timestamp, got %+v", got)
+	if got, ok := classified.emails[scopedEmail]; !ok || !got.notAfter.Equal(future) {
+		t.Errorf("%s: expected future timestamp, got %+v", scopedEmail, got)
 	}
 }
 
@@ -206,16 +245,16 @@ func TestFormatResults_CertExpiredFiltering(t *testing.T) {
 
 	classified := classifiedIdentities{
 		subdomains: map[string]classifiedIdentity{
-			"active.example.com":  {notAfter: future, source: "crt.sh"},
-			"expired.example.com": {notAfter: past, source: "crt.sh"},
-			"unknown.example.com": {source: "crt.sh"},
+			"active.example.com":  {notAfter: future, source: srcCrtsh},
+			"expired.example.com": {notAfter: past, source: srcCrtsh},
+			"unknown.example.com": {source: srcCrtsh},
 		},
 		emails: map[string]classifiedIdentity{
-			"active@alum.example.com":  {notAfter: future, source: "crt.sh-pg"},
-			"expired@alum.example.com": {notAfter: past, source: "crt.sh-pg"},
+			"active@alum.example.com":  {notAfter: future, source: srcCrtshPG},
+			"expired@alum.example.com": {notAfter: past, source: srcCrtshPG},
 		},
 		targetMaxExpiry: future,
-		targetSource:    "crt.sh",
+		targetSource:    srcCrtsh,
 	}
 
 	results := formatResults(classified, false)
@@ -223,17 +262,17 @@ func TestFormatResults_CertExpiredFiltering(t *testing.T) {
 	var subdomains, emails, certExpired, certNotAfter, emailNotAfter, statuses int
 	for _, r := range results {
 		switch r.Type {
-		case resultTypeSubdomain, resultTypeWildcard:
+		case constants.TypeSubdomain, constants.TypeWildcardSubdomain:
 			subdomains++
-		case resultTypeEmail:
+		case constants.TypeEmail:
 			emails++
-		case "cert_expired_subdomains":
+		case constants.TypeCertExpiredSubdomains:
 			certExpired++
-		case resultTypeCertNotAfter:
+		case constants.TypeCertNotAfter:
 			certNotAfter++
-		case resultTypeEmailNotAfter:
+		case constants.TypeDomainCertNotAfter:
 			emailNotAfter++
-		case resultTypeStatus:
+		case constants.TypeStatus:
 			statuses++
 		}
 	}
@@ -265,14 +304,14 @@ func TestFormatResults_DisableCertExpiredSubdomains(t *testing.T) {
 
 	classified := classifiedIdentities{
 		subdomains: map[string]classifiedIdentity{
-			"active.example.com":  {notAfter: future, source: "crt.sh"},
-			"expired.example.com": {notAfter: past, source: "crt.sh"},
+			"active.example.com":  {notAfter: future, source: srcCrtsh},
+			"expired.example.com": {notAfter: past, source: srcCrtsh},
 		},
 		emails: map[string]classifiedIdentity{
-			"expired@alum.example.com": {notAfter: past, source: "crt.sh-pg"},
+			"expired@alum.example.com": {notAfter: past, source: srcCrtshPG},
 		},
 		targetMaxExpiry: future,
-		targetSource:    "crt.sh",
+		targetSource:    srcCrtsh,
 	}
 
 	results := formatResults(classified, true)
@@ -280,17 +319,17 @@ func TestFormatResults_DisableCertExpiredSubdomains(t *testing.T) {
 	var subdomains, emails, certExpired, certNotAfter, emailNotAfter, statuses int
 	for _, r := range results {
 		switch r.Type {
-		case resultTypeSubdomain, resultTypeWildcard:
+		case constants.TypeSubdomain, constants.TypeWildcardSubdomain:
 			subdomains++
-		case resultTypeEmail:
+		case constants.TypeEmail:
 			emails++
-		case "cert_expired_subdomains":
+		case constants.TypeCertExpiredSubdomains:
 			certExpired++
-		case resultTypeCertNotAfter:
+		case constants.TypeCertNotAfter:
 			certNotAfter++
-		case resultTypeEmailNotAfter:
+		case constants.TypeDomainCertNotAfter:
 			emailNotAfter++
-		case resultTypeStatus:
+		case constants.TypeStatus:
 			statuses++
 		}
 	}
@@ -322,8 +361,8 @@ func TestModuleCapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if len(caps.Functions) != 1 || caps.Functions[0] != "get_domains" {
-		t.Fatalf("expected 1 function get_domains, got %v", caps.Functions)
+	if len(caps.Functions) != 1 || caps.Functions[0] != constants.FuncGetDomains {
+		t.Fatalf("expected 1 function %s, got %v", constants.FuncGetDomains, caps.Functions)
 	}
 }
 
@@ -334,7 +373,7 @@ func TestFormatResults_ExpiredTarget(t *testing.T) {
 		subdomains:      make(map[string]classifiedIdentity),
 		emails:          make(map[string]classifiedIdentity),
 		targetMaxExpiry: past,
-		targetSource:    "crt.sh",
+		targetSource:    srcCrtsh,
 	}
 
 	results := formatResults(classified, false)

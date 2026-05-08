@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
@@ -42,8 +43,8 @@ func withMockHost(t *testing.T, url string) func() {
 
 func TestEmailFormatModule_Name(t *testing.T) {
 	m := New()
-	if m.Name() != "emailformat" {
-		t.Errorf("expected module name 'emailformat', got %q", m.Name())
+	if m.Name() != moduleName {
+		t.Errorf("expected module name %q, got %q", moduleName, m.Name())
 	}
 }
 
@@ -58,9 +59,9 @@ func TestEmailFormatModule_Capabilities(t *testing.T) {
 		t.Fatalf("expected 1 custom function, got %d", len(caps.CustomFunctions))
 	}
 
-	fnCaps, ok := caps.CustomFunctions["get_emails"]
+	fnCaps, ok := caps.CustomFunctions[constants.FuncGetEmails]
 	if !ok {
-		t.Fatal("expected 'get_emails' capability")
+		t.Fatalf("expected %q capability", constants.FuncGetEmails)
 	}
 
 	if fnCaps.Limit != 1 {
@@ -74,7 +75,7 @@ func TestEmailFormatModule_Capabilities(t *testing.T) {
 func TestEmailFormatModule_Exec_UnsupportedFunction(t *testing.T) {
 	m := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "domain", Value: "example.com"},
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "unsupported.example.com"},
 		Functions: []string{"unsupported_function"},
 	}
 
@@ -95,7 +96,7 @@ func TestDecodeCFEmail(t *testing.T) {
 		t.Fatal("expected ok")
 	}
 	if dec != "admin@example.com" {
-		t.Errorf("expected admin@example.com, got %q", dec)
+		t.Errorf("expected %q, got %q", "admin@example.com", dec)
 	}
 
 	_, ok = decodeCFEmail("5")
@@ -134,8 +135,8 @@ func TestGetEmails_Success(t *testing.T) {
 
 	m := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "domain", Value: "example.com"},
-		Functions: []string{"get_emails"},
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "example.com"},
+		Functions: []string{constants.FuncGetEmails},
 	}
 
 	output, err := m.Exec(input)
@@ -156,7 +157,7 @@ func TestGetEmails_Success(t *testing.T) {
 	}
 
 	if exec.Results[0].Value != "admin@example.com" {
-		t.Errorf("expected admin@example.com, got %s", exec.Results[0].Value)
+		t.Errorf("expected %q, got %s", "admin@example.com", exec.Results[0].Value)
 	}
 }
 
@@ -170,8 +171,8 @@ func TestGetEmails_NotFound(t *testing.T) {
 
 	m := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "domain", Value: "example.com"},
-		Functions: []string{"get_emails"},
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "notfound.example.com"},
+		Functions: []string{constants.FuncGetEmails},
 	}
 
 	output, err := m.Exec(input)
@@ -199,8 +200,8 @@ func TestGetEmails_HTTPError(t *testing.T) {
 
 	m := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "domain", Value: "example.com"},
-		Functions: []string{"get_emails"},
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "httperror.example.com"},
+		Functions: []string{constants.FuncGetEmails},
 	}
 
 	output, err := m.Exec(input)
@@ -226,8 +227,8 @@ func TestGetEmails_AbortStatus(t *testing.T) {
 
 	m := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "domain", Value: "example.com"},
-		Functions: []string{"get_emails"},
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "forbidden.example.com"},
+		Functions: []string{constants.FuncGetEmails},
 	}
 
 	output, err := m.Exec(input)

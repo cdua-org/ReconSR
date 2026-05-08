@@ -3,19 +3,25 @@ package preflightcheck
 import (
 	"context"
 	"encoding/binary"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
 func TestStripTrailingDot(t *testing.T) {
+	const (
+		baseDomain = "example.com"
+		subdomain  = "sub.example.com"
+	)
+
 	tests := []struct {
 		input    string
 		expected string
 	}{
-		{"example.com.", "example.com"},
-		{"example.com", "example.com"},
-		{"sub.example.com.", "sub.example.com"},
+		{baseDomain + ".", baseDomain},
+		{baseDomain, baseDomain},
+		{subdomain + ".", subdomain},
 		{"", ""},
 		{".", ""},
 		{"a.", "a"},
@@ -30,15 +36,22 @@ func TestStripTrailingDot(t *testing.T) {
 }
 
 func TestSplitDomain(t *testing.T) {
+	const (
+		baseDomain       = "example.com"
+		subdomain        = "sub.example.com"
+		multiLabelDomain = "a.b.c.example.com"
+		singleLabel      = "com"
+	)
+
 	tests := []struct {
 		input    string
 		expected []string
 	}{
-		{"example.com", []string{"example", "com"}},
-		{"sub.example.com", []string{"sub", "example", "com"}},
-		{"a.b.c.example.com", []string{"a", "b", "c", "example", "com"}},
-		{"example.com.", []string{"example", "com"}},
-		{"com", []string{"com"}},
+		{baseDomain, strings.Split(baseDomain, ".")},
+		{subdomain, strings.Split(subdomain, ".")},
+		{multiLabelDomain, strings.Split(multiLabelDomain, ".")},
+		{baseDomain + ".", strings.Split(baseDomain, ".")},
+		{singleLabel, []string{singleLabel}},
 		{"", nil},
 	}
 
@@ -57,8 +70,7 @@ func TestSplitDomain(t *testing.T) {
 }
 
 func TestBuildDNSQuery_Structure(t *testing.T) {
-	domain := "example.com"
-	query := buildDNSQuery(domain)
+	query := buildDNSQuery("example.com")
 
 	if len(query) < dnsHeaderSize {
 		t.Fatalf("DNS query too short: %d bytes", len(query))
@@ -102,13 +114,11 @@ func TestBuildDNSQuery_Structure(t *testing.T) {
 }
 
 func TestBuildDNSQuery_DomainEncoding(t *testing.T) {
-	domain := "test.example.com"
-	query := buildDNSQuery(domain)
+	query := buildDNSQuery("test.example.com")
 
 	offset := dnsHeaderSize
-	expectedLabels := []string{"test", "example", "com"}
 
-	for _, expectedLabel := range expectedLabels {
+	for expectedLabel := range strings.SplitSeq("test.example.com", ".") {
 		if offset >= len(query) {
 			t.Fatalf("query ended prematurely at offset %d", offset)
 		}
@@ -133,13 +143,13 @@ func TestBuildDNSQuery_DomainEncoding(t *testing.T) {
 }
 
 func TestBuildDNSQuery_DifferentDomains(t *testing.T) {
-	domains := []string{
-		"a.com",
-		"sub.example.com",
-		"a.b.c.d.example.com",
-	}
+	const (
+		domainA    = "a.example.com"
+		subdomain  = "sub.example.com"
+		deepDomain = "a.b.c.d.example.com"
+	)
 
-	for _, domain := range domains {
+	for _, domain := range []string{domainA, subdomain, deepDomain} {
 		t.Run(domain, func(t *testing.T) {
 			query := buildDNSQuery(domain)
 			if len(query) < dnsHeaderSize {
@@ -155,7 +165,14 @@ func TestBuildDNSQuery_DifferentDomains(t *testing.T) {
 }
 
 func TestCache_Functionality(t *testing.T) {
-	key := cacheKey{domain: "test.com", nsIP: "1.2.3.4"}
+	const (
+		testDomain = "test.example.com"
+		baseIPv4   = "192.0.2.1"
+	)
+
+	dnsQueryCache = sync.Map{}
+
+	key := cacheKey{domain: testDomain, nsIP: baseIPv4}
 
 	_, ok := loadFromCache(key)
 	if ok {
@@ -174,7 +191,14 @@ func TestCache_Functionality(t *testing.T) {
 }
 
 func TestCache_WithinValidityPeriod(t *testing.T) {
-	key := cacheKey{domain: "valid.com", nsIP: "5.6.7.8"}
+	const (
+		subdomain = "sub.example.com"
+		altIPv4   = "198.51.100.2"
+	)
+
+	dnsQueryCache = sync.Map{}
+
+	key := cacheKey{domain: subdomain, nsIP: altIPv4}
 
 	storeInCache(key, 0)
 
@@ -192,9 +216,18 @@ func TestCache_WithinValidityPeriod(t *testing.T) {
 }
 
 func TestCache_DifferentKeys(t *testing.T) {
-	key1 := cacheKey{domain: "a.com", nsIP: "1.1.1.1"}
-	key2 := cacheKey{domain: "a.com", nsIP: "2.2.2.2"}
-	key3 := cacheKey{domain: "b.com", nsIP: "1.1.1.1"}
+	const (
+		domainA = "a.example.com"
+		domainB = "b.example.com"
+		baseIP  = "192.0.2.1"
+		altIP   = "198.51.100.2"
+	)
+
+	dnsQueryCache = sync.Map{}
+
+	key1 := cacheKey{domain: domainA, nsIP: baseIP}
+	key2 := cacheKey{domain: domainA, nsIP: altIP}
+	key3 := cacheKey{domain: domainB, nsIP: baseIP}
 
 	storeInCache(key1, rcodeServfail)
 
@@ -218,6 +251,17 @@ func TestCache_DifferentKeys(t *testing.T) {
 }
 
 func TestCache_KeyIsolation(t *testing.T) {
+	const (
+		testDomain = "test.example.com"
+		domainA    = "a.example.com"
+		domainB    = "b.example.com"
+		subdomain  = "sub.example.com"
+		baseIPv4   = "192.0.2.1"
+		altIPv4    = "198.51.100.2"
+		otherIPv4  = "203.0.113.25"
+		lastIPv4   = "192.0.2.44"
+	)
+
 	dnsQueryCache = sync.Map{}
 
 	tests := []struct {
@@ -229,29 +273,29 @@ func TestCache_KeyIsolation(t *testing.T) {
 	}{
 		{
 			name:       "same domain same IP",
-			storeKey:   cacheKey{domain: "test.com", nsIP: "1.1.1.1"},
-			lookupKey:  cacheKey{domain: "test.com", nsIP: "1.1.1.1"},
+			storeKey:   cacheKey{domain: testDomain, nsIP: baseIPv4},
+			lookupKey:  cacheKey{domain: testDomain, nsIP: baseIPv4},
 			storeRcode: rcodeServfail,
 			expectHit:  true,
 		},
 		{
 			name:       "same domain different IP",
-			storeKey:   cacheKey{domain: "test.com", nsIP: "1.1.1.1"},
-			lookupKey:  cacheKey{domain: "test.com", nsIP: "2.2.2.2"},
+			storeKey:   cacheKey{domain: testDomain, nsIP: baseIPv4},
+			lookupKey:  cacheKey{domain: testDomain, nsIP: altIPv4},
 			storeRcode: rcodeServfail,
 			expectHit:  false,
 		},
 		{
 			name:       "different domain same IP",
-			storeKey:   cacheKey{domain: "a.com", nsIP: "8.8.8.8"},
-			lookupKey:  cacheKey{domain: "b.com", nsIP: "8.8.8.8"},
+			storeKey:   cacheKey{domain: domainA, nsIP: otherIPv4},
+			lookupKey:  cacheKey{domain: domainB, nsIP: otherIPv4},
 			storeRcode: 0,
 			expectHit:  false,
 		},
 		{
 			name:       "different domain different IP",
-			storeKey:   cacheKey{domain: "x.com", nsIP: "3.3.3.3"},
-			lookupKey:  cacheKey{domain: "y.com", nsIP: "4.4.4.4"},
+			storeKey:   cacheKey{domain: subdomain, nsIP: otherIPv4},
+			lookupKey:  cacheKey{domain: testDomain, nsIP: lastIPv4},
 			storeRcode: 3,
 			expectHit:  false,
 		},
@@ -273,12 +317,12 @@ func TestCache_KeyIsolation(t *testing.T) {
 	}
 }
 
-func TestPreFlightCheck_EmptyBaseDomain(t *testing.T) {
-	target := "this-domain.doesnotexist123"
+func TestPreFlightCheck_InvalidTarget(t *testing.T) {
+	domainChecks = sync.Map{}
 
-	err := PreFlightCheck(context.Background(), target)
+	err := PreFlightCheck(context.Background(), "not a valid domain")
 	if err == nil {
-		t.Error("expected error for non-existent domain")
+		t.Error("expected error for invalid target")
 	}
 }
 
@@ -316,8 +360,7 @@ func TestParseDNSResponse_RCODEExtraction(t *testing.T) {
 }
 
 func TestDNSQueryPacketSize(t *testing.T) {
-	longDomain := "a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.example.com"
-	query := buildDNSQuery(longDomain)
+	query := buildDNSQuery("a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.example.com")
 
 	if len(query) > dnsMaxPacketLen {
 		t.Errorf("query exceeds max packet size: %d > %d", len(query), dnsMaxPacketLen)
@@ -325,14 +368,14 @@ func TestDNSQueryPacketSize(t *testing.T) {
 }
 
 func TestConcurrentPreFlightCheck_SameTarget(_ *testing.T) {
-	target := "concurrent.test.com"
+	domainChecks = sync.Map{}
 
 	var wg sync.WaitGroup
 	errorsChan := make(chan error, 10)
 
 	for range 10 {
 		wg.Go(func() {
-			err := PreFlightCheck(context.Background(), target)
+			err := PreFlightCheck(context.Background(), "not a valid domain")
 			errorsChan <- err
 		})
 	}

@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/resolver"
 )
-
-const debugEnabled = "true"
 
 func captureStderr(t *testing.T, fn func()) string {
 	t.Helper()
@@ -38,7 +37,7 @@ func captureStderr(t *testing.T, fn func()) string {
 }
 
 func TestPrintf_Enabled(t *testing.T) {
-	resolver.Options["Debug"] = debugEnabled
+	resolver.Options["Debug"] = strconv.FormatBool(true)
 	defer delete(resolver.Options, "Debug")
 
 	log := New("test")
@@ -66,7 +65,7 @@ func TestPrintf_Disabled_Unset(t *testing.T) {
 }
 
 func TestPrintf_Disabled_False(t *testing.T) {
-	resolver.Options["Debug"] = "false"
+	resolver.Options["Debug"] = strconv.FormatBool(false)
 	defer delete(resolver.Options, "Debug")
 
 	log := New("test")
@@ -94,7 +93,7 @@ func TestPrintf_CaseSensitive(t *testing.T) {
 }
 
 func TestPrintf_Format(t *testing.T) {
-	resolver.Options["Debug"] = debugEnabled
+	resolver.Options["Debug"] = strconv.FormatBool(true)
 	defer delete(resolver.Options, "Debug")
 
 	log := New("dns")

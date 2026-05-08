@@ -6,13 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
-)
-
-const (
-	hipNodeCategory     = "node"
-	hipPropertyCategory = "property"
-	hipPropertyType     = "hip"
 )
 
 func TestParseHIP(t *testing.T) {
@@ -22,14 +17,14 @@ func TestParseHIP(t *testing.T) {
 		expected string
 	}{
 		{
-			"standard wire format",
+			"standard hip wire format",
 			"\\# 18 08020004010203040506070801020304",
 			"2 0102030405060708 AQIDBA==",
 		},
 		{
-			"passthrough non-wire",
-			"2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.example.com.",
-			"2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.example.com.",
+			"passthrough hip text",
+			"2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.example.net.",
+			"2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.example.net.",
 		},
 		{
 			"invalid hex data",
@@ -73,51 +68,50 @@ func TestGetHIPDataNX(t *testing.T) {
 }
 
 func TestBuildHIPResultsUsesSemanticServerType(t *testing.T) {
-	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.other.net.", "example.com")
+	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.example.net.", "semantic.hip.example.com")
 	if len(results) != 2 {
 		t.Fatalf("buildHIPResults() returned %d results, want 2", len(results))
 	}
 
-	assertHIPResults(t, results, "AwEAAb", "rv1.other.net", true)
+	assertHIPResults(t, results, "AwEAAb", "rv1.example.net", true)
 }
 
 func TestParseHIPRecordBuildsSemanticServerResult(t *testing.T) {
-	rawRecord := "2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.other.net."
-	results := buildHIPResults(parseHIP(rawRecord), "example.com")
+	results := buildHIPResults(parseHIP("2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.example.net."), "parse.hip.example.com")
 	if len(results) != 2 {
 		t.Fatalf("buildHIPResults(parseHIP()) returned %d results, want 2", len(results))
 	}
 
-	assertHIPResults(t, results, "AwEAAb", "rv1.other.net", true)
+	assertHIPResults(t, results, "AwEAAb", "rv1.example.net", true)
 }
 
 func TestBuildHIPResultsEmptyRendezvousSkipsNode(t *testing.T) {
-	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb .", "example.com")
+	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb .", "empty.hip.example.com")
 	if len(results) != 1 {
 		t.Fatalf("buildHIPResults() returned %d results, want 1", len(results))
 	}
-	if results[0].Type != hipPropertyType {
-		t.Fatalf("Type = %q, want %q", results[0].Type, hipPropertyType)
+	if results[0].Type != constants.TypeHIP {
+		t.Fatalf("Type = %q, want %q", results[0].Type, constants.TypeHIP)
 	}
 }
 
 func TestBuildHIPResultsInvalidRendezvousSkipsNode(t *testing.T) {
-	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb rv_1.other.net.", "example.com")
+	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb rv_1.example.net.", "invalid.hip.example.com")
 	if len(results) != 1 {
 		t.Fatalf("buildHIPResults() returned %d results, want 1", len(results))
 	}
-	if results[0].Type != hipPropertyType {
-		t.Fatalf("Type = %q, want %q", results[0].Type, hipPropertyType)
+	if results[0].Type != constants.TypeHIP {
+		t.Fatalf("Type = %q, want %q", results[0].Type, constants.TypeHIP)
 	}
 }
 
 func TestBuildHIPResultsNormalizesRendezvousServer(t *testing.T) {
-	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb RV1.Other.NET.", "example.com")
+	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb RV1.EXAMPLE.NET.", "normalize.hip.example.com")
 	if len(results) != 2 {
 		t.Fatalf("buildHIPResults() returned %d results, want 2", len(results))
 	}
 
-	assertHIPResults(t, results, "AwEAAb", "rv1.other.net", true)
+	assertHIPResults(t, results, "AwEAAb", "rv1.example.net", true)
 }
 
 func TestHIPCapabilities(t *testing.T) {
@@ -127,7 +121,7 @@ func TestHIPCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_hip") {
+	if !slices.Contains(caps.Functions, constants.FuncGetHIP) {
 		t.Error("expected get_hip in capabilities")
 	}
 }
@@ -136,22 +130,22 @@ func assertHIPResults(t *testing.T, results []schema.ModuleResult, wantPubKey, w
 	t.Helper()
 
 	propertyResult := results[0]
-	if propertyResult.Type != hipPropertyType {
-		t.Fatalf("property Type = %q, want %q", propertyResult.Type, hipPropertyType)
+	if propertyResult.Type != constants.TypeHIP {
+		t.Fatalf("property Type = %q, want %q", propertyResult.Type, constants.TypeHIP)
 	}
-	if propertyResult.Category != hipPropertyCategory {
-		t.Fatalf("property Category = %q, want %q", propertyResult.Category, hipPropertyCategory)
+	if propertyResult.Category != constants.CategoryProperty {
+		t.Fatalf("property Category = %q, want %q", propertyResult.Category, constants.CategoryProperty)
 	}
 	if propertyResult.Value != wantPubKey {
 		t.Fatalf("property Value = %q, want %q", propertyResult.Value, wantPubKey)
 	}
 
 	nodeResult := results[1]
-	if nodeResult.Type != "hip_server" {
-		t.Fatalf("node Type = %q, want %q", nodeResult.Type, "hip_server")
+	if nodeResult.Type != constants.TypeHIPServer {
+		t.Fatalf("node Type = %q, want %q", nodeResult.Type, constants.TypeHIPServer)
 	}
-	if nodeResult.Category != hipNodeCategory {
-		t.Fatalf("node Category = %q, want %q", nodeResult.Category, hipNodeCategory)
+	if nodeResult.Category != constants.CategoryNode {
+		t.Fatalf("node Category = %q, want %q", nodeResult.Category, constants.CategoryNode)
 	}
 	if nodeResult.Value != wantHost {
 		t.Fatalf("node Value = %q, want %q", nodeResult.Value, wantHost)

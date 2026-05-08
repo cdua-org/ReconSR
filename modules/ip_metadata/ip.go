@@ -1,6 +1,7 @@
 package ip_metadata
 
 import (
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
@@ -8,13 +9,7 @@ import (
 
 var dbg = debuglog.New("ip_meta")
 
-const (
-	errInvalidIPFormat = "invalid ip address format: "
-	typeASN            = "asn"
-	typeCIDR           = "cidr"
-	typeTag            = "tag"
-	typePTR            = "ptr"
-)
+const errInvalidIPFormat = "invalid ip address format: "
 
 type module struct{}
 
@@ -29,25 +24,32 @@ func (m *module) Name() string {
 
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
-		Functions:  []string{"get_ptr", "get_asn", "get_tor", "get_rbl", "get_ip_info", "get_ip_abuse_contacts"},
-		InputTypes: []string{"ipv4", "ipv6"},
+		Functions: []string{
+			constants.FuncGetPTR,
+			constants.FuncGetASN,
+			constants.FuncGetTOR,
+			constants.FuncGetRBL,
+			constants.FuncGetIPInfo,
+			constants.FuncGetIPAbuseContacts,
+		},
+		InputTypes: []string{constants.TypeIPv4, constants.TypeIPv6},
 		ModuleConfig: &schema.FunctionCapabilities{
 			Limit:   50,
 			DelayMs: 0,
 		},
 		CustomFunctions: map[string]schema.FunctionCapabilities{
-			"get_ip_info": {
+			constants.FuncGetIPInfo: {
 				Limit:   3,
 				DelayMs: 1000,
 			},
-			"get_ip_abuse_contacts": {
+			constants.FuncGetIPAbuseContacts: {
 				Limit:   3,
 				DelayMs: 1000,
 			},
-			"get_tor": {
+			constants.FuncGetTOR: {
 				Limit: 10,
 			},
-			"get_rbl": {
+			constants.FuncGetRBL: {
 				Limit: 10,
 			},
 		},
@@ -61,17 +63,17 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		var execution schema.ModuleExecution
 
 		switch f {
-		case "get_ptr":
+		case constants.FuncGetPTR:
 			execution = getPTRData(data.Target.Value)
-		case "get_asn":
+		case constants.FuncGetASN:
 			execution = getASNData(data.Target.Value)
-		case "get_tor":
+		case constants.FuncGetTOR:
 			execution = getTorData(data.Target.Value)
-		case "get_rbl":
+		case constants.FuncGetRBL:
 			execution = getRBLData(data.Target.Value)
-		case "get_ip_info":
+		case constants.FuncGetIPInfo:
 			execution = getIPInfo(data.Target.Value)
-		case "get_ip_abuse_contacts":
+		case constants.FuncGetIPAbuseContacts:
 			execution = getIPAbuseContacts(data.Target.Value)
 		default:
 			execution = modutil.NewExecution(f)

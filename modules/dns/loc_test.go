@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseLOC(t *testing.T) {
@@ -50,7 +52,7 @@ func TestLOCCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_loc") {
+	if !slices.Contains(caps.Functions, constants.FuncGetLOC) {
 		t.Error("expected get_loc in capabilities")
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseURI(t *testing.T) {
@@ -50,7 +52,7 @@ func TestURICapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_uri") {
+	if !slices.Contains(caps.Functions, constants.FuncGetURI) {
 		t.Error("expected get_uri in capabilities")
 	}
 }

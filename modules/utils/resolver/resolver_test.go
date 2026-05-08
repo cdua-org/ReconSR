@@ -1,8 +1,6 @@
 package resolver
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestReverseIP(t *testing.T) {
 	tests := []struct {
@@ -11,9 +9,9 @@ func TestReverseIP(t *testing.T) {
 		isIPv4   bool
 		isErr    bool
 	}{
-		{"8.8.8.8", "8.8.8.8", true, false},
-		{"93.184.216.34", "34.216.184.93", true, false},
-		{"2001:4860:4860::8888", "8.8.8.8.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.6.8.4.0.6.8.4.1.0.0.2", false, false},
+		{"192.0.2.1", "1.2.0.192", true, false},
+		{"198.51.100.2", "2.100.51.198", true, false},
+		{"2001:db8::1", "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2", false, false},
 		{"invalid", "", false, true},
 	}
 

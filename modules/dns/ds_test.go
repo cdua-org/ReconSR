@@ -5,23 +5,27 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseDS(t *testing.T) {
+	const parsedDSRecord = "3437 8 2 1234567890ABCDEF1234567890ABCDEF"
+
 	tests := []struct {
 		name     string
 		input    string
 		expected string
 	}{
 		{
-			"standard wire format",
+			"standard ds wire format",
 			"\\# 20 0d6d08021234567890abcdef1234567890abcdef",
-			"3437 8 2 1234567890ABCDEF1234567890ABCDEF",
+			parsedDSRecord,
 		},
 		{
-			"passthrough non-wire",
-			"3437 8 2 1234567890ABCDEF1234567890ABCDEF",
-			"3437 8 2 1234567890ABCDEF1234567890ABCDEF",
+			"passthrough ds text",
+			parsedDSRecord,
+			parsedDSRecord,
 		},
 	}
 
@@ -61,7 +65,7 @@ func TestDSCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_ds") {
+	if !slices.Contains(caps.Functions, constants.FuncGetDS) {
 		t.Error("expected get_ds in capabilities")
 	}
 }

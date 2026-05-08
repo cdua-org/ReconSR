@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseTLSA(t *testing.T) {
@@ -14,12 +16,12 @@ func TestParseTLSA(t *testing.T) {
 		expected string
 	}{
 		{
-			"standard wire format",
+			"standard tlsa wire format",
 			"\\# 35 03 01 01 abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
 			"3 1 1 abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
 		},
 		{
-			"passthrough non-wire",
+			"passthrough tlsa text",
 			"3 1 1 abcdef0123456789",
 			"3 1 1 abcdef0123456789",
 		},
@@ -61,7 +63,7 @@ func TestTLSACapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_tlsa") {
+	if !slices.Contains(caps.Functions, constants.FuncGetTLSA) {
 		t.Error("expected get_tlsa in capabilities")
 	}
 }

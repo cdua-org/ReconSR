@@ -3,27 +3,30 @@ package whois
 import (
 	"testing"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestBuildMetadataResults_WhoisServerUsesSemanticType(t *testing.T) {
 	m := &module{}
-	anchor := &schema.EntityRef{Type: "whois_registrar", Value: "Registrar of example.com"}
+	targetDomain := "example.com"
+	whoisServer := "whois.example.com"
+	anchor := &schema.EntityRef{Type: constants.TypeWhoisRegistrar, Value: "Registrar of " + targetDomain}
 
-	results := m.buildMetadataResults(&Metadata{WhoisServer: "whois.example.com"}, "example.com", "WHOIS", anchor)
+	results := m.buildMetadataResults(&Metadata{WhoisServer: whoisServer}, targetDomain, "WHOIS", anchor)
 	if len(results) != 1 {
 		t.Fatalf("buildMetadataResults() returned %d results, want 1", len(results))
 	}
 
 	got := results[0]
-	if got.Type != "whois_server" {
-		t.Fatalf("Type = %q, want %q", got.Type, "whois_server")
+	if got.Type != constants.TypeWhoisServer {
+		t.Fatalf("Type = %q, want %q", got.Type, constants.TypeWhoisServer)
 	}
-	if got.Category != "node" {
-		t.Fatalf("Category = %q, want %q", got.Category, "node")
+	if got.Category != constants.CategoryNode {
+		t.Fatalf("Category = %q, want %q", got.Category, constants.CategoryNode)
 	}
-	if got.Value != "whois.example.com" {
-		t.Fatalf("Value = %q, want %q", got.Value, "whois.example.com")
+	if got.Value != whoisServer {
+		t.Fatalf("Value = %q, want %q", got.Value, whoisServer)
 	}
 	if got.Context != "Whois Server (WHOIS)" {
 		t.Fatalf("Context = %q, want %q", got.Context, "Whois Server (WHOIS)")

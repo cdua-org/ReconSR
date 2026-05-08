@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -14,12 +15,12 @@ func TestModuleCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	fnCaps, ok := caps.CustomFunctions["get_domains"]
+	fnCaps, ok := caps.CustomFunctions[constants.FuncGetDomains]
 	if !ok {
 		t.Fatal("expected get_domains custom capabilities")
 	}
 
-	if len(fnCaps.InputTypes) != 1 || fnCaps.InputTypes[0] != "domain" {
+	if len(fnCaps.InputTypes) != 1 || fnCaps.InputTypes[0] != constants.TypeDomain {
 		t.Errorf("expected input type domain, got %v", fnCaps.InputTypes)
 	}
 }
@@ -27,7 +28,7 @@ func TestModuleCapabilities(t *testing.T) {
 func TestExecUnsupportedFunction(t *testing.T) {
 	mod := New()
 	input := schema.ModuleInput{
-		Target:    schema.Entity{Type: "domain", Value: "example.com"},
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "portal.example.com"},
 		Functions: []string{"invalid_func"},
 	}
 

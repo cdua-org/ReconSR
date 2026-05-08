@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -14,7 +15,7 @@ import (
 )
 
 func getDMARCData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_dmarc")
+	exec := modutil.NewExecution(constants.FuncGetDMARC)
 
 	log.Printf("get_dmarc starting query for target=%q", target)
 
@@ -48,8 +49,8 @@ func getDMARCData(ctx context.Context, target string) schema.ModuleExecution {
 
 	for _, rec := range dmarcRecords {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "dmarc",
-			Category: "property",
+			Type:     constants.TypeDMARC,
+			Category: constants.CategoryProperty,
 			Value:    rec,
 		})
 
@@ -118,7 +119,7 @@ func processDMARCEmails(target string, parsed map[string]string) []schema.Module
 		}
 		emails := extractEmails(val)
 		for i, email := range emails {
-			validatedEmail, err := validator.Validate("email", email)
+			validatedEmail, err := validator.Validate(constants.TypeEmail, email)
 			if err != nil {
 				log.Printf("get_dmarc skipping invalid email target=%q entity=%q err=%v", target, email, err)
 				continue
@@ -134,7 +135,7 @@ func processDMARCEmails(target string, parsed map[string]string) []schema.Module
 
 			results = append(results, schema.ModuleResult{
 				Type:       validatedEmail.Type,
-				Category:   "node",
+				Category:   constants.CategoryNode,
 				Value:      validatedEmail.Value,
 				Context:    contextMsg,
 				OutOfScope: isOOS,

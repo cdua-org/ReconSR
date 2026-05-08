@@ -4,6 +4,8 @@ import (
 	"context"
 	"slices"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestCheckWildcard(t *testing.T) {
@@ -23,7 +25,7 @@ func TestWildcardCapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "check_wildcard") {
+	if !slices.Contains(caps.Functions, constants.FuncCheckWildcard) {
 		t.Error("expected check_wildcard in capabilities")
 	}
 }

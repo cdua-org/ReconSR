@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -68,7 +69,7 @@ func performPTRQuery(target string) ([]string, error) {
 }
 
 func getPTRData(target string) (execution schema.ModuleExecution) {
-	execution = modutil.NewExecution("get_ptr")
+	execution = modutil.NewExecution(constants.FuncGetPTR)
 
 	dbg.Printf("getPTRData target=%q", target)
 
@@ -79,7 +80,7 @@ func getPTRData(target string) (execution schema.ModuleExecution) {
 		}
 	}()
 
-	names, err := performPTRQuery(target)
+	names, err := ptrQueryFunc(target)
 
 	if err != nil {
 		if strings.Contains(err.Error(), "unrecognized address") {
@@ -102,8 +103,8 @@ func getPTRData(target string) (execution schema.ModuleExecution) {
 			continue
 		}
 		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:     typePTR,
-			Category: "property",
+			Type:     constants.TypePTR,
+			Category: constants.CategoryProperty,
 			Value:    name,
 		})
 	}

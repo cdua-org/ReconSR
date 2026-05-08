@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -56,7 +57,7 @@ func getASNInfo(asn string) string {
 		val = "AS" + val
 	}
 
-	names, err := performTXTQuery(val, val+".asn.cymru.com", "asn_info")
+	names, err := txtQueryFunc(val, val+".asn.cymru.com", "asn_info")
 	if err != nil || len(names) == 0 {
 		return ""
 	}
@@ -81,7 +82,7 @@ func getASNInfo(asn string) string {
 }
 
 func getASNData(target string) (execution schema.ModuleExecution) {
-	execution = modutil.NewExecution("get_asn")
+	execution = modutil.NewExecution(constants.FuncGetASN)
 
 	dbg.Printf("getASNData target=%q", target)
 
@@ -104,7 +105,7 @@ func getASNData(target string) (execution schema.ModuleExecution) {
 		originZone = "origin.asn.cymru.com"
 	}
 
-	originNames, originErr := performTXTQuery(target, rev+"."+originZone, "origin")
+	originNames, originErr := txtQueryFunc(target, rev+"."+originZone, "origin")
 
 	if originErr != nil {
 		errMsg := fmt.Errorf("asn lookup failed after retries: %w", originErr).Error()
@@ -124,8 +125,8 @@ func getASNData(target string) (execution schema.ModuleExecution) {
 			prefix := strings.TrimSpace(parts[1])
 
 			execution.Results = append(execution.Results, schema.ModuleResult{
-				Type:     typeCIDR,
-				Category: "property",
+				Type:     constants.TypeCIDR,
+				Category: constants.CategoryProperty,
 				Value:    prefix,
 				Context:  "BGP Prefix",
 			})
@@ -139,8 +140,8 @@ func getASNData(target string) (execution schema.ModuleExecution) {
 				info := getASNInfo(val)
 
 				execution.Results = append(execution.Results, schema.ModuleResult{
-					Type:     typeASN,
-					Category: "node",
+					Type:     constants.TypeASN,
+					Category: constants.CategoryNode,
 					Value:    val,
 					Context:  "ASN Origin" + info,
 				})

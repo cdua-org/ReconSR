@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/schema"
@@ -21,8 +22,8 @@ func parseShodanAPIDomain(exec *schema.ModuleExecution, rawBody []byte, target s
 
 	if len(payload.Tags) > 0 {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     entityTypeDomain,
-			Category: resultCategoryNode,
+			Type:     constants.TypeDomain,
+			Category: constants.CategoryNode,
 			Value:    target,
 			Tags:     payload.Tags,
 		})
@@ -58,11 +59,11 @@ func buildShodanFQDN(target, subdomain string) (resultValue, resultType string, 
 	isWildcard := strings.HasPrefix(fqdn, "*.")
 	validatedValue := strings.TrimPrefix(fqdn, "*.")
 
-	validated, err := validator.Validate(entityTypeDomain, validatedValue)
+	validated, err := validator.Validate(constants.TypeDomain, validatedValue)
 	if err != nil {
 		if strings.Contains(validatedValue, "_") {
 			resultValue = strings.ToLower(validatedValue)
-			resultType = "subdomain"
+			resultType = constants.TypeSubdomain
 		} else {
 			return "", "", false
 		}
@@ -73,10 +74,10 @@ func buildShodanFQDN(target, subdomain string) (resultValue, resultType string, 
 
 	if isWildcard {
 		resultValue = "*." + resultValue
-		if resultType == "domain" {
-			resultType = "wildcard_domain"
+		if resultType == constants.TypeDomain {
+			resultType = constants.TypeWildcardDomain
 		} else {
-			resultType = "wildcard_subdomain"
+			resultType = constants.TypeWildcardSubdomain
 		}
 	}
 
@@ -90,7 +91,7 @@ func appendShodanSubdomain(exec *schema.ModuleExecution, fqdn, entityType, targe
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:       entityType,
-		Category:   resultCategoryNode,
+		Category:   constants.CategoryNode,
 		Value:      fqdn,
 		Context:    "Shodan DNS",
 		OutOfScope: orgdomain.IsOutOfScope(fqdn, target),
@@ -131,14 +132,14 @@ func processShodanDNSRecord(exec *schema.ModuleExecution, record shodanDomainRec
 }
 
 func appendShodanIPResult(exec *schema.ModuleExecution, value string, source *schema.EntityRef) *schema.EntityRef {
-	validated, err := validator.Validate(entityTypeIP, value)
+	validated, err := validator.Validate(constants.TypeIP, value)
 	if err != nil {
 		return nil
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     validated.Type,
-		Category: resultCategoryNode,
+		Category: constants.CategoryNode,
 		Value:    validated.Value,
 		Context:  "A/AAAA Record",
 		Source:   source,
@@ -148,7 +149,7 @@ func appendShodanIPResult(exec *schema.ModuleExecution, value string, source *sc
 }
 
 func appendShodanCNAMEResult(exec *schema.ModuleExecution, value, target string, source *schema.EntityRef) *schema.EntityRef {
-	validated, err := validator.Validate(entityTypeDomain, value)
+	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
 		return nil
 	}
@@ -156,12 +157,12 @@ func appendShodanCNAMEResult(exec *schema.ModuleExecution, value, target string,
 	isOOS := orgdomain.IsOutOfScope(validated.Value, target)
 	resultType := validated.Type
 	if isOOS {
-		resultType = "cname_target"
+		resultType = constants.TypeCNAMETarget
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:       resultType,
-		Category:   resultCategoryNode,
+		Category:   constants.CategoryNode,
 		Value:      validated.Value,
 		Context:    "CNAME Record",
 		OutOfScope: isOOS,
@@ -178,22 +179,22 @@ func appendShodanMXResult(exec *schema.ModuleExecution, record shodanDomainRecor
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     "mx",
-		Category: resultCategoryProperty,
+		Type:     constants.TypeMX,
+		Category: constants.CategoryProperty,
 		Value:    mxValue,
 		Source:   source,
 	})
 
-	mxRef := &schema.EntityRef{Type: "mx", Value: mxValue}
+	mxRef := &schema.EntityRef{Type: constants.TypeMX, Value: mxValue}
 
-	validated, err := validator.Validate(entityTypeDomain, value)
+	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
 		return mxRef
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:       "mx_host",
-		Category:   resultCategoryNode,
+		Type:       constants.TypeMXHost,
+		Category:   constants.CategoryNode,
 		Value:      validated.Value,
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     source,
@@ -203,32 +204,32 @@ func appendShodanMXResult(exec *schema.ModuleExecution, record shodanDomainRecor
 }
 
 func appendShodanNSResult(exec *schema.ModuleExecution, value, target string, source *schema.EntityRef) *schema.EntityRef {
-	validated, err := validator.Validate(entityTypeDomain, value)
+	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
 		return nil
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:       "ns",
-		Category:   resultCategoryNode,
+		Type:       constants.TypeNS,
+		Category:   constants.CategoryNode,
 		Value:      validated.Value,
 		Context:    "NS Record",
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     source,
 	})
 
-	return &schema.EntityRef{Type: "ns", Value: validated.Value}
+	return &schema.EntityRef{Type: constants.TypeNS, Value: validated.Value}
 }
 
 func appendShodanTXTResult(exec *schema.ModuleExecution, value string, source *schema.EntityRef) *schema.EntityRef {
-	resultType := "txt"
+	resultType := constants.TypeTXT
 	if strings.HasPrefix(strings.ToLower(value), "v=spf1") {
-		resultType = "spf"
+		resultType = constants.TypeSPF
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
-		Category: resultCategoryProperty,
+		Category: constants.CategoryProperty,
 		Value:    value,
 		Source:   source,
 	})
@@ -239,29 +240,29 @@ func appendShodanTXTResult(exec *schema.ModuleExecution, value string, source *s
 func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRecord, primaryNS, target string, source *schema.EntityRef) *schema.EntityRef {
 	soaRaw := buildShodanSOARaw(primaryNS, record.Options)
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     resultTypeSOA,
-		Category: resultCategoryProperty,
+		Type:     constants.TypeSOA,
+		Category: constants.CategoryProperty,
 		Value:    soaRaw,
 		Source:   source,
 	})
 
-	soaRef := &schema.EntityRef{Type: resultTypeSOA, Value: soaRaw}
+	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: soaRaw}
 
 	if record.Options != nil && record.Options.Serial != 0 {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     resultTypeSOA,
-			Category: resultCategoryProperty,
+			Type:     constants.TypeSOA,
+			Category: constants.CategoryProperty,
 			Value:    strconv.FormatUint(record.Options.Serial, 10),
 			Context:  "Serial",
 			Source:   source,
 		})
 	}
 
-	validatedNS, err := validator.Validate(entityTypeDomain, primaryNS)
+	validatedNS, err := validator.Validate(constants.TypeDomain, primaryNS)
 	if err == nil {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:       "ns",
-			Category:   resultCategoryNode,
+			Type:       constants.TypeNS,
+			Category:   constants.CategoryNode,
 			Value:      validatedNS.Value,
 			Context:    "Primary NS",
 			OutOfScope: orgdomain.IsOutOfScope(validatedNS.Value, target),
@@ -271,11 +272,11 @@ func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRec
 
 	if record.Options != nil && record.Options.Hostmaster != "" {
 		email := formatShodanSOAMbox(record.Options.Hostmaster)
-		validatedEmail, emailErr := validator.Validate("email", email)
+		validatedEmail, emailErr := validator.Validate(constants.TypeEmail, email)
 		if emailErr == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validatedEmail.Type,
-				Category:   resultCategoryNode,
+				Category:   constants.CategoryNode,
 				Value:      validatedEmail.Value,
 				Context:    "Responsible Email",
 				OutOfScope: orgdomain.IsEmailOutOfScope(validatedEmail.Value, target),
@@ -311,7 +312,7 @@ func appendShodanGenericDNSResult(exec *schema.ModuleExecution, recordType, valu
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
-		Category: resultCategoryProperty,
+		Category: constants.CategoryProperty,
 		Value:    value,
 		Source:   source,
 	})
@@ -326,8 +327,8 @@ func appendShodanLastSeen(exec *schema.ModuleExecution, lastSeen string, source 
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     "last_seen",
-		Category: resultCategoryProperty,
+		Type:     constants.TypeLastSeen,
+		Category: constants.CategoryProperty,
 		Value:    lastSeen,
 		Context:  fqdn,
 		Source:   source,
@@ -339,10 +340,10 @@ func appendShodanSRVResult(exec *schema.ModuleExecution, value, target string, s
 	parts := strings.Fields(value)
 	if len(parts) >= 4 {
 		host := strings.TrimSuffix(parts[3], ".")
-		if validated, err := validator.Validate(entityTypeDomain, host); err == nil {
+		if validated, err := validator.Validate(constants.TypeDomain, host); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       "srv_host",
-				Category:   resultCategoryNode,
+				Type:       constants.TypeSRVHost,
+				Category:   constants.CategoryNode,
 				Value:      validated.Value,
 				OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 				Source:     source,
@@ -357,10 +358,10 @@ func appendShodanCAAResult(exec *schema.ModuleExecution, value, target string, s
 	parts := strings.Fields(value)
 	if len(parts) >= 3 {
 		issuer := strings.Trim(parts[2], "\"")
-		if validated, err := validator.Validate(entityTypeDomain, issuer); err == nil {
+		if validated, err := validator.Validate(constants.TypeDomain, issuer); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       "cert_authority",
-				Category:   resultCategoryNode,
+				Type:       constants.TypeCertAuthority,
+				Category:   constants.CategoryNode,
 				Value:      validated.Value,
 				Context:    "CAA Record",
 				OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
@@ -378,8 +379,8 @@ func appendShodanURIResult(exec *schema.ModuleExecution, value, _ string, source
 		uri := strings.Trim(parts[2], "\"")
 		if uri != "" {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:     "url",
-				Category: resultCategoryProperty,
+				Type:     constants.TypeURL,
+				Category: constants.CategoryProperty,
 				Value:    uri,
 				Context:  "URI Endpoint",
 				Source:   source,
@@ -397,7 +398,7 @@ func appendShodanNAPTRResult(exec *schema.ModuleExecution, value, target string,
 		validatedValue := targetNode
 		valid := false
 
-		if validated, err := validator.Validate(entityTypeDomain, targetNode); err == nil {
+		if validated, err := validator.Validate(constants.TypeDomain, targetNode); err == nil {
 			validatedValue = validated.Value
 			valid = true
 		} else if strings.Contains(targetNode, "_") {
@@ -407,8 +408,8 @@ func appendShodanNAPTRResult(exec *schema.ModuleExecution, value, target string,
 
 		if valid {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       "naptr_target",
-				Category:   resultCategoryNode,
+				Type:       constants.TypeNAPTRTarget,
+				Category:   constants.CategoryNode,
 				Value:      validatedValue,
 				Context:    "NAPTR Target",
 				OutOfScope: orgdomain.IsOutOfScope(validatedValue, target),
@@ -427,10 +428,10 @@ func appendShodanRPResult(exec *schema.ModuleExecution, value, target string, so
 		if idx := strings.Index(mbox, "."); idx > 0 && idx < len(mbox)-1 {
 			mbox = mbox[:idx] + "@" + mbox[idx+1:]
 		}
-		if validated, err := validator.Validate("email", mbox); err == nil {
+		if validated, err := validator.Validate(constants.TypeEmail, mbox); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validated.Type,
-				Category:   resultCategoryNode,
+				Category:   constants.CategoryNode,
 				Value:      validated.Value,
 				Context:    "RP Administrator Email",
 				OutOfScope: orgdomain.IsEmailOutOfScope(validated.Value, target),
@@ -439,10 +440,10 @@ func appendShodanRPResult(exec *schema.ModuleExecution, value, target string, so
 		}
 
 		txtDomain := strings.TrimSuffix(parts[1], ".")
-		if validated, err := validator.Validate(entityTypeDomain, txtDomain); err == nil {
+		if validated, err := validator.Validate(constants.TypeDomain, txtDomain); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       "rp_domain",
-				Category:   resultCategoryNode,
+				Type:       constants.TypeRPDomain,
+				Category:   constants.CategoryNode,
 				Value:      validated.Value,
 				Context:    "RP TXT Reference Domain",
 				OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
@@ -459,10 +460,10 @@ func appendShodanHIPResult(exec *schema.ModuleExecution, value, target string, s
 	if len(parts) >= 4 {
 		for _, rv := range parts[3:] {
 			rvNode := strings.TrimSuffix(rv, ".")
-			if validated, err := validator.Validate(entityTypeDomain, rvNode); err == nil {
+			if validated, err := validator.Validate(constants.TypeDomain, rvNode); err == nil {
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:       "hip_server",
-					Category:   resultCategoryNode,
+					Type:       constants.TypeHIPServer,
+					Category:   constants.CategoryNode,
 					Value:      validated.Value,
 					Context:    "HIP Rendezvous Server",
 					OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),

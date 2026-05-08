@@ -5,15 +5,11 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
-)
-
-const (
-	categoryNode     = "node"
-	categoryProperty = "property"
 )
 
 func parseRPMailbox(mbox string) string {
@@ -34,7 +30,7 @@ func processRPMailbox(mailbox, target string) []schema.ModuleResult {
 		return results
 	}
 
-	res, vErr := validator.Validate("email", mailbox)
+	res, vErr := validator.Validate(constants.TypeEmail, mailbox)
 	if vErr != nil {
 		return results
 	}
@@ -44,7 +40,7 @@ func processRPMailbox(mailbox, target string) []schema.ModuleResult {
 
 	results = append(results, schema.ModuleResult{
 		Type:       res.Type,
-		Category:   categoryNode,
+		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		Context:    "RP Administrator Email",
 		OutOfScope: isOOS,
@@ -61,7 +57,7 @@ func processRPTXTDomain(txtDomain, target string) []schema.ModuleResult {
 		return results
 	}
 
-	res, vErr := validator.Validate("domain", txtDomain)
+	res, vErr := validator.Validate(constants.TypeDomain, txtDomain)
 	if vErr != nil {
 		return results
 	}
@@ -70,8 +66,8 @@ func processRPTXTDomain(txtDomain, target string) []schema.ModuleResult {
 	log.Printf("get_rp target=%q entity=%q oos=%v", target, res.Value, isOOS)
 
 	results = append(results, schema.ModuleResult{
-		Type:       "rp_domain",
-		Category:   categoryNode,
+		Type:       constants.TypeRPDomain,
+		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		Context:    "RP TXT Reference Domain",
 		OutOfScope: isOOS,
@@ -91,8 +87,8 @@ func processRPRecord(record, target string) []schema.ModuleResult {
 	results := make([]schema.ModuleResult, 0, 3)
 
 	rpResult := schema.ModuleResult{
-		Type:     "rp",
-		Category: categoryProperty,
+		Type:     constants.TypeRP,
+		Category: constants.CategoryProperty,
 		Value:    record,
 	}
 	results = append(results, rpResult)
@@ -111,7 +107,7 @@ func processRPRecord(record, target string) []schema.ModuleResult {
 }
 
 func getRPData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_rp")
+	exec := modutil.NewExecution(constants.FuncGetRP)
 
 	log.Printf("get_rp query started for %q", target)
 

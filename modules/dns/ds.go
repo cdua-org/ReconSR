@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -14,10 +15,10 @@ import (
 )
 
 var dsDigestTypes = map[byte]string{
-	1: "SHA-1",
-	2: "SHA-256",
-	3: "GOST R 34.11-94",
-	4: "SHA-384",
+	1: constants.DigestSHA1,
+	2: constants.DigestSHA256,
+	3: constants.DigestGOSTR341194,
+	4: constants.DigestSHA384,
 }
 
 func parseDS(raw string) string {
@@ -35,7 +36,7 @@ func parseDS(raw string) string {
 }
 
 func getDSData(ctx context.Context, target string) schema.ModuleExecution {
-	exec := modutil.NewExecution("get_ds")
+	exec := modutil.NewExecution(constants.FuncGetDS)
 
 	log.Printf("get_ds target=%q", target)
 
@@ -78,8 +79,8 @@ func getDSData(ctx context.Context, target string) schema.ModuleExecution {
 		}
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     "ds",
-			Category: "property",
+			Type:     constants.TypeDS,
+			Category: constants.CategoryProperty,
 			Value:    parts[3],
 			Context:  "DS Record, KeyTag: " + keyTag + ", Alg: " + algName + ", Hash: " + digestName,
 		})

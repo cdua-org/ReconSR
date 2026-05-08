@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseIPSECKEY(t *testing.T) {
@@ -84,7 +86,6 @@ func TestClassifyIPSECKEYGateway(t *testing.T) {
 		name      string
 		gwType    string
 		gateway   string
-		target    string
 		wantType  string
 		wantValue string
 		wantOK    bool
@@ -94,61 +95,55 @@ func TestClassifyIPSECKEYGateway(t *testing.T) {
 			name:      "ipv4 gateway stays ip",
 			gwType:    "1",
 			gateway:   "192.0.2.10",
-			target:    "example.com",
 			wantOK:    true,
-			wantType:  "ip",
+			wantType:  constants.TypeIP,
 			wantValue: "192.0.2.10",
 			wantOOS:   false,
 		},
 		{
 			name:      "ipv6 gateway stays ip",
 			gwType:    "2",
-			gateway:   "2001:db8::1",
-			target:    "example.com",
+			gateway:   "2001:db8::10",
 			wantOK:    true,
-			wantType:  "ip",
-			wantValue: "2001:db8::1",
+			wantType:  constants.TypeIP,
+			wantValue: "2001:db8::10",
 			wantOOS:   false,
 		},
 		{
 			name:      "domain gateway becomes ipsec gateway",
 			gwType:    "3",
-			gateway:   "vpn.example.com",
-			target:    "example.com",
+			gateway:   "vpn-gateway.example.com",
 			wantOK:    true,
-			wantType:  ipsecGatewayType,
-			wantValue: "vpn.example.com",
+			wantType:  constants.TypeIPSECGateway,
+			wantValue: "vpn-gateway.example.com",
 			wantOOS:   false,
 		},
 		{
 			name:      "external domain gateway stays out of scope",
 			gwType:    "3",
-			gateway:   "vpn.vendor.net",
-			target:    "example.com",
+			gateway:   "vpn-gateway.example.net",
 			wantOK:    true,
-			wantType:  ipsecGatewayType,
-			wantValue: "vpn.vendor.net",
+			wantType:  constants.TypeIPSECGateway,
+			wantValue: "vpn-gateway.example.net",
 			wantOOS:   true,
 		},
 		{
 			name:    "ipv4 gateway rejects ipv6 value",
 			gwType:  "1",
-			gateway: "2001:db8::1",
-			target:  "example.com",
+			gateway: "2001:db8::11",
 			wantOK:  false,
 		},
 		{
 			name:    "domain gateway rejects invalid domain",
 			gwType:  "3",
 			gateway: "vpn_example.com",
-			target:  "example.com",
 			wantOK:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := classifyIPSECKEYGateway(tt.gwType, tt.gateway, tt.target)
+			got, ok := classifyIPSECKEYGateway(tt.gwType, tt.gateway, "gateway.ipseckey.example.com")
 			if ok != tt.wantOK {
 				t.Fatalf("classifyIPSECKEYGateway() ok = %v, want %v", ok, tt.wantOK)
 			}
@@ -172,7 +167,6 @@ func TestBuildIPSECKEYResults(t *testing.T) {
 	tests := []struct {
 		name          string
 		parsed        string
-		target        string
 		wantNodeType  string
 		wantNodeValue string
 		wantLen       int
@@ -181,91 +175,81 @@ func TestBuildIPSECKEYResults(t *testing.T) {
 		{
 			name:          "ipv4 gateway produces ip node",
 			parsed:        "10 1 2 192.0.2.38 AQID",
-			target:        "example.com",
 			wantLen:       2,
-			wantNodeType:  "ip",
+			wantNodeType:  constants.TypeIP,
 			wantNodeValue: "192.0.2.38",
 			wantNodeOOS:   false,
 		},
 		{
 			name:          "ipv6 gateway produces ip node",
-			parsed:        "10 2 2 2001:db8::1 AQID",
-			target:        "example.com",
+			parsed:        "10 2 2 2001:db8::20 AQID",
 			wantLen:       2,
-			wantNodeType:  "ip",
-			wantNodeValue: "2001:db8::1",
+			wantNodeType:  constants.TypeIP,
+			wantNodeValue: "2001:db8::20",
 			wantNodeOOS:   false,
 		},
 		{
 			name:          "in scope domain gateway produces ipsec gateway node",
-			parsed:        "10 3 2 vpn.example.com AQID",
-			target:        "example.com",
+			parsed:        "10 3 2 branch-vpn.example.com AQID",
 			wantLen:       2,
-			wantNodeType:  ipsecGatewayType,
-			wantNodeValue: "vpn.example.com",
+			wantNodeType:  constants.TypeIPSECGateway,
+			wantNodeValue: "branch-vpn.example.com",
 			wantNodeOOS:   false,
 		},
 		{
 			name:          "external domain gateway produces out of scope ipsec gateway node",
-			parsed:        "10 3 2 vpn.vendor.net AQID",
-			target:        "example.com",
+			parsed:        "10 3 2 branch-vpn.example.net AQID",
 			wantLen:       2,
-			wantNodeType:  ipsecGatewayType,
-			wantNodeValue: "vpn.vendor.net",
+			wantNodeType:  constants.TypeIPSECGateway,
+			wantNodeValue: "branch-vpn.example.net",
 			wantNodeOOS:   true,
 		},
 		{
 			name:    "no gateway produces property only",
 			parsed:  "10 0 2 . AQID",
-			target:  "example.com",
 			wantLen: 1,
 		},
 		{
 			name:    "unknown gateway produces property only",
 			parsed:  "10 9 2 <unknown> AQID",
-			target:  "example.com",
 			wantLen: 1,
 		},
 		{
 			name:          "domain gateway from parsed wire format produces ipsec gateway node",
 			parsed:        parseIPSECKEY("\\# 23 0A03020376706E076578616D706C6503636F6D00010203"),
-			target:        "example.com",
 			wantLen:       2,
-			wantNodeType:  ipsecGatewayType,
+			wantNodeType:  constants.TypeIPSECGateway,
 			wantNodeValue: "vpn.example.com",
 			wantNodeOOS:   false,
 		},
 		{
 			name:    "mismatched ipv4 gateway family produces property only",
 			parsed:  "10 1 2 2001:db8::1 AQID",
-			target:  "example.com",
 			wantLen: 1,
 		},
 		{
 			name:    "invalid domain gateway produces property only",
 			parsed:  "10 3 2 vpn_example.com AQID",
-			target:  "example.com",
 			wantLen: 1,
 		},
 		{
 			name:    "invalid parsed record produces no results",
 			parsed:  "broken",
-			target:  "example.com",
 			wantLen: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := buildIPSECKEYResults(tt.parsed, tt.target)
+			results := buildIPSECKEYResults(tt.parsed, "results.ipseckey.example.com")
 			if len(results) != tt.wantLen {
 				t.Fatalf("buildIPSECKEYResults() len = %d, want %d", len(results), tt.wantLen)
 			}
 			if tt.wantLen == 0 {
 				return
 			}
-			if results[0].Type != "ipseckey" {
-				t.Fatalf("buildIPSECKEYResults() property type = %q, want %q", results[0].Type, "ipseckey")
+			if results[0].Type != constants.TypeIPSECKEY {
+				t.Fatalf("buildIPSECKEYResults() property type = %q, want %q", results[0].Type, constants.TypeIPSECKEY)
 			}
 			if tt.wantLen == 1 {
 				return
@@ -291,7 +275,7 @@ func TestIPSECKEYCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error getting capabilities: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_ipseckey") {
+	if !slices.Contains(caps.Functions, constants.FuncGetIPSECKEY) {
 		t.Error("expected get_ipseckey in capabilities")
 	}
 }

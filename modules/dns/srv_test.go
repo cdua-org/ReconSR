@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"slices"
 	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 func TestParseSRVHost(t *testing.T) {
@@ -68,7 +70,7 @@ func TestSRVCapabilities(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !slices.Contains(caps.Functions, "get_srv") {
+	if !slices.Contains(caps.Functions, constants.FuncGetSRV) {
 		t.Error("expected get_srv in capabilities")
 	}
 }

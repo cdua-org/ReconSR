@@ -7,13 +7,14 @@ import (
 	"net/http"
 	"net/url"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
 func (m *shodanModule) getShodanAPIDomain(target schema.Entity) schema.ModuleExecution {
-	exec := modutil.NewExecution(functionShodanAPIDomain)
+	exec := modutil.NewExecution(constants.FuncGetShodanAPIDomain)
 	m.preflightOnce.Do(func() { m.handlePreflightAPI() })
 
 	m.mu.Lock()
@@ -23,8 +24,8 @@ func (m *shodanModule) getShodanAPIDomain(target schema.Entity) schema.ModuleExe
 
 	if invalid || credits <= 0 {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     resultTypeInfo,
-			Category: resultCategoryProperty,
+			Type:     constants.TypeInfo,
+			Category: constants.CategoryProperty,
 			Value:    "Shodan API key is invalid or query credits exhausted",
 		})
 		return exec

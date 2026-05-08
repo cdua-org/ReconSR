@@ -13,12 +13,24 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/apiconfig"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
+)
+
+const (
+	moduleName          = "hackertarget"
+	apiServiceName      = "HackerTarget"
+	hostSearchPath      = "/hostsearch/?q="
+	quotaCountHeader    = "X-Api-Count"
+	quotaLimitHeader    = "X-Api-Quota"
+	quotaExhaustedValue = "API quota exhausted"
+	contextPDNSRecord   = "HackerTarget pDNS Record"
+	contextResolvedIP   = "HackerTarget Resolved IP"
 )
 
 var dbg = debuglog.New("ht")
@@ -28,7 +40,7 @@ var apiBaseURL = "https://api.hackertarget.com"
 // New instantiates the module for registration within the dispatcher's lifecycle.
 func New() schema.Module {
 	return &module{
-		apiKey: apiconfig.GetKey("HackerTarget"),
+		apiKey: apiconfig.GetKey(apiServiceName),
 	}
 }
 
@@ -37,13 +49,13 @@ type module struct {
 }
 
 func (m *module) Name() string {
-	return "hackertarget"
+	return moduleName
 }
 
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
-		Functions:  []string{"get_hosts"},
-		InputTypes: []string{"domain"},
+		Functions:  []string{constants.FuncGetHosts},
+		InputTypes: []string{constants.TypeDomain},
 		ModuleConfig: &schema.FunctionCapabilities{
 			Limit:   5,
 			DelayMs: 2000,
@@ -57,7 +69,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	for _, f := range data.Functions {
 		var execution schema.ModuleExecution
 
-		if f == "get_hosts" {
+		if f == constants.FuncGetHosts {
 			execution = m.getHosts(data.Target.Value)
 		} else {
 			execution = modutil.NewExecution(f)
@@ -74,7 +86,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 }
 
 func (m *module) getHosts(target string) schema.ModuleExecution {
-	execution := modutil.NewExecution("get_hosts")
+	execution := modutil.NewExecution(constants.FuncGetHosts)
 
 	dbg.Printf("getHosts target=%q", target)
 
@@ -87,10 +99,10 @@ func (m *module) getHosts(target string) schema.ModuleExecution {
 
 	if isQuotaLimit {
 		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:     "api_quota",
-			Category: "property",
-			Value:    "API quota exhausted",
-			Context:  "HackerTarget",
+			Type:     constants.TypeAPIQuota,
+			Category: constants.CategoryProperty,
+			Value:    quotaExhaustedValue,
+			Context:  apiServiceName,
 			Applied:  true,
 		})
 		return execution
@@ -136,7 +148,7 @@ func fetchWithRetry(ctx context.Context, target, apiKey string) (body string, is
 }
 
 func doRequest(ctx context.Context, target, apiKey string) (body string, isQuota bool, errMsg *string, action httputil.ResponseAction) {
-	u := apiBaseURL + "/hostsearch/?q=" + url.QueryEscape(target)
+	u := apiBaseURL + hostSearchPath + url.QueryEscape(target)
 	if apiKey != "" {
 		u += "&apikey=" + url.QueryEscape(apiKey)
 	}
@@ -195,8 +207,8 @@ func doRequest(ctx context.Context, target, apiKey string) (body string, isQuota
 }
 
 func isQuotaExceeded(header http.Header) bool {
-	apiCount := header.Get("X-Api-Count")
-	apiQuota := header.Get("X-Api-Quota")
+	apiCount := header.Get(quotaCountHeader)
+	apiQuota := header.Get(quotaLimitHeader)
 
 	if apiCount == "" || apiQuota == "" {
 		return false
@@ -245,7 +257,7 @@ func parseHostSearch(body, target string) []schema.ModuleResult {
 
 		var src *schema.EntityRef
 		if rawDomain != "" {
-			domainRes, err := validator.Validate("domain", rawDomain)
+			domainRes, err := validator.Validate(constants.TypeDomain, rawDomain)
 			if err != nil {
 				continue
 			}
@@ -254,9 +266,9 @@ func parseHostSearch(body, target string) []schema.ModuleResult {
 
 			results = append(results, schema.ModuleResult{
 				Type:       domainRes.Type,
-				Category:   "node",
+				Category:   constants.CategoryNode,
 				Value:      domainRes.Value,
-				Context:    "HackerTarget pDNS Record",
+				Context:    contextPDNSRecord,
 				OutOfScope: isOOS,
 			})
 			src = &schema.EntityRef{
@@ -266,13 +278,13 @@ func parseHostSearch(body, target string) []schema.ModuleResult {
 		}
 
 		if rawIP != "" {
-			ipRes, err := validator.Validate("ip", rawIP)
+			ipRes, err := validator.Validate(constants.TypeIP, rawIP)
 			if err == nil {
 				results = append(results, schema.ModuleResult{
 					Type:     ipRes.Type,
-					Category: "node",
+					Category: constants.CategoryNode,
 					Value:    ipRes.Value,
-					Context:  "HackerTarget Resolved IP",
+					Context:  contextResolvedIP,
 					Source:   src,
 				})
 			}

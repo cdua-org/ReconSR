@@ -8,10 +8,16 @@ import (
 	"slices"
 	"strings"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
+)
+
+const (
+	dnsblPositive    = "127.0.0.2"
+	dnsblPositiveAlt = "127.0.0.100"
 )
 
 func performAQuery(target, query, queryType string) ([]string, error) {
@@ -51,7 +57,7 @@ func performAQuery(target, query, queryType string) ([]string, error) {
 }
 
 func getTorData(target string) (execution schema.ModuleExecution) {
-	execution = modutil.NewExecution("get_tor")
+	execution = modutil.NewExecution(constants.FuncGetTOR)
 
 	dbg.Printf("getTorData target=%q", target)
 
@@ -76,14 +82,14 @@ func getTorData(target string) (execution schema.ModuleExecution) {
 
 	for _, zone := range zones {
 		query := rev + zone.suffix
-		ips, lookupErr := performAQuery(target, query, "get_tor")
+		ips, lookupErr := aQueryFunc(target, query, constants.FuncGetTOR)
 
 		if lookupErr != nil {
 			lastErr = lookupErr
 			continue
 		}
 
-		if slices.Contains(ips, "127.0.0.2") || slices.Contains(ips, "127.0.0.100") {
+		if slices.Contains(ips, dnsblPositive) || slices.Contains(ips, dnsblPositiveAlt) {
 			isTor = true
 			detectedContext = zone.tag
 			break
@@ -98,12 +104,12 @@ func getTorData(target string) (execution schema.ModuleExecution) {
 
 	if isTor {
 		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:     typeTag,
-			Category: "property",
-			Value:    "tor_exit",
+			Type:     constants.TypeTag,
+			Category: constants.CategoryProperty,
+			Value:    constants.TagTorExit,
 			Context:  detectedContext,
 		})
-		execution.RawData = "127.0.0.2"
+		execution.RawData = dnsblPositive
 	}
 
 	return execution
