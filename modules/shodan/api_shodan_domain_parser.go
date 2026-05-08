@@ -40,7 +40,10 @@ func processShodanDomainRecord(exec *schema.ModuleExecution, record shodanDomain
 		return
 	}
 
-	source := appendShodanSubdomain(exec, fqdn, entityType, target)
+	var source *schema.EntityRef
+	if record.Type != "TXT" || !strings.HasPrefix(record.Subdomain, "_") {
+		source = appendShodanSubdomain(exec, fqdn, entityType, target)
+	}
 	value := strings.TrimSpace(record.Value)
 	if value == "" {
 		return
@@ -113,7 +116,7 @@ func processShodanDNSRecord(exec *schema.ModuleExecution, record shodanDomainRec
 	case "SOA":
 		return appendShodanSOAResults(exec, record, value, target, source)
 	case "TXT":
-		return appendShodanTXTResult(exec, value, source)
+		return appendShodanTXTResult(exec, record, value, source)
 	case "SRV":
 		return appendShodanSRVResult(exec, value, target, source)
 	case "CAA":
@@ -221,16 +224,28 @@ func appendShodanNSResult(exec *schema.ModuleExecution, value, target string, so
 	return &schema.EntityRef{Type: constants.TypeNS, Value: validated.Value}
 }
 
-func appendShodanTXTResult(exec *schema.ModuleExecution, value string, source *schema.EntityRef) *schema.EntityRef {
+func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainRecord, value string, source *schema.EntityRef) *schema.EntityRef {
 	resultType := constants.TypeTXT
-	if strings.HasPrefix(strings.ToLower(value), "v=spf1") {
+	contextStr := ""
+
+	switch {
+	case strings.HasPrefix(strings.ToLower(value), "v=spf1"):
 		resultType = constants.TypeSPF
+	case strings.EqualFold(record.Subdomain, "_dmarc"):
+		resultType = constants.TypeDMARC
+	case strings.HasSuffix(strings.ToLower(record.Subdomain), "_domainkey"):
+		resultType = constants.TypeDKIM
+	}
+
+	if strings.HasPrefix(record.Subdomain, "_") {
+		contextStr = record.Subdomain
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
 		Category: constants.CategoryProperty,
 		Value:    value,
+		Context:  contextStr,
 		Source:   source,
 	})
 
@@ -289,12 +304,20 @@ func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRec
 }
 
 func buildShodanSOARaw(primaryNS string, opts *shodanDomainRecordOptions) string {
+	if !strings.HasSuffix(primaryNS, ".") {
+		primaryNS += "."
+	}
 	if opts == nil {
 		return primaryNS
 	}
 
+	hostmaster := opts.Hostmaster
+	if hostmaster != "" && !strings.HasSuffix(hostmaster, ".") {
+		hostmaster += "."
+	}
+
 	return fmt.Sprintf("%s %s %d %d %d %d %d",
-		primaryNS, opts.Hostmaster,
+		primaryNS, hostmaster,
 		opts.Serial, opts.Refresh, opts.Retry, opts.Expires, opts.MinTTL)
 }
 

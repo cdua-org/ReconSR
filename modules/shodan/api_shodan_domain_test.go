@@ -151,7 +151,7 @@ func assertShodanDomainWildcards(t *testing.T, results []schema.ModuleResult) {
 func assertShodanDomainSOA(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	soaRaw := requireModuleResult(t, results, constants.TypeSOA, "ns1.example.com dns.example.net 1234567890 10000 2400 604800 1800")
+	soaRaw := requireModuleResult(t, results, constants.TypeSOA, "ns1.example.com. dns.example.net. 1234567890 10000 2400 604800 1800")
 	if soaRaw.Source != nil {
 		t.Fatalf("expected root SOA linked to target, got %+v", soaRaw.Source)
 	}
@@ -252,7 +252,7 @@ func assertShodanDomainLastSeen(t *testing.T, results []schema.ModuleResult, roo
 		t.Fatalf("expected last_seen context %s, got %q", mailSubdomainValue, mxLastSeen.Context)
 	}
 
-	soaLastSeen := findModuleResultBySource(results, constants.TypeLastSeen, constants.TypeSOA, "ns1.example.com dns.example.net 1234567890 10000 2400 604800 1800")
+	soaLastSeen := findModuleResultBySource(results, constants.TypeLastSeen, constants.TypeSOA, "ns1.example.com. dns.example.net. 1234567890 10000 2400 604800 1800")
 	if soaLastSeen == nil {
 		t.Fatal("expected last_seen for SOA record")
 	}
