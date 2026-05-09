@@ -48,4 +48,5 @@ const (
 	FuncGetIDBShodan        = "get_idb_shodan"
 	FuncGetShodanAPIIP      = "get_shodan_api_ip"
 	FuncGetShodanAPIDomain  = "get_shodan_api_domain"
+	FuncGetVTApiData        = "get_vt_api_data"
 )

@@ -1,0 +1,285 @@
+{
+  "data": {
+    "id": "192.0.2.44",
+    "type": "ip_address",
+    "links": {
+      "self": "https://www.virustotal.com/api/v3/ip_addresses/192.0.2.44"
+    },
+    "attributes": {
+      "last_analysis_date": 1771000000,
+      "rdap": {
+        "object_class_name": "ip network",
+        "handle": "192.0.2.0 - 192.0.2.255",
+        "start_address": "192.0.2.0",
+        "end_address": "192.0.2.255",
+        "ip_version": "v4",
+        "name": "EXAMPLE-NET-1",
+        "type": "ASSIGNED PA",
+        "country": "EX",
+        "parent_handle": "0.0.0.0 - 255.255.255.255",
+        "status": [
+          "active"
+        ],
+        "links": [
+          {
+            "href": "https://rdap.example.com/ip/192.0.2.44",
+            "rel": "self",
+            "type": "application/rdap+json",
+            "value": "https://rdap.example.com/ip/192.0.2.44",
+            "title": "",
+            "media": "",
+            "href_lang": []
+          }
+        ],
+        "notices": [
+          {
+            "title": "Source",
+            "description": [
+              "Objects returned came from source",
+              "EXAMPLE-RIR"
+            ],
+            "links": [],
+            "type": ""
+          }
+        ],
+        "events": [
+          {
+            "event_action": "registration",
+            "event_date": "2020-01-31T00:00:00Z",
+            "event_actor": "",
+            "links": []
+          },
+          {
+            "event_action": "last changed",
+            "event_date": "2026-01-15T00:00:00Z",
+            "event_actor": "",
+            "links": []
+          }
+        ],
+        "rdap_conformance": [
+          "rdap_level_0"
+        ],
+        "entities": [
+          {
+            "object_class_name": "entity",
+            "handle": "ORG-EXAMPLE-1",
+            "vcard_array": [
+              {
+                "name": "version",
+                "type": "text",
+                "values": [
+                  "4.0"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "fn",
+                "type": "text",
+                "values": [
+                  "Example Network Operations"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "kind",
+                "type": "text",
+                "values": [
+                  "org"
+                ],
+                "parameters": {}
+              }
+            ],
+            "roles": [
+              "registrant"
+            ],
+            "links": [],
+            "public_ids": [],
+            "entities": [],
+            "remarks": [],
+            "events": [],
+            "as_event_actor": [],
+            "status": [],
+            "port43": "",
+            "networks": [],
+            "autnums": [],
+            "url": "",
+            "lang": "",
+            "rdap_conformance": []
+          },
+          {
+            "object_class_name": "entity",
+            "handle": "ABUSE-EXAMPLE-1",
+            "vcard_array": [
+              {
+                "name": "version",
+                "type": "text",
+                "values": [
+                  "4.0"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "fn",
+                "type": "text",
+                "values": [
+                  "Example Abuse Handler"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "email",
+                "parameters": {
+                  "type": [
+                    "abuse"
+                  ]
+                },
+                "type": "text",
+                "values": [
+                  "abuse@example.net"
+                ]
+              }
+            ],
+            "roles": [
+              "abuse"
+            ],
+            "links": [],
+            "public_ids": [],
+            "entities": [],
+            "remarks": [],
+            "events": [],
+            "as_event_actor": [],
+            "status": [],
+            "port43": "",
+            "networks": [],
+            "autnums": [],
+            "url": "",
+            "lang": "",
+            "rdap_conformance": []
+          }
+        ],
+        "port43": "whois.example.com",
+        "cidr0_cidrs": [
+          {
+            "v4prefix": "192.0.2.0",
+            "length": 24,
+            "v6prefix": ""
+          }
+        ],
+        "arin_originas0_originautnums": [],
+        "remarks": []
+      },
+      "reputation": 3,
+      "jarm": "27d40d40d00040d00042d43d000000syntheticip",
+      "last_https_certificate": {
+        "cert_signature": {
+          "signature_algorithm": "1.2.840.10045.4.3.3",
+          "signature": "30650231syntheticip0001"
+        },
+        "extensions": {
+          "key_usage": [
+            "digitalSignature"
+          ],
+          "extended_key_usage": [
+            "serverAuth"
+          ],
+          "CA": false,
+          "subject_key_identifier": "synthetic-ip-ski",
+          "authority_key_identifier": {
+            "keyid": "synthetic-ip-akid"
+          },
+          "ca_information_access": {
+            "CA Issuers": "http://crt.example.com/ip-root.crt"
+          },
+          "subject_alternative_name": [
+            "gateway.target-example.com",
+            "vpn.target-example.com",
+            "edge.target-example.com",
+            "*.target-example.com",
+            "*.vpn.target-example.com"
+          ],
+          "certificate_policies": [
+            "2.23.140.1.2.1"
+          ],
+          "crl_distribution_points": [
+            "http://crl.example.com/ip-root.crl"
+          ]
+        },
+        "validity": {
+          "not_after": "2027-02-28 00:00:00",
+          "not_before": "2026-02-28 00:00:00"
+        },
+        "size": 944,
+        "version": "V3",
+        "public_key": {
+          "algorithm": "EC",
+          "ec": {
+            "oid": "secp256r1",
+            "pub": "30593013syntheticippub"
+          }
+        },
+        "thumbprint_sha256": "synthetic-ip-sha256-thumbprint",
+        "thumbprint": "synthetic-ip-thumbprint",
+        "serial_number": "synthetic-ip-serial",
+        "issuer": {
+          "C": "EX",
+          "O": "Example Certificate Authority",
+          "CN": "Example CA IP Issuer"
+        },
+        "subject": {
+          "CN": "gateway.target-example.com"
+        }
+      },
+      "regional_internet_registry": "EXAMPLE-RIR",
+      "network": "192.0.2.0/24",
+      "country": "EX",
+      "whois_date": 1771000100,
+      "total_votes": {
+        "harmless": 1,
+        "malicious": 2
+      },
+      "continent": "NA",
+      "last_analysis_stats": {
+        "malicious": 1,
+        "suspicious": 2,
+        "undetected": 52,
+        "harmless": 21,
+        "timeout": 0
+      },
+      "tags": [
+        "synthetic",
+        "network"
+      ],
+      "asn": 64544,
+      "as_owner": "Example Network Operations",
+      "last_analysis_results": {
+        "SyntheticIPEngineA": {
+          "method": "blacklist",
+          "engine_name": "SyntheticIPEngineA",
+          "category": "malicious",
+          "result": "scanner"
+        },
+        "SyntheticIPEngineB": {
+          "method": "blacklist",
+          "engine_name": "SyntheticIPEngineB",
+          "category": "suspicious",
+          "result": "suspicious"
+        },
+        "SyntheticIPEngineC": {
+          "method": "blacklist",
+          "engine_name": "SyntheticIPEngineC",
+          "category": "suspicious",
+          "result": "proxy"
+        },
+        "SyntheticIPEngineD": {
+          "method": "blacklist",
+          "engine_name": "SyntheticIPEngineD",
+          "category": "harmless",
+          "result": "clean"
+        }
+      },
+      "last_modification_date": 1771000200,
+      "last_https_certificate_date": 1771000300,
+      "whois": "inetnum: 192.0.2.0 - 192.0.2.255\nnetname: EXAMPLE-NET-1\ncountry: EX\norg: ORG-EXAMPLE-1\nadmin-c: ADMIN-EXAMPLE-1\ntech-c: TECH-EXAMPLE-1\nstatus: ASSIGNED PA\nmnt-by: EXAMPLE-MNT\ncreated: 2020-01-31T00:00:00Z\nlast-modified: 2026-01-15T00:00:00Z\nsource: EXAMPLE-RIR\norganisation: ORG-EXAMPLE-1\norg-name: Example Network Operations\ncountry: EX\norg-type: OTHER\naddress: 100 Example Street\naddress: Example City, Example State\nabuse-c: ABUSE-EXAMPLE-1\nroute: 192.0.2.0/24\ndescr: Example production edge network\norigin: AS64544\nsource: EXAMPLE-RIR"
+    }
+  }
+}

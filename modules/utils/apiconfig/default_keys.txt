@@ -1,3 +1,4 @@
 [Keys]
 HackerTarget=
 Shodan=
+VirusTotal=

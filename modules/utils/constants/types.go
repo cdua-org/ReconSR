@@ -98,4 +98,7 @@ const (
 	TypeDNSSEC                = "dnssec"
 	TypePhone                 = "phone"
 	TypeHandle                = "handle"
+	TypeVTThreatScore         = "vt_threat_score"
+	TypeVTReputation          = "vt_reputation"
+	TypePDNSRecord            = "pdns_record"
 )

@@ -1,0 +1,130 @@
+package virustotal
+
+import (
+	"encoding/json"
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+
+	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/schema"
+)
+
+func appendVTProperty(exec *schema.ModuleExecution, resultType, value, resultContext string, tags []string, source *schema.EntityRef) {
+	trimmedValue := strings.TrimSpace(value)
+	if trimmedValue == "" {
+		return
+	}
+
+	exec.Results = append(exec.Results, schema.ModuleResult{
+		Type:     resultType,
+		Category: constants.CategoryProperty,
+		Value:    trimmedValue,
+		Context:  strings.TrimSpace(resultContext),
+		Tags:     tags,
+		Source:   source,
+	})
+}
+
+func extractVTTags(attr map[string]any) []string {
+	rawTags, ok := attr["tags"].([]any)
+	if !ok || len(rawTags) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(rawTags))
+	tags := make([]string, 0, len(rawTags))
+	for _, rawTag := range rawTags {
+		tag, ok := rawTag.(string)
+		if !ok {
+			continue
+		}
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		if _, exists := seen[tag]; exists {
+			continue
+		}
+		seen[tag] = struct{}{}
+		tags = append(tags, tag)
+	}
+
+	sort.Strings(tags)
+	return tags
+}
+
+func (m *module) extractThreatScore(attr map[string]any, src *schema.EntityRef, exec *schema.ModuleExecution) {
+	stats, ok := attr["last_analysis_stats"].(map[string]any)
+	if !ok {
+		return
+	}
+
+	var malicious, suspicious int
+	if mVal, ok := stats["malicious"].(float64); ok {
+		malicious = int(mVal)
+	}
+	if sVal, ok := stats["suspicious"].(float64); ok {
+		suspicious = int(sVal)
+	}
+
+	if malicious == 0 && suspicious == 0 {
+		return
+	}
+
+	engines := extractEngines(attr)
+
+	exec.Results = append(exec.Results, schema.ModuleResult{
+		Type:     constants.TypeVTThreatScore,
+		Category: constants.CategoryProperty,
+		Value:    fmt.Sprintf("Malicious: %d, Suspicious: %d", malicious, suspicious),
+		Context:  strings.Join(engines, ", "),
+		Source:   src,
+	})
+}
+
+func extractEngines(attr map[string]any) []string {
+	var engines []string
+	results, ok := attr["last_analysis_results"].(map[string]any)
+	if !ok {
+		return engines
+	}
+
+	for _, v := range results {
+		res, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		cat, ok := res["category"].(string)
+		if !ok || (cat != "malicious" && cat != "suspicious") {
+			continue
+		}
+		eng, ok := res["engine_name"].(string)
+		if ok && eng != "" {
+			engines = append(engines, eng)
+		}
+	}
+
+	sort.Strings(engines)
+	return engines
+}
+
+func normalizeVTText(value string) string {
+	return strings.Join(strings.Fields(value), " ")
+}
+
+func formatVTInt(value any) (string, bool) {
+	switch typedValue := value.(type) {
+	case float64:
+		return strconv.FormatInt(int64(typedValue), 10), true
+	case int:
+		return strconv.Itoa(typedValue), true
+	case int64:
+		return strconv.FormatInt(typedValue, 10), true
+	case json.Number:
+		return typedValue.String(), true
+	default:
+		return "", false
+	}
+}

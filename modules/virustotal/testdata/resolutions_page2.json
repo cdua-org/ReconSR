@@ -1,0 +1,65 @@
+{
+  "data": [
+    {
+      "id": "192.0.2.44mail.target-example.com",
+      "type": "resolution",
+      "links": {
+        "self": "https://www.virustotal.com/api/v3/resolutions/192.0.2.44mail.target-example.com"
+      },
+      "attributes": {
+        "date": 1771100200,
+        "host_name": "mail.target-example.com",
+        "ip_address_last_analysis_stats": {
+          "malicious": 1,
+          "suspicious": 2,
+          "undetected": 52,
+          "harmless": 21,
+          "timeout": 0
+        },
+        "resolver": "VirusTotal",
+        "ip_address": "192.0.2.44",
+        "host_name_last_analysis_stats": {
+          "malicious": 1,
+          "suspicious": 2,
+          "undetected": 44,
+          "harmless": 16,
+          "timeout": 0
+        }
+      }
+    },
+    {
+      "id": "192.0.2.44api.target-example.com",
+      "type": "resolution",
+      "links": {
+        "self": "https://www.virustotal.com/api/v3/resolutions/192.0.2.44api.target-example.com"
+      },
+      "attributes": {
+        "date": 1771100300,
+        "host_name": "api.target-example.com",
+        "ip_address_last_analysis_stats": {
+          "malicious": 1,
+          "suspicious": 2,
+          "undetected": 52,
+          "harmless": 21,
+          "timeout": 0
+        },
+        "resolver": "VirusTotal",
+        "ip_address": "192.0.2.44",
+        "host_name_last_analysis_stats": {
+          "malicious": 0,
+          "suspicious": 0,
+          "undetected": 61,
+          "harmless": 11,
+          "timeout": 0
+        }
+      }
+    }
+  ],
+  "meta": {
+    "count": 4,
+    "cursor": "synthetic-resolutions-cursor-page-2"
+  },
+  "links": {
+    "self": "https://www.virustotal.com/api/v3/ip_addresses/192.0.2.44/resolutions?limit=40&cursor=synthetic-resolutions-cursor-page-2"
+  }
+}

@@ -1,0 +1,230 @@
+{
+  "data": [
+    {
+      "id": "vpn.target-example.com",
+      "type": "domain",
+      "links": {
+        "self": "https://www.virustotal.com/api/v3/domains/vpn.target-example.com"
+      },
+      "attributes": {
+        "last_modification_date": 1778250954,
+        "tld": "com",
+        "whois": "Administrative city: Example City\nAdministrative country: United States\nAdministrative email: admin-ops@target-example.com\nAdministrative state: EX\nBilling city: Example City\nBilling country: United States\nBilling email: billing@target-example.com\nBilling state: EX\nCreate date: 2020-01-31 00:00:00\nDomain name: target-example.com\nDomain registrar id: 424242\nDomain registrar url: https://registrar.example.com\nExpiry date: 2027-01-31 00:00:00\nQuery time: 2026-02-01 10:00:00\nRegistrant address: 100 Example Street\nRegistrant city: Example City\nRegistrant country: United States\nRegistrant name: Example Registrant\nRegistrant state: EX\nRegistrant zip: 12345\nTechnical city: Example City\nTechnical country: United States\nTechnical email: tech@target-example.com\nTechnical state: EX\nUpdate date: 2026-01-29 00:00:00",
+        "categories": {},
+        "reputation": 0,
+        "popularity_ranks": {},
+        "last_analysis_stats": {
+          "malicious": 2,
+          "suspicious": 1,
+          "undetected": 39,
+          "harmless": 14,
+          "timeout": 0
+        },
+        "last_update_date": 1768435200,
+        "total_votes": {
+          "harmless": 0,
+          "malicious": 0
+        },
+        "creation_date": 1580428800,
+        "last_analysis_date": 1778250622,
+        "tags": [],
+        "last_dns_records_date": 1778250953,
+        "last_dns_records": [
+          {
+            "type": "CNAME",
+            "ttl": 1800,
+            "value": "vpn-gateway.target-example.com"
+          },
+          {
+            "type": "A",
+            "ttl": 1800,
+            "value": "192.0.2.30"
+          },
+          {
+            "type": "A",
+            "ttl": 1800,
+            "value": "192.0.2.31"
+          },
+          {
+            "type": "AAAA",
+            "ttl": 300,
+            "value": "2001:db8::30"
+          },
+          {
+            "type": "AAAA",
+            "ttl": 300,
+            "value": "2001:db8::31"
+          },
+          {
+            "type": "TXT",
+            "ttl": 300,
+            "value": "access-policy=employees-only"
+          },
+          {
+            "type": "TXT",
+            "ttl": 300,
+            "value": "service-tier=critical"
+          },
+          {
+            "type": "CAA",
+            "ttl": 300,
+            "flag": 0,
+            "tag": "issue",
+            "value": "vpn-ca.example.org"
+          },
+          {
+            "type": "CAA",
+            "ttl": 300,
+            "flag": 0,
+            "tag": "issuewild",
+            "value": "vpn-wild-ca.example.net"
+          }
+        ],
+        "last_analysis_results": {
+          "SyntheticEngineVPNA": {
+            "method": "blacklist",
+            "engine_name": "SyntheticEngineVPNA",
+            "category": "malicious",
+            "result": "trojan"
+          },
+          "SyntheticEngineVPNB": {
+            "method": "blacklist",
+            "engine_name": "SyntheticEngineVPNB",
+            "category": "suspicious",
+            "result": "suspicious"
+          },
+          "SyntheticEngineVPNC": {
+            "method": "blacklist",
+            "engine_name": "SyntheticEngineVPNC",
+            "category": "undetected",
+            "result": "unrated"
+          }
+        },
+        "jarm": "27d40d40d00040d00042d43d000000syntheticvpn",
+        "last_https_certificate": {
+          "cert_signature": {
+            "signature_algorithm": "sha256RSA",
+            "signature": "synthetic-vpn-cert-signature-0001"
+          },
+          "extensions": {
+            "subject_alternative_name": [
+              "vpn.target-example.com"
+            ]
+          },
+          "validity": {
+            "not_after": "2027-03-15 12:00:00",
+            "not_before": "2026-03-15 12:00:00"
+          },
+          "size": 1024,
+          "version": "V3",
+          "thumbprint_sha256": "synthetic-vpn-sha256-thumbprint-0001",
+          "thumbprint": "synthetic-vpn-thumbprint-0001",
+          "serial_number": "synthetic-vpn-serial-0001",
+          "issuer": {
+            "C": "US",
+            "O": "Synthetic VPN CA",
+            "CN": "Synthetic VPN Issuer"
+          },
+          "subject": {
+            "CN": "vpn.target-example.com"
+          }
+        }
+      },
+      "context_attributes": {
+        "timestamp": 1770002250
+      }
+    },
+    {
+      "id": "ns.target-example.com",
+      "type": "domain",
+      "links": {
+        "self": "https://www.virustotal.com/api/v3/domains/ns.target-example.com"
+      },
+      "attributes": {
+        "last_analysis_stats": {
+          "malicious": 0,
+          "suspicious": 0,
+          "undetected": 58,
+          "harmless": 12,
+          "timeout": 0
+        },
+        "last_dns_records": [
+          {
+            "type": "NS",
+            "ttl": 21600,
+            "value": "ns1.target-example.com"
+          },
+          {
+            "type": "NS",
+            "ttl": 21600,
+            "value": "ns2.target-example.com"
+          },
+          {
+            "type": "MX",
+            "ttl": 300,
+            "priority": 25,
+            "value": "mail.target-example.com"
+          },
+          {
+            "type": "MX",
+            "ttl": 300,
+            "priority": 35,
+            "value": "backup.target-example.com"
+          },
+          {
+            "type": "SOA",
+            "ttl": 1800,
+            "value": "ns2.target-example.com",
+            "rname": "dns.target-example.com",
+            "serial": 2026010301,
+            "refresh": 7200,
+            "retry": 3600,
+            "expire": 1209600,
+            "minimum": 1800
+          },
+          {
+            "type": "CAA",
+            "ttl": 300,
+            "flag": 0,
+            "tag": "issue",
+            "value": "ns-ca.example.org"
+          },
+          {
+            "type": "CAA",
+            "ttl": 300,
+            "flag": 0,
+            "tag": "issuewild",
+            "value": "ns-wild-ca.example.net"
+          }
+        ],
+        "last_dns_records_date": 1770002300,
+        "last_analysis_results": {
+          "SyntheticEngineNSA": {
+            "method": "blacklist",
+            "engine_name": "SyntheticEngineNSA",
+            "category": "undetected",
+            "result": "unrated"
+          },
+          "SyntheticEngineNSB": {
+            "method": "blacklist",
+            "engine_name": "SyntheticEngineNSB",
+            "category": "harmless",
+            "result": "clean"
+          }
+        },
+        "last_modification_date": 1770002400,
+        "whois": "Domain Name: NS.TARGET-EXAMPLE.COM"
+      },
+      "context_attributes": {
+        "timestamp": 1770002450
+      }
+    }
+  ],
+  "meta": {
+    "count": 4,
+    "cursor": "synthetic-subdomains-cursor-page-2"
+  },
+  "links": {
+    "self": "https://www.virustotal.com/api/v3/domains/target-example.com/subdomains?limit=40&cursor=synthetic-subdomains-cursor-page-2"
+  }
+}

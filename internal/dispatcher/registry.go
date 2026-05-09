@@ -12,6 +12,7 @@ import (
 	"cdua-org/ReconSR/modules/mailcrypto"
 	"cdua-org/ReconSR/modules/shodan"
 	"cdua-org/ReconSR/modules/subdomain_hierarchy"
+	"cdua-org/ReconSR/modules/virustotal"
 	"cdua-org/ReconSR/modules/whois"
 	"cdua-org/ReconSR/schema"
 )
@@ -28,5 +29,6 @@ var ModuleRegistry = []schema.Module{
 	mailcrypto.New(),
 	shodan.New(),
 	subdomain_hierarchy.New(),
+	virustotal.New(),
 	whois.New(),
 }

@@ -1,0 +1,423 @@
+package virustotal
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+	"time"
+
+	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/orgdomain"
+	"cdua-org/ReconSR/schema"
+)
+
+const vtTimeFormat = "2006-01-02 15:04:05"
+
+func (m *module) extractDomainMetadata(attr map[string]any, target string, exec *schema.ModuleExecution) {
+	tags := extractVTTags(attr)
+
+	if records, ok := attr["last_dns_records"].([]any); ok {
+		for _, r := range records {
+			if rec, ok := r.(map[string]any); ok {
+				m.parseDNSRecord(rec, target, nil, exec)
+			}
+		}
+	}
+
+	m.extractThreatScore(attr, nil, exec)
+	appendDomainCategories(exec, attr, tags)
+	appendDomainReputation(exec, attr, tags)
+	appendDomainPopularityRanks(exec, attr, tags)
+	appendDomainJARM(exec, attr, target, tags)
+	appendDomainCrowdsourcedContext(exec, attr, tags)
+	appendDomainLastUpdate(exec, attr, target, tags)
+	appendDomainCertificateSummary(exec, attr, target, tags)
+
+	if _, ok := attr["whois"]; ok {
+		dbg.Printf("extractDomainMetadata target=%q ignored_field=whois", target)
+	}
+	if _, ok := attr["rdap"]; ok {
+		dbg.Printf("extractDomainMetadata target=%q ignored_field=rdap", target)
+	}
+	for key := range attr {
+		keyLower := strings.ToLower(key)
+		if strings.Contains(keyLower, "registrar") || strings.Contains(keyLower, "registrant") {
+			dbg.Printf("extractDomainMetadata target=%q ignored_field=%q", target, key)
+		}
+	}
+}
+
+func appendDomainCategories(exec *schema.ModuleExecution, attr map[string]any, tags []string) {
+	categories, ok := attr["categories"].(map[string]any)
+	if !ok || len(categories) == 0 {
+		return
+	}
+
+	providers := make([]string, 0, len(categories))
+	for provider := range categories {
+		providers = append(providers, provider)
+	}
+	sort.Strings(providers)
+
+	for _, provider := range providers {
+		category, ok := categories[provider].(string)
+		if !ok {
+			continue
+		}
+		appendVTProperty(exec, constants.TypeInfo, category, "VirusTotal Category by "+provider, tags, nil)
+	}
+}
+
+func appendDomainReputation(exec *schema.ModuleExecution, attr map[string]any, tags []string) {
+	reputationFloat, ok := attr["reputation"].(float64)
+	if !ok {
+		return
+	}
+
+	reputation := int(reputationFloat)
+	if reputation >= 0 {
+		return
+	}
+
+	value := fmt.Sprintf("%d (Malicious/Suspicious)", reputation)
+	appendVTProperty(exec, constants.TypeVTReputation, value, "VirusTotal Community Reputation", tags, nil)
+}
+
+func appendDomainPopularityRanks(exec *schema.ModuleExecution, attr map[string]any, tags []string) {
+	popularityRanks, ok := attr["popularity_ranks"].(map[string]any)
+	if !ok || len(popularityRanks) == 0 {
+		return
+	}
+
+	providers := make([]string, 0, len(popularityRanks))
+	for provider := range popularityRanks {
+		providers = append(providers, provider)
+	}
+	sort.Strings(providers)
+
+	for _, provider := range providers {
+		rankEntry, ok := popularityRanks[provider].(map[string]any)
+		if !ok {
+			continue
+		}
+		rank, ok := formatVTInt(rankEntry["rank"])
+		if !ok {
+			continue
+		}
+		appendVTProperty(exec, constants.TypeInfo, rank, "VirusTotal Popularity Rank by "+provider, tags, nil)
+	}
+}
+
+func appendDomainJARM(exec *schema.ModuleExecution, attr map[string]any, target string, tags []string) {
+	jarm, ok := attr["jarm"].(string)
+	if !ok {
+		return
+	}
+
+	appendVTProperty(exec, constants.TypeJARM, jarm, "JARM for "+target, tags, nil)
+}
+
+func appendDomainCrowdsourcedContext(exec *schema.ModuleExecution, attr map[string]any, tags []string) {
+	entries, ok := attr["crowdsourced_context"].([]any)
+	if !ok || len(entries) == 0 {
+		return
+	}
+
+	for _, entry := range entries {
+		item, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		title := ""
+		if rawTitle, titleOK := item["title"].(string); titleOK {
+			title = rawTitle
+		}
+
+		details := ""
+		if rawDetails, detailsOK := item["details"].(string); detailsOK {
+			details = rawDetails
+		}
+
+		value := normalizeVTText(details)
+		resultContext := strings.TrimSpace(title)
+		if resultContext == "" {
+			resultContext = "VirusTotal Crowdsourced Context"
+		}
+		appendVTProperty(exec, constants.TypeSummary, value, resultContext, tags, nil)
+	}
+}
+
+func appendDomainLastUpdate(exec *schema.ModuleExecution, attr map[string]any, target string, tags []string) {
+	lastUpdateRaw, ok := attr["last_modification_date"].(float64)
+	if !ok {
+		return
+	}
+
+	formattedDate := time.Unix(int64(lastUpdateRaw), 0).UTC().Format(time.RFC3339)
+	appendVTProperty(exec, constants.TypeLastUpdate, formattedDate, "Last Update for "+target, tags, nil)
+}
+
+func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[string]any, target string, tags []string) {
+	certificate, ok := attr["last_https_certificate"].(map[string]any)
+	if !ok {
+		return
+	}
+
+	sources := appendVTCertificateSANs(exec, certificate, target, tags)
+	issuer := formatVTCertificateIssuer(certificate)
+	notAfter := extractVTCertificateNotAfter(certificate)
+
+	if len(sources) == 0 {
+		appendVTProperty(exec, constants.TypeCertIssuer, issuer, "Cert Issuer for "+target, tags, nil)
+		appendVTProperty(exec, constants.TypeCertNotAfter, notAfter, "Cert Expiration for "+target, tags, nil)
+	} else {
+		for _, source := range sources {
+			appendVTProperty(exec, constants.TypeCertIssuer, issuer, "Cert Issuer for "+target, tags, source)
+			appendVTProperty(exec, constants.TypeCertNotAfter, notAfter, "Cert Expiration for "+target, tags, source)
+		}
+	}
+
+	if thumbprint, ok := certificate["thumbprint"].(string); ok {
+		appendVTProperty(exec, constants.TypeCertFingerprint, thumbprint, "Cert Fingerprint for "+target, tags, nil)
+	}
+	if thumbprintSHA256, ok := certificate["thumbprint_sha256"].(string); ok {
+		appendVTProperty(exec, constants.TypeCertFingerprint, thumbprintSHA256, "Cert Fingerprint for "+target, tags, nil)
+	}
+}
+
+func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[string]any, target string, tags []string) []*schema.EntityRef {
+	extensions, ok := certificate["extensions"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	rawSANs, ok := extensions["subject_alternative_name"].([]any)
+	if !ok || len(rawSANs) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(rawSANs))
+	sources := make([]*schema.EntityRef, 0, len(rawSANs))
+	for _, rawSAN := range rawSANs {
+		san, ok := rawSAN.(string)
+		if !ok {
+			continue
+		}
+		resultType, resultValue, valid := classifyVTCertificateSAN(san, target)
+		if !valid {
+			continue
+		}
+
+		cacheKey := resultType + ":" + resultValue
+		if _, exists := seen[cacheKey]; exists {
+			continue
+		}
+		seen[cacheKey] = struct{}{}
+
+		var src *schema.EntityRef
+		if resultType != constants.TypeDomain {
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     resultType,
+				Category: constants.CategoryNode,
+				Value:    resultValue,
+				Tags:     tags,
+				Source: &schema.EntityRef{
+					Type:  constants.TypeDomain,
+					Value: target,
+				},
+			})
+			src = &schema.EntityRef{Type: resultType, Value: resultValue}
+		}
+
+		sources = append(sources, src)
+	}
+
+	return sources
+}
+
+func classifyVTCertificateSAN(value, target string) (resultType, resultValue string, ok bool) {
+	trimmedValue := strings.TrimSpace(value)
+	isWildcard := strings.HasPrefix(trimmedValue, "*.")
+	candidate := strings.TrimPrefix(trimmedValue, "*.")
+	if candidate == "" {
+		return "", "", false
+	}
+
+	validated, err := validator.Validate(constants.TypeDomain, candidate)
+	if err != nil {
+		return "", "", false
+	}
+
+	if validated.Value == target {
+		if isWildcard {
+			return constants.TypeWildcardDomain, "*." + validated.Value, true
+		}
+		return constants.TypeDomain, validated.Value, true
+	}
+
+	if !orgdomain.IsOutOfScope(validated.Value, target) {
+		if isWildcard {
+			return constants.TypeWildcardSubdomain, "*." + validated.Value, true
+		}
+		return constants.TypeSubdomain, validated.Value, true
+	}
+
+	if !isWildcard {
+		return constants.TypeSANDomain, validated.Value, true
+	}
+
+	return constants.TypeWildcardSANDomain, "*." + validated.Value, true
+}
+
+func formatVTCertificateIssuer(certificate map[string]any) string {
+	issuer, ok := certificate["issuer"].(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	parts := make([]string, 0, 3)
+	if organization, ok := issuer["O"].(string); ok && organization != "" {
+		parts = append(parts, "O: "+organization)
+	}
+	if commonName, ok := issuer["CN"].(string); ok && commonName != "" {
+		parts = append(parts, "CN: "+commonName)
+	}
+	if country, ok := issuer["C"].(string); ok && country != "" {
+		parts = append(parts, "C: "+country)
+	}
+
+	return strings.Join(parts, " | ")
+}
+
+func extractVTCertificateNotAfter(certificate map[string]any) string {
+	validity, ok := certificate["validity"].(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	value, ok := validity["not_after"].(string)
+	if !ok {
+		return ""
+	}
+
+	return strings.TrimSpace(value)
+}
+
+func parseVTCertificateExpiration(attr map[string]any) (string, bool) {
+	cert, ok := attr["last_https_certificate"].(map[string]any)
+	if !ok {
+		return "", false
+	}
+
+	notAfter := extractVTCertificateNotAfter(cert)
+	if notAfter == "" {
+		return "", false
+	}
+
+	isExpired := false
+	notAfterStr := notAfter
+
+	if t, err := time.Parse(vtTimeFormat, notAfter); err == nil {
+		if !t.IsZero() && !t.After(time.Now()) {
+			isExpired = true
+		}
+		notAfterStr = t.UTC().Format(time.RFC3339)
+	} else if t, err := time.Parse(time.RFC3339, notAfter); err == nil {
+		if !t.IsZero() && !t.After(time.Now()) {
+			isExpired = true
+		}
+		notAfterStr = t.UTC().Format(time.RFC3339)
+	}
+
+	return notAfterStr, isExpired
+}
+
+func (m *module) extractSubdomain(item map[string]any, parent string, disableCertExpired bool, exec *schema.ModuleExecution) string {
+	sub, ok := item["id"].(string)
+	if !ok {
+		return ""
+	}
+
+	validatedSubdomain, err := validator.Validate(constants.TypeDomain, sub)
+	if err != nil {
+		dbg.Printf("extractSubdomain parent=%q value=%q err=%v", parent, sub, err)
+		return ""
+	}
+
+	attr, ok := item["attributes"].(map[string]any)
+	if !ok {
+		attr = map[string]any{}
+	}
+
+	notAfterStr, isExpired := parseVTCertificateExpiration(attr)
+
+	if isExpired && !disableCertExpired {
+		return fmt.Sprintf("%s (%s)", validatedSubdomain.Value, notAfterStr)
+	}
+
+	isOOS := orgdomain.IsOutOfScope(validatedSubdomain.Value, parent)
+	subEntity := schema.ModuleResult{
+		Type:       validatedSubdomain.Type,
+		Category:   constants.CategoryNode,
+		Value:      validatedSubdomain.Value,
+		Context:    "VirusTotal Subdomain Enumeration",
+		OutOfScope: isOOS,
+		Source: &schema.EntityRef{
+			Type:  constants.TypeDomain,
+			Value: parent,
+		},
+	}
+	exec.Results = append(exec.Results, subEntity)
+
+	subRef := &schema.EntityRef{Type: validatedSubdomain.Type, Value: validatedSubdomain.Value}
+
+	if notAfterStr != "" {
+		tags := extractVTTags(attr)
+		appendVTProperty(exec, constants.TypeCertNotAfter, notAfterStr, "Cert Expiration for "+validatedSubdomain.Value, tags, subRef)
+		if isExpired {
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     constants.TypeStatus,
+				Category: constants.CategoryProperty,
+				Value:    constants.StatusExpired,
+				Source: &schema.EntityRef{
+					Type:  constants.TypeCertNotAfter,
+					Value: notAfterStr,
+				},
+			})
+		}
+	}
+
+	m.appendSubdomainDeepResults(attr, parent, subRef, exec)
+	m.logIgnoredSubdomainFields(attr, validatedSubdomain.Value)
+
+	return ""
+}
+
+func (m *module) appendSubdomainDeepResults(attr map[string]any, scopeTarget string, subRef *schema.EntityRef, exec *schema.ModuleExecution) {
+	if records, ok := attr["last_dns_records"].([]any); ok {
+		for _, r := range records {
+			if rec, ok := r.(map[string]any); ok {
+				m.parseDNSRecord(rec, scopeTarget, subRef, exec)
+			}
+		}
+	}
+
+	m.extractThreatScore(attr, subRef, exec)
+}
+
+func (m *module) logIgnoredSubdomainFields(attr map[string]any, subdomain string) {
+	for _, field := range []string{"whois", "rdap"} {
+		if _, ok := attr[field]; ok {
+			dbg.Printf("extractSubdomain subdomain=%q ignored_field=%q", subdomain, field)
+		}
+	}
+
+	for key := range attr {
+		keyLower := strings.ToLower(key)
+		if strings.Contains(keyLower, "registrar") || strings.Contains(keyLower, "registrant") {
+			dbg.Printf("extractSubdomain subdomain=%q ignored_field=%q", subdomain, key)
+		}
+	}
+}

@@ -1,0 +1,1054 @@
+{
+  "data": {
+    "id": "target-example.com",
+    "type": "domain",
+    "links": {
+      "self": "https://www.virustotal.com/api/v3/domains/target-example.com"
+    },
+    "attributes": {
+      "categories": {
+        "alphaMountain.ai": "Information Technology (alphaMountain.ai)",
+        "BitDefender": "technology",
+        "Sophos": "business",
+        "Forcepoint ThreatSeeker": "software-and-services"
+      },
+      "whois_date": 1809302400,
+      "last_analysis_stats": {
+        "malicious": 2,
+        "suspicious": 1,
+        "undetected": 47,
+        "harmless": 18,
+        "timeout": 0
+      },
+      "reputation": -12,
+      "last_analysis_results": {
+        "SyntheticEngineA": {
+          "method": "blacklist",
+          "engine_name": "SyntheticEngineA",
+          "category": "malicious",
+          "result": "phishing"
+        },
+        "SyntheticEngineB": {
+          "method": "blacklist",
+          "engine_name": "SyntheticEngineB",
+          "category": "suspicious",
+          "result": "suspicious"
+        },
+        "SyntheticEngineC": {
+          "method": "blacklist",
+          "engine_name": "SyntheticEngineC",
+          "category": "harmless",
+          "result": "clean"
+        },
+        "SyntheticEngineD": {
+          "method": "blacklist",
+          "engine_name": "SyntheticEngineD",
+          "category": "undetected",
+          "result": "unrated"
+        }
+      },
+      "crowdsourced_context": [
+        {
+          "timestamp": 1771000001,
+          "title": "Synthetic IOC Context",
+          "details": "Contextual Indicators: The domain's Cisco Umbrella rank is 4\n\nContextual Indicators: The domain's Alexa rank is 24\n\nVirusTotal Link: https://www.virustotal.com/gui/domain/target-example.com/detection\n\nClassification Description: Legitimate-looking synthetic website used for parser coverage.",
+          "severity": "low",
+          "source": "Synthetic Threat Intelligence"
+        }
+      ],
+      "creation_date": 1580428800,
+      "last_update_date": 1769644800,
+      "popularity_ranks": {
+        "Majestic": {
+          "rank": 8,
+          "timestamp": 1778251093
+        },
+        "Statvoo": {
+          "timestamp": 1684083481,
+          "rank": 24
+        },
+        "Alexa": {
+          "timestamp": 1684083480,
+          "rank": 24
+        },
+        "Cisco Umbrella": {
+          "rank": 4,
+          "timestamp": 1778251088
+        },
+        "Quantcast": {
+          "timestamp": 1585755370,
+          "rank": 44
+        },
+        "Cloudflare Radar": {
+          "rank": 6,
+          "timestamp": 1778251085
+        }
+      },
+      "whois": "Administrative city: Example City\nAdministrative country: United States\nAdministrative email: admin-ops@target-example.com\nAdministrative state: EX\nBilling city: Example City\nBilling country: United States\nBilling email: billing@target-example.com\nBilling state: EX\nCreate date: 2020-01-31 00:00:00\nDomain name: target-example.com\nDomain registrar id: 424242\nDomain registrar url: https://registrar.example.com\nExpiry date: 2027-01-31 00:00:00\nQuery time: 2026-02-01 10:00:00\nRegistrant address: 100 Example Street\nRegistrant city: Example City\nRegistrant company: Example Org\nRegistrant country: United States\nRegistrant email: admin@domains.target-example.com\nRegistrant fax: +1-650-555-0111\nRegistrant name: Example Registrant\nRegistrant phone: +1-650-555-0199\nRegistrant state: EX\nRegistrant zip: 12345\nTechnical city: Example City\nTechnical country: United States\nTechnical email: tech@target-example.com\nUpdate date: 2026-01-29 00:00:00\nName server 1: ns1.target-example.com\nName server 2: ns2.target-example.com\nName server 3: ns1-39.example-dns.com\nName server 4: ns2-39.example-dns.net\n[Last Updated] 2026/02/01 19:00:00 (JST)\n[Lock Status] AgentChangeLocked\n[Lock Status] DomainTransferLocked\n[Postal code] 12345\n[Status] Active",
+      "last_https_certificate_date": 1778312598,
+      "last_dns_records": [
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "d365mktkey=fake-d365mktkey-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "linear-domain-verification=fake-linear-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "facebook-domain-verification=fake-facebook-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "ms-domain-verification=fake-ms-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "hcp-domain-verification=fake-hcp-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "atlassian-domain-verification=fake-atlassian-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "hubspot-developer-verification=fake-hubspot-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "mixpanel-domain-verify=fake-mixpanel-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "zoom-domain-verification=fake-zoom-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "workplace-domain-verification=fake-workplace-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "anthropic-domain-verification-phksss=fake-anthropic-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "sitecore-domain-verification=fake-sitecore-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "google-site-verification=fake-google-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "openai-domain-verification=fake-openai-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "amazonses:fake-amazonses-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "docusign=fake-docusign-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "stripe-verification=fake-stripe-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "pardot123456=fake-pardot-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "airtable-verification=fake-airtable-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "adobe-idp-site-verification=fake-adobe-token-01"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "v=MCPv1; k=ecdsap384; p=FakeMCPKey0001"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "v=MCPv1; k=ecdsap384; p=FakeMCPKey0002"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "v=spf1 include:_spf.target-example.com include:_spf-a.example.net include:_spf-b.example.org -all"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "MS=ms00000001"
+        },
+        {
+          "type": "TXT",
+          "ttl": 3009,
+          "value": "opaque-token=fake-long-token-value-01"
+        },
+        {
+          "type": "NS",
+          "ttl": 2416,
+          "value": "ns1.target-example.com"
+        },
+        {
+          "type": "NS",
+          "ttl": 2416,
+          "value": "ns2.target-example.com"
+        },
+        {
+          "type": "NS",
+          "ttl": 2416,
+          "value": "ns1-39.example-dns.com"
+        },
+        {
+          "type": "NS",
+          "ttl": 2416,
+          "value": "ns2-39.example-dns.net"
+        },
+        {
+          "type": "NS",
+          "ttl": 2416,
+          "value": "ns3-39.example-dns.org"
+        },
+        {
+          "type": "NS",
+          "ttl": 2416,
+          "value": "ns4-39.example-dns.info"
+        },
+        {
+          "type": "A",
+          "ttl": 905,
+          "value": "192.0.2.10"
+        },
+        {
+          "type": "A",
+          "ttl": 905,
+          "value": "192.0.2.11"
+        },
+        {
+          "type": "A",
+          "ttl": 905,
+          "value": "192.0.2.12"
+        },
+        {
+          "type": "AAAA",
+          "ttl": 164,
+          "value": "2001:db8::10"
+        },
+        {
+          "type": "AAAA",
+          "ttl": 164,
+          "value": "2001:db8::11"
+        },
+        {
+          "type": "MX",
+          "ttl": 2875,
+          "priority": 10,
+          "value": "target-example-com.mail.protection.example.org"
+        },
+        {
+          "type": "MX",
+          "ttl": 300,
+          "priority": 50,
+          "value": "relay.example.net"
+        },
+        {
+          "type": "MX",
+          "ttl": 300,
+          "priority": 100,
+          "value": "mail.target-example.com"
+        },
+        {
+          "type": "SOA",
+          "ttl": 3600,
+          "value": "ns1-39.example-dns.com",
+          "rname": "exampledns-hostmaster.target-example.com",
+          "serial": 1,
+          "refresh": 3600,
+          "retry": 300,
+          "expire": 2419200,
+          "minimum": 300
+        },
+        {
+          "type": "CAA",
+          "ttl": 3038,
+          "flag": 0,
+          "tag": "contactemail",
+          "value": "caarecordaware@target-example.com"
+        },
+        {
+          "type": "CAA",
+          "ttl": 300,
+          "flag": 0,
+          "tag": "issue",
+          "value": "ca.example.org"
+        },
+        {
+          "type": "CAA",
+          "ttl": 300,
+          "flag": 0,
+          "tag": "issue",
+          "value": "backup-ca.example.net"
+        },
+        {
+          "type": "CAA",
+          "ttl": 300,
+          "flag": 0,
+          "tag": "issuewild",
+          "value": "wild-ca.example.org"
+        },
+        {
+          "type": "CAA",
+          "ttl": 300,
+          "flag": 0,
+          "tag": "issuewild",
+          "value": "wild-backup-ca.example.net"
+        }
+      ],
+      "tld": "com",
+      "last_https_certificate": {
+        "cert_signature": {
+          "signature_algorithm": "1.2.840.113549.1.1.12",
+          "signature": "synthetic-rsa-signature-0001"
+        },
+        "extensions": {
+          "authority_key_identifier": {
+            "keyid": "synthetic-domain-rsa-akid"
+          },
+          "subject_key_identifier": "synthetic-domain-rsa-ski",
+          "subject_alternative_name": [
+            "target-example.com",
+            "s.target-example.com",
+            "api.target-example.com",
+            "portal.target-example.com",
+            "store.target-example.com",
+            "mail.target-example.com",
+            "support.target-example.com",
+            "community.target-example.com",
+            "discover.target-example.com",
+            "www.target-example.com",
+            "edge.target-example.com",
+            "login.target-example.com",
+            "*.target-example.com",
+            "*.store.target-example.com",
+            "*.app.target-example.com",
+            "*.partners.target-example.com",
+            "example.net"
+          ],
+          "certificate_policies": [
+            "2.23.140.1.2.2",
+            "1.3.6.1.4.1.311.76.509.1.1"
+          ],
+          "key_usage": [
+            "digitalSignature",
+            "keyEncipherment"
+          ],
+          "extended_key_usage": [
+            "serverAuth"
+          ],
+          "crl_distribution_points": [
+            "http://crl3.example.com/domain-ca.crl",
+            "http://crl4.example.com/domain-ca.crl"
+          ],
+          "ca_information_access": {
+            "OCSP": "http://ocsp.example.com",
+            "CA Issuers": "http://cacerts.example.com/domain-ca.crt"
+          },
+          "CA": false,
+          "1.3.6.1.4.1.11129.2.4.2": "synthetic-sct-extension-0001",
+          "1.3.6.1.4.1.311.21.10": "synthetic-ms-extension-21-10",
+          "1.3.6.1.4.1.311.21.7": "synthetic-ms-extension-21-7"
+        },
+        "validity": {
+          "not_after": "2027-01-31 23:59:59",
+          "not_before": "2026-01-31 00:00:00"
+        },
+        "size": 6405,
+        "version": "V3",
+        "public_key": {
+          "algorithm": "RSA",
+          "rsa": {
+            "modulus": "synthetic-rsa-modulus-0001",
+            "exponent": "10001",
+            "key_size": 2048
+          }
+        },
+        "thumbprint_sha256": "synthetic-domain-rsa-sha256-thumbprint",
+        "thumbprint": "synthetic-domain-rsa-thumbprint",
+        "serial_number": "synthetic-domain-rsa-serial",
+        "issuer": {
+          "C": "US",
+          "O": "Example PKI Inc",
+          "OU": "www.example.com",
+          "CN": "Example Global TLS RSA CA"
+        },
+        "subject": {
+          "C": "US",
+          "ST": "Example State",
+          "L": "Example City",
+          "O": "Example Org",
+          "CN": "target-example.com"
+        }
+      },
+      "jarm": "2ad2ad0002ad2ad00042d42d000000syntheticdomain",
+      "last_modification_date": 1778316164,
+      "last_dns_records_date": 1778312598,
+      "last_analysis_date": 1778312275,
+      "total_votes": {
+        "harmless": 86,
+        "malicious": 20
+      },
+      "tags": [],
+      "rdap": {
+        "handle": "2724960_DOMAIN_COM-VRSN",
+        "ldh_name": "target-example.com",
+        "events": [
+          {
+            "event_action": "registrar expiration",
+            "event_date": "2027-05-03T04:00:00.000+00:00",
+            "event_actor": "",
+            "links": []
+          },
+          {
+            "event_action": "expiration",
+            "event_date": "2027-05-03T00:00:00.000+00:00",
+            "event_actor": "",
+            "links": []
+          },
+          {
+            "event_action": "registration",
+            "event_date": "1991-05-02T04:00:00.000+00:00",
+            "event_actor": "",
+            "links": []
+          },
+          {
+            "event_action": "last changed",
+            "event_date": "2026-01-29T18:46:57.000+00:00",
+            "event_actor": "",
+            "links": []
+          },
+          {
+            "event_action": "last update of RDAP database",
+            "event_date": "2026-05-06T15:40:43.000+00:00",
+            "event_actor": "",
+            "links": []
+          }
+        ],
+        "notices": [
+          {
+            "title": "Terms of Use",
+            "description": [
+              "By submitting an RDAP query, you agree that you will use this data only for lawful purposes.",
+              "High volume automated processes are prohibited.",
+              "Example Registrar Domain Management.",
+              "Visit Example Registrar at https://registrar.example.com"
+            ],
+            "links": [
+              {
+                "href": "https://registrar.example.com/legal/domain-management-terms-and-conditions",
+                "rel": "related",
+                "type": "terms-of-service",
+                "value": "https://registrar.example.com/legal/domain-management-terms-and-conditions",
+                "title": "",
+                "media": "",
+                "href_lang": []
+              }
+            ],
+            "type": ""
+          },
+          {
+            "title": "Status Codes",
+            "description": [
+              "For more information on domain status codes, please visit https://icann.org/epp"
+            ],
+            "links": [
+              {
+                "href": "https://icann.org/epp",
+                "rel": "glossary",
+                "type": "text/html",
+                "value": "https://rdap.registrar.example.com/rdap/domain/target-example.com",
+                "title": "",
+                "media": "",
+                "href_lang": []
+              }
+            ],
+            "type": ""
+          },
+          {
+            "title": "RDDS Inaccuracy Complaint Form",
+            "description": [
+              "URL of the ICANN RDDS Inaccuracy Complaint Form: https://icann.org/wicf"
+            ],
+            "links": [
+              {
+                "href": "https://icann.org/wicf",
+                "rel": "help",
+                "type": "text/html",
+                "value": "https://rdap.registrar.example.com/rdap/domain/target-example.com",
+                "title": "",
+                "media": "",
+                "href_lang": []
+              }
+            ],
+            "type": ""
+          }
+        ],
+        "nameservers": [
+          {
+            "ldh_name": "ns1-39.example-dns.com",
+            "events": [
+              {
+                "event_action": "last changed",
+                "event_date": "2022-04-05T16:14:52.000+00:00",
+                "event_actor": "",
+                "links": []
+              }
+            ],
+            "object_class_name": "nameserver",
+            "status": [
+              "active"
+            ],
+            "handle": "",
+            "unicode_name": "",
+            "links": [],
+            "notices": [],
+            "lang": "",
+            "port43": "",
+            "entities": [],
+            "remarks": []
+          },
+          {
+            "ldh_name": "ns2-39.example-dns.net",
+            "events": [
+              {
+                "event_action": "last changed",
+                "event_date": "2022-04-07T17:29:58.000+00:00",
+                "event_actor": "",
+                "links": []
+              }
+            ],
+            "object_class_name": "nameserver",
+            "status": [
+              "active"
+            ],
+            "handle": "",
+            "unicode_name": "",
+            "links": [],
+            "notices": [],
+            "lang": "",
+            "port43": "",
+            "entities": [],
+            "remarks": []
+          },
+          {
+            "ldh_name": "ns3-39.example-dns.org",
+            "events": [
+              {
+                "event_action": "last changed",
+                "event_date": "2022-04-11T22:02:38.000+00:00",
+                "event_actor": "",
+                "links": []
+              }
+            ],
+            "object_class_name": "nameserver",
+            "status": [
+              "active"
+            ],
+            "handle": "",
+            "unicode_name": "",
+            "links": [],
+            "notices": [],
+            "lang": "",
+            "port43": "",
+            "entities": [],
+            "remarks": []
+          },
+          {
+            "ldh_name": "ns4-39.example-dns.info",
+            "events": [
+              {
+                "event_action": "last changed",
+                "event_date": "2022-04-12T22:06:12.000+00:00",
+                "event_actor": "",
+                "links": []
+              }
+            ],
+            "object_class_name": "nameserver",
+            "status": [
+              "active"
+            ],
+            "handle": "",
+            "unicode_name": "",
+            "links": [],
+            "notices": [],
+            "lang": "",
+            "port43": "",
+            "entities": [],
+            "remarks": []
+          }
+        ],
+        "rdap_conformance": [
+          "rdap_level_0",
+          "icann_rdap_technical_implementation_guide_0",
+          "icann_rdap_technical_implementation_guide_1",
+          "icann_rdap_response_profile_0",
+          "icann_rdap_response_profile_1"
+        ],
+        "entities": [
+          {
+            "object_class_name": "entity",
+            "vcard_array": [
+              {
+                "name": "version",
+                "type": "text",
+                "values": [
+                  "4.0"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "contact-uri",
+                "type": "uri",
+                "values": [
+                  "https://domains.example.com/whois/contact/target-example.com"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "fn",
+                "type": "text",
+                "values": [
+                  "Domain Administrator"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "org",
+                "parameters": {
+                  "type": [
+                    "work"
+                  ]
+                },
+                "type": "text",
+                "values": [
+                  "Example Org"
+                ]
+              },
+              {
+                "name": "adr",
+                "parameters": {
+                  "cc": [
+                    "US"
+                  ]
+                },
+                "type": "text",
+                "values": [
+                  "",
+                  "",
+                  "100 Example Street",
+                  "Example City",
+                  "EX",
+                  "12345",
+                  ""
+                ]
+              },
+              {
+                "name": "email",
+                "parameters": {
+                  "type": [
+                    "work"
+                  ]
+                },
+                "type": "text",
+                "values": [
+                  "admin@domains.target-example.com"
+                ]
+              },
+              {
+                "name": "tel",
+                "parameters": {
+                  "type": [
+                    "voice"
+                  ]
+                },
+                "type": "text",
+                "values": [
+                  "+1.4258828080"
+                ]
+              },
+              {
+                "name": "tel",
+                "parameters": {
+                  "type": [
+                    "fax"
+                  ]
+                },
+                "type": "text",
+                "values": [
+                  "+1.4259367329"
+                ]
+              }
+            ],
+            "roles": [
+              "registrant"
+            ],
+            "events": [
+              {
+                "event_action": "last changed",
+                "event_date": "2020-06-09T18:06:58.000+00:00",
+                "event_actor": "",
+                "links": []
+              }
+            ],
+            "handle": "",
+            "public_ids": [],
+            "entities": [],
+            "remarks": [],
+            "links": [],
+            "as_event_actor": [],
+            "status": [],
+            "port43": "",
+            "networks": [],
+            "autnums": [],
+            "url": "",
+            "lang": "",
+            "rdap_conformance": []
+          },
+          {
+            "object_class_name": "entity",
+            "vcard_array": [
+              {
+                "name": "version",
+                "type": "text",
+                "values": [
+                  "4.0"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "contact-uri",
+                "type": "uri",
+                "values": [
+                  "https://domains.example.com/whois/contact/target-example.com"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "fn",
+                "type": "text",
+                "values": [
+                  "Example Hostmaster"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "email",
+                "parameters": {
+                  "type": [
+                    "work"
+                  ]
+                },
+                "type": "text",
+                "values": [
+                  "tech@target-example.com"
+                ]
+              },
+              {
+                "name": "tel",
+                "parameters": {
+                  "type": [
+                    "voice"
+                  ]
+                },
+                "type": "text",
+                "values": [
+                  "+1.4258828080"
+                ]
+              }
+            ],
+            "roles": [
+              "technical"
+            ],
+            "events": [
+              {
+                "event_action": "last changed",
+                "event_date": "2018-05-24T16:45:00.000+00:00",
+                "event_actor": "",
+                "links": []
+              }
+            ],
+            "handle": "",
+            "public_ids": [],
+            "entities": [],
+            "remarks": [],
+            "links": [],
+            "as_event_actor": [],
+            "status": [],
+            "port43": "",
+            "networks": [],
+            "autnums": [],
+            "url": "",
+            "lang": "",
+            "rdap_conformance": []
+          },
+          {
+            "object_class_name": "entity",
+            "handle": "424242",
+            "vcard_array": [
+              {
+                "name": "version",
+                "type": "text",
+                "values": [
+                  "4.0"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "org",
+                "parameters": {
+                  "type": [
+                    "work"
+                  ]
+                },
+                "type": "text",
+                "values": [
+                  "Example Registrar LLC"
+                ]
+              },
+              {
+                "name": "adr",
+                "parameters": {
+                  "cc": [
+                    "US"
+                  ]
+                },
+                "type": "text",
+                "values": [
+                  "",
+                  "",
+                  "3540 Example Lane",
+                  "Meridian",
+                  "ID",
+                  "83646",
+                  ""
+                ]
+              },
+              {
+                "name": "contact-uri",
+                "type": "uri",
+                "values": [
+                  "https://www.registrar.example.com/contact-us/"
+                ],
+                "parameters": {}
+              },
+              {
+                "name": "fn",
+                "type": "text",
+                "values": [
+                  "Example Registrar LLC"
+                ],
+                "parameters": {}
+              }
+            ],
+            "roles": [
+              "registrar"
+            ],
+            "public_ids": [
+              {
+                "type": "IANA Registrar ID",
+                "identifier": "424242"
+              }
+            ],
+            "entities": [
+              {
+                "object_class_name": "entity",
+                "vcard_array": [
+                  {
+                    "name": "version",
+                    "type": "text",
+                    "values": [
+                      "4.0"
+                    ],
+                    "parameters": {}
+                  },
+                  {
+                    "name": "contact-uri",
+                    "parameters": {
+                      "type": [
+                        "work"
+                      ]
+                    },
+                    "type": "uri",
+                    "values": [
+                      "https://corp.registrar.example.com/domain/ui/abuse-report"
+                    ]
+                  },
+                  {
+                    "name": "tel",
+                    "parameters": {
+                      "type": [
+                        "voice"
+                      ]
+                    },
+                    "type": "text",
+                    "values": [
+                      "+1.2086851750"
+                    ]
+                  },
+                  {
+                    "name": "fn",
+                    "type": "text",
+                    "values": [
+                      "Example Registrar Abuse Desk"
+                    ],
+                    "parameters": {}
+                  }
+                ],
+                "roles": [
+                  "abuse"
+                ],
+                "handle": "",
+                "public_ids": [],
+                "entities": [],
+                "remarks": [],
+                "links": [],
+                "events": [],
+                "as_event_actor": [],
+                "status": [],
+                "port43": "",
+                "networks": [],
+                "autnums": [],
+                "url": "",
+                "lang": "",
+                "rdap_conformance": []
+              }
+            ],
+            "links": [
+              {
+                "href": "https://rdap.registrar.example.com/rdap/domain/target-example.com",
+                "rel": "self",
+                "type": "application/rdap+json",
+                "value": "https://rdap.registrar.example.com/rdap/domain/target-example.com",
+                "title": "",
+                "media": "",
+                "href_lang": []
+              },
+              {
+                "href": "https://www.registrar.example.com/about-us/",
+                "rel": "about",
+                "type": "text/html",
+                "value": "https://rdap.registrar.example.com/rdap/domain/target-example.com",
+                "title": "",
+                "media": "",
+                "href_lang": []
+              }
+            ],
+            "remarks": [],
+            "events": [],
+            "as_event_actor": [],
+            "status": [],
+            "port43": "",
+            "networks": [],
+            "autnums": [],
+            "url": "",
+            "lang": "",
+            "rdap_conformance": []
+          }
+        ],
+        "object_class_name": "domain",
+        "status": [
+          "client update prohibited",
+          "client transfer prohibited",
+          "client delete prohibited",
+          "server update prohibited",
+          "server transfer prohibited",
+          "server delete prohibited"
+        ],
+        "secure_dns": {
+          "delegation_signed": true,
+          "zone_signed": false,
+          "max_sig_life": 0,
+          "ds_data": [
+            {
+              "algorithm": 13,
+              "digest_type": 2,
+              "digest": "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789",
+              "key_tag": 2371,
+              "events": [],
+              "links": []
+            },
+            {
+              "algorithm": 13,
+              "digest_type": 2,
+              "digest": "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF",
+              "key_tag": 2372,
+              "events": [],
+              "links": []
+            }
+          ],
+          "key_data": []
+        },
+        "port43": "whois.registrar.example.com",
+        "unicode_name": "",
+        "punycode": "",
+        "type": "",
+        "links": [],
+        "switch_name": "",
+        "public_ids": [],
+        "lang": "",
+        "remarks": [],
+        "nask0_state": "",
+        "variants": []
+      },
+      "registrar": "Example Registrar LLC",
+      "registrar_url": "https://registrar.example.com",
+      "registrar_iana_id": "424242",
+      "whois_server": "whois.registrar.example.com",
+      "registrant": "Example Registrant",
+      "registrant_organization": "Example Org",
+      "registrant_email": "admin@domains.target-example.com",
+      "admin_email": "hostmaster@target-example.com",
+      "tech_email": "tech@target-example.com",
+      "expiration_date": 1801353600,
+      "status": [
+        "clientTransferProhibited",
+        "clientUpdateProhibited",
+        "clientDeleteProhibited",
+        "serverUpdateProhibited",
+        "serverTransferProhibited",
+        "serverDeleteProhibited",
+        "AgentChangeLocked",
+        "DomainTransferLocked",
+        "Active"
+      ],
+      "dnssec": "signedDelegation"
+    }
+  }
+}

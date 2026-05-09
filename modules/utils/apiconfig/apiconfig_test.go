@@ -33,6 +33,14 @@ func TestGetKey(t *testing.T) {
 			expectedFile: true,
 		},
 		{
+			name: "initial creation writes default and returns empty VirusTotal",
+			setupMock: func(_ string) {
+			},
+			serviceName:  "VirusTotal",
+			expectedKey:  "",
+			expectedFile: true,
+		},
+		{
 			name: "parsing existing data with valid key",
 			setupMock: func(mockPath string) {
 				content := []byte("[Keys]\nShodan=test_key_123\n")

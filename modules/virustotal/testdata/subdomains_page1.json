@@ -1,0 +1,263 @@
+{
+  "data": [
+    {
+      "id": "api.target-example.com",
+      "type": "domain",
+      "links": {
+        "self": "https://www.virustotal.com/api/v3/domains/api.target-example.com"
+      },
+      "attributes": {
+        "last_modification_date": 1778235305,
+        "tld": "com",
+        "whois": "Administrative city: Example City\nAdministrative country: United States\nAdministrative email: admin-ops@target-example.com\nAdministrative state: EX\nBilling city: Example City\nBilling country: United States\nBilling email: billing@target-example.com\nBilling state: EX\nCreate date: 2020-01-31 00:00:00\nDomain name: target-example.com\nDomain registrar id: 424242\nDomain registrar url: https://registrar.example.com\nExpiry date: 2027-01-31 00:00:00\nQuery time: 2026-02-01 10:00:00\nRegistrant address: 100 Example Street\nRegistrant city: Example City\nRegistrant country: United States\nRegistrant name: Example Registrant\nRegistrant state: EX\nRegistrant zip: 12345\nTechnical city: Example City\nTechnical country: United States\nTechnical email: tech@target-example.com\nTechnical state: EX\nUpdate date: 2026-01-29 00:00:00",
+        "last_https_certificate_date": 1778235304,
+        "categories": {},
+        "reputation": 0,
+        "popularity_ranks": {},
+        "last_analysis_stats": {
+          "malicious": 0,
+          "suspicious": 0,
+          "undetected": 61,
+          "harmless": 11,
+          "timeout": 0
+        },
+        "last_update_date": 1768435200,
+        "last_https_certificate": {
+          "cert_signature": {
+            "signature_algorithm": "1.2.840.10045.4.3.3",
+            "signature": "synthetic-subdomain-ec-signature-0001"
+          },
+          "extensions": {
+            "key_usage": [
+              "digitalSignature"
+            ],
+            "extended_key_usage": [
+              "serverAuth"
+            ],
+            "CA": false,
+            "subject_key_identifier": "synthetic-subdomain-ski-0001",
+            "authority_key_identifier": {
+              "keyid": "synthetic-subdomain-akid-0001"
+            },
+            "ca_information_access": {
+              "CA Issuers": "http://crt.example.com/subdomain-ca.crt"
+            },
+            "subject_alternative_name": [
+              "api.target-example.com",
+              "console.target-example.com",
+              "api-alt.target-example.com",
+              "*.api.target-example.com"
+            ],
+            "certificate_policies": [
+              "2.23.140.1.2.1"
+            ],
+            "crl_distribution_points": [
+              "http://crl.example.com/subdomain-ca.crl"
+            ],
+            "1.3.6.1.4.1.11129.2.4.2": "synthetic-subdomain-sct-0001"
+          },
+          "validity": {
+            "not_after": "2026-08-06 08:21:31",
+            "not_before": "2026-05-08 08:21:32"
+          },
+          "size": 932,
+          "version": "V3",
+          "public_key": {
+            "algorithm": "EC",
+            "ec": {
+              "oid": "secp256r1",
+              "pub": "30593013syntheticsubdomainpub0001"
+            }
+          },
+          "thumbprint_sha256": "synthetic-subdomain-sha256-thumbprint-0001",
+          "thumbprint": "synthetic-subdomain-thumbprint-0001",
+          "serial_number": "synthetic-subdomain-serial-0001",
+          "issuer": {
+            "C": "US",
+            "O": "Example Certificate Authority",
+            "CN": "Example E8"
+          },
+          "subject": {
+            "CN": "api.target-example.com"
+          }
+        },
+        "total_votes": {
+          "harmless": 0,
+          "malicious": 0
+        },
+        "creation_date": 1580428800,
+        "last_analysis_date": 1778235150,
+        "jarm": "27d40d40d00040d00042d43d000000syntheticapi",
+        "tags": [],
+        "last_dns_records_date": 1778235304,
+        "last_dns_records": [
+          {
+            "type": "A",
+            "ttl": 1458,
+            "value": "192.0.2.20"
+          },
+          {
+            "type": "A",
+            "ttl": 1458,
+            "value": "192.0.2.21"
+          },
+          {
+            "type": "CNAME",
+            "ttl": 1800,
+            "value": "edge.target-example.com"
+          },
+          {
+            "type": "TXT",
+            "ttl": 3009,
+            "value": "v=spf1 include:_spf.api.target-example.com include:_spf.example.net -all"
+          },
+          {
+            "type": "TXT",
+            "ttl": 3009,
+            "value": "service-owner=api-team"
+          },
+          {
+            "type": "NS",
+            "ttl": 21600,
+            "value": "ns1.target-example.com"
+          },
+          {
+            "type": "NS",
+            "ttl": 21600,
+            "value": "ns2.target-example.com"
+          },
+          {
+            "type": "CAA",
+            "ttl": 300,
+            "flag": 0,
+            "tag": "issue",
+            "value": "ca.example.org"
+          },
+          {
+            "type": "CAA",
+            "ttl": 300,
+            "flag": 0,
+            "tag": "issuewild",
+            "value": "wild-ca.example.net"
+          }
+        ],
+        "last_analysis_results": {
+          "SyntheticEngineNeutralA": {
+            "method": "blacklist",
+            "engine_name": "SyntheticEngineNeutralA",
+            "category": "undetected",
+            "result": "unrated"
+          },
+          "SyntheticEngineNeutralB": {
+            "method": "blacklist",
+            "engine_name": "SyntheticEngineNeutralB",
+            "category": "harmless",
+            "result": "clean"
+          }
+        }
+      },
+      "context_attributes": {
+        "timestamp": 1770001250
+      }
+    },
+    {
+      "id": "mail.target-example.com",
+      "type": "domain",
+      "links": {
+        "self": "https://www.virustotal.com/api/v3/domains/mail.target-example.com"
+      },
+      "attributes": {
+        "last_analysis_stats": {
+          "malicious": 1,
+          "suspicious": 2,
+          "undetected": 44,
+          "harmless": 16,
+          "timeout": 0
+        },
+        "last_dns_records": [
+          {
+            "type": "MX",
+            "ttl": 300,
+            "priority": 5,
+            "value": "mail.target-example.com"
+          },
+          {
+            "type": "MX",
+            "ttl": 300,
+            "priority": 15,
+            "value": "relay.example.org"
+          },
+          {
+            "type": "AAAA",
+            "ttl": 300,
+            "value": "2001:db8::20"
+          },
+          {
+            "type": "AAAA",
+            "ttl": 300,
+            "value": "2001:db8::21"
+          },
+          {
+            "type": "SOA",
+            "ttl": 1800,
+            "value": "ns1.target-example.com",
+            "rname": "dns.target-example.com",
+            "serial": 2026010201,
+            "refresh": 7200,
+            "retry": 3600,
+            "expire": 1209600,
+            "minimum": 1800
+          },
+          {
+            "type": "CAA",
+            "ttl": 300,
+            "flag": 0,
+            "tag": "issue",
+            "value": "mail-ca.example.org"
+          },
+          {
+            "type": "CAA",
+            "ttl": 300,
+            "flag": 0,
+            "tag": "issuewild",
+            "value": "mail-wild-ca.example.net"
+          }
+        ],
+        "last_dns_records_date": 1770001300,
+        "last_analysis_results": {
+          "SyntheticEngineMailA": {
+            "method": "blacklist",
+            "engine_name": "SyntheticEngineMailA",
+            "category": "malicious",
+            "result": "malware"
+          },
+          "SyntheticEngineMailB": {
+            "method": "blacklist",
+            "engine_name": "SyntheticEngineMailB",
+            "category": "suspicious",
+            "result": "suspicious"
+          },
+          "SyntheticEngineMailC": {
+            "method": "blacklist",
+            "engine_name": "SyntheticEngineMailC",
+            "category": "harmless",
+            "result": "clean"
+          }
+        },
+        "last_modification_date": 1770001400,
+        "whois": "Domain Name: MAIL.TARGET-EXAMPLE.COM"
+      },
+      "context_attributes": {
+        "timestamp": 1770001450
+      }
+    }
+  ],
+  "meta": {
+    "count": 4,
+    "cursor": "synthetic-subdomains-cursor-page-1"
+  },
+  "links": {
+    "self": "https://www.virustotal.com/api/v3/domains/target-example.com/subdomains?limit=40",
+    "next": "SERVER_URL/api/v3/domains/target-example.com/subdomains?limit=40&cursor=synthetic-subdomains-cursor-page-2"
+  }
+}

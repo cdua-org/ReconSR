@@ -1,0 +1,156 @@
+package virustotal
+
+import (
+	"strings"
+	"testing"
+
+	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/schema"
+)
+
+type ipFixtureRun struct {
+	exec schema.ModuleExecution
+	mock *vtMockServer
+}
+
+func TestModuleExecIPFixtureContract(t *testing.T) {
+	run := executeIPFixture(t)
+
+	t.Run("request flow", func(t *testing.T) {
+		assertIPRequestFlow(t, run.mock)
+	})
+	t.Run("metadata extraction", func(t *testing.T) {
+		assertIPMetadataExtraction(t, run.exec.Results)
+	})
+	t.Run("passive dns extraction", func(t *testing.T) {
+		assertIPPassiveDNSExtraction(t, run.exec.Results)
+	})
+	t.Run("ignored whois and rdap", func(t *testing.T) {
+		assertIPIgnoredWhoisAndRDAP(t, run.exec.Results)
+	})
+}
+
+func executeIPFixture(t *testing.T) ipFixtureRun {
+	t.Helper()
+
+	ipBody := loadVTFixture(t, "ip_page1.json")
+	resolutionsPage1 := loadVTFixture(t, "resolutions_page1.json")
+	resolutionsPage2 := loadVTFixture(t, "resolutions_page2.json")
+
+	withVTDelayConfig(t, 8)
+
+	responses := map[string]string{
+		"/api/v3/ip_addresses/" + fixtureIPTarget:                                                                      ipBody,
+		"/api/v3/ip_addresses/" + fixtureIPTarget + "/resolutions?limit=40":                                            resolutionsPage1,
+		"/api/v3/ip_addresses/" + fixtureIPTarget + "/resolutions?limit=40&cursor=synthetic-resolutions-cursor-page-2": resolutionsPage2,
+	}
+
+	mock, server := newVTMockServer(t, responses, nil)
+	defer server.Close()
+
+	setVTBaseURL(t, server.URL+"/api/v3")
+
+	mod := &module{apiKey: fixtureFixtureAPIKey}
+	exec := execVT(t, mod, schema.Entity{Type: constants.TypeIPv4, Value: fixtureIPTarget})
+	if exec.Error != nil {
+		t.Fatalf("unexpected execution error: %q", *exec.Error)
+	}
+
+	return ipFixtureRun{exec: exec, mock: mock}
+}
+
+func assertIPRequestFlow(t *testing.T, mock *vtMockServer) {
+	t.Helper()
+
+	metaReq := assertSinglePathHit(t, mock, "/api/v3/ip_addresses/"+fixtureIPTarget)
+	page1Req := assertSinglePathHit(t, mock, "/api/v3/ip_addresses/"+fixtureIPTarget+"/resolutions?limit=40")
+	page2Req := assertSinglePathHit(t, mock, "/api/v3/ip_addresses/"+fixtureIPTarget+"/resolutions?limit=40&cursor=synthetic-resolutions-cursor-page-2")
+	assertRequestAPIKey(t, mock.allRequests(), fixtureFixtureAPIKey)
+	assertMinimumGap(t, metaReq, page1Req, "ip phase transition")
+	assertMinimumGap(t, page1Req, page2Req, "ip pagination")
+}
+
+func assertIPMetadataExtraction(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+	assertIPMetadataExtractionCore(t, results)
+	assertIPMetadataExtractionGeo(t, results)
+}
+
+func assertIPMetadataExtractionCore(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	asn := requireResult(t, results, "ASN result", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeASN && result.Value == "64544"
+	})
+	if asn.Category != constants.CategoryNode {
+		t.Fatalf("expected ASN to be a node, got %+v", asn)
+	}
+
+	requireResult(t, results, "network cidr result", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeCIDR && result.Value == "192.0.2.0/24"
+	})
+
+	requireResult(t, results, "ip JARM result", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeJARM && result.Value == "27d40d40d00040d00042d43d000000syntheticip"
+	})
+
+	requireResult(t, results, "ip last update result", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeLastUpdate && strings.Contains(result.Value, "2026-02-13T16:30:00Z")
+	})
+
+	requireResult(t, results, "tag propagation", func(result schema.ModuleResult) bool {
+		return hasAllTags(&result, "synthetic", "network")
+	})
+
+	threat := requireResult(t, results, "ip threat score", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeVTThreatScore
+	})
+	if !strings.Contains(threat.Context, "SyntheticIPEngineA") || !strings.Contains(threat.Context, "SyntheticIPEngineB") || !strings.Contains(threat.Context, "SyntheticIPEngineC") {
+		t.Fatalf("expected ip threat context to contain malicious and suspicious engines, got %+v", threat)
+	}
+}
+
+func assertIPMetadataExtractionGeo(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	requireResult(t, results, "as owner result", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeOrg && result.Value == "Example Network Operations"
+	})
+
+	requireResult(t, results, "geo result", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeGeo && result.Value == "Country: EX | Continent: NA"
+	})
+}
+
+func assertIPPassiveDNSExtraction(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	for _, host := range []string{
+		"gateway.target-example.com",
+		"vpn.target-example.com",
+		fixtureMailSubdomain,
+		fixtureAPISubdomain,
+	} {
+		result := requireResult(t, results, "passive dns result for "+host, func(result schema.ModuleResult) bool {
+			return result.Type == constants.TypePDNSRecord && result.Value == host
+		})
+		if result.Category != constants.CategoryProperty {
+			t.Fatalf("expected passive dns to be property, got %+v", result)
+		}
+		if result.Source == nil || result.Source.Type != constants.TypeIP || result.Source.Value != fixtureIPTarget {
+			t.Fatalf("expected passive dns to point to ip source, got %s", describeSource(result.Source))
+		}
+	}
+}
+
+func assertIPIgnoredWhoisAndRDAP(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	assertNoResult(t, results, "raw ip whois text leakage", func(result schema.ModuleResult) bool {
+		return strings.Contains(result.Value, "inetnum:") || strings.Contains(result.Value, "organisation:")
+	})
+
+	assertNoResult(t, results, "raw rdap text leakage", func(result schema.ModuleResult) bool {
+		return strings.Contains(result.Value, "ip network") || strings.Contains(result.Value, "rdap_level_0")
+	})
+}
