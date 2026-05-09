@@ -116,6 +116,26 @@ func TestShodanModule_CapabilitiesWithAPIKey(t *testing.T) {
 	}
 }
 
+func TestShodanModule_CapabilitiesWithScanSubdomains(t *testing.T) {
+	resolver.ShodanScanSubdomains = true
+	defer func() { resolver.ShodanScanSubdomains = false }()
+
+	m := &shodanModule{apiKey: shodanTestAPIKey()}
+	caps, err := m.Capabilities()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	domainCaps, ok := caps.CustomFunctions[constants.FuncGetShodanAPIDomain]
+	if !ok {
+		t.Fatal("expected 'get_shodan_api_domain' capability")
+	}
+
+	if len(domainCaps.InputTypes) != 2 || domainCaps.InputTypes[0] != constants.TypeDomain || domainCaps.InputTypes[1] != constants.TypeSubdomain {
+		t.Errorf("unexpected domain input types with ShodanScanSubdomains=true: %v", domainCaps.InputTypes)
+	}
+}
+
 func TestShodanModule_Exec_UnsupportedFunction(t *testing.T) {
 	input := schema.ModuleInput{
 		Target:    schema.Entity{Type: constants.TypeIP, Value: internetDBTestIPv4()},

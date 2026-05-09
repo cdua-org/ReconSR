@@ -35,7 +35,23 @@ func (m *shodanModule) getShodanAPIIP(target schema.Entity) schema.ModuleExecuti
 	ctx, cancel := context.WithTimeout(context.Background(), resolver.HTTPTimeout)
 	defer cancel()
 
-	u := fmt.Sprintf("%s/shodan/host/%s?key=%s", shodanAPIBaseURL, url.PathEscape(target.Value), url.QueryEscape(m.apiKey))
+	u := fmt.Sprintf("%s/shodan/host/%s", shodanAPIBaseURL, url.PathEscape(target.Value))
+	parsedURL, err := url.Parse(u)
+	if err != nil {
+		modutil.SetError(&exec, "parse url: %v", err)
+		return exec
+	}
+	q := parsedURL.Query()
+	q.Set("key", m.apiKey)
+	if resolver.ShodanIPHistory {
+		q.Set("history", "true")
+	}
+	if resolver.ShodanIPMinify {
+		q.Set("minify", "true")
+	}
+	parsedURL.RawQuery = q.Encode()
+	u = parsedURL.String()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
 		modutil.SetError(&exec, "create request: %v", err)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -26,6 +27,7 @@ func TestParseShodanAPIDomain(t *testing.T) {
 	assertShodanDomainSOA(t, exec.Results)
 	assertShodanDomainAdvancedRecords1(t, exec.Results)
 	assertShodanDomainAdvancedRecords2(t, exec.Results)
+	assertShodanDomainInvalidSubdomains(t, exec.Results)
 	assertShodanDomainLastSeen(t, exec.Results, rootDomainValue)
 }
 
@@ -205,6 +207,28 @@ func assertShodanDomainAdvancedRecords2(t *testing.T, results []schema.ModuleRes
 	}
 }
 
+func assertShodanDomainInvalidSubdomains(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	if _, ok := findModuleResult(results, constants.TypeSubdomain, "invalid_name.scripts.example.com"); ok {
+		t.Fatal("expected no subdomain node for invalid hostname invalid_name.scripts.example.com")
+	}
+
+	invalidRecordIPv4 := requireModuleResult(t, results, constants.TypeIPv4, "198.51.100.99")
+	if invalidRecordIPv4.Source != nil {
+		t.Fatalf("expected IPv4 from invalid subdomain to be linked to root domain, got %+v", invalidRecordIPv4.Source)
+	}
+
+	if _, ok := findModuleResult(results, constants.TypeSubdomain, "_fake.service.media.example.com"); ok {
+		t.Fatal("expected no subdomain node for invalid hostname _fake.service.media.example.com")
+	}
+
+	invalidRecordTXT := requireModuleResult(t, results, constants.TypeTXT, "some-txt-record")
+	if invalidRecordTXT.Source != nil {
+		t.Fatalf("expected TXT property from invalid subdomain to be linked to root domain, got %+v", invalidRecordTXT.Source)
+	}
+}
+
 func assertShodanDomainLastSeen(t *testing.T, results []schema.ModuleResult, rootDomainValue string) {
 	t.Helper()
 
@@ -246,21 +270,15 @@ func assertShodanDomainLastSeen(t *testing.T, results []schema.ModuleResult, roo
 }
 
 func TestGetShodanAPIDomain(t *testing.T) {
-	rootDomainValue := "example.com"
+	rootDomainValue := "example.net"
 	apiKey := shodanTestAPIKey()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api-info":
-			w.WriteHeader(http.StatusOK)
-			if _, err := w.Write([]byte(`{"query_credits":1}`)); err != nil {
-				t.Errorf("write error: %v", err)
-			}
+		case shodanTestPreflightPath():
+			writeTestResponse(t, w, `{"query_credits":1}`)
 		case "/dns/domain/" + rootDomainValue:
-			w.WriteHeader(http.StatusOK)
-			if _, err := w.Write([]byte(`{"data":[{"subdomain":"www","type":"A","value":"198.51.100.25"}]}`)); err != nil {
-				t.Errorf("write error: %v", err)
-			}
+			writeTestResponse(t, w, `{"data":[{"subdomain":"www","type":"A","value":"198.51.100.25"}]}`)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -285,7 +303,7 @@ func TestGetShodanAPIDomain(t *testing.T) {
 		t.Fatalf("expected credits to be decremented to 0, got %d", module.queryCredits)
 	}
 
-	requireModuleResult(t, exec.Results, constants.TypeSubdomain, "www.example.com")
+	requireModuleResult(t, exec.Results, constants.TypeSubdomain, "www.example.net")
 	requireModuleResult(t, exec.Results, constants.TypeIPv4, "198.51.100.25")
 
 	module.lastReqTime = time.Now().Add(-2 * time.Second)
@@ -294,4 +312,56 @@ func TestGetShodanAPIDomain(t *testing.T) {
 	if infoResult.Category != constants.CategoryProperty {
 		t.Fatalf("expected info result to be property, got %q", infoResult.Category)
 	}
+}
+
+func TestGetShodanAPIDomainPagination(t *testing.T) {
+	resolver.ShodanMaxDomainPages = 2
+	defer func() { resolver.ShodanMaxDomainPages = 1 }()
+
+	rootDomainValue := "example.org"
+	apiKey := shodanTestAPIKey()
+
+	var reqCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case shodanTestPreflightPath():
+			writeTestResponse(t, w, `{"query_credits":5}`)
+		case "/dns/domain/" + rootDomainValue:
+			reqCount++
+			switch r.URL.Query().Get("page") {
+			case "":
+				writeTestResponse(t, w, `{"data":[{"subdomain":"page1","type":"A","value":"198.51.100.1"}],"more":true}`)
+			case "2":
+				writeTestResponse(t, w, `{"data":[{"subdomain":"page2","type":"A","value":"198.51.100.2"}],"more":false}`)
+			default:
+				w.WriteHeader(http.StatusBadRequest)
+			}
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := shodanAPIBaseURL
+	shodanAPIBaseURL = server.URL
+	defer func() { shodanAPIBaseURL = originalBaseURL }()
+
+	module := &shodanModule{apiKey: apiKey}
+	module.lastReqTime = time.Now().Add(-2 * time.Second)
+
+	exec := module.getShodanAPIDomain(schema.Entity{Type: constants.TypeDomain, Value: rootDomainValue})
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %v", *exec.Error)
+	}
+
+	if reqCount != 2 {
+		t.Fatalf("expected 2 page requests, got %d", reqCount)
+	}
+
+	if module.queryCredits != 3 {
+		t.Fatalf("expected 3 credits remaining, got %d", module.queryCredits)
+	}
+
+	requireModuleResult(t, exec.Results, constants.TypeSubdomain, "page1.example.org")
+	requireModuleResult(t, exec.Results, constants.TypeSubdomain, "page2.example.org")
 }

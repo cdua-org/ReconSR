@@ -1,27 +1,124 @@
 [Options]
+
+### General Network & Retry Options ###
+
+# General timeout for network dial operations, in seconds (default: 10)
 Timeout=10
-HTTPTimeout=30
+
+# TCP keep-alive interval for persistent connections, in seconds (default: 30)
 KeepAlive=30
-DisableRDAP=false
-DisableCertspotter=false
-DisableCertExpiredSubdomains=false
-DisableCrtshPG=false
-DisableMailcryptoBruteForce=true
-AnubisLimit=1000
-CrtshPGTimeout=30
-MaxRetriesCert=3
-MaxRetriesWhois=3
-MaxRetriesDNS=3
-MaxRetriesHT=3
-MaxRetriesIPMeta=3
-MaxRetriesASNMeta=3
-TimeoutASNMeta=30
-MaxRecursionDepth=3
-DNSQueryTimeout=10
-DNSFallbackTimeout=15
-DNSBruteTimeout=40
-DNSConcurrency=10
+
+# Base pause between HTTP retry attempts across all modules, in seconds (default: 2)
 RetryBaseDelay=2
+
+
+### DNS Options ###
+
+# Timeout for simple DoH-only queries (LOC, SSHFP, DNSKEY, etc.), in seconds (default: 10)
+DNSQueryTimeout=10
+
+# Timeout for DoH + Plain DNS fallback queries (NS, MX, TXT, etc.), in seconds (default: 15)
+DNSFallbackTimeout=15
+
+# Timeout for concurrent brute-force DNS operations (DKIM, SRV, TLSA), in seconds (default: 40)
+DNSBruteTimeout=40
+
+# Maximum parallel goroutines for brute-force DNS handlers (default: 10)
+DNSConcurrency=10
+
+# Maximum retry attempts for DNS resolution (default: 3)
+MaxRetriesDNS=3
+
+
+### HTTP & General API Options ###
+
+# Timeout for HTTP API requests (RIPE, Shodan, VirusTotal, etc.), in seconds (default: 30)
+HTTPTimeout=30
+
+# Maximum retry attempts for HackerTarget API requests (default: 3)
+MaxRetriesHT=3
+
+
+### Certificate & crt.sh Options ###
+
+# Disable Certspotter certificate transparency lookups (default: false)
+DisableCertspotter=false
+
+# When false, expired-cert subdomains are aggregated into a summary property on the root domain;
+# when true, each expired-cert subdomain is emitted as an individual node into the system (default: false)
+DisableCertExpiredSubdomains=false
+
+# Disable direct PostgreSQL queries to crt.sh (default: false)
+DisableCrtshPG=false
+
+# Timeout for crt.sh direct PostgreSQL connections, in seconds (default: 30)
+CrtshPGTimeout=30
+
+# Maximum retry attempts for certificate transparency lookups (default: 3)
+MaxRetriesCert=3
+
+
+### WHOIS, RDAP & ASN Metadata Options ###
+
+# Disable RDAP protocol and fall back to legacy WHOIS over port 43 (default: false)
+DisableRDAP=false
+
+# Maximum retry attempts for WHOIS/RDAP queries (default: 3)
+MaxRetriesWhois=3
+
+# HTTP timeout for ASN metadata API lookups, in seconds (default: 30)
+TimeoutASNMeta=30
+
+# Maximum retry attempts for ASN metadata lookups (default: 3)
+MaxRetriesASNMeta=3
+
+# Maximum depth for ASN transit chain traversal (default: 3)
+MaxRecursionDepth=3
+
+
+### IP Metadata Options ###
+
+# Maximum retry attempts for IP metadata lookups (default: 3)
+MaxRetriesIPMeta=3
+
+
+### Mailcrypto Options ###
+
+# Prevent domains and subdomains from being routed to the mailcrypto brute-force handler (default: true)
+DisableMailcryptoBruteForce=true
+
+
+### Anubis Options ###
+
+# Maximum number of subdomains to process from jldc.me/Anubis (default: 1000)
+AnubisLimit=1000
+
+
+### VirusTotal Options ###
+
+# Enable routing of subdomains to the VirusTotal domain endpoint in addition to root domains (default: false)
+VirustotalScanSubdomains=false
+
+
+### Shodan Options ###
+
+# Enable routing of subdomains to the Shodan domain endpoint in addition to root domains; each lookup costs 1 query credit (default: false)
+ShodanScanSubdomains=false
+
+# Include historical DNS data in Shodan domain lookup results (default: false)
+ShodanDomainHistory=false
+
+# Filter Shodan domain results by DNS type; possible values: A, AAAA, CNAME, NS, SOA, MX, TXT (default: empty, returns all)
+ShodanDomainType=
+
+# Maximum number of pages to fetch for Shodan domain lookups; each page costs 1 query credit (default: 1)
+ShodanMaxDomainPages=1
+
+# Include all historical banners in Shodan IP lookup results (default: false)
+ShodanIPHistory=false
+
+# Return only ports and general host information without full banners for Shodan IP lookups (default: false)
+ShodanIPMinify=false
 
 [DoH]
 https://dns.cloudflare.com/dns-query

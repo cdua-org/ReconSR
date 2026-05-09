@@ -15,6 +15,8 @@
     {"subdomain":"_http._tcp","type":"URI","value":"10 100 \"https://example.com/api\"","last_seen":"2026-05-02T12:41:00.000000"},
     {"subdomain":"sip","type":"NAPTR","value":"100 50 \"s\" \"SIP+D2U\" \"\" _sip._udp.example.com.","last_seen":"2026-05-02T12:42:00.000000"},
     {"subdomain":"","type":"RP","value":"admin.example.com admin-txt.example.com","last_seen":"2026-05-02T12:43:00.000000"},
-    {"subdomain":"host","type":"HIP","value":"2 2001:10... base64... rv1.example.net rv2.example.com","last_seen":"2026-05-02T12:44:00.000000"}
+    {"subdomain":"host","type":"HIP","value":"2 2001:10... base64... rv1.example.net rv2.example.com","last_seen":"2026-05-02T12:44:00.000000"},
+    {"subdomain":"invalid_name.scripts","type":"A","value":"198.51.100.99","last_seen":"2026-05-09T20:11:27.046000"},
+    {"subdomain":"_fake.service.media","type":"TXT","value":"some-txt-record","last_seen":"2026-05-09T20:11:28.000000"}
   ]
 }

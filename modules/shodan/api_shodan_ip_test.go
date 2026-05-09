@@ -264,20 +264,14 @@ func TestGetShodanAPIIP(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api-info":
-			w.WriteHeader(http.StatusOK)
-			if _, err := w.Write([]byte(`{"query_credits":100}`)); err != nil {
-				t.Errorf("write error: %v", err)
-			}
+		case shodanTestPreflightPath():
+			writeTestResponse(t, w, `{"query_credits":100}`)
 		case "/shodan/host/" + targetIP:
-			w.WriteHeader(http.StatusOK)
-			if _, err := w.Write([]byte(`{
+			writeTestResponse(t, w, `{
 				"asn": "AS99999",
 				"tags": ["faketag"],
 				"data": [{"port": 443, "transport": "tcp", "product": "FakeProduct", "version": "9.9", "hash": 2222222}]
-			}`)); err != nil {
-				t.Errorf("write error: %v", err)
-			}
+			}`)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}

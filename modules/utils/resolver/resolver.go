@@ -71,6 +71,19 @@ var (
 	// AnubisLimit limits the number of subdomains processed from jldc.me.
 	AnubisLimit = 1000
 
+	// ShodanDomainHistory includes historical DNS data for Shodan domain lookups.
+	ShodanDomainHistory = false
+	// ShodanDomainType specifies DNS type for Shodan domain lookups (e.g. A, AAAA, TXT).
+	ShodanDomainType = ""
+	// ShodanMaxDomainPages limits the number of pages to fetch for Shodan domain lookups.
+	ShodanMaxDomainPages = 1
+	// ShodanScanSubdomains enables processing of subdomains via the domain endpoint.
+	ShodanScanSubdomains = false
+	// ShodanIPHistory includes all historical banners for Shodan IP lookups.
+	ShodanIPHistory = false
+	// ShodanIPMinify returns only ports and general info for Shodan IP lookups.
+	ShodanIPMinify = false
+
 	// DNSQueryTimeout bounds simple DoH-only queries (LOC, SSHFP, DNSKEY, etc.).
 	DNSQueryTimeout = 10 * time.Second
 	// DNSFallbackTimeout bounds DoH + Plain DNS fallback queries (NS, MX, TXT, etc.).
@@ -86,6 +99,9 @@ var (
 
 	// DisableMailcryptoBruteForce prevents domains and subdomains from being routed to mailcrypto.
 	DisableMailcryptoBruteForce = true
+
+	// VirustotalScanSubdomains enables processing of subdomains via the VirusTotal domain endpoint.
+	VirustotalScanSubdomains = false
 
 	// Options acts as a generic configuration dictionary.
 	Options = make(map[string]string)
@@ -117,6 +133,7 @@ func GetConfiguredDNS() (doh, plain string) {
 }
 
 func loadConfig() {
+	initOptionMaps()
 	if strings.HasSuffix(os.Args[0], ".test") {
 		parseConfig(string(defaultNetworkConfig))
 		return
@@ -200,6 +217,51 @@ func parseConfig(content string) {
 	}
 }
 
+var durationOptions map[string]*time.Duration
+
+var boolOptions map[string]*bool
+
+var intOptions map[string]*int
+
+var stringOptions map[string]*string
+
+func initOptionMaps() {
+	durationOptions = map[string]*time.Duration{
+		"Timeout":            &Timeout,
+		"KeepAlive":          &KeepAlive,
+		"TimeoutASNMeta":     &TimeoutASNMeta,
+		"DNSQueryTimeout":    &DNSQueryTimeout,
+		"DNSFallbackTimeout": &DNSFallbackTimeout,
+		"DNSBruteTimeout":    &DNSBruteTimeout,
+		"CrtshPGTimeout":     &CrtshPGTimeout,
+		"RetryBaseDelay":     &RetryBaseDelay,
+		"HTTPTimeout":        &HTTPTimeout,
+	}
+	boolOptions = map[string]*bool{
+		"DisableMailcryptoBruteForce": &DisableMailcryptoBruteForce,
+		"VirustotalScanSubdomains":    &VirustotalScanSubdomains,
+		"ShodanDomainHistory":         &ShodanDomainHistory,
+		"ShodanScanSubdomains":        &ShodanScanSubdomains,
+		"ShodanIPHistory":             &ShodanIPHistory,
+		"ShodanIPMinify":              &ShodanIPMinify,
+	}
+	intOptions = map[string]*int{
+		"MaxRetriesCert":       &MaxRetriesCert,
+		"MaxRetriesWhois":      &MaxRetriesWhois,
+		"MaxRetriesDNS":        &MaxRetriesDNS,
+		"MaxRetriesHT":         &MaxRetriesHT,
+		"MaxRetriesIPMeta":     &MaxRetriesIPMeta,
+		"MaxRetriesASNMeta":    &MaxRetriesASNMeta,
+		"MaxRecursionDepth":    &MaxRecursionDepth,
+		"AnubisLimit":          &AnubisLimit,
+		"ShodanMaxDomainPages": &ShodanMaxDomainPages,
+		"DNSConcurrency":       &DNSConcurrency,
+	}
+	stringOptions = map[string]*string{
+		"ShodanDomainType": &ShodanDomainType,
+	}
+}
+
 func parseOption(line string) {
 	parts := strings.SplitN(line, "=", 2)
 	if len(parts) != 2 {
@@ -209,27 +271,20 @@ func parseOption(line string) {
 	val := strings.TrimSpace(parts[1])
 	Options[key] = val
 
-	switch key {
-	case "Timeout":
-		parseDurationOption(val, &Timeout)
-	case "KeepAlive":
-		parseDurationOption(val, &KeepAlive)
-	case "TimeoutASNMeta":
-		parseDurationOption(val, &TimeoutASNMeta)
-	case "DNSQueryTimeout":
-		parseDurationOption(val, &DNSQueryTimeout)
-	case "DNSFallbackTimeout":
-		parseDurationOption(val, &DNSFallbackTimeout)
-	case "DNSBruteTimeout":
-		parseDurationOption(val, &DNSBruteTimeout)
-	case "CrtshPGTimeout":
-		parseDurationOption(val, &CrtshPGTimeout)
-	case "RetryBaseDelay":
-		parseDurationOption(val, &RetryBaseDelay)
-	case "DisableMailcryptoBruteForce":
-		parseBoolOption(val, &DisableMailcryptoBruteForce)
-	default:
-		parseIntOption(key, val)
+	if target, ok := durationOptions[key]; ok {
+		parseDurationOption(val, target)
+		return
+	}
+	if target, ok := boolOptions[key]; ok {
+		parseBoolOption(val, target)
+		return
+	}
+	if target, ok := intOptions[key]; ok {
+		parseIntOption(val, target)
+		return
+	}
+	if target, ok := stringOptions[key]; ok {
+		*target = val
 	}
 }
 
@@ -245,34 +300,9 @@ func parseBoolOption(val string, target *bool) {
 	}
 }
 
-func parseIntOption(key, val string) {
-	v, err := strconv.Atoi(val)
-	if err != nil || v <= 0 {
-		return
-	}
-	switch key {
-	case "MaxRetriesCert":
-		MaxRetriesCert = v
-	case "MaxRetriesWhois":
-		MaxRetriesWhois = v
-	case "MaxRetriesDNS":
-		MaxRetriesDNS = v
-	case "MaxRetriesHT":
-		MaxRetriesHT = v
-	case "MaxRetriesIPMeta":
-		MaxRetriesIPMeta = v
-	case "MaxRetriesASNMeta":
-		MaxRetriesASNMeta = v
-	case "MaxRecursionDepth":
-		MaxRecursionDepth = v
-	case "AnubisLimit":
-		AnubisLimit = v
-	case "DNSConcurrency":
-		DNSConcurrency = v
-	case "HTTPTimeout":
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			HTTPTimeout = time.Duration(v) * time.Second
-		}
+func parseIntOption(val string, target *int) {
+	if v, err := strconv.Atoi(val); err == nil && v > 0 {
+		*target = v
 	}
 }
 

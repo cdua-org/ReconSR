@@ -80,10 +80,15 @@ func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 		return schema.ModuleCapabilities{}, nil
 	}
 
+	inputTypes := []string{constants.TypeIPv4, constants.TypeIPv6, constants.TypeDomain}
+	if resolver.VirustotalScanSubdomains {
+		inputTypes = append(inputTypes, constants.TypeSubdomain)
+	}
+
 	return schema.ModuleCapabilities{
 		CustomFunctions: map[string]schema.FunctionCapabilities{
 			constants.FuncGetVTApiData: {
-				InputTypes: []string{constants.TypeIPv4, constants.TypeIPv6, constants.TypeDomain},
+				InputTypes: inputTypes,
 				Limit:      1,
 				DelayMs:    int(defaultVTDelay / time.Millisecond),
 			},
@@ -177,7 +182,7 @@ func (m *module) getVTApiData(input schema.ModuleInput) schema.ModuleExecution {
 	dbg.Printf("getVTApiData target=%q type=%q delay=%s", target, targetType, delay)
 
 	switch targetType {
-	case constants.TypeDomain:
+	case constants.TypeDomain, constants.TypeSubdomain:
 		m.processDomain(ctx, target, delay, &exec)
 	case constants.TypeIPv4, constants.TypeIPv6:
 		m.processIP(ctx, target, delay, &exec)

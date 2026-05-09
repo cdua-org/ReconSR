@@ -35,14 +35,16 @@ func parseShodanAPIDomain(exec *schema.ModuleExecution, rawBody []byte, target s
 }
 
 func processShodanDomainRecord(exec *schema.ModuleExecution, record shodanDomainRecord, target string) {
-	fqdn, entityType, ok := buildShodanFQDN(target, record.Subdomain)
+	fqdn, entityType, isValidNode, ok := buildShodanFQDN(target, record.Subdomain)
 	if !ok {
 		return
 	}
 
 	var source *schema.EntityRef
-	if record.Type != "TXT" || !strings.HasPrefix(record.Subdomain, "_") {
-		source = appendShodanSubdomain(exec, fqdn, entityType, target)
+	if isValidNode {
+		if record.Type != "TXT" || !strings.HasPrefix(record.Subdomain, "_") {
+			source = appendShodanSubdomain(exec, fqdn, entityType, target)
+		}
 	}
 	value := strings.TrimSpace(record.Value)
 	if value == "" {
@@ -53,7 +55,7 @@ func processShodanDomainRecord(exec *schema.ModuleExecution, record shodanDomain
 	appendShodanLastSeen(exec, record.LastSeen, lastSeenSource, fqdn)
 }
 
-func buildShodanFQDN(target, subdomain string) (resultValue, resultType string, ok bool) {
+func buildShodanFQDN(target, subdomain string) (resultValue, resultType string, isValidNode, ok bool) {
 	fqdn := target
 	if subdomain != "" && subdomain != "@" {
 		fqdn = subdomain + "." + target
@@ -62,13 +64,15 @@ func buildShodanFQDN(target, subdomain string) (resultValue, resultType string, 
 	isWildcard := strings.HasPrefix(fqdn, "*.")
 	validatedValue := strings.TrimPrefix(fqdn, "*.")
 
+	isValidNode = true
 	validated, err := validator.Validate(constants.TypeDomain, validatedValue)
 	if err != nil {
 		if strings.Contains(validatedValue, "_") {
 			resultValue = strings.ToLower(validatedValue)
 			resultType = constants.TypeSubdomain
+			isValidNode = false
 		} else {
-			return "", "", false
+			return "", "", false, false
 		}
 	} else {
 		resultValue = validated.Value
@@ -84,7 +88,7 @@ func buildShodanFQDN(target, subdomain string) (resultValue, resultType string, 
 		}
 	}
 
-	return resultValue, resultType, true
+	return resultValue, resultType, isValidNode, true
 }
 
 func appendShodanSubdomain(exec *schema.ModuleExecution, fqdn, entityType, target string) *schema.EntityRef {

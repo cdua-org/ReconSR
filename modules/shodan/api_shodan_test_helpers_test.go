@@ -11,6 +11,10 @@ func shodanTestAPIKey() string {
 	return "test-key"
 }
 
+func shodanTestPreflightPath() string {
+	return "/api-info"
+}
+
 func shodanTestAPIIPv4() string {
 	return "198.51.100.1"
 }

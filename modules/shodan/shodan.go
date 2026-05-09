@@ -8,6 +8,7 @@ import (
 	"cdua-org/ReconSR/modules/utils/apiconfig"
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -44,10 +45,15 @@ func (m *shodanModule) Capabilities() (schema.ModuleCapabilities, error) {
 			DelayMs:    0,
 			InputTypes: []string{constants.TypeIPv4, constants.TypeIPv6},
 		}
+		inputTypes := []string{constants.TypeDomain}
+		if resolver.ShodanScanSubdomains {
+			inputTypes = append(inputTypes, constants.TypeSubdomain)
+		}
+
 		customFns[constants.FuncGetShodanAPIDomain] = schema.FunctionCapabilities{
 			Limit:      1,
 			DelayMs:    0,
-			InputTypes: []string{constants.TypeDomain},
+			InputTypes: inputTypes,
 		}
 	}
 
