@@ -177,7 +177,52 @@ func extractBannerVulns(exec *schema.ModuleExecution, banner *shodanIPBanner, ta
 				Source:   cveRef,
 			})
 		}
+
+		appendVulnScoring(exec, vuln, vulnContext, tags, cveRef)
 	}
+}
+
+func appendVulnScoring(exec *schema.ModuleExecution, vuln shodanVuln, vulnContext string, tags []string, cveRef *schema.EntityRef) {
+	if vuln.Cvss != 0 {
+		cvssValue := strconv.FormatFloat(vuln.Cvss, 'f', -1, 64)
+		if vuln.CvssVersion != 0 {
+			cvssValue += " (v" + strconv.FormatFloat(vuln.CvssVersion, 'f', 1, 64) + ")"
+		}
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeCVSS,
+			Category: constants.CategoryProperty,
+			Value:    cvssValue,
+			Context:  vulnContext,
+			Tags:     tags,
+			Source:   cveRef,
+		})
+	}
+
+	if vuln.EPSS != 0 {
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeEPSS,
+			Category: constants.CategoryProperty,
+			Value:    formatPercent(vuln.EPSS),
+			Context:  vulnContext,
+			Tags:     tags,
+			Source:   cveRef,
+		})
+	}
+
+	if vuln.RankingEPSS != 0 {
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeRankEPSS,
+			Category: constants.CategoryProperty,
+			Value:    formatPercent(vuln.RankingEPSS),
+			Context:  vulnContext,
+			Tags:     tags,
+			Source:   cveRef,
+		})
+	}
+}
+
+func formatPercent(v float64) string {
+	return strconv.FormatFloat(v*100, 'f', 2, 64) + "%"
 }
 
 func buildVulnContext(banner *shodanIPBanner, target string) string {

@@ -101,4 +101,7 @@ const (
 	TypeVTThreatScore         = "vt_threat_score"
 	TypeVTReputation          = "vt_reputation"
 	TypePDNSRecord            = "pdns_record"
+	TypeCVSS                  = "cvss"
+	TypeEPSS                  = "epss"
+	TypeRankEPSS              = "ranking_epss"
 )

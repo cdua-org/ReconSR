@@ -68,8 +68,12 @@ type shodanSSLExtension struct {
 }
 
 type shodanVuln struct {
-	Summary  string `json:"summary"`
-	Verified bool   `json:"verified"`
+	Summary     string  `json:"summary"`
+	CvssVersion float64 `json:"cvss_version"`
+	Cvss        float64 `json:"cvss"`
+	EPSS        float64 `json:"epss"`
+	RankingEPSS float64 `json:"ranking_epss"`
+	Verified    bool    `json:"verified"`
 }
 
 type shodanBannerLocation struct {

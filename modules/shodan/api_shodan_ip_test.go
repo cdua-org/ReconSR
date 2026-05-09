@@ -55,9 +55,19 @@ func TestParseShodanAPIIP(t *testing.T) {
 					"longitude": 20.5678
 				},
 				"vulns": {
-					"CVE-9999-9999": {
+					"CVE-1111-1001": {
 						"verified": true,
-						"summary": "Fake vulnerability"
+						"summary": "Fake vulnerability alpha"
+					},
+					"CVE-2222-2002": {
+						"verified": false,
+						"cvss": 9.8,
+						"cvss_version": 3
+					},
+					"CVE-3333-3003": {
+						"verified": false,
+						"epss": 0.00032,
+						"ranking_epss": 0.07151
 					}
 				}
 			}
@@ -108,24 +118,59 @@ func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult, tar
 func assertShodanIPCVEChain(t *testing.T, results []schema.ModuleResult, targetIP, service string) {
 	t.Helper()
 
-	cveResult := requireModuleResult(t, results, constants.TypeCVE, "CVE-9999-9999")
-	if cveResult.Category != constants.CategoryNode {
-		t.Fatalf("expected cve to be a node, got %q", cveResult.Category)
+	vulnCtx := targetIP + ":443/tcp (" + service + ")"
+
+	assertCVEWithSummary(t, results, service, vulnCtx)
+	assertCVEWithCVSS(t, results, vulnCtx)
+	assertCVEWithEPSS(t, results, vulnCtx)
+}
+
+func assertCVEWithSummary(t *testing.T, results []schema.ModuleResult, service, vulnCtx string) {
+	t.Helper()
+
+	cve := requireModuleResult(t, results, constants.TypeCVE, "CVE-1111-1001")
+	if cve.Category != constants.CategoryNode {
+		t.Fatalf("expected cve to be a node, got %q", cve.Category)
 	}
-	if cveResult.Source == nil || cveResult.Source.Type != constants.TypeService || cveResult.Source.Value != service {
-		t.Fatalf("expected cve to be chained to service, got %+v", cveResult.Source)
+	if cve.Source == nil || cve.Source.Type != constants.TypeService || cve.Source.Value != service {
+		t.Fatalf("expected cve to be chained to service, got %+v", cve.Source)
 	}
 
-	expectedVulnCtx := targetIP + ":443/tcp (" + service + ")"
-
-	verifiedResult := requireModuleResultWithContext(t, results, constants.TypeVerified, "true", expectedVulnCtx)
-	if verifiedResult.Source == nil || verifiedResult.Source.Type != constants.TypeCVE || verifiedResult.Source.Value != "CVE-9999-9999" {
-		t.Fatalf("expected verified to be chained to cve, got %+v", verifiedResult.Source)
+	verified := requireModuleResultWithContext(t, results, constants.TypeVerified, "true", vulnCtx)
+	if verified.Source == nil || verified.Source.Value != "CVE-1111-1001" {
+		t.Fatalf("expected verified to be chained to cve, got %+v", verified.Source)
 	}
 
-	summaryResult := requireModuleResultWithContext(t, results, constants.TypeSummary, "Fake vulnerability", expectedVulnCtx)
-	if summaryResult.Source == nil || summaryResult.Source.Type != constants.TypeCVE || summaryResult.Source.Value != "CVE-9999-9999" {
-		t.Fatalf("expected summary to be chained to cve, got %+v", summaryResult.Source)
+	summary := requireModuleResultWithContext(t, results, constants.TypeSummary, "Fake vulnerability alpha", vulnCtx)
+	if summary.Source == nil || summary.Source.Value != "CVE-1111-1001" {
+		t.Fatalf("expected summary to be chained to cve, got %+v", summary.Source)
+	}
+}
+
+func assertCVEWithCVSS(t *testing.T, results []schema.ModuleResult, vulnCtx string) {
+	t.Helper()
+
+	requireModuleResult(t, results, constants.TypeCVE, "CVE-2222-2002")
+
+	cvss := requireModuleResultWithContext(t, results, constants.TypeCVSS, "9.8 (v3.0)", vulnCtx)
+	if cvss.Source == nil || cvss.Source.Value != "CVE-2222-2002" {
+		t.Fatalf("expected cvss to be chained to cve, got %+v", cvss.Source)
+	}
+}
+
+func assertCVEWithEPSS(t *testing.T, results []schema.ModuleResult, vulnCtx string) {
+	t.Helper()
+
+	requireModuleResult(t, results, constants.TypeCVE, "CVE-3333-3003")
+
+	epss := requireModuleResultWithContext(t, results, constants.TypeEPSS, "0.03%", vulnCtx)
+	if epss.Source == nil || epss.Source.Value != "CVE-3333-3003" {
+		t.Fatalf("expected epss to be chained to cve, got %+v", epss.Source)
+	}
+
+	rank := requireModuleResultWithContext(t, results, constants.TypeRankEPSS, "7.15%", vulnCtx)
+	if rank.Source == nil || rank.Source.Value != "CVE-3333-3003" {
+		t.Fatalf("expected ranking_epss to be chained to cve, got %+v", rank.Source)
 	}
 }
 
