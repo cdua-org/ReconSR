@@ -1,0 +1,28 @@
+{
+  "asn": "",
+  "domains": [],
+  "hostnames": [],
+  "last_update": "",
+  "isp": "",
+  "org": "",
+  "os": "",
+  "tags": ["faketag"],
+  "data": [
+    {
+      "port": 3478,
+      "transport": "udp",
+      "timestamp": "2026-05-04T18:19:25.001152",
+      "product": "",
+      "version": "",
+      "hash": 1111111,
+      "http": {},
+      "ssl": {},
+      "opts": {},
+      "cpe": [],
+      "cpe23": [],
+      "location": {},
+      "vulns": {},
+      "_shodan": {"module": "stun"}
+    }
+  ]
+}

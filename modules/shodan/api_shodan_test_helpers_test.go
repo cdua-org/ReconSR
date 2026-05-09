@@ -1,6 +1,7 @@
 package shodan
 
 import (
+	"os"
 	"testing"
 
 	"cdua-org/ReconSR/schema"
@@ -82,4 +83,34 @@ func findModuleResultBySource(results []schema.ModuleResult, resultType, sourceT
 	}
 
 	return nil
+}
+
+func loadShodanFixture(t *testing.T, filename string) []byte {
+	t.Helper()
+
+	var (
+		data []byte
+		err  error
+	)
+
+	switch filename {
+	case "domain.json":
+		data, err = os.ReadFile("testdata/domain.json")
+	case "ip_full.json":
+		data, err = os.ReadFile("testdata/ip_full.json")
+	case "ip_escaped_san.json":
+		data, err = os.ReadFile("testdata/ip_escaped_san.json")
+	case "ip_duplicate_webserver.json":
+		data, err = os.ReadFile("testdata/ip_duplicate_webserver.json")
+	case "ip_heartbleed.json":
+		data, err = os.ReadFile("testdata/ip_heartbleed.json")
+	case "ip_port_fallback.json":
+		data, err = os.ReadFile("testdata/ip_port_fallback.json")
+	default:
+		t.Fatalf("unsupported fixture %s", filename)
+	}
+	if err != nil {
+		t.Fatalf("failed to read fixture %s: %v", filename, err)
+	}
+	return data
 }

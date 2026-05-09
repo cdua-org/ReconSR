@@ -14,65 +14,7 @@ import (
 func TestParseShodanAPIIP(t *testing.T) {
 	targetIP := shodanTestAPIIPv4()
 	service := "FakeProduct 9.9"
-	rawBody := []byte(`{
-		"asn": "AS99999",
-		"domains": ["fake.example.com"],
-		"hostnames": ["ptr.fake.example.com"],
-		"last_update": "2027-05-05T16:15:08Z",
-		"isp": "Fake ISP",
-		"org": "Fake Org",
-		"os": "FakeOS",
-		"tags": ["faketag"],
-		"data": [
-			{
-				"port": 443,
-				"transport": "tcp",
-				"timestamp": "2026-05-02T16:15:08.228066",
-				"product": "FakeProduct",
-				"version": "9.9",
-				"hash": 2222222,
-				"http": {"server": "FakeHTTP"},
-				"ssl": {
-					"jarm": "29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d",
-					"versions": ["-TLSv1", "TLSv1.2", "TLSv1.3"],
-					"cert": {
-						"expires": "20270720194415Z",
-						"issuer": {"O": "Example Test CA", "CN": "Example Issuer", "C": "ZZ"},
-						"fingerprint": {"sha1": "00112233445566778899aabbccddeeff00112233", "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
-						"extensions": [
-							{"name": "subjectAltName", "data": "DNS:tls.sandbox.example.com, DNS:alt.sandbox.example.com"}
-						]
-					}
-				},
-				"opts": {"heartbleed": "2026/05/02 16:15:14 198.51.100.1:443 - SAFE\n"},
-				"cpe": ["cpe:/a:fake:product:9.9"],
-				"cpe23": ["cpe:2.3:a:fake:product:9.9"],
-				"location": {
-					"city": "FakeCity",
-					"country_code": "FC",
-					"country_name": "Fakeland",
-					"latitude": 10.1234,
-					"longitude": 20.5678
-				},
-				"vulns": {
-					"CVE-1111-1001": {
-						"verified": true,
-						"summary": "Fake vulnerability alpha"
-					},
-					"CVE-2222-2002": {
-						"verified": false,
-						"cvss": 9.8,
-						"cvss_version": 3
-					},
-					"CVE-3333-3003": {
-						"verified": false,
-						"epss": 0.00032,
-						"ranking_epss": 0.07151
-					}
-				}
-			}
-		]
-	}`)
+	rawBody := loadShodanFixture(t, "ip_full.json")
 
 	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
 	parseShodanAPIIP(&exec, rawBody, targetIP)
@@ -213,26 +155,7 @@ func assertShodanIPCoreResults(t *testing.T, results []schema.ModuleResult) {
 func TestParseShodanAPIIPParsesEscapedSubjectAltName(t *testing.T) {
 	targetIP := shodanTestAPIIPv4()
 	wildcardSAN := "*.wild.sandbox.example.com"
-	rawBody := []byte(`{
-		"tags": ["faketag"],
-		"data": [
-			{
-				"port": 443,
-				"transport": "tcp",
-				"ssl": {
-					"versions": ["TLSv1.2", "TLSv1.3"],
-					"cert": {
-						"expires": "20270720194415Z",
-						"issuer": {"O": "Example Test CA", "CN": "Example Issuer", "C": "ZZ"},
-						"fingerprint": {"sha1": "00112233445566778899aabbccddeeff00112233", "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
-						"extensions": [
-							{"name": "subjectAltName", "data": "0\\x25\\x82\\x19*.wild.sandbox.example.com\\x82\\x17wild.sandbox.example.com"}
-						]
-					}
-				}
-			}
-		]
-	}`)
+	rawBody := loadShodanFixture(t, "ip_escaped_san.json")
 
 	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
 	parseShodanAPIIP(&exec, rawBody, targetIP)
@@ -258,21 +181,7 @@ func TestParseShodanAPIIPParsesEscapedSubjectAltName(t *testing.T) {
 
 func TestParseShodanAPIIPSkipsDuplicateWebServerValue(t *testing.T) {
 	targetIP := shodanTestAPIIPv4()
-	rawBody := []byte(`{
-		"tags": ["faketag"],
-		"data": [
-			{
-				"port": 443,
-				"transport": "tcp",
-				"product": "nginx",
-				"hash": 3333333,
-				"http": {"server": "nginx"},
-				"cpe": ["cpe:/a:f5:nginx"],
-				"cpe23": ["cpe:2.3:a:f5:nginx"],
-				"_shodan": {"module": "https"}
-			}
-		]
-	}`)
+	rawBody := loadShodanFixture(t, "ip_duplicate_webserver.json")
 
 	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
 	parseShodanAPIIP(&exec, rawBody, targetIP)
@@ -318,18 +227,7 @@ func assertShodanIPResultTypeAbsent(t *testing.T, results []schema.ModuleResult,
 
 func TestParseShodanAPIIPExtractsRiskyHeartbleed(t *testing.T) {
 	targetIP := shodanTestAPIIPv4()
-	rawBody := []byte(`{
-		"tags": ["faketag"],
-		"data": [
-			{
-				"port": 443,
-				"transport": "tcp",
-				"hash": 4444444,
-				"opts": {"heartbleed": "2026/05/02 16:15:14 198.51.100.1:443 - VULNERABLE\n"},
-				"_shodan": {"module": "https"}
-			}
-		]
-	}`)
+	rawBody := loadShodanFixture(t, "ip_heartbleed.json")
 
 	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
 	parseShodanAPIIP(&exec, rawBody, targetIP)
@@ -343,18 +241,7 @@ func TestParseShodanAPIIPExtractsRiskyHeartbleed(t *testing.T) {
 
 func TestParseShodanAPIIPFallsBackToPortSource(t *testing.T) {
 	targetIP := shodanTestAPIIPv4()
-	rawBody := []byte(`{
-		"tags": ["faketag"],
-		"data": [
-			{
-				"port": 3478,
-				"transport": "udp",
-				"timestamp": "2026-05-04T18:19:25.001152",
-				"hash": 1111111,
-				"_shodan": {"module": "stun"}
-			}
-		]
-	}`)
+	rawBody := loadShodanFixture(t, "ip_port_fallback.json")
 
 	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
 	parseShodanAPIIP(&exec, rawBody, targetIP)

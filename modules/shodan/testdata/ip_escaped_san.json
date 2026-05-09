@@ -1,0 +1,42 @@
+{
+  "asn": "",
+  "domains": [],
+  "hostnames": [],
+  "last_update": "",
+  "isp": "",
+  "org": "",
+  "os": "",
+  "tags": ["faketag"],
+  "data": [
+    {
+      "port": 443,
+      "transport": "tcp",
+      "timestamp": "",
+      "product": "",
+      "version": "",
+      "hash": 0,
+      "http": {},
+      "ssl": {
+        "jarm": "",
+        "versions": ["TLSv1.2", "TLSv1.3"],
+        "cert": {
+          "expires": "20270720194415Z",
+          "issuer": {"O": "Example Test CA", "CN": "Example Issuer", "C": "ZZ"},
+          "fingerprint": {
+            "sha1": "00112233445566778899aabbccddeeff00112233",
+            "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          },
+          "extensions": [
+            {"name": "subjectAltName", "data": "0\\x25\\x82\\x19*.wild.sandbox.example.com\\x82\\x17wild.sandbox.example.com"}
+          ]
+        }
+      },
+      "opts": {},
+      "cpe": [],
+      "cpe23": [],
+      "location": {},
+      "vulns": {},
+      "_shodan": {"module": ""}
+    }
+  ]
+}

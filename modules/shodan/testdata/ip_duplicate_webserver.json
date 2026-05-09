@@ -1,0 +1,28 @@
+{
+  "asn": "",
+  "domains": [],
+  "hostnames": [],
+  "last_update": "",
+  "isp": "",
+  "org": "",
+  "os": "",
+  "tags": ["faketag"],
+  "data": [
+    {
+      "port": 443,
+      "transport": "tcp",
+      "timestamp": "",
+      "product": "nginx",
+      "version": "",
+      "hash": 3333333,
+      "http": {"server": "nginx"},
+      "ssl": {},
+      "opts": {},
+      "cpe": ["cpe:/a:f5:nginx"],
+      "cpe23": ["cpe:2.3:a:f5:nginx"],
+      "location": {},
+      "vulns": {},
+      "_shodan": {"module": "https"}
+    }
+  ]
+}

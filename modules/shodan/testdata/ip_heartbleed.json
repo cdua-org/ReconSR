@@ -1,0 +1,28 @@
+{
+  "asn": "",
+  "domains": [],
+  "hostnames": [],
+  "last_update": "",
+  "isp": "",
+  "org": "",
+  "os": "",
+  "tags": ["faketag"],
+  "data": [
+    {
+      "port": 443,
+      "transport": "tcp",
+      "timestamp": "",
+      "product": "",
+      "version": "",
+      "hash": 4444444,
+      "http": {},
+      "ssl": {},
+      "opts": {"heartbleed": "2026/05/02 16:15:14 198.51.100.1:443 - VULNERABLE\n"},
+      "cpe": [],
+      "cpe23": [],
+      "location": {},
+      "vulns": {},
+      "_shodan": {"module": "https"}
+    }
+  ]
+}
