@@ -83,7 +83,7 @@ const (
 	TypeWebServer             = "web_server"
 	TypeWildcardSANDomain     = "wildcard_san_domain"
 	TypeISP                   = "isp"
-	TypeOrg                   = "org"
+	TypeOrg                   = "organization"
 	TypeOS                    = "os"
 	TypeGeo                   = "geo"
 	TypeHash                  = "hash"

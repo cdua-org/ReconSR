@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
 )
@@ -51,7 +52,7 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 	m.extractThreatScore(attr, nil, exec)
 }
 
-func (m *module) extractIPResolution(item map[string]any, target string, exec *schema.ModuleExecution) {
+func (m *module) extractIPResolution(item map[string]any, _ string, exec *schema.ModuleExecution) {
 	attr, ok := item["attributes"].(map[string]any)
 	if !ok {
 		return
@@ -62,14 +63,15 @@ func (m *module) extractIPResolution(item map[string]any, target string, exec *s
 		return
 	}
 
+	validated, err := validator.Validate(constants.TypeDomain, host)
+	if err != nil {
+		return
+	}
+
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypePDNSRecord,
-		Category: constants.CategoryProperty,
-		Value:    host,
+		Category: constants.CategoryNode,
+		Value:    validated.Value,
 		Context:  "VirusTotal Passive DNS",
-		Source: &schema.EntityRef{
-			Type:  constants.TypeIP,
-			Value: target,
-		},
 	})
 }

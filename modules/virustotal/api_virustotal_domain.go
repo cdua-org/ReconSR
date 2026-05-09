@@ -179,11 +179,18 @@ func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[strin
 		}
 	}
 
-	if thumbprint, ok := certificate["thumbprint"].(string); ok {
-		appendVTProperty(exec, constants.TypeCertFingerprint, thumbprint, "Cert Fingerprint for "+target, tags, nil)
-	}
-	if thumbprintSHA256, ok := certificate["thumbprint_sha256"].(string); ok {
-		appendVTProperty(exec, constants.TypeCertFingerprint, thumbprintSHA256, "Cert Fingerprint for "+target, tags, nil)
+	for k, v := range certificate {
+		strVal, ok := v.(string)
+		if !ok || !strings.HasPrefix(k, "thumbprint") {
+			continue
+		}
+
+		algo := "sha1"
+		if suffix, found := strings.CutPrefix(k, "thumbprint_"); found {
+			algo = suffix
+		}
+
+		appendVTProperty(exec, constants.TypeCertFingerprint, algo+":"+strVal, "Cert Fingerprint for "+target, tags, nil)
 	}
 }
 

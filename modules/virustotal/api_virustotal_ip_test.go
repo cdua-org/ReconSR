@@ -134,12 +134,16 @@ func assertIPPassiveDNSExtraction(t *testing.T, results []schema.ModuleResult) {
 		result := requireResult(t, results, "passive dns result for "+host, func(result schema.ModuleResult) bool {
 			return result.Type == constants.TypePDNSRecord && result.Value == host
 		})
-		if result.Category != constants.CategoryProperty {
-			t.Fatalf("expected passive dns to be property, got %+v", result)
+		if result.Category != constants.CategoryNode {
+			t.Fatalf("expected passive dns to be node, got %+v", result)
 		}
-		if result.Source == nil || result.Source.Type != constants.TypeIP || result.Source.Value != fixtureIPTarget {
-			t.Fatalf("expected passive dns to point to ip source, got %s", describeSource(result.Source))
-		}
+	}
+
+	oosPDNS := requireResult(t, results, "out of scope passive dns", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypePDNSRecord && result.Value == "example.net"
+	})
+	if oosPDNS.Category != constants.CategoryNode {
+		t.Fatalf("expected out of scope passive dns to be node, got %+v", oosPDNS)
 	}
 }
 

@@ -188,8 +188,12 @@ func assertDomainCertificateExtraction(t *testing.T, results []schema.ModuleResu
 		t.Fatalf("expected certificate issuer summary, got %+v", certIssuer)
 	}
 
-	requireResult(t, results, "certificate fingerprint property", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeCertFingerprint && strings.Contains(result.Value, "synthetic-domain-rsa-sha256-thumbprint")
+	requireResult(t, results, "certificate sha256 fingerprint property", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeCertFingerprint && result.Value == "sha256:synthetic-domain-rsa-sha256-thumbprint"
+	})
+
+	requireResult(t, results, "certificate sha1 fingerprint property", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeCertFingerprint && result.Value == "sha1:synthetic-domain-rsa-thumbprint"
 	})
 
 	requireResult(t, results, "certificate not after property", func(result schema.ModuleResult) bool {

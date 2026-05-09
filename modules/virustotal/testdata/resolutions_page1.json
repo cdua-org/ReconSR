@@ -53,6 +53,19 @@
           "timeout": 0
         }
       }
+    },
+    {
+      "id": "192.0.2.44example.net",
+      "type": "resolution",
+      "links": {
+        "self": "https://www.virustotal.com/api/v3/resolutions/192.0.2.44example.net"
+      },
+      "attributes": {
+        "date": 1735689601,
+        "host_name": "example.net",
+        "ip_address": "192.0.2.44",
+        "resolver": "synthetic"
+      }
     }
   ],
   "meta": {
