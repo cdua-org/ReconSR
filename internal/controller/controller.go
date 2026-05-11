@@ -8,6 +8,7 @@ import (
 	"cdua-org/ReconSR/schema"
 	"context"
 	"errors"
+	"os"
 )
 
 var (
@@ -30,20 +31,61 @@ func GetInjection() *schema.PipelineInjection {
 	return inj
 }
 
-// GetActiveGraph retrieves the results for the currently active session.
+// GetActiveGraph retrieves the results for the currently active session and applies depth limits.
 func GetActiveGraph(ctx context.Context, includeRawData bool) (*schema.ProjectGraph, error) {
 	if currentProjID == "" {
 		return nil, errors.New("no active project")
 	}
-	return repository.GetGraphData(ctx, currentProjID, includeRawData)
+
+	graph, err := repository.GetGraphData(ctx, currentProjID, includeRawData)
+	if err != nil {
+		return nil, err
+	}
+
+	root, err := os.OpenRoot(".")
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+
+	_, _, _, _, _, _, _, _, maxDepth, strictDepth, _, _, err := loadConfigFromFile(root)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range graph.Edges {
+		currentDepth := graph.Edges[i].TargetDepthRelaxed
+		if strictDepth {
+			currentDepth = graph.Edges[i].TargetDepthStrict
+		}
+		if currentDepth > maxDepth {
+			graph.Edges[i].TargetDepthLimitReached = true
+		}
+	}
+
+	return graph, nil
 }
 
 // GetActiveProjectStats retrieves the counts of unique entity values for the active project.
-func GetActiveProjectStats(ctx context.Context) (map[string]int, error) {
+func GetActiveProjectStats(ctx context.Context) (int, map[string]map[string]int, map[string]int, error) {
 	if currentProjID == "" {
-		return nil, errors.New("no active project")
+		return 0, nil, nil, errors.New("no active project")
 	}
-	return repository.GetProjectStats(ctx, currentProjID)
+	stats, err := repository.GetProjectStats(ctx, currentProjID)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	totalEntities := 0
+	totalsByCat := make(map[string]int)
+	for cat, types := range stats {
+		for _, count := range types {
+			totalsByCat[cat] += count
+			totalEntities += count
+		}
+	}
+
+	return totalEntities, stats, totalsByCat, nil
 }
 
 // SetActiveProject explicitly sets the current project identifier.
@@ -62,7 +104,7 @@ func ClearActiveProject() {
 	activeSession = nil
 }
 
-// ValidateTarget checks if the input is valid and returns its type and value.
+// ValidateTarget checks if the input is valid and returns its type, value, and anchor.
 func ValidateTarget(targetType, rawInput string) (string, string, error) {
 	res, err := validator.Validate(targetType, rawInput)
 	if err != nil {
@@ -83,21 +125,62 @@ func GetProjects(ctx context.Context, targetType, targetValue string) ([]schema.
 
 // GetProjectStatus analyzes pending tasks and errors for a specific project.
 func GetProjectStatus(ctx context.Context, projectID string) ([]string, []string, error) {
-	rawPending, errs, err := repository.GetProjectStatus(ctx, projectID)
+	pendingTasks, errorTasks, err := repository.GetProjectStatus(ctx, projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	root, err := os.OpenRoot(".")
+	if err != nil {
+		return nil, nil, err
+	}
+	defer root.Close()
+
+	_, _, _, _, _, _, _, _, maxDepth, strictDepth, _, _, err := loadConfigFromFile(root)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	pendingMap := make(map[string]bool)
-	for _, task := range rawPending {
+	for _, task := range pendingTasks {
+		currentDepth := task.DepthRelaxed
+		if strictDepth {
+			currentDepth = task.DepthStrict
+		}
+
+		if currentDepth > maxDepth {
+			continue
+		}
+
 		if dispatcher.IsActionable(task.EntityType, task.ModuleName, task.Function, task.EntityTags) {
 			pendingMap[task.ModuleName+":"+task.Function] = true
+		}
+	}
+
+	errorMap := make(map[string]bool)
+	for _, task := range errorTasks {
+		currentDepth := task.DepthRelaxed
+		if strictDepth {
+			currentDepth = task.DepthStrict
+		}
+
+		if currentDepth > maxDepth {
+			continue
+		}
+
+		if dispatcher.IsActionable(task.EntityType, task.ModuleName, task.Function, task.EntityTags) {
+			errorMap[task.ModuleName+":"+task.Function] = true
 		}
 	}
 
 	var pending []string
 	for p := range pendingMap {
 		pending = append(pending, p)
+	}
+
+	var errs []string
+	for e := range errorMap {
+		errs = append(errs, e)
 	}
 
 	return pending, errs, nil
@@ -110,6 +193,15 @@ func ResetProjectLog(ctx context.Context, projectID string, clearAll, clearError
 
 // CreateNewProject generates a DB and prepares the initial session state.
 func CreateNewProject(ctx context.Context, targetType, targetValue string) (string, error) {
+	res, err := validator.Validate(targetType, targetValue)
+	if err != nil {
+		return "", err
+	}
+	anchor := res.Anchor
+	if res.Type == "domain" {
+		anchor = ""
+	}
+
 	// Double check module availability before final creation
 	_, hasModules, hasActiveFuncs, err := repository.FindProjects(ctx, targetType, targetValue)
 	if err != nil {
@@ -122,7 +214,7 @@ func CreateNewProject(ctx context.Context, targetType, targetValue string) (stri
 		return "", ErrNoActiveFuncs
 	}
 
-	routeRef, err := repository.CreateProjectDB(ctx, targetType, targetValue)
+	routeRef, err := repository.CreateProjectDB(ctx, targetType, targetValue, anchor)
 	if err != nil {
 		return "", err
 	}

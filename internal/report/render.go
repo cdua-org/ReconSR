@@ -133,29 +133,67 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	}
 
 	nodes := make(map[string]bool)
-	stats := make(map[string]int)
+	statsByCat := make(map[string]map[string]int)
+	totalsByCat := make(map[string]int)
+
 	for _, edge := range graph.Edges {
 		src := edge.Source.Type + ":" + edge.Source.Value
 		dst := edge.Target.Type + ":" + edge.Target.Value
-		if !nodes[src] {
-			nodes[src] = true
-			stats[edge.Source.Type]++
+
+		processEntity := func(id, eType, category string) {
+			if !nodes[id] {
+				nodes[id] = true
+				if statsByCat[category] == nil {
+					statsByCat[category] = make(map[string]int)
+				}
+				statsByCat[category][eType]++
+				totalsByCat[category]++
+			}
 		}
-		if !nodes[dst] {
-			nodes[dst] = true
-			stats[edge.Target.Type]++
-		}
+
+		processEntity(src, edge.Source.Type, edge.Source.Category)
+		processEntity(dst, edge.Target.Type, edge.Target.Category)
 	}
 
 	fmt.Printf("\n"+colorCyan+colorBold+"--- %s: %s ---"+colorReset+"\n", i18n.T["LBL_RESULTS_FOR"], graph.ProjectName)
 	if len(nodes) > 0 {
 		fmt.Printf(colorCyan+"Total entities: %d"+colorReset+"\n", len(nodes))
-		for t, count := range stats {
-			fmt.Printf("  - %s: %d\n", t, count)
+
+		var catKeys []string
+		for cat := range statsByCat {
+			catKeys = append(catKeys, cat)
+		}
+		sort.Strings(catKeys)
+
+		for _, cat := range catKeys {
+			stats := statsByCat[cat]
+			if len(stats) == 0 {
+				continue
+			}
+
+			catTotal := totalsByCat[cat]
+			var keys []string
+			hasInvalid := false
+			for t := range stats {
+				if t == "invalid" {
+					hasInvalid = true
+				} else {
+					keys = append(keys, t)
+				}
+			}
+			sort.Strings(keys)
+			if hasInvalid {
+				keys = append(keys, "invalid")
+			}
+
+			displayCat := strings.ToUpper(cat)
+			fmt.Printf("\n"+colorCyan+"%s: %d"+colorReset+"\n", displayCat, catTotal)
+			for _, t := range keys {
+				fmt.Printf("  - %s: %d\n", t, stats[t])
+			}
 		}
 	}
 	fmt.Println()
-
 	adj := make(map[string][]schema.GraphEdge)
 
 	type nodeEdgeKey struct {
@@ -283,15 +321,18 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	}
 
 	visited := make(map[string]bool)
-	printNode(initialTargetID, graph.InitialTarget, initialTargetType, false, "", "", "", true, adj, visited, nodeProperties)
+	printNode(initialTargetID, graph.InitialTarget, initialTargetType, false, false, "", "", "", true, adj, visited, nodeProperties)
 }
 
-func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, prefix string, marker string, connInfo string, isLast bool, adj map[string][]schema.GraphEdge, visited map[string]bool, nodeProperties map[string][]propertyInfo) {
+func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, isLimitReached bool, prefix string, marker string, connInfo string, isLast bool, adj map[string][]schema.GraphEdge, visited map[string]bool, nodeProperties map[string][]propertyInfo) {
 	nodeColor := colorGreen + colorBold
 	suffix := ""
 	if isOutOfScope {
 		nodeColor = colorBlue
-		suffix = " " + i18n.T["LBL_OUT_OF_SCOPE"]
+		suffix = " " + colorBlue + i18n.T["LBL_OUT_OF_SCOPE"] + colorReset
+	} else if isLimitReached {
+		nodeColor = colorYellow + colorBold
+		suffix = " " + colorYellow + i18n.T["LBL_LIMIT_REACHED"] + colorReset
 	}
 
 	formattedConn := ""
@@ -366,7 +407,7 @@ func printProperties(nodeID string, basePrefix string, hasChildren bool, propInd
 		suffix := ""
 		if prop.OutOfScope {
 			valColor = colorBlue
-			suffix = " " + i18n.T["LBL_OUT_OF_SCOPE"]
+			suffix = " " + colorBlue + i18n.T["LBL_OUT_OF_SCOPE"] + colorReset
 		}
 
 		typeColor := colorYellow
@@ -397,11 +438,23 @@ func printChildren(children []schema.GraphEdge, childPrefix string, adj map[stri
 	}
 
 	sort.Slice(children, func(i, j int) bool {
-		if !children[i].TargetOutOfScope && children[j].TargetOutOfScope {
-			return true
+		score := func(child schema.GraphEdge) int {
+			if child.TargetOutOfScope {
+				return 3
+			}
+			targetID := child.Target.Type + ":" + child.Target.Value
+			if visited[targetID] {
+				return 2
+			}
+			if child.TargetDepthLimitReached {
+				return 1
+			}
+			return 0
 		}
-		if children[i].TargetOutOfScope && !children[j].TargetOutOfScope {
-			return false
+		scoreI := score(children[i])
+		scoreJ := score(children[j])
+		if scoreI != scoreJ {
+			return scoreI < scoreJ
 		}
 		return children[i].Target.Value < children[j].Target.Value
 	})
@@ -433,16 +486,23 @@ func printChildren(children []schema.GraphEdge, childPrefix string, adj map[stri
 			if childConn != "" {
 				formattedChildConn = fmt.Sprintf(" (%s%s%s)", colorMagenta, childConn, colorReset)
 			}
-			fmt.Printf("%s%s %s%s%s %s\n", childPrefix, childMarker, targetTypeStr, colorBlue+targetValue+colorReset, formattedChildConn, i18n.T["LBL_OUT_OF_SCOPE"])
+			fmt.Printf("%s%s %s%s%s %s\n", childPrefix, childMarker, targetTypeStr, colorBlue+targetValue+colorReset, formattedChildConn, colorBlue+i18n.T["LBL_OUT_OF_SCOPE"]+colorReset)
+		} else if child.TargetDepthLimitReached {
+			childConn := child.Context
+			formattedChildConn := ""
+			if childConn != "" {
+				formattedChildConn = fmt.Sprintf(" (%s%s%s)", colorMagenta, childConn, colorReset)
+			}
+			fmt.Printf("%s%s %s%s%s %s\n", childPrefix, childMarker, targetTypeStr, colorYellow+colorBold+targetValue+colorReset, formattedChildConn, colorYellow+i18n.T["LBL_LIMIT_REACHED"]+colorReset)
 		} else if visited[targetID] {
 			childConn := child.Context
 			formattedChildConn := ""
 			if childConn != "" {
 				formattedChildConn = fmt.Sprintf(" (%s%s%s)", colorMagenta, childConn, colorReset)
 			}
-			fmt.Printf("%s%s %s%s%s (seen)\n", childPrefix, childMarker, targetTypeStr, colorYellow+targetValue+colorReset, formattedChildConn)
+			fmt.Printf("%s%s %s%s%s %s\n", childPrefix, childMarker, targetTypeStr, colorYellow+targetValue+colorReset, formattedChildConn, colorCyan+"(seen)"+colorReset)
 		} else {
-			printNode(targetID, targetValue, targetType, child.TargetOutOfScope, childPrefix, childMarker, child.Context, isChildLast, adj, visited, nodeProperties)
+			printNode(targetID, targetValue, targetType, child.TargetOutOfScope, child.TargetDepthLimitReached, childPrefix, childMarker, child.Context, isChildLast, adj, visited, nodeProperties)
 		}
 	}
 }

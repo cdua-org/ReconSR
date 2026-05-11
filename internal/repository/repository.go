@@ -17,6 +17,11 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const AnchorEntityType = "domain"
+const StorageBaseDir = "storage/base"
+const StorageProjectsDir = "storage/projects"
+const MasterDBName = "master.db"
+
 type routeRegistry struct {
 	mu     sync.RWMutex
 	routes map[string]string
@@ -26,20 +31,25 @@ var activeRoutes = &routeRegistry{
 	routes: make(map[string]string),
 }
 
-func generateRouteRef() string {
+func generateRouteRef() (string, error) {
 	b := make([]byte, 32)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 // AllocateWorkspaceRoute reserves a new route for the workspace context.
-func AllocateWorkspaceRoute(internalName string) string {
+func AllocateWorkspaceRoute(internalName string) (string, error) {
 	activeRoutes.mu.Lock()
 	defer activeRoutes.mu.Unlock()
 
-	ref := generateRouteRef()
+	ref, err := generateRouteRef()
+	if err != nil {
+		return "", err
+	}
 	activeRoutes.routes[ref] = internalName
-	return ref
+	return ref, nil
 }
 
 // ResolveWorkspaceRoute translates a route reference to the internal context.
@@ -56,12 +66,11 @@ func ResolveWorkspaceRoute(ref string) (string, error) {
 
 // SyncMasterDB creates or updates the master database with projects and available modules.
 func SyncMasterDB(ctx context.Context, regs []schema.ModuleRegistration) (err error) {
-	baseDir := filepath.Join("storage", "base")
-	if err := os.MkdirAll(baseDir, 0750); err != nil {
+	if err := os.MkdirAll(StorageBaseDir, 0750); err != nil {
 		return err
 	}
 
-	dbPath := filepath.Join(baseDir, "master.db")
+	dbPath := filepath.Join(StorageBaseDir, MasterDBName)
 	db, dbErr := sql.Open("sqlite", dbPath)
 	if dbErr != nil {
 		return dbErr
@@ -153,7 +162,7 @@ func SyncMasterDB(ctx context.Context, regs []schema.ModuleRegistration) (err er
 
 // FindProjects searches for projects and checks module support for a target type in the master database.
 func FindProjects(ctx context.Context, targetType, targetValue string) (projects []schema.ProjectInfo, hasModules bool, hasActiveFuncs bool, err error) {
-	dbPath := filepath.Join("storage", "base", "master.db")
+	dbPath := filepath.Join(StorageBaseDir, MasterDBName)
 	db, dbErr := sql.Open("sqlite", dbPath)
 	if dbErr != nil {
 		return nil, false, false, dbErr
@@ -195,7 +204,11 @@ func FindProjects(ctx context.Context, targetType, targetValue string) (projects
 			}
 		}
 		p.CreatedAt = parsedTime
-		p.DBIdentifier = AllocateWorkspaceRoute(p.DBIdentifier)
+		ref, err := AllocateWorkspaceRoute(p.DBIdentifier)
+		if err != nil {
+			return nil, false, false, err
+		}
+		p.DBIdentifier = ref
 		projects = append(projects, p)
 	}
 
@@ -215,9 +228,8 @@ func FindProjects(ctx context.Context, targetType, targetValue string) (projects
 }
 
 // CreateProjectDB creates a new project database and registers it in the master database.
-func CreateProjectDB(ctx context.Context, targetType, targetValue string) (id string, err error) {
-	projectsDir := filepath.Join("storage", "projects")
-	if err := os.MkdirAll(projectsDir, 0750); err != nil {
+func CreateProjectDB(ctx context.Context, targetType, targetValue, anchor string) (id string, err error) {
+	if err := os.MkdirAll(StorageProjectsDir, 0750); err != nil {
 		return "", err
 	}
 
@@ -229,7 +241,7 @@ func CreateProjectDB(ctx context.Context, targetType, targetValue string) (id st
 	uuidBytes[8] = (uuidBytes[8] & 0x3f) | 0x80
 	projectID := "proj_" + hex.EncodeToString(uuidBytes)
 
-	projectDBPath := filepath.Join(projectsDir, projectID+".db")
+	projectDBPath := filepath.Join(StorageProjectsDir, projectID+".db")
 	db, dbErr := sql.Open("sqlite", projectDBPath)
 	if dbErr != nil {
 		return "", dbErr
@@ -248,6 +260,10 @@ func CreateProjectDB(ctx context.Context, targetType, targetValue string) (id st
                         type TEXT NOT NULL,
 			out_of_scope BOOLEAN DEFAULT FALSE,
 			category TEXT NOT NULL DEFAULT 'node',
+			depth_strict INTEGER DEFAULT 0,
+			depth_relaxed INTEGER DEFAULT 0,
+			is_anchor BOOLEAN DEFAULT 0,
+			anchor_id INTEGER REFERENCES entities(id),
 			UNIQUE(type, value)
 		);`,
 		`CREATE TABLE entity_tags (
@@ -298,12 +314,29 @@ func CreateProjectDB(ctx context.Context, targetType, targetValue string) (id st
 		}
 	}
 
+	// Create anchor if applicable
+	if anchor != "" {
+		insertAnchor := `INSERT INTO entities (type, value, is_anchor, depth_strict, depth_relaxed)
+		                 VALUES ('domain', ?, 1, 999999, 0)
+		                 ON CONFLICT(type, value) DO NOTHING`
+		if _, err := db.ExecContext(ctx, insertAnchor, anchor); err != nil {
+			return "", err
+		}
+	}
+
 	// Insert the initial target entity
-	if _, err := db.ExecContext(ctx, "INSERT INTO entities(type, value) VALUES(?, ?)", targetType, targetValue); err != nil {
+	insertTarget := `INSERT INTO entities (type, value, is_anchor, depth_strict, depth_relaxed, anchor_id)
+	                 VALUES (?, ?, 0, 0, 0, (SELECT id FROM entities WHERE type='domain' AND value=?))
+	                 ON CONFLICT(type, value) DO UPDATE SET
+	                     is_anchor = 0,
+	                     depth_strict = 0,
+	                     depth_relaxed = 0,
+	                     anchor_id = excluded.anchor_id`
+	if _, err := db.ExecContext(ctx, insertTarget, targetType, targetValue, anchor); err != nil {
 		return "", err
 	}
 
-	masterDBPath := filepath.Join("storage", "base", "master.db")
+	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
 	masterDB, mdbErr := sql.Open("sqlite", masterDBPath)
 	if mdbErr != nil {
 		return "", mdbErr
@@ -321,7 +354,17 @@ func CreateProjectDB(ctx context.Context, targetType, targetValue string) (id st
 		return "", err
 	}
 
-	return AllocateWorkspaceRoute(projectID), nil
+	return AllocateWorkspaceRoute(projectID)
+}
+
+type entityAgg struct {
+	entity       schema.Entity
+	outOfScope   bool
+	depthStrict  int
+	depthRelaxed int
+	anchor    string
+	anchorID     sql.NullInt64
+	isAnchor     bool
 }
 
 // Store saves incoming data to the project database and returns an updated entity list.
@@ -331,8 +374,7 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 		return nil, err
 	}
 
-	// Open the project-specific database
-	dbPath := filepath.Join("storage", "projects", internalName+".db")
+	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := sql.Open("sqlite", dbPath)
 	if dbErr != nil {
 		return nil, dbErr
@@ -344,7 +386,6 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 		}
 	}()
 
-	// Begin a transaction
 	tx, txErr := db.BeginTx(ctx, nil)
 	if txErr != nil {
 		return nil, txErr
@@ -358,35 +399,158 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 		}
 	}()
 
-	// Collect all entities and resolve their IDs.
-	entityMap := make(map[string]schema.Entity)
-	scopeMap := make(map[string]bool)
-
-	entityMap[fmt.Sprintf("%s:%s", data.SourceEntity.Type, data.SourceEntity.Value)] = data.SourceEntity
-	for _, group := range data.Groups {
-		srcKey := fmt.Sprintf("%s:%s", group.Source.Type, group.Source.Value)
-		if _, exists := entityMap[srcKey]; !exists {
-			entityMap[srcKey] = schema.Entity{Type: group.Source.Type, Value: group.Source.Value}
-		}
-		for _, res := range group.Results {
-			key := fmt.Sprintf("%s:%s", res.Type, res.Value)
-			entityMap[key] = schema.Entity{
-				Type:     res.Type,
-				Value:    res.Value,
-				Category: res.Category,
-				Tags:     res.Tags,
+	uniqueKeys := make(map[string]schema.Entity)
+	rootKey := fmt.Sprintf("%s:%s", data.SourceEntity.Type, data.SourceEntity.Value)
+	uniqueKeys[rootKey] = data.SourceEntity
+	for _, g := range data.Groups {
+		uniqueKeys[fmt.Sprintf("%s:%s", g.Source.Type, g.Source.Value)] = schema.Entity{Type: g.Source.Type, Value: g.Source.Value}
+		for _, r := range g.Results {
+			uniqueKeys[fmt.Sprintf("%s:%s", r.Type, r.Value)] = schema.Entity{Type: r.Type, Value: r.Value}
+			if r.Anchor != "" {
+				uniqueKeys[fmt.Sprintf("%s:%s", AnchorEntityType, r.Anchor)] = schema.Entity{Type: AnchorEntityType, Value: r.Anchor}
 			}
-			scopeMap[key] = res.OutOfScope
 		}
 	}
 
-	entityMetaMap, err := upsertAndGetEntities(ctx, tx, entityMap, scopeMap)
+	aggMap := make(map[string]*entityAgg)
+	allKeys := make([]string, 0, len(uniqueKeys))
+	for k := range uniqueKeys {
+		allKeys = append(allKeys, k)
+	}
+
+	const selectBatchSize = 450 // 2 params per key, SQLite limit 999
+	for i := 0; i < len(allKeys); i += selectBatchSize {
+		end := i + selectBatchSize
+		if end > len(allKeys) {
+			end = len(allKeys)
+		}
+		batch := allKeys[i:end]
+		placeholders := make([]string, len(batch))
+		args := make([]interface{}, 0, len(batch)*2)
+		for j, k := range batch {
+			e := uniqueKeys[k]
+			placeholders[j] = "(e.type = ? AND e.value = ?)"
+			args = append(args, e.Type, e.Value)
+		}
+		query := `SELECT e.type, e.value, e.out_of_scope, e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed), e.category, e.anchor_id, e.is_anchor
+		          FROM entities e
+		          LEFT JOIN entities a ON e.anchor_id = a.id
+		          WHERE ` + strings.Join(placeholders, " OR ")
+		rows, err := tx.QueryContext(ctx, query, args...)
+		if err == nil {
+			for rows.Next() {
+				var t, v, cat string
+				var oos bool
+				var ds, dr int
+				var aid sql.NullInt64
+				var isAnchor bool
+				if err := rows.Scan(&t, &v, &oos, &ds, &dr, &cat, &aid, &isAnchor); err == nil {
+					k := fmt.Sprintf("%s:%s", t, v)
+					aggMap[k] = &entityAgg{
+						entity:       schema.Entity{Type: t, Value: v, Category: cat},
+						outOfScope:   oos,
+						depthStrict:  ds,
+						depthRelaxed: dr,
+						anchorID:     aid,
+						isAnchor:     isAnchor,
+					}
+				}
+			}
+			rows.Close()
+		}
+	}
+
+	if _, ok := aggMap[rootKey]; !ok {
+		aggMap[rootKey] = &entityAgg{
+			entity:       data.SourceEntity,
+			depthStrict:  0,
+			depthRelaxed: 0,
+			isAnchor:     false,
+		}
+	} else {
+		aggMap[rootKey].isAnchor = false
+	}
+
+	for k, e := range uniqueKeys {
+		if _, ok := aggMap[k]; !ok {
+			aggMap[k] = &entityAgg{
+				entity:       e,
+				depthStrict:  999999,
+				depthRelaxed: 999999,
+				isAnchor:     true,
+			}
+		}
+	}
+
+	for _, group := range data.Groups {
+		srcKey := fmt.Sprintf("%s:%s", group.Source.Type, group.Source.Value)
+		if agg, ok := aggMap[srcKey]; ok {
+			agg.isAnchor = false
+		}
+		for _, res := range group.Results {
+			key := fmt.Sprintf("%s:%s", res.Type, res.Value)
+			if agg, ok := aggMap[key]; ok {
+				agg.isAnchor = false
+			}
+		}
+	}
+
+	for i := 0; i < 5; i++ {
+		changed := false
+		for _, group := range data.Groups {
+			srcKey := fmt.Sprintf("%s:%s", group.Source.Type, group.Source.Value)
+			src := aggMap[srcKey]
+			if src.depthStrict == 999999 {
+				continue
+			}
+			for _, res := range group.Results {
+				key := fmt.Sprintf("%s:%s", res.Type, res.Value)
+				target := aggMap[key]
+
+				newS := src.depthStrict + res.CostStrict
+				if newS < target.depthStrict {
+					target.depthStrict = newS
+					changed = true
+				}
+
+				if res.Anchor != "" {
+					target.anchor = res.Anchor
+					anchorKey := fmt.Sprintf("%s:%s", AnchorEntityType, res.Anchor)
+					anchor := aggMap[anchorKey]
+					newR := src.depthRelaxed + res.CostRelaxed
+					if newR < anchor.depthRelaxed {
+						anchor.depthRelaxed = newR
+						changed = true
+					}
+					if anchor.depthRelaxed < target.depthRelaxed {
+						target.depthRelaxed = anchor.depthRelaxed
+						changed = true
+					}
+				} else {
+					newR := src.depthRelaxed + res.CostRelaxed
+					if newR < target.depthRelaxed {
+						target.depthRelaxed = newR
+						changed = true
+					}
+				}
+
+				target.entity.Tags = append(target.entity.Tags, res.Tags...)
+				target.outOfScope = target.outOfScope || res.OutOfScope
+				target.entity.Category = res.Category
+			}
+		}
+		if !changed {
+			break
+		}
+	}
+
+	entityMetaMap, err := upsertAndGetEntities(ctx, tx, aggMap)
 	if err != nil {
 		return nil, err
 	}
 
-	sourceKey := fmt.Sprintf("%s:%s", data.SourceEntity.Type, data.SourceEntity.Value)
-	sourceID := entityMetaMap[sourceKey].id
+	sourceID := entityMetaMap[rootKey].id
+
 
 	rawDataIDs := make(map[string]sql.NullInt64)
 	for fn, rawData := range data.FunctionRawData {
@@ -420,16 +584,15 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 		}
 	}
 
-	// Batch insert tags.
 	type tagItem struct {
 		eid int64
 		tag string
 	}
 	var tagItems []tagItem
-	for key, e := range entityMap {
-		if len(e.Tags) > 0 {
+	for key, agg := range aggMap {
+		if len(agg.entity.Tags) > 0 {
 			eid := entityMetaMap[key].id
-			for _, t := range e.Tags {
+			for _, t := range agg.entity.Tags {
 				if t != "" {
 					tagItems = append(tagItems, tagItem{eid: eid, tag: t})
 				}
@@ -457,7 +620,6 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 		}
 	}
 
-	// Batch insert relations.
 	if len(flatRelations) > 0 {
 		const batchSize = 499 // 2 fields per row
 		for i := 0; i < len(flatRelations); i += batchSize {
@@ -650,7 +812,6 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 		}
 	}
 
-	// Commit the transaction
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -659,7 +820,13 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 	for _, res := range flatResults {
 		key := fmt.Sprintf("%s:%s", res.Type, res.Value)
 		meta := entityMetaMap[key]
-		targets = append(targets, entityWithID{id: meta.id, e: schema.Entity{Type: res.Type, Value: res.Value}, outOfScope: meta.outOfScope})
+		targets = append(targets, entityWithID{
+			id:           meta.id,
+			e:            schema.Entity{Type: res.Type, Value: res.Value},
+			outOfScope:   meta.outOfScope,
+			depthStrict:  meta.depthStrict,
+			depthRelaxed: meta.depthRelaxed,
+		})
 	}
 
 	batch, err := buildBatchItems(ctx, db, targets)
@@ -674,23 +841,67 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 	return &schema.RepoToDispatcherData{ProjectID: data.ProjectID, Batch: batch}, nil
 }
 
-// upsertAndGetEntities inserts entities if they don't exist and returns a map of their IDs.
+// upsertAndGetEntities inserts entities if they don't exist and returns a map of their IDs and current depths.
 type entityMeta struct {
-	id         int64
-	outOfScope bool
+	id           int64
+	outOfScope   bool
+	depthStrict  int
+	depthRelaxed int
+	anchorID     sql.NullInt64
 }
 
-func upsertAndGetEntities(ctx context.Context, tx *sql.Tx, entityMap map[string]schema.Entity, scopeMap map[string]bool) (map[string]entityMeta, error) {
-	if len(entityMap) == 0 {
+func upsertAndGetEntities(ctx context.Context, tx *sql.Tx, aggMap map[string]*entityAgg) (map[string]entityMeta, error) {
+	if len(aggMap) == 0 {
 		return make(map[string]entityMeta), nil
 	}
 
-	entityList := make([]schema.Entity, 0, len(entityMap))
-	for _, e := range entityMap {
-		entityList = append(entityList, e)
+	entityList := make([]*entityAgg, 0, len(aggMap))
+	for _, agg := range aggMap {
+		entityList = append(entityList, agg)
 	}
 
-	const batchSize = 249 // SQLite parameter limit is 999, each entity has 4 fields (type, value, out_of_scope, category)
+	uniqueAnchors := make(map[string]int)
+	for _, agg := range entityList {
+		if agg.anchor != "" {
+			if existing, ok := uniqueAnchors[agg.anchor]; !ok || agg.depthRelaxed < existing {
+				uniqueAnchors[agg.anchor] = agg.depthRelaxed
+			}
+		}
+	}
+
+	if len(uniqueAnchors) > 0 {
+		type anchorItem struct {
+			domain  string
+			relaxed int
+		}
+		var anchors []anchorItem
+		for dom, rel := range uniqueAnchors {
+			anchors = append(anchors, anchorItem{domain: dom, relaxed: rel})
+		}
+
+		const anchorBatchSize = 333 // SQLite parameter limit is 999, each anchor has 3 fields (type, value, depth_relaxed)
+		for i := 0; i < len(anchors); i += anchorBatchSize {
+			end := i + anchorBatchSize
+			if end > len(anchors) {
+				end = len(anchors)
+			}
+			currentBatch := anchors[i:end]
+			placeholders := make([]string, len(currentBatch))
+			values := make([]interface{}, 0, len(currentBatch)*3)
+			for j, a := range currentBatch {
+				placeholders[j] = "(?, ?, 1, 999999, ?)"
+				values = append(values, AnchorEntityType, a.domain, a.relaxed)
+			}
+			query := fmt.Sprintf(`INSERT INTO entities(type, value, is_anchor, depth_strict, depth_relaxed) VALUES %s
+			                      ON CONFLICT(type, value) DO UPDATE SET depth_relaxed = MIN(depth_relaxed, excluded.depth_relaxed)`,
+				strings.Join(placeholders, ","))
+			if _, err := tx.ExecContext(ctx, query, values...); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	const batchSize = 111 // SQLite parameter limit is 999, each target entity has 9 fields
 
 	// Batch insert entities.
 	for i := 0; i < len(entityList); i += batchSize {
@@ -700,21 +911,29 @@ func upsertAndGetEntities(ctx context.Context, tx *sql.Tx, entityMap map[string]
 		}
 		currentBatch := entityList[i:end]
 		placeholders := make([]string, len(currentBatch))
-		values := make([]interface{}, 0, len(currentBatch)*4)
-		for j, entity := range currentBatch {
-			placeholders[j] = "(?, ?, ?, ?)"
-			key := fmt.Sprintf("%s:%s", entity.Type, entity.Value)
-			values = append(values, entity.Type, entity.Value, scopeMap[key], entity.Category)
+		values := make([]interface{}, 0, len(currentBatch)*8)
+		for j, agg := range currentBatch {
+			isAnchorVal := 0
+			if agg.isAnchor {
+				isAnchorVal = 1
+			}
+			placeholders[j] = "(?, ?, ?, ?, ?, ?, ?, (SELECT id FROM entities WHERE type=? AND value=?))"
+			values = append(values, agg.entity.Type, agg.entity.Value, agg.outOfScope, agg.entity.Category, isAnchorVal, agg.depthStrict, agg.depthRelaxed, AnchorEntityType, agg.anchor)
 		}
-		query := fmt.Sprintf(`INSERT INTO entities(type, value, out_of_scope, category) VALUES %s
-		                      ON CONFLICT(type, value) DO UPDATE SET out_of_scope = out_of_scope OR excluded.out_of_scope, category = CASE WHEN excluded.category = '' THEN category ELSE excluded.category END`,
+		query := fmt.Sprintf(`INSERT INTO entities(type, value, out_of_scope, category, is_anchor, depth_strict, depth_relaxed, anchor_id) VALUES %s
+		                      ON CONFLICT(type, value) DO UPDATE SET
+		                        out_of_scope = out_of_scope OR excluded.out_of_scope,
+		                        category = CASE WHEN excluded.category = '' THEN category ELSE excluded.category END,
+		                        is_anchor = MIN(is_anchor, excluded.is_anchor),
+		                        depth_strict = MIN(depth_strict, excluded.depth_strict),
+		                        depth_relaxed = MIN(depth_relaxed, excluded.depth_relaxed),
+		                        anchor_id = COALESCE(excluded.anchor_id, anchor_id)`,
 			strings.Join(placeholders, ","))
 		if _, err := tx.ExecContext(ctx, query, values...); err != nil {
 			return nil, err
 		}
 	}
-
-	// Batch retrieve entity IDs.
+	// Batch retrieve entity IDs and actual depths.
 	entityMetaMap := make(map[string]entityMeta)
 	for i := 0; i < len(entityList); i += batchSize {
 		end := i + batchSize
@@ -724,11 +943,14 @@ func upsertAndGetEntities(ctx context.Context, tx *sql.Tx, entityMap map[string]
 		currentBatch := entityList[i:end]
 		placeholders := make([]string, len(currentBatch))
 		values := make([]interface{}, 0, len(currentBatch)*2)
-		for j, entity := range currentBatch {
-			placeholders[j] = "(type = ? AND value = ?)"
-			values = append(values, entity.Type, entity.Value)
+		for j, agg := range currentBatch {
+			placeholders[j] = "(e.type = ? AND e.value = ?)"
+			values = append(values, agg.entity.Type, agg.entity.Value)
 		}
-		query := "SELECT id, type, value, out_of_scope, category FROM entities WHERE " + strings.Join(placeholders, " OR ")
+		query := `SELECT e.id, e.type, e.value, e.out_of_scope, e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed), e.anchor_id
+		          FROM entities e
+		          LEFT JOIN entities a ON e.anchor_id = a.id
+		          WHERE ` + strings.Join(placeholders, " OR ")
 		rows, err := tx.QueryContext(ctx, query, values...)
 		if err != nil {
 			return nil, err
@@ -738,14 +960,21 @@ func upsertAndGetEntities(ctx context.Context, tx *sql.Tx, entityMap map[string]
 			var id int64
 			var entType, entValue string
 			var outOfScope bool
-			var entCategory string
-			if err := rows.Scan(&id, &entType, &entValue, &outOfScope, &entCategory); err != nil {
+			var dStrict, dRelaxed int
+			var aid sql.NullInt64
+			if err := rows.Scan(&id, &entType, &entValue, &outOfScope, &dStrict, &dRelaxed, &aid); err != nil {
 				if errClose := rows.Close(); errClose != nil {
 					return nil, err
 				}
 				return nil, err
 			}
-			entityMetaMap[fmt.Sprintf("%s:%s", entType, entValue)] = entityMeta{id: id, outOfScope: outOfScope}
+			entityMetaMap[fmt.Sprintf("%s:%s", entType, entValue)] = entityMeta{
+				id:           id,
+				outOfScope:   outOfScope,
+				depthStrict:  dStrict,
+				depthRelaxed: dRelaxed,
+				anchorID:     aid,
+			}
 		}
 		if err := rows.Err(); err != nil {
 			if errClose := rows.Close(); errClose != nil {
@@ -762,13 +991,13 @@ func upsertAndGetEntities(ctx context.Context, tx *sql.Tx, entityMap map[string]
 }
 
 // GetProjectStatus analyzes a project's state against available modules.
-func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.PendingTask, errors []string, err error) {
+func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.PendingTask, errors []schema.PendingTask, err error) {
 	internalName, err := ResolveWorkspaceRoute(projectID)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	dbPath := filepath.Join("storage", "projects", internalName+".db")
+	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := sql.Open("sqlite", dbPath)
 	if dbErr != nil {
 		return nil, nil, dbErr
@@ -780,7 +1009,7 @@ func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.P
 		}
 	}()
 
-	masterDBPath := filepath.Join("storage", "base", "master.db")
+	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
 	// modernc/sqlite doesn't always support parameterized ATTACH, safe to format since path is controlled
 	if _, err := db.ExecContext(ctx, fmt.Sprintf("ATTACH DATABASE '%s' AS master", masterDBPath)); err != nil {
 		return nil, nil, err
@@ -788,12 +1017,14 @@ func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.P
 
 	pendingQuery := `
 		SELECT DISTINCT m.module_name, m.function, e.type,
-		       (SELECT GROUP_CONCAT(tag) FROM entity_tags WHERE entity_id = e.id) as tags
+		       (SELECT GROUP_CONCAT(tag) FROM entity_tags WHERE entity_id = e.id) as tags,
+		       e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 		FROM entities e
+		LEFT JOIN entities a ON e.anchor_id = a.id
 		JOIN master.modules m ON e.type = m.input_type
 		LEFT JOIN entity_function_log efl
 		  ON e.id = efl.entity_id AND m.module_name = efl.module_name AND m.function = efl.function_name
-		WHERE efl.entity_id IS NULL AND m.function != '' AND e.out_of_scope = FALSE AND m.is_enabled = 1`
+		WHERE efl.entity_id IS NULL AND m.function != '' AND e.out_of_scope = FALSE AND e.is_anchor = 0 AND m.is_enabled = 1`
 
 	rows, rErr := db.QueryContext(ctx, pendingQuery)
 	if rErr != nil {
@@ -809,23 +1040,29 @@ func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.P
 	for rows.Next() {
 		var mod, fn, eType string
 		var tagsStr sql.NullString
-		if err := rows.Scan(&mod, &fn, &eType, &tagsStr); err == nil {
+		var dStrict, dRelaxed int
+		if err := rows.Scan(&mod, &fn, &eType, &tagsStr, &dStrict, &dRelaxed); err == nil {
 			var eTags []string
 			if tagsStr.Valid && tagsStr.String != "" {
 				eTags = strings.Split(tagsStr.String, ",")
 			}
 			pending = append(pending, schema.PendingTask{
-				ModuleName: mod,
-				Function:   fn,
-				EntityType: eType,
-				EntityTags: eTags,
+				ModuleName:   mod,
+				Function:     fn,
+				EntityType:   eType,
+				EntityTags:   eTags,
+				DepthStrict:  dStrict,
+				DepthRelaxed: dRelaxed,
 			})
 		}
 	}
 	errorQuery := `
-		SELECT DISTINCT efl.module_name, efl.function_name
+		SELECT DISTINCT efl.module_name, efl.function_name, e.type,
+		       (SELECT GROUP_CONCAT(tag) FROM entity_tags WHERE entity_id = e.id) as tags,
+		       e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 		FROM entity_function_log efl
 		JOIN entities e ON e.id = efl.entity_id
+		LEFT JOIN entities a ON e.anchor_id = a.id
 		JOIN master.modules m ON efl.module_name = m.module_name AND efl.function_name = m.function
 		WHERE efl.is_success = 0 AND e.out_of_scope = FALSE AND m.is_enabled = 1`
 	rowsErr, reErr := db.QueryContext(ctx, errorQuery)
@@ -840,9 +1077,22 @@ func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.P
 	}()
 
 	for rowsErr.Next() {
-		var mod, fn string
-		if err := rowsErr.Scan(&mod, &fn); err == nil {
-			errors = append(errors, fmt.Sprintf("%s:%s", mod, fn))
+		var mod, fn, eType string
+		var tagsStr sql.NullString
+		var dStrict, dRelaxed int
+		if err := rowsErr.Scan(&mod, &fn, &eType, &tagsStr, &dStrict, &dRelaxed); err == nil {
+			var eTags []string
+			if tagsStr.Valid && tagsStr.String != "" {
+				eTags = strings.Split(tagsStr.String, ",")
+			}
+			errors = append(errors, schema.PendingTask{
+				ModuleName:   mod,
+				Function:     fn,
+				EntityType:   eType,
+				EntityTags:   eTags,
+				DepthStrict:  dStrict,
+				DepthRelaxed: dRelaxed,
+			})
 		}
 	}
 
@@ -856,7 +1106,7 @@ func ResetProjectLog(ctx context.Context, projectID string, clearAll, clearError
 		return err
 	}
 
-	dbPath := filepath.Join("storage", "projects", internalName+".db")
+	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := sql.Open("sqlite", dbPath)
 	if dbErr != nil {
 		return dbErr
@@ -868,7 +1118,7 @@ func ResetProjectLog(ctx context.Context, projectID string, clearAll, clearError
 		}
 	}()
 
-	masterDBPath := filepath.Join("storage", "base", "master.db")
+	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
 	if _, err := db.ExecContext(ctx, fmt.Sprintf("ATTACH DATABASE '%s' AS master", masterDBPath)); err != nil {
 		return err
 	}
@@ -902,7 +1152,7 @@ func GetResumePayload(ctx context.Context, projectID string, resumePending, retr
 		return nil, err
 	}
 
-	dbPath := filepath.Join("storage", "projects", internalName+".db")
+	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := sql.Open("sqlite", dbPath)
 	if dbErr != nil {
 		return nil, dbErr
@@ -914,7 +1164,7 @@ func GetResumePayload(ctx context.Context, projectID string, resumePending, retr
 		}
 	}()
 
-	masterDBPath := filepath.Join("storage", "base", "master.db")
+	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
 	if _, err := db.ExecContext(ctx, fmt.Sprintf("ATTACH DATABASE '%s' AS master", masterDBPath)); err != nil {
 		return nil, err
 	}
@@ -922,17 +1172,19 @@ func GetResumePayload(ctx context.Context, projectID string, resumePending, retr
 	var queryParts []string
 	if resumePending {
 		queryParts = append(queryParts, `
-			SELECT DISTINCT e.id, e.type, e.value, e.out_of_scope
+			SELECT DISTINCT e.id, e.type, e.value, e.out_of_scope, e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 			FROM entities e
+			LEFT JOIN entities a ON e.anchor_id = a.id
 			JOIN master.modules m ON e.type = m.input_type
 			LEFT JOIN entity_function_log efl
 			  ON e.id = efl.entity_id AND m.module_name = efl.module_name AND m.function = efl.function_name
-			WHERE efl.entity_id IS NULL AND m.function != '' AND e.out_of_scope = FALSE AND m.is_enabled = 1`)
+			WHERE efl.entity_id IS NULL AND m.function != '' AND e.out_of_scope = FALSE AND e.is_anchor = 0 AND m.is_enabled = 1`)
 	}
 	if retryErrors {
 		queryParts = append(queryParts, `
-			SELECT DISTINCT e.id, e.type, e.value, e.out_of_scope
+			SELECT DISTINCT e.id, e.type, e.value, e.out_of_scope, e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 			FROM entities e
+			LEFT JOIN entities a ON e.anchor_id = a.id
 			JOIN entity_function_log efl ON e.id = efl.entity_id
 			JOIN master.modules m ON efl.module_name = m.module_name AND efl.function_name = m.function
 			WHERE efl.is_success = 0 AND e.out_of_scope = FALSE AND m.is_enabled = 1`)
@@ -958,10 +1210,17 @@ func GetResumePayload(ctx context.Context, projectID string, resumePending, retr
 		var id int64
 		var t, v string
 		var oos bool
-		if sErr := rows.Scan(&id, &t, &v, &oos); sErr != nil {
+		var ds, dr int
+		if sErr := rows.Scan(&id, &t, &v, &oos, &ds, &dr); sErr != nil {
 			return nil, sErr
 		}
-		entities = append(entities, entityWithID{id: id, e: schema.Entity{Type: t, Value: v}, outOfScope: oos})
+		entities = append(entities, entityWithID{
+			id:           id,
+			e:            schema.Entity{Type: t, Value: v},
+			outOfScope:   oos,
+			depthStrict:  ds,
+			depthRelaxed: dr,
+		})
 	}
 
 	if retryErrors {
@@ -982,9 +1241,11 @@ func GetResumePayload(ctx context.Context, projectID string, resumePending, retr
 }
 
 type entityWithID struct {
-	id         int64
-	e          schema.Entity
-	outOfScope bool
+	id           int64
+	e            schema.Entity
+	outOfScope   bool
+	depthStrict  int
+	depthRelaxed int
 }
 
 func buildBatchItems(ctx context.Context, db *sql.DB, entities []entityWithID) ([]schema.RepoToDispatcherBatchItem, error) {
@@ -1071,20 +1332,22 @@ func buildBatchItems(ctx context.Context, db *sql.DB, entities []entityWithID) (
 		batch = append(batch, schema.RepoToDispatcherBatchItem{
 			Entity:             e,
 			OutOfScope:         ent.outOfScope,
+			DepthStrict:        ent.depthStrict,
+			DepthRelaxed:       ent.depthRelaxed,
 			CompletedFunctions: entityFunctions[ent.id],
 		})
 	}
 	return batch, nil
 }
 
-// GetProjectStats retrieves the counts of unique entity values grouped by type.
-func GetProjectStats(ctx context.Context, projectID string) (map[string]int, error) {
+// GetProjectStats retrieves the counts of unique entity values grouped by category and type.
+func GetProjectStats(ctx context.Context, projectID string) (map[string]map[string]int, error) {
 	internalName, err := ResolveWorkspaceRoute(projectID)
 	if err != nil {
 		return nil, err
 	}
 
-	dbPath := filepath.Join("storage", "projects", internalName+".db")
+	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := sql.Open("sqlite", dbPath)
 	if dbErr != nil {
 		return nil, dbErr
@@ -1096,7 +1359,7 @@ func GetProjectStats(ctx context.Context, projectID string) (map[string]int, err
 		}
 	}()
 
-	query := "SELECT type, COUNT(DISTINCT value) FROM entities WHERE out_of_scope = FALSE GROUP BY type"
+	query := "SELECT category, type, COUNT(DISTINCT value) FROM entities WHERE is_anchor = 0 GROUP BY category, type"
 	rows, rErr := db.QueryContext(ctx, query)
 	if rErr != nil {
 		return nil, rErr
@@ -1108,12 +1371,15 @@ func GetProjectStats(ctx context.Context, projectID string) (map[string]int, err
 		}
 	}()
 
-	stats := make(map[string]int)
+	stats := make(map[string]map[string]int)
 	for rows.Next() {
-		var t string
+		var cat, t string
 		var c int
-		if err := rows.Scan(&t, &c); err == nil {
-			stats[t] = c
+		if err := rows.Scan(&cat, &t, &c); err == nil {
+			if stats[cat] == nil {
+				stats[cat] = make(map[string]int)
+			}
+			stats[cat][t] = c
 		}
 	}
 
@@ -1127,7 +1393,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 		return nil, err
 	}
 
-	masterDBPath := filepath.Join("storage", "base", "master.db")
+	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
 	masterDB, mdbErr := sql.Open("sqlite", masterDBPath)
 	if mdbErr != nil {
 		return nil, mdbErr
@@ -1144,7 +1410,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 		projectName = internalName
 	}
 
-	dbPath := filepath.Join("storage", "projects", internalName+".db")
+	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := sql.Open("sqlite", dbPath)
 	if dbErr != nil {
 		return nil, dbErr
@@ -1159,11 +1425,12 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 	query := `
 		SELECT
 			e1.type, e1.value, e1.category,
-			e2.type, e2.value, e2.out_of_scope, e2.category,
+			e2.type, e2.value, e2.out_of_scope, e2.category, e2.depth_strict, COALESCE(a.depth_relaxed, e2.depth_relaxed),
 			o.module_name, o.function_name, o.context, o.created_at, e1.id
 		FROM relations r
 		JOIN entities e1 ON r.source_entity_id = e1.id
 		JOIN entities e2 ON r.target_entity_id = e2.id
+		LEFT JOIN entities a ON e2.anchor_id = a.id
 		JOIN observations o ON r.id = o.relation_id
 	`
 	rows, rErr := db.QueryContext(ctx, query)
@@ -1195,7 +1462,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 		var sourceID int64
 		err := rows.Scan(
 			&e.Source.Type, &e.Source.Value, &e.Source.Category,
-			&e.Target.Type, &e.Target.Value, &e.TargetOutOfScope, &e.Target.Category,
+			&e.Target.Type, &e.Target.Value, &e.TargetOutOfScope, &e.Target.Category, &e.TargetDepthStrict, &e.TargetDepthRelaxed,
 			&e.ModuleName, &e.FunctionName,
 			&e.Context,
 			&e.CreatedAt,

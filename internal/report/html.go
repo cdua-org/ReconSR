@@ -32,13 +32,14 @@ type statItem struct {
 }
 
 type reportTemplateData struct {
-	ProjectName     string
-	Timestamp       string
-	NodesCount      int
-	OutOfScopeCount int
-	PropertiesCount int
-	EdgesCount      int
-	Stats           []statItem
+	ProjectName       string
+	Timestamp         string
+	NodesCount        int
+	OutOfScopeCount   int
+	LimitReachedCount int
+	PropertiesCount   int
+	EdgesCount        int
+	Stats             []statItem
 }
 
 func sanitizePath(name string) string {
@@ -63,15 +64,16 @@ type visProperty struct {
 }
 
 type visNode struct {
-	ID          string            `json:"id"`
-	Label       string            `json:"label"`
-	Group       string            `json:"group"`
-	Title       string            `json:"title"`
-	Properties  []*visProperty    `json:"properties,omitempty"`
-	Executions  map[string]string `json:"executions,omitempty"`
-	OutOfScope  bool              `json:"outOfScope"`
-	Color       map[string]string `json:"color,omitempty"`
-	BorderWidth int               `json:"borderWidth,omitempty"`
+	ID                string            `json:"id"`
+	Label             string            `json:"label"`
+	Group             string            `json:"group"`
+	Title             string            `json:"title"`
+	Properties        []*visProperty    `json:"properties,omitempty"`
+	Executions        map[string]string `json:"executions,omitempty"`
+	OutOfScope        bool              `json:"outOfScope"`
+	DepthLimitReached bool              `json:"depthLimitReached"`
+	Color             map[string]string `json:"color,omitempty"`
+	BorderWidth       int               `json:"borderWidth,omitempty"`
 }
 
 type visEdge struct {
@@ -267,20 +269,22 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		}
 		if _, exists := nodesMap[dstID]; !exists {
 			title := fmt.Sprintf("Type: %s\nValue: %s", edge.Target.Type, edge.Target.Value)
-			var borderWidth int
+			var borderWidth int = 2
 			if edge.TargetOutOfScope {
 				title += "\nOut of Scope: Yes"
-				borderWidth = 5
+			} else if edge.TargetDepthLimitReached {
+				title += "\nDepth Limit Reached: Yes"
 			}
 			node := visNode{
-				ID:          dstID,
-				Label:       edge.Target.Value,
-				Group:       edge.Target.Type,
-				Title:       title,
-				Properties:  nodeProperties[dstID],
-				Executions:  nodeExecutions[dstID],
-				OutOfScope:  edge.TargetOutOfScope,
-				BorderWidth: borderWidth,
+				ID:                dstID,
+				Label:             edge.Target.Value,
+				Group:             edge.Target.Type,
+				Title:             title,
+				Properties:        nodeProperties[dstID],
+				Executions:        nodeExecutions[dstID],
+				OutOfScope:        edge.TargetOutOfScope,
+				DepthLimitReached: edge.TargetDepthLimitReached,
+				BorderWidth:       borderWidth,
 			}
 			nodesMap[dstID] = node
 		}
@@ -361,10 +365,13 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 	visNodes := make([]interface{}, 0, len(nodesMap))
 	statsMap := make(map[string]int)
 	outOfScopeCount := 0
+	limitReachedCount := 0
 	for _, n := range nodesMap {
-		statsMap[n.Group]++
 		if n.OutOfScope {
 			outOfScopeCount++
+		}
+		if n.DepthLimitReached {
+			limitReachedCount++
 		}
 
 		isInitial := false
@@ -375,16 +382,18 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		}
 
 		if isInitial {
+			n.Group = "root"
 			visNodes = append(visNodes, highlightedNode{
 				visNode: n,
 				Shape:   "diamond",
-				Size:    30,
+				Size:    35,
 				Color: map[string]string{
 					"border":     "#fbbf24",
 					"background": "#d97706",
 				},
 			})
 		} else {
+			statsMap[n.Group]++
 			visNodes = append(visNodes, n)
 		}
 	}
@@ -401,13 +410,14 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 	})
 
 	data := reportTemplateData{
-		ProjectName:     html.EscapeString(graph.ProjectName),
-		Timestamp:       timestamp,
-		NodesCount:      len(visNodes),
-		OutOfScopeCount: outOfScopeCount,
-		PropertiesCount: len(allProps),
-		EdgesCount:      len(visEdges),
-		Stats:           stats,
+		ProjectName:       html.EscapeString(graph.ProjectName),
+		Timestamp:         timestamp,
+		NodesCount:        len(visNodes),
+		OutOfScopeCount:   outOfScopeCount,
+		LimitReachedCount: limitReachedCount,
+		PropertiesCount:   len(allProps),
+		EdgesCount:        len(visEdges),
+		Stats:             stats,
 	}
 
 	f, err := root.Create(relPath)

@@ -447,6 +447,75 @@
                             style="
                                 color: #cbd5e1;
                                 font-size: 0.95rem;
+                                font-weight: bold;
+                                text-transform: capitalize;
+                                user-select: none;
+                            "
+                            >Root Target</span
+                        >
+                    </div>
+                    <div class="meta-item-controls">
+                        <span style="visibility: hidden" class="stat-badge"
+                            >000</span
+                        >
+                        <div
+                            class="icon-btn active label-toggle-btn"
+                            data-type="root"
+                            title="Toggle Label"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M4 7V4h16v3M12 4v16M8 20h8" />
+                            </svg>
+                        </div>
+                        <div
+                            class="icon-btn"
+                            title="Focus Root Target"
+                            onclick="
+                                focusNode(
+                                    initialNodes.find((n) => n.group === 'root')
+                                        .id,
+                                )
+                            "
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line
+                                    x1="21"
+                                    y1="21"
+                                    x2="16.65"
+                                    y2="16.65"
+                                ></line>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="meta-item">
+                    <div class="meta-item-left">
+                        <span
+                            style="
+                                color: #cbd5e1;
+                                font-size: 0.95rem;
                                 user-select: none;
                             "
                             >Out of Scope</span
@@ -459,6 +528,43 @@
                             class="icon-btn"
                             id="toggle-oos-btn"
                             title="Toggle Out of Scope Visibility"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path
+                                    d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                                ></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-item-left">
+                        <span
+                            style="
+                                color: #cbd5e1;
+                                font-size: 0.95rem;
+                                user-select: none;
+                            "
+                            >Depth Limit Reached</span
+                        >
+                    </div>
+                    <div class="meta-item-controls">
+                        <span class="stat-badge">{{ .LimitReachedCount }}</span>
+                        <div style="width: 18px; display: inline-block"></div>
+                        <div
+                            class="icon-btn active"
+                            id="toggle-limit-reached-btn"
+                            title="Toggle Depth Limit Reached Visibility"
                         >
                             <svg
                                 width="18"
@@ -566,7 +672,8 @@
                         </div>
                     </div>
                 </div>
-                {{range .Stats}}
+
+                {{range .Stats}} {{if ne .Type "root"}}
                 <div class="meta-item">
                     <div class="meta-item-left">
                         <span
@@ -580,7 +687,11 @@
                         >
                     </div>
                     <div class="meta-item-controls">
-                        <span class="stat-badge">{{.Count}}</span>
+                        <span
+                            class="stat-badge type-stat-badge"
+                            data-type="{{.Type}}"
+                            >{{.Count}}</span
+                        >
                         <div
                             class="icon-btn active label-toggle-btn"
                             data-type="{{.Type}}"
@@ -622,7 +733,7 @@
                         </div>
                     </div>
                 </div>
-                {{end}}
+                {{end}} {{end}}
             </div>
         </div>
 
@@ -1026,11 +1137,11 @@
                             borderWidth: 2, shadow: true
                         },
                         edges: {
-                            width: 2,
-                            color: { color: '#64748b', highlight: '#38bdf8', hover: '#94a3b8' },
-                            arrows: { to: { enabled: true, scaleFactor: 0.8 } },
+                            width: 1.5,
+                            color: { color: 'rgba(100, 116, 139, 0.8)', highlight: '#38bdf8', hover: '#94a3b8' },
+                            arrows: { to: { enabled: true, scaleFactor: 0.7 } },
                             font: {
-                                color: '#cbd5e1',
+                                color: 'rgba(203, 213, 225, 0.9)',
                                 size: 11,
                                 align: 'top',
                                 strokeWidth: 2,
@@ -1039,10 +1150,7 @@
                             hoverWidth: 1.5, smooth: { type: 'continuous' }
                         },
                         groups: {
-                            domain: { color: { background: '#0ea5e9', border: '#0284c7' } },
-                            subdomain: { color: { background: '#8b5cf6', border: '#7c3aed' } },
-                            ipv4: { color: { background: '#10b981', border: '#059669' } },
-                            email: { color: { background: '#f59e0b', border: '#d97706' } }
+                            root: { mass: 8, color: { background: '#d97706', border: '#fbbf24', highlight: { background: '#f59e0b', border: '#fbbf24' } }, shape: 'diamond', size: 35 }
                         },
                         physics: {
                             enabled: true,
@@ -1055,42 +1163,74 @@
                                 avoidOverlap: 0.2
                             },
                             stabilization: { iterations: 200 }
-                        },
-                        interaction: { hover: true, navigationButtons: true, keyboard: true, dragNodes: true }
+                        },                        interaction: { hover: true, navigationButtons: true, keyboard: true, dragNodes: true }
                     };
+                    const dynamicPalette = [
+                        { background: '#0ea5e9', border: '#0284c7', highlight: { background: '#38bdf8', border: '#0ea5e9' }, hover: { background: '#7dd3fc', border: '#0ea5e9' } }, // Blue
+                        { background: '#8b5cf6', border: '#7c3aed', highlight: { background: '#a78bfa', border: '#8b5cf6' }, hover: { background: '#c4b5fd', border: '#8b5cf6' } }, // Violet
+                        { background: '#10b981', border: '#059669', highlight: { background: '#34d399', border: '#10b981' }, hover: { background: '#6ee7b7', border: '#10b981' } }, // Emerald
+                        { background: '#f97316', border: '#c2410c', highlight: { background: '#fb923c', border: '#f97316' }, hover: { background: '#fdba74', border: '#f97316' } }, // Orange
+                        { background: '#ec4899', border: '#be185d', highlight: { background: '#f472b6', border: '#ec4899' }, hover: { background: '#f9a8d4', border: '#ec4899' } }, // Pink
+                        { background: '#d946ef', border: '#a21caf', highlight: { background: '#e879f9', border: '#d946ef' }, hover: { background: '#f0abfc', border: '#d946ef' } }, // Fuchsia
+                        { background: '#a855f7', border: '#7e22ce', highlight: { background: '#c084fc', border: '#a855f7' }, hover: { background: '#d8b4fe', border: '#a855f7' } }, // Purple
+                        { background: '#6366f1', border: '#4338ca', highlight: { background: '#818cf8', border: '#6366f1' }, hover: { background: '#a5b4fc', border: '#6366f1' } }, // Indigo
+                        { background: '#06b6d4', border: '#0e7490', highlight: { background: '#22d3ee', border: '#06b6d4' }, hover: { background: '#67e8f9', border: '#06b6d4' } }, // Cyan
+                        { background: '#14b8a6', border: '#0f766e', highlight: { background: '#2dd4bf', border: '#14b8a6' }, hover: { background: '#5eead4', border: '#14b8a6' } }, // Teal
+                        { background: '#22c55e', border: '#15803d', highlight: { background: '#4ade80', border: '#22c55e' }, hover: { background: '#86efac', border: '#22c55e' } }, // Green
+                        { background: '#84cc16', border: '#4d7c0f', highlight: { background: '#a3e635', border: '#84cc16' }, hover: { background: '#bef264', border: '#84cc16' } }  // Lime
+                    ];
+
+                    const customTypes = [...new Set(initialNodes.map(n => n.group))].filter(t => t !== 'root').sort();
+                    customTypes.forEach((t, i) => {
+                        const p = dynamicPalette[i % dynamicPalette.length];
+                        options.groups[t] = {
+                            color: {
+                                background: p.background,
+                                border: p.border,
+                                highlight: { ...p.highlight },
+                                hover: { ...p.hover }
+                            }
+                        };
+                    });
+
                     const network = new vis.Network(container, data, options);
 
                     const originalColors = {};
                     nodes.forEach(node => {
-                        if (node.color) {
+                        if (node.color && typeof node.color === 'object') {
+                            if (node.group === 'root') {
+                                node.color.highlight = { background: '#f59e0b', border: '#fbbf24' };
+                                node.color.hover = { background: '#fcd34d', border: '#fbbf24' };
+                            }
                             originalColors[node.id] = node.color;
                         }
+
+                        let updated = false;
+                        let updateObj = { id: node.id };
+
                         if (node.outOfScope) {
-                            const groupColor = (options.groups[node.group] && options.groups[node.group].color)
-                                ? options.groups[node.group].color.background
-                                : '#64748b';
-                            const newColor = {
-                                border: '#334155',
-                                background: groupColor
-                            };
-                            originalColors[node.id] = newColor;
-                            nodes.update({
-                                id: node.id,
-                                color: newColor
-                            });
+                            updateObj.shape = 'triangle';
+                            updated = true;
+                        } else if (node.depthLimitReached) {
+                            updateObj.shape = 'hexagon';
+                            updated = true;
+                        } else if (originalColors[node.id]) {
+                            updateObj.color = originalColors[node.id];
+                            updated = true;
+                        }
+
+                        if (updated) {
+                            nodes.update(updateObj);
                         }
                     });
                     const hiddenLabelTypes = new Set();
 
-                    function updateNodeLabels() {
+                    function updateNodeLabels(targetGroup) {
                         const updates = [];
                         nodes.forEach(n => {
+                            if (targetGroup && n.group !== targetGroup) return;
                             const isHidden = hiddenLabelTypes.has(n.group);
-                            const updateObj = { id: n.id, font: { size: isHidden ? 0 : 16 } };
-                            if (originalColors[n.id]) {
-                                updateObj.color = originalColors[n.id];
-                            }
-                            updates.push(updateObj);
+                            updates.push({ id: n.id, font: { size: isHidden ? 0 : 16 } });
                         });
                         nodes.update(updates);
                     }
@@ -1122,7 +1262,7 @@
                             } else {
                                 hiddenLabelTypes.add(type);
                             }
-                            updateNodeLabels();
+                            updateNodeLabels(type);
                             return;
                         }
 
@@ -1198,8 +1338,17 @@
                         });
                     }
 
+                    const limitReachedBtn = document.getElementById('toggle-limit-reached-btn');
+                    if (limitReachedBtn) {
+                        limitReachedBtn.addEventListener('click', function() {
+                            this.classList.toggle('active');
+                            applyTimeFilter();
+                        });
+                    }
+
                     function applyTimeFilter() {
                         const showOOS = oosBtn ? oosBtn.classList.contains('active') : false;
+                        const showLimitReached = limitReachedBtn ? limitReachedBtn.classList.contains('active') : false;
                         const activeNodes = new Set();
                         const visibleNodes = new Set();
 
@@ -1213,19 +1362,38 @@
                         });
 
                         const nodeUpdates = [];
+                        const visibleTypeCounts = {};
                         nodes.forEach(n => {
-                            let hidden = !activeNodes.has(n.id);
+                            let hiddenForCount = !activeNodes.has(n.id);
 
-                            if (n.id !== rootNode.id) {
-                                if ((!showOOS && n.outOfScope) || hiddenTypes.has(n.group)) {
-                                    hidden = true;
-                                }
+                            if (n.outOfScope) {
+                                if (!showOOS) hiddenForCount = true;
+                            } else if (n.depthLimitReached) {
+                                if (!showLimitReached) hiddenForCount = true;
+                            }
+
+                            if (!hiddenForCount && n.group !== 'root') {
+                                visibleTypeCounts[n.group] = (visibleTypeCounts[n.group] || 0) + 1;
+                            }
+
+                            let hidden = hiddenForCount;
+                            if (hiddenTypes.has(n.group)) {
+                                hidden = true;
                             }
 
                             nodeUpdates.push({ id: n.id, hidden: hidden });
-                            if (!hidden) visibleNodes.add(n.id);
+                            if (!hidden) {
+                                visibleNodes.add(n.id);
+                            }
                         });
                         nodes.update(nodeUpdates);
+
+                        document.querySelectorAll('.type-stat-badge').forEach(badge => {
+                            const type = badge.getAttribute('data-type');
+                            if (type) {
+                                badge.innerText = visibleTypeCounts[type] || 0;
+                            }
+                        });
 
                         const adjOut = {};
                         activeEdges.forEach(e => {
@@ -1311,10 +1479,15 @@
                     }, 700);
 
                     let currentModalId = null;
+                    let currentlySelectedNodeId = null;
 
                     function closeModal() {
                         document.getElementById('modal').style.display = 'none';
                         currentModalId = null;
+                        if (currentlySelectedNodeId) {
+                            nodes.update({ id: currentlySelectedNodeId, color: originalColors[currentlySelectedNodeId] || null });
+                            currentlySelectedNodeId = null;
+                        }
                     }
 
                     function toggleSection(id) {
@@ -1367,7 +1540,7 @@
                                 clearInterval(currentBlinkInterval);
                                 nodes.update({
                                     id: nodeId,
-                                    color: originalColor,
+                                    color: (currentlySelectedNodeId === nodeId) ? { background: '#cbd5e1', border: '#94a3b8', highlight: { background: '#e2e8f0', border: '#94a3b8' } } : (originalColor || null),
                                     borderWidth: originalBorderWidth
                                 });
                                 network.selectNodes([nodeId]);
@@ -1444,6 +1617,32 @@
                         }
                     });
 
+                    network.on("hoverNode", function (params) {
+                        if (params.node === currentlySelectedNodeId) {
+                            nodes.update({
+                                id: params.node,
+                                color: {
+                                    background: '#cbd5e1',
+                                    border: '#94a3b8',
+                                    highlight: { background: '#f1f5f9', border: '#cbd5e1' }
+                                }
+                            });
+                        }
+                    });
+
+                    network.on("blurNode", function (params) {
+                        if (params.node === currentlySelectedNodeId) {
+                            nodes.update({
+                                id: params.node,
+                                color: {
+                                    background: '#cbd5e1',
+                                    border: '#94a3b8',
+                                    highlight: { background: '#e2e8f0', border: '#94a3b8' }
+                                }
+                            });
+                        }
+                    });
+
                     network.on("click", function (params) {
                         let clickedId = null;
                         if (params.nodes.length > 0) {
@@ -1466,8 +1665,16 @@
                         currentModalId = clickedId;
                         let content = '';
 
+                        if (currentlySelectedNodeId && currentlySelectedNodeId !== (params.nodes.length > 0 ? params.nodes[0] : null)) {
+                            nodes.update({ id: currentlySelectedNodeId, color: originalColors[currentlySelectedNodeId] || null });
+                            currentlySelectedNodeId = null;
+                        }
+
                         if (params.nodes.length > 0) {
                             const nodeId = params.nodes[0];
+                            currentlySelectedNodeId = nodeId;
+                            nodes.update({ id: nodeId, color: { background: '#cbd5e1', border: '#94a3b8', highlight: { background: '#e2e8f0', border: '#94a3b8' } } });
+
                             const node = nodes.get(nodeId);
                             if (node) {
                                 content += '<div class="prop-container" style="position: relative;">';
@@ -1477,6 +1684,10 @@
                                 if (node.outOfScope) {
                                     content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
                                     content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
+                                    content += '</div>';
+                                } else if (node.depthLimitReached) {
+                                    content += '<div style="color: #fbbf24; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
+                                    content += '<span style="margin-right: 5px;">🛑</span> DEPTH LIMIT REACHED';
                                     content += '</div>';
                                 }
                                 content += '</div>';

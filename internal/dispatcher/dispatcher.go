@@ -13,11 +13,13 @@ import (
 
 var (
 	// System limits (initialized with defaults, updated by config)
-	GlobalMaxConcurrency      = 200 // Max total concurrent module executions
-	DefaultFuncConcurrency    = 30  // Default limit if module provides none
-	MaxAllowedFuncConcurrency = 100 // Hard cap to prevent greedy modules
-	DefaultFuncDelayMs        = 200 // Default rate limit delay in ms
-	GlobalTimeoutSeconds      = 120 // Global execution timeout in seconds
+	MaxDepth                  = 0     // Maximum recursion depth for entities
+	StrictDepth               = false // Use strict depth calculation if true
+	GlobalMaxConcurrency      = 200   // Max total concurrent module executions
+	DefaultFuncConcurrency    = 30    // Default limit if module provides none
+	MaxAllowedFuncConcurrency = 100   // Hard cap to prevent greedy modules
+	DefaultFuncDelayMs        = 200   // Default rate limit delay in ms
+	GlobalTimeoutSeconds      = 120   // Global execution timeout in seconds
 )
 
 var (
@@ -157,7 +159,9 @@ func GetFuncDefaults() (map[string]map[string]int, map[string]map[string]int) {
 }
 
 // ApplyConfigOverrides applies user-defined values from the config file.
-func ApplyConfigOverrides(globalMax, defConc, maxConc, defDelay *int, limits, delays map[string]map[string]int) {
+func ApplyConfigOverrides(maxDepth int, strictDepth bool, globalMax, defConc, maxConc, defDelay *int, limits, delays map[string]map[string]int) {
+	MaxDepth = maxDepth
+	StrictDepth = strictDepth
 	if globalMax != nil {
 		GlobalMaxConcurrency = *globalMax
 		dispatcherConcurrencyLimit = make(chan struct{}, GlobalMaxConcurrency)
@@ -363,6 +367,16 @@ func Dispatch(data *schema.RepoToDispatcherData, out chan<- *schema.ProcessorToR
 			defer func() { <-dispatcherConcurrencyLimit }()
 
 			if item.OutOfScope {
+				writersWg.Done()
+				return
+			}
+
+			currentDepth := item.DepthRelaxed
+			if StrictDepth {
+				currentDepth = item.DepthStrict
+			}
+
+			if currentDepth > MaxDepth {
 				writersWg.Done()
 				return
 			}

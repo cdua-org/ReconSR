@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"cdua-org/ReconSR/internal/controller"
 	"cdua-org/ReconSR/internal/i18n"
@@ -89,21 +90,47 @@ func ShowScanCompleteBanner(ctx context.Context) {
 	fmt.Println(colorGreen + colorBold + "[*] " + i18n.T["MSG_SCAN_COMPLETE"] + colorReset)
 
 	if projectID := controller.GetActiveProjectID(); projectID != "" {
-		stats, err := controller.GetActiveProjectStats(ctx)
-		if err == nil && len(stats) > 0 {
-			totalEntities := 0
-			for _, count := range stats {
-				totalEntities += count
-			}
+		totalEntities, statsByCat, totalsByCat, err := controller.GetActiveProjectStats(ctx)
+		if err == nil && len(statsByCat) > 0 {
 			fmt.Printf(colorCyan+"Total entities: %d"+colorReset+"\n", totalEntities)
-			for t, count := range stats {
-				fmt.Printf("  - %s: %d\n", t, count)
+
+			var catKeys []string
+			for cat := range statsByCat {
+				catKeys = append(catKeys, cat)
+			}
+			sort.Strings(catKeys)
+
+			for _, cat := range catKeys {
+				catTotal := totalsByCat[cat]
+				stats := statsByCat[cat]
+				if len(stats) == 0 {
+					continue
+				}
+
+				var keys []string
+				hasInvalid := false
+				for t := range stats {
+					if t == "invalid" {
+						hasInvalid = true
+					} else {
+						keys = append(keys, t)
+					}
+				}
+				sort.Strings(keys)
+				if hasInvalid {
+					keys = append(keys, "invalid")
+				}
+
+				displayCat := strings.ToUpper(cat)
+				fmt.Printf("\n"+colorCyan+"%s: %d"+colorReset+"\n", displayCat, catTotal)
+				for _, t := range keys {
+					fmt.Printf("  - %s: %d\n", t, stats[t])
+				}
 			}
 		}
 	}
 	fmt.Println(colorGreen + colorBold + "--------------------------------------------------" + colorReset)
 }
-
 // GetRawTarget extracts the target from args.
 func GetRawTarget(args []string) string {
 	if len(args) < 2 {

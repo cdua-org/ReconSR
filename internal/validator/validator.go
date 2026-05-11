@@ -9,7 +9,6 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-// Standard error sentinels for cross-package checking.
 var (
 	ErrUnsupportedType = errors.New("unsupported_type")
 	ErrInvalidSyntax   = errors.New("invalid_syntax")
@@ -18,8 +17,9 @@ var (
 
 // Result encapsulates the outcome of a validation operation.
 type Result struct {
-	Type  string
-	Value string
+	Type      string
+	Value     string
+	Anchor    string
 }
 
 // ValidateTag ensures a tag contains only [a-z0-9_-] characters.
@@ -133,14 +133,9 @@ func validateDomain(value string) (Result, error) {
 		return Result{}, ErrInvalidSyntax
 	}
 
-	orgDomain, err := publicsuffix.EffectiveTLDPlusOne(asciiDomain)
+	orgDomain, err := getICANNAnchor(asciiDomain)
 	if err != nil {
-		suffix, icannSuffix := publicsuffix.PublicSuffix(asciiDomain)
-		if suffix == asciiDomain && !icannSuffix {
-			orgDomain = asciiDomain
-		} else {
-			return Result{}, ErrInvalidSyntax
-		}
+		return Result{}, ErrInvalidSyntax
 	}
 
 	correctedType := "subdomain"
@@ -149,15 +144,15 @@ func validateDomain(value string) (Result, error) {
 	}
 
 	return Result{
-		Type:  correctedType,
-		Value: asciiDomain,
+		Type:      correctedType,
+		Value:     asciiDomain,
+		Anchor:    orgDomain,
 	}, nil
 }
 
 func validateIP(value string) (Result, error) {
 	val := strings.TrimSpace(value)
 
-	// Standard validation
 	ip := net.ParseIP(val)
 	if ip != nil {
 		actualType := "ipv6"
@@ -220,8 +215,8 @@ func validateEmail(value string) (Result, error) {
 
 	resType := "email"
 
-	// 1. Validate Domain Part
 	var domainValue string
+	var orgDomain string
 	if strings.HasPrefix(domainPart, "[") && strings.HasSuffix(domainPart, "]") {
 		resType = "email-extra"
 		ipStr := domainPart[1 : len(domainPart)-1]
@@ -238,9 +233,9 @@ func validateEmail(value string) (Result, error) {
 			return Result{}, ErrInvalidSyntax
 		}
 		domainValue = domainRes.Value
+		orgDomain = domainRes.Anchor
 	}
 
-	// 2. Validate Local Part (dot-separated words)
 	standardChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_+'"
 	extraAtextChars := "!#$%&*/=?^{|}~"
 
@@ -326,8 +321,9 @@ func validateEmail(value string) (Result, error) {
 	}
 
 	return Result{
-		Type:  resType,
-		Value: localPart + "@" + domainValue,
+		Type:      resType,
+		Value:     localPart + "@" + domainValue,
+		Anchor:    orgDomain,
 	}, nil
 }
 
@@ -356,4 +352,34 @@ func validateASN(value string) (Result, error) {
 		Type:  "asn",
 		Value: val,
 	}, nil
+}
+
+func getICANNAnchor(domain string) (string, error) {
+	_, isICANN := publicsuffix.PublicSuffix(domain)
+	if isICANN {
+		return publicsuffix.EffectiveTLDPlusOne(domain)
+	}
+
+	parts := strings.Split(domain, ".")
+	for i := 1; i < len(parts); i++ {
+		sub := strings.Join(parts[i:], ".")
+		_, ic := publicsuffix.PublicSuffix(sub)
+		if ic {
+			anchor, err := publicsuffix.EffectiveTLDPlusOne(sub)
+			if err == nil {
+				return anchor, nil
+			}
+			return strings.Join(parts[i-1:], "."), nil
+		}
+	}
+
+	anchor, err := publicsuffix.EffectiveTLDPlusOne(domain)
+	if err != nil {
+		suffix, icannSuffix := publicsuffix.PublicSuffix(domain)
+		if suffix == domain && !icannSuffix {
+			return domain, nil
+		}
+		return "", err
+	}
+	return anchor, nil
 }

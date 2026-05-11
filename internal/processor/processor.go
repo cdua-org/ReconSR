@@ -117,6 +117,10 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 			} else {
 				ref.Type = vRes.Type
 				ref.Value = vRes.Value
+				ref.Anchor = vRes.Anchor
+				if ref.Type == "domain" {
+					ref.Anchor = ""
+				}
 			}
 		}
 	}
@@ -222,15 +226,28 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 				if cat == "" {
 					cat = "node"
 				}
+
+				costStrict := 1
+				costRelaxed := 1
+				if cat == "property" {
+					costStrict = 0
+					costRelaxed = 0
+				}
+
+				targetAnchor := targetRef.Anchor
+
 				aggregatedGroups[srcRefVal][resKey] = &schema.ProcessorToRepoValidResult{
-					Function:   exec.Function,
-					Type:       targetRef.Type,
-					Value:      targetRef.Value,
-					Context:    res.Context,
-					Category:   cat,
-					Applied:    applied,
-					OutOfScope: res.OutOfScope || scopemanager.IsOutOfScope(targetRef.Type, targetRef.Value),
-					Tags:       validTags,
+					Function:    exec.Function,
+					Type:        targetRef.Type,
+					Value:       targetRef.Value,
+					Context:     res.Context,
+					Category:    cat,
+					Applied:     applied,
+					OutOfScope:  res.OutOfScope || scopemanager.IsOutOfScope(targetRef.Type, targetRef.Value),
+					Tags:        validTags,
+					CostStrict:  costStrict,
+					CostRelaxed: costRelaxed,
+					Anchor:      targetAnchor,
 				}
 			}
 			functionHasFindings[exec.Function] = true

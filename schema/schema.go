@@ -17,8 +17,9 @@ type Entity struct {
 
 // EntityRef represents a reference to an entity.
 type EntityRef struct {
-	Type  string `json:"Type"`
-	Value string `json:"Value"`
+	Type      string `json:"Type"`
+	Value     string `json:"Value"`
+	Anchor string `json:"Anchor,omitempty"`
 }
 
 type ModuleFunction struct {
@@ -29,6 +30,8 @@ type ModuleFunction struct {
 type RepoToDispatcherBatchItem struct {
 	Entity             Entity           `json:"Entity"`
 	OutOfScope         bool             `json:"OutOfScope"`
+	DepthStrict        int              `json:"DepthStrict"`
+	DepthRelaxed       int              `json:"DepthRelaxed"`
 	CompletedFunctions []ModuleFunction `json:"CompletedFunctions"`
 }
 
@@ -120,14 +123,17 @@ type PipelineInjection struct {
 }
 
 type ProcessorToRepoValidResult struct {
-	Function   string   `json:"Function"`
-	Type       string   `json:"Type"`
-	Category   string   `json:"Category,omitempty"`
-	Value      string   `json:"Value"`
-	Context    string   `json:"Context"`
-	Applied    bool     `json:"Applied,omitempty"`
-	OutOfScope bool     `json:"OutOfScope,omitempty"`
-	Tags       []string `json:"Tags,omitempty"`
+	Function    string   `json:"Function"`
+	Type        string   `json:"Type"`
+	Category    string   `json:"Category,omitempty"`
+	Value       string   `json:"Value"`
+	Context     string   `json:"Context"`
+	Applied     bool     `json:"Applied,omitempty"`
+	OutOfScope  bool     `json:"OutOfScope,omitempty"`
+	Tags        []string `json:"Tags,omitempty"`
+	CostStrict  int      `json:"CostStrict"`
+	CostRelaxed int      `json:"CostRelaxed"`
+	Anchor      string   `json:"Anchor,omitempty"`
 }
 
 type ProcessorToRepoError struct {
@@ -152,14 +158,17 @@ type ProcessorToRepoData struct {
 }
 
 type GraphEdge struct {
-	Source           Entity `json:"Source"`
-	Target           Entity `json:"Target"`
-	TargetOutOfScope bool   `json:"TargetOutOfScope"`
-	ModuleName       string `json:"ModuleName"`
-	FunctionName     string `json:"FunctionName"`
-	Context          string `json:"Context"`
-	RawData          string `json:"RawData"`
-	CreatedAt        string `json:"CreatedAt"`
+	Source                  Entity `json:"Source"`
+	Target                  Entity `json:"Target"`
+	TargetOutOfScope        bool   `json:"TargetOutOfScope"`
+	TargetDepthStrict       int    `json:"TargetDepthStrict,omitempty"`
+	TargetDepthRelaxed      int    `json:"TargetDepthRelaxed,omitempty"`
+	TargetDepthLimitReached bool   `json:"TargetDepthLimitReached,omitempty"`
+	ModuleName              string `json:"ModuleName"`
+	FunctionName            string `json:"FunctionName"`
+	Context                 string `json:"Context"`
+	RawData                 string `json:"RawData"`
+	CreatedAt               string `json:"CreatedAt"`
 }
 
 // ProjectGraph holds all nodes and edges for report generation.
@@ -215,10 +224,12 @@ type ModuleRegistration struct {
 }
 
 type PendingTask struct {
-	ModuleName string
-	Function   string
-	EntityType string
-	EntityTags []string
+	ModuleName   string
+	Function     string
+	EntityType   string
+	EntityTags   []string
+	DepthStrict  int
+	DepthRelaxed int
 }
 
 // ProjectInfo is a row from the master database projects table.

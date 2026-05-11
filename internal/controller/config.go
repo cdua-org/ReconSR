@@ -63,14 +63,20 @@ func SyncConfig(ctx context.Context) error {
 		return saveConfig(root, defaultSettings)
 	}
 
-	settings, timeout, globalMax, defConc, maxConc, defDelay, funcLimits, funcDelays, err := loadConfigFromFile(root)
+	settings, timeout, globalMax, defConc, maxConc, defDelay, funcLimits, funcDelays, maxDepth, strictDepth, hasMaxDepth, hasStrictDepth, err := loadConfigFromFile(root)
 	if err != nil {
 		return err
 	}
 	if timeout != 0 {
 		dispatcher.SetGlobalTimeout(timeout)
 	}
-	dispatcher.ApplyConfigOverrides(globalMax, defConc, maxConc, defDelay, funcLimits, funcDelays)
+	dispatcher.ApplyConfigOverrides(maxDepth, strictDepth, globalMax, defConc, maxConc, defDelay, funcLimits, funcDelays)
+
+	if !hasMaxDepth || !hasStrictDepth {
+		if err := saveConfig(root, settings); err != nil {
+			return err
+		}
+	}
 
 	var appendOnly strings.Builder
 	newFuncsExisting := make(map[string][]string)
@@ -162,10 +168,10 @@ func SyncConfig(ctx context.Context) error {
 	return dispatcher.LoadConfig(ctx, settings)
 }
 
-func loadConfigFromFile(root *os.Root) (map[string]map[string]bool, time.Duration, *int, *int, *int, *int, map[string]map[string]int, map[string]map[string]int, error) {
+func loadConfigFromFile(root *os.Root) (map[string]map[string]bool, time.Duration, *int, *int, *int, *int, map[string]map[string]int, map[string]map[string]int, int, bool, bool, bool, error) {
 	f, err := root.Open(configFile)
 	if err != nil {
-		return nil, 0, nil, nil, nil, nil, nil, nil, err
+		return nil, 0, nil, nil, nil, nil, nil, nil, 0, false, false, false, err
 	}
 	defer func() { _ = f.Close() }()
 
@@ -174,6 +180,11 @@ func loadConfigFromFile(root *os.Root) (map[string]map[string]bool, time.Duratio
 	funcDelays := make(map[string]map[string]int)
 	var timeout time.Duration
 	var globalMax, defConc, maxConc, defDelay *int
+	var maxDepth int
+	var strictDepth bool
+	var hasMaxDepth, hasStrictDepth bool
+	var parseErr error
+
 	scanner := bufio.NewScanner(f)
 	currentMod := ""
 
@@ -202,34 +213,50 @@ func loadConfigFromFile(root *os.Root) (map[string]map[string]bool, time.Duratio
 			key := strings.TrimSpace(parts[0])
 			val := strings.TrimSpace(parts[1])
 			switch key {
+			case "max_depth":
+				v, err := strconv.Atoi(val)
+				if err != nil {
+					parseErr = err
+				} else {
+					maxDepth = v
+					hasMaxDepth = true
+				}
+			case "strict_depth":
+				v, err := strconv.ParseBool(val)
+				if err != nil {
+					parseErr = err
+				} else {
+					strictDepth = v
+					hasStrictDepth = true
+				}
 			case "timeout":
 				d, err := time.ParseDuration(val)
 				if err != nil {
-					return nil, 0, nil, nil, nil, nil, nil, nil, err
+					return nil, 0, nil, nil, nil, nil, nil, nil, 0, false, false, false, err
 				}
 				timeout = d
 			case "global_max_concurrency":
 				v, err := strconv.Atoi(val)
 				if err != nil {
-					return nil, 0, nil, nil, nil, nil, nil, nil, err
+					return nil, 0, nil, nil, nil, nil, nil, nil, 0, false, false, false, err
 				}
 				globalMax = &v
 			case "default_func_concurrency":
 				v, err := strconv.Atoi(val)
 				if err != nil {
-					return nil, 0, nil, nil, nil, nil, nil, nil, err
+					return nil, 0, nil, nil, nil, nil, nil, nil, 0, false, false, false, err
 				}
 				defConc = &v
 			case "max_allowed_func_concurrency":
 				v, err := strconv.Atoi(val)
 				if err != nil {
-					return nil, 0, nil, nil, nil, nil, nil, nil, err
+					return nil, 0, nil, nil, nil, nil, nil, nil, 0, false, false, false, err
 				}
 				maxConc = &v
 			case "default_func_delay":
 				v, err := strconv.Atoi(val)
 				if err != nil {
-					return nil, 0, nil, nil, nil, nil, nil, nil, err
+					return nil, 0, nil, nil, nil, nil, nil, nil, 0, false, false, false, err
 				}
 				defDelay = &v
 			}
@@ -250,7 +277,7 @@ func loadConfigFromFile(root *os.Root) (map[string]map[string]bool, time.Duratio
 				}
 				v, err := strconv.Atoi(kv[1])
 				if err != nil {
-					return nil, 0, nil, nil, nil, nil, nil, nil, err
+					return nil, 0, nil, nil, nil, nil, nil, nil, 0, false, false, false, err
 				}
 				switch kv[0] {
 				case "concurrency":
@@ -267,7 +294,7 @@ func loadConfigFromFile(root *os.Root) (map[string]map[string]bool, time.Duratio
 			}
 		}
 	}
-	return settings, timeout, globalMax, defConc, maxConc, defDelay, funcLimits, funcDelays, scanner.Err()
+	return settings, timeout, globalMax, defConc, maxConc, defDelay, funcLimits, funcDelays, maxDepth, strictDepth, hasMaxDepth, hasStrictDepth, parseErr
 }
 
 func saveConfig(root *os.Root, settings map[string]map[string]bool) (err error) {
@@ -282,7 +309,13 @@ func saveConfig(root *os.Root, settings map[string]map[string]bool) (err error) 
 		}
 	}()
 
-	if _, err := fmt.Fprintln(f, "# ReconSR Configuration File"); err != nil {
+	if _, err := fmt.Fprintln(f, "# ReconSR Configuration File\n"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(f, "max_depth = %d\n", 0); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(f, "strict_depth = %t\n", false); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(f, "timeout = %s\n", dispatcher.GetGlobalTimeout()); err != nil {
