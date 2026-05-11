@@ -16,6 +16,7 @@ import (
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/httputil"
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -453,4 +454,35 @@ func describeSource(source *schema.EntityRef) string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("%s:%s", source.Type, source.Value)
+}
+
+func TestProcessPaginatedLimits(t *testing.T) {
+	domainBody := loadVTFixture(t, "domain_page1.json")
+	subdomainsPage1 := loadVTFixture(t, "subdomains_page1.json")
+	subdomainsPage2 := loadVTFixture(t, "subdomains_page2.json")
+
+	withVTDelayConfig(t, 0)
+
+	responses := map[string]string{
+		"/api/v3/domains/" + fixtureDomainTarget:                                                                    domainBody,
+		"/api/v3/domains/" + fixtureDomainTarget + "/subdomains?limit=40":                                           subdomainsPage1,
+		"/api/v3/domains/" + fixtureDomainTarget + "/subdomains?limit=40&cursor=synthetic-subdomains-cursor-page-2": subdomainsPage2,
+	}
+
+	mock, server := newVTMockServer(t, responses, nil)
+	defer server.Close()
+
+	setVTBaseURL(t, server.URL+"/api/v3")
+
+	originalMaxPages := resolver.VirustotalMaxPages
+	resolver.VirustotalMaxPages = 1
+	defer func() { resolver.VirustotalMaxPages = originalMaxPages }()
+
+	mod := &module{apiKey: fixtureFixtureAPIKey}
+	execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: fixtureDomainTarget})
+
+	requests := mock.requestsForPath("/api/v3/domains/" + fixtureDomainTarget + "/subdomains?limit=40&cursor=synthetic-subdomains-cursor-page-2")
+	if len(requests) > 0 {
+		t.Fatalf("expected 0 requests to page 2 due to VirustotalMaxPages=1 limit, got %d", len(requests))
+	}
 }

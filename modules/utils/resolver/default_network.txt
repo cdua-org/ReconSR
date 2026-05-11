@@ -99,6 +99,9 @@ AnubisLimit=1000
 # Enable routing of subdomains to the VirusTotal domain endpoint in addition to root domains (default: false)
 VirustotalScanSubdomains=false
 
+# Maximum number of pages to fetch for VirusTotal lookups; each page fetches up to 40 objects (default: 5)
+VirustotalMaxPages=5
+
 
 ### Shodan Options ###
 

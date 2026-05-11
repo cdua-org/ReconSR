@@ -276,8 +276,14 @@ func (m *module) processIP(ctx context.Context, target string, delay time.Durati
 func (m *module) processPaginated(ctx context.Context, firstURL string, delay time.Duration, exec *schema.ModuleExecution, handler func(map[string]any)) {
 	currentURL := firstURL
 	page := 1
+	maxPages := resolver.VirustotalMaxPages
 
 	for currentURL != "" {
+		if maxPages > 0 && page > maxPages {
+			dbg.Printf("processPaginated page=%d limit_reached max_pages=%d", page, maxPages)
+			break
+		}
+
 		dbg.Printf("processPaginated page=%d url=%q", page, currentURL)
 
 		data, raw, err := m.doVTRequest(ctx, currentURL)

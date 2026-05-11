@@ -103,6 +103,9 @@ var (
 	// VirustotalScanSubdomains enables processing of subdomains via the VirusTotal domain endpoint.
 	VirustotalScanSubdomains = false
 
+	// VirustotalMaxPages limits the number of pages to fetch for VirusTotal paginated lookups.
+	VirustotalMaxPages = 5
+
 	// Options acts as a generic configuration dictionary.
 	Options = make(map[string]string)
 
@@ -254,6 +257,7 @@ func initOptionMaps() {
 		"MaxRetriesASNMeta":    &MaxRetriesASNMeta,
 		"MaxRecursionDepth":    &MaxRecursionDepth,
 		"AnubisLimit":          &AnubisLimit,
+		"VirustotalMaxPages":   &VirustotalMaxPages,
 		"ShodanMaxDomainPages": &ShodanMaxDomainPages,
 		"DNSConcurrency":       &DNSConcurrency,
 	}
