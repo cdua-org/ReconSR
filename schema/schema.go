@@ -157,25 +157,32 @@ type ProcessorToRepoData struct {
 	Errors                  []ProcessorToRepoError `json:"Errors"`
 }
 
-type GraphEdge struct {
-	Source                  Entity `json:"Source"`
-	Target                  Entity `json:"Target"`
-	TargetOutOfScope        bool   `json:"TargetOutOfScope"`
-	TargetDepthStrict       int    `json:"TargetDepthStrict,omitempty"`
-	TargetDepthRelaxed      int    `json:"TargetDepthRelaxed,omitempty"`
-	TargetDepthLimitReached bool   `json:"TargetDepthLimitReached,omitempty"`
-	ModuleName              string `json:"ModuleName"`
-	FunctionName            string `json:"FunctionName"`
-	Context                 string `json:"Context"`
-	RawData                 string `json:"RawData"`
-	CreatedAt               string `json:"CreatedAt"`
+type NodeData struct {
+	Type         string `json:"Type"`
+	Value        string `json:"Value"`
+	Category     string `json:"Category"`
+	OutOfScope   bool   `json:"OutOfScope"`
+	DepthStrict  int    `json:"DepthStrict"`
+	DepthRelaxed int    `json:"DepthRelaxed"`
 }
 
-// ProjectGraph holds all nodes and edges for report generation.
+type EdgeData struct {
+	SourceID     string `json:"SourceID"`
+	TargetID     string `json:"TargetID"`
+	ModuleName   string `json:"ModuleName"`
+	FunctionName string `json:"FunctionName"`
+	Context      string `json:"Context"`
+	RawData      string `json:"RawData,omitempty"`
+	CreatedAt    string `json:"CreatedAt"`
+}
+
 type ProjectGraph struct {
-	ProjectName   string      `json:"ProjectName"`
-	InitialTarget string      `json:"InitialTarget"`
-	Edges         []GraphEdge `json:"Edges"`
+	ProjectName   string              `json:"ProjectName"`
+	InitialTarget string              `json:"InitialTarget"`
+	MaxDepth      int                 `json:"MaxDepth"`
+	StrictDepth   bool                `json:"StrictDepth"`
+	Nodes         map[string]NodeData `json:"Nodes"`
+	Edges         []EdgeData          `json:"Edges"`
 }
 
 type ProcessorToDispatcherData struct {

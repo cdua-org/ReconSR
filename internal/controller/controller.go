@@ -53,15 +53,8 @@ func GetActiveGraph(ctx context.Context, includeRawData bool) (*schema.ProjectGr
 		return nil, err
 	}
 
-	for i := range graph.Edges {
-		currentDepth := graph.Edges[i].TargetDepthRelaxed
-		if strictDepth {
-			currentDepth = graph.Edges[i].TargetDepthStrict
-		}
-		if currentDepth > maxDepth {
-			graph.Edges[i].TargetDepthLimitReached = true
-		}
-	}
+	graph.MaxDepth = maxDepth
+	graph.StrictDepth = strictDepth
 
 	return graph, nil
 }

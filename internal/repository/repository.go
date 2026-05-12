@@ -1445,7 +1445,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 	}()
 
 	type edgeWithID struct {
-		edge     schema.GraphEdge
+		edge     schema.EdgeData
 		sourceID int64
 	}
 	var tempEdges []edgeWithID
@@ -1456,22 +1456,56 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 		funcName   string
 	}
 	neededRawData := make(map[rawDataKey]bool)
+	nodes := make(map[string]schema.NodeData)
 
 	for rows.Next() {
-		var e schema.GraphEdge
+		var srcType, srcValue, srcCategory string
+		var tgtType, tgtValue, tgtCategory string
+		var tgtOutOfScope bool
+		var tgtDepthStrict, tgtDepthRelaxed int
+		var moduleName, functionName, contextStr, createdAt string
 		var sourceID int64
+
 		err := rows.Scan(
-			&e.Source.Type, &e.Source.Value, &e.Source.Category,
-			&e.Target.Type, &e.Target.Value, &e.TargetOutOfScope, &e.Target.Category, &e.TargetDepthStrict, &e.TargetDepthRelaxed,
-			&e.ModuleName, &e.FunctionName,
-			&e.Context,
-			&e.CreatedAt,
+			&srcType, &srcValue, &srcCategory,
+			&tgtType, &tgtValue, &tgtOutOfScope, &tgtCategory, &tgtDepthStrict, &tgtDepthRelaxed,
+			&moduleName, &functionName,
+			&contextStr,
+			&createdAt,
 			&sourceID,
 		)
 		if err == nil {
+			srcID := srcType + ":" + srcValue
+			tgtID := tgtType + ":" + tgtValue
+
+			if _, exists := nodes[srcID]; !exists {
+				nodes[srcID] = schema.NodeData{
+					Type:     srcType,
+					Value:    srcValue,
+					Category: srcCategory,
+				}
+			}
+
+			nodes[tgtID] = schema.NodeData{
+				Type:         tgtType,
+				Value:        tgtValue,
+				Category:     tgtCategory,
+				OutOfScope:   tgtOutOfScope,
+				DepthStrict:  tgtDepthStrict,
+				DepthRelaxed: tgtDepthRelaxed,
+			}
+
+			e := schema.EdgeData{
+				SourceID:     srcID,
+				TargetID:     tgtID,
+				ModuleName:   moduleName,
+				FunctionName: functionName,
+				Context:      contextStr,
+				CreatedAt:    createdAt,
+			}
 			tempEdges = append(tempEdges, edgeWithID{edge: e, sourceID: sourceID})
 			if includeRawData {
-				neededRawData[rawDataKey{sourceID, e.ModuleName, e.FunctionName}] = true
+				neededRawData[rawDataKey{sourceID, moduleName, functionName}] = true
 			}
 		}
 	}
@@ -1506,7 +1540,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 		}
 	}
 
-	var edges []schema.GraphEdge
+	var edges []schema.EdgeData
 	for _, te := range tempEdges {
 		edges = append(edges, te.edge)
 	}
@@ -1514,6 +1548,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 	return &schema.ProjectGraph{
 		ProjectName:   projectName,
 		InitialTarget: initialTarget,
+		Nodes:         nodes,
 		Edges:         edges,
 	}, nil
 }

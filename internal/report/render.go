@@ -42,9 +42,10 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	propDetails := make(map[propKey][]string)
 
 	for _, edge := range graph.Edges {
-		if edge.Target.Category == "property" {
-			srcID := edge.Source.Type + ":" + edge.Source.Value
-			dstID := edge.Target.Type + ":" + edge.Target.Value
+		targetNode := graph.Nodes[edge.TargetID]
+		if targetNode.Category == "property" {
+			srcID := edge.SourceID
+			dstID := edge.TargetID
 
 			key := propEdgeKey{
 				parentID: srcID,
@@ -114,19 +115,20 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	addedProps := make(map[propKey]bool)
 
 	for _, edge := range graph.Edges {
-		if edge.Target.Category == "property" {
-			srcID := edge.Source.Type + ":" + edge.Source.Value
-			dstID := edge.Target.Type + ":" + edge.Target.Value
+		targetNode := graph.Nodes[edge.TargetID]
+		if targetNode.Category == "property" {
+			srcID := edge.SourceID
+			dstID := edge.TargetID
 			pk := propKey{parentID: srcID, propID: dstID}
 			if !addedProps[pk] {
 				addedProps[pk] = true
 				details := propDetails[pk]
 				nodeProperties[srcID] = append(nodeProperties[srcID], propertyInfo{
 					ID:         dstID,
-					Type:       edge.Target.Type,
-					Value:      edge.Target.Value,
+					Type:       targetNode.Type,
+					Value:      targetNode.Value,
 					Context:    strings.Join(details, " | "),
-					OutOfScope: edge.TargetOutOfScope,
+					OutOfScope: targetNode.OutOfScope,
 				})
 			}
 		}
@@ -137,8 +139,8 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	totalsByCat := make(map[string]int)
 
 	for _, edge := range graph.Edges {
-		src := edge.Source.Type + ":" + edge.Source.Value
-		dst := edge.Target.Type + ":" + edge.Target.Value
+		src := edge.SourceID
+		dst := edge.TargetID
 
 		processEntity := func(id, eType, category string) {
 			if !nodes[id] {
@@ -151,8 +153,10 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 			}
 		}
 
-		processEntity(src, edge.Source.Type, edge.Source.Category)
-		processEntity(dst, edge.Target.Type, edge.Target.Category)
+		srcNode := graph.Nodes[src]
+		dstNode := graph.Nodes[dst]
+		processEntity(src, srcNode.Type, srcNode.Category)
+		processEntity(dst, dstNode.Type, dstNode.Category)
 	}
 
 	fmt.Printf("\n"+colorCyan+colorBold+"--- %s: %s ---"+colorReset+"\n", i18n.T["LBL_RESULTS_FOR"], graph.ProjectName)
@@ -194,7 +198,7 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 		}
 	}
 	fmt.Println()
-	adj := make(map[string][]schema.GraphEdge)
+	adj := make(map[string][]schema.EdgeData)
 
 	type nodeEdgeKey struct {
 		srcID string
@@ -206,15 +210,16 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 		fn    string
 	}
 	nodeEdgeGroups := make(map[nodeEdgeGroupKey][]contextGroup)
-	edgeBase := make(map[nodeEdgeKey]schema.GraphEdge)
+	edgeBase := make(map[nodeEdgeKey]schema.EdgeData)
 
 	for _, edge := range graph.Edges {
-		if edge.Target.Category == "property" {
+		targetNode := graph.Nodes[edge.TargetID]
+		if targetNode.Category == "property" {
 			continue
 		}
 
-		srcID := edge.Source.Type + ":" + edge.Source.Value
-		dstID := edge.Target.Type + ":" + edge.Target.Value
+		srcID := edge.SourceID
+		dstID := edge.TargetID
 
 		key := nodeEdgeGroupKey{
 			srcID: srcID,
@@ -289,12 +294,13 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 
 	addedEdges := make(map[nodeEdgeKey]bool)
 	for _, edge := range graph.Edges {
-		if edge.Target.Category == "property" {
+		targetNode := graph.Nodes[edge.TargetID]
+		if targetNode.Category == "property" {
 			continue
 		}
 
-		srcID := edge.Source.Type + ":" + edge.Source.Value
-		dstID := edge.Target.Type + ":" + edge.Target.Value
+		srcID := edge.SourceID
+		dstID := edge.TargetID
 
 		nk := nodeEdgeKey{srcID: srcID, dstID: dstID}
 		if !addedEdges[nk] {
@@ -308,9 +314,10 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	var initialTargetID string
 	var initialTargetType string
 	for _, edge := range graph.Edges {
-		if edge.Source.Value == graph.InitialTarget {
-			initialTargetID = edge.Source.Type + ":" + edge.Source.Value
-			initialTargetType = edge.Source.Type
+		srcNode := graph.Nodes[edge.SourceID]
+		if srcNode.Value == graph.InitialTarget {
+			initialTargetID = edge.SourceID
+			initialTargetType = srcNode.Type
 			break
 		}
 	}
@@ -320,11 +327,22 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 		initialTargetType = "unknown"
 	}
 
+	initialOutOfScope := false
+	initialLimitReached := false
+	if n, ok := graph.Nodes[initialTargetID]; ok {
+		initialOutOfScope = n.OutOfScope
+		d := n.DepthRelaxed
+		if graph.StrictDepth {
+			d = n.DepthStrict
+		}
+		initialLimitReached = d > graph.MaxDepth
+	}
+
 	visited := make(map[string]bool)
-	printNode(initialTargetID, graph.InitialTarget, initialTargetType, false, false, "", "", "", true, adj, visited, nodeProperties)
+	printNode(initialTargetID, graph.InitialTarget, initialTargetType, initialOutOfScope, initialLimitReached, "", "", "", true, adj, visited, nodeProperties, graph)
 }
 
-func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, isLimitReached bool, prefix string, marker string, connInfo string, isLast bool, adj map[string][]schema.GraphEdge, visited map[string]bool, nodeProperties map[string][]propertyInfo) {
+func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, isLimitReached bool, prefix string, marker string, connInfo string, isLast bool, adj map[string][]schema.EdgeData, visited map[string]bool, nodeProperties map[string][]propertyInfo, graph *schema.ProjectGraph) {
 	nodeColor := colorGreen + colorBold
 	suffix := ""
 	if isOutOfScope {
@@ -367,18 +385,18 @@ func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, 
 	children := adj[nodeID]
 	hasChildren := len(children) > 0
 
-	printProperties(nodeID, childPrefix, hasChildren, "", nodeProperties, adj, visited)
+	printProperties(nodeID, childPrefix, hasChildren, "", nodeProperties, adj, visited, graph)
 
 	visited[nodeID] = true
 
-	printChildren(children, childPrefix, adj, visited, nodeProperties)
+	printChildren(children, childPrefix, adj, visited, nodeProperties, graph)
 
 	if prefix == "" && marker == "" {
 		fmt.Println()
 	}
 }
 
-func printProperties(nodeID string, basePrefix string, hasChildren bool, propIndent string, nodeProperties map[string][]propertyInfo, adj map[string][]schema.GraphEdge, visited map[string]bool) {
+func printProperties(nodeID string, basePrefix string, hasChildren bool, propIndent string, nodeProperties map[string][]propertyInfo, adj map[string][]schema.EdgeData, visited map[string]bool, graph *schema.ProjectGraph) {
 	props := nodeProperties[nodeID]
 	if len(props) > 1 {
 		sort.Slice(props, func(i, j int) bool {
@@ -423,30 +441,43 @@ func printProperties(nodeID string, basePrefix string, hasChildren bool, propInd
 			nextPropIndent = propIndent + "  │ "
 		}
 
-		printProperties(prop.ID, basePrefix, hasChildren, nextPropIndent, nodeProperties, adj, visited)
+		printProperties(prop.ID, basePrefix, hasChildren, nextPropIndent, nodeProperties, adj, visited, graph)
 
 		if len(propChildren) > 0 {
 			propChildPrefix := basePrefix + startChar + propIndent + "  "
-			printChildren(propChildren, propChildPrefix, adj, visited, nodeProperties)
+			printChildren(propChildren, propChildPrefix, adj, visited, nodeProperties, graph)
 		}
 	}
 }
 
-func printChildren(children []schema.GraphEdge, childPrefix string, adj map[string][]schema.GraphEdge, visited map[string]bool, nodeProperties map[string][]propertyInfo) {
+func printChildren(children []schema.EdgeData, childPrefix string, adj map[string][]schema.EdgeData, visited map[string]bool, nodeProperties map[string][]propertyInfo, graph *schema.ProjectGraph) {
 	if len(children) == 0 {
 		return
 	}
 
+	isLimitReached := func(id string) bool {
+		n, exists := graph.Nodes[id]
+		if !exists {
+			return false
+		}
+		d := n.DepthRelaxed
+		if graph.StrictDepth {
+			d = n.DepthStrict
+		}
+		return d > graph.MaxDepth
+	}
+
 	sort.Slice(children, func(i, j int) bool {
-		score := func(child schema.GraphEdge) int {
-			if child.TargetOutOfScope {
+		score := func(child schema.EdgeData) int {
+			targetNode := graph.Nodes[child.TargetID]
+			if targetNode.OutOfScope {
 				return 3
 			}
-			targetID := child.Target.Type + ":" + child.Target.Value
+			targetID := child.TargetID
 			if visited[targetID] {
 				return 2
 			}
-			if child.TargetDepthLimitReached {
+			if isLimitReached(targetID) {
 				return 1
 			}
 			return 0
@@ -456,7 +487,7 @@ func printChildren(children []schema.GraphEdge, childPrefix string, adj map[stri
 		if scoreI != scoreJ {
 			return scoreI < scoreJ
 		}
-		return children[i].Target.Value < children[j].Target.Value
+		return graph.Nodes[children[i].TargetID].Value < graph.Nodes[children[j].TargetID].Value
 	})
 
 	for i, child := range children {
@@ -467,9 +498,10 @@ func printChildren(children []schema.GraphEdge, childPrefix string, adj map[stri
 			childMarker = "└──"
 		}
 
-		targetValue := child.Target.Value
-		targetType := child.Target.Type
-		targetID := targetType + ":" + targetValue
+		targetNode := graph.Nodes[child.TargetID]
+		targetValue := targetNode.Value
+		targetType := targetNode.Type
+		targetID := child.TargetID
 
 		targetTypeStr := ""
 		if targetType != "" {
@@ -488,17 +520,17 @@ func printChildren(children []schema.GraphEdge, childPrefix string, adj map[stri
 			}
 			nodeColor := colorYellow
 			suffix := ""
-			if child.TargetOutOfScope {
+			if targetNode.OutOfScope {
 				nodeColor = colorBlue
 				suffix = " " + colorBlue + i18n.T["LBL_OUT_OF_SCOPE"] + colorReset
-			} else if child.TargetDepthLimitReached {
+			} else if isLimitReached(targetID) {
 				nodeColor = colorYellow + colorBold
 				suffix = " " + colorYellow + i18n.T["LBL_LIMIT_REACHED"] + colorReset
 			}
 			suffix += " " + colorCyan + "(seen)" + colorReset
 			fmt.Printf("%s%s %s%s%s%s\n", childPrefix, childMarker, targetTypeStr, nodeColor+targetValue+colorReset, formattedChildConn, suffix)
 		} else {
-			printNode(targetID, targetValue, targetType, child.TargetOutOfScope, child.TargetDepthLimitReached, childPrefix, childMarker, child.Context, isChildLast, adj, visited, nodeProperties)
+			printNode(targetID, targetValue, targetType, targetNode.OutOfScope, isLimitReached(targetID), childPrefix, childMarker, child.Context, isChildLast, adj, visited, nodeProperties, graph)
 		}
 	}
 }
