@@ -106,6 +106,24 @@ var (
 	// VirustotalMaxPages limits the number of pages to fetch for VirusTotal paginated lookups.
 	VirustotalMaxPages = 5
 
+	// CirclWithMeta includes metadata for CIRCL vulnerabilities.
+	CirclWithMeta = true
+
+	// CirclWithLinked includes linked vulnerabilities for CIRCL vulnerabilities.
+	CirclWithLinked = false
+
+	// CirclWithComments includes comments for CIRCL vulnerabilities.
+	CirclWithComments = false
+
+	// CirclWithBundles includes bundles for CIRCL vulnerabilities.
+	CirclWithBundles = false
+
+	// CirclWithSightings includes sightings for CIRCL vulnerabilities.
+	CirclWithSightings = false
+
+	// MaxRetriesCircl defines maximum attempts for CIRCL API.
+	MaxRetriesCircl = 3
+
 	// Options acts as a generic configuration dictionary.
 	Options = make(map[string]string)
 
@@ -247,6 +265,11 @@ func initOptionMaps() {
 		"ShodanScanSubdomains":        &ShodanScanSubdomains,
 		"ShodanIPHistory":             &ShodanIPHistory,
 		"ShodanIPMinify":              &ShodanIPMinify,
+		"CirclWithMeta":               &CirclWithMeta,
+		"CirclWithLinked":             &CirclWithLinked,
+		"CirclWithComments":           &CirclWithComments,
+		"CirclWithBundles":            &CirclWithBundles,
+		"CirclWithSightings":          &CirclWithSightings,
 	}
 	intOptions = map[string]*int{
 		"MaxRetriesCert":       &MaxRetriesCert,
@@ -260,6 +283,7 @@ func initOptionMaps() {
 		"VirustotalMaxPages":   &VirustotalMaxPages,
 		"ShodanMaxDomainPages": &ShodanMaxDomainPages,
 		"DNSConcurrency":       &DNSConcurrency,
+		"MaxRetriesCircl":      &MaxRetriesCircl,
 	}
 	stringOptions = map[string]*string{
 		"ShodanDomainType": &ShodanDomainType,

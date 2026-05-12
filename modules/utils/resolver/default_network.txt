@@ -123,6 +123,26 @@ ShodanIPHistory=false
 # Return only ports and general host information without full banners for Shodan IP lookups (default: false)
 ShodanIPMinify=false
 
+### CIRCL Options ###
+
+# Include metadata for CIRCL vulnerabilities (default: true)
+CirclWithMeta=true
+
+# Include linked vulnerabilities for CIRCL vulnerabilities (default: false)
+CirclWithLinked=false
+
+# Include comments for CIRCL vulnerabilities (default: false)
+CirclWithComments=false
+
+# Include bundles for CIRCL vulnerabilities (default: false)
+CirclWithBundles=false
+
+# Include sightings for CIRCL vulnerabilities (default: false)
+CirclWithSightings=false
+
+# Maximum retry attempts for CIRCL API requests (default: 3)
+MaxRetriesCircl=3
+
 [DoH]
 https://dns.cloudflare.com/dns-query
 https://dns.google/resolve

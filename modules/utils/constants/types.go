@@ -104,4 +104,7 @@ const (
 	TypeCVSS                  = "cvss"
 	TypeEPSS                  = "epss"
 	TypeRankEPSS              = "ranking_epss"
+	TypeCWE                   = "cwe"
+	TypeSSVC                  = "ssvc"
+	TypeKEV                   = "kev"
 )

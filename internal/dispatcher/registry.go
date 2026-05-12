@@ -13,6 +13,7 @@ import (
 	"cdua-org/ReconSR/modules/shodan"
 	"cdua-org/ReconSR/modules/subdomain_hierarchy"
 	"cdua-org/ReconSR/modules/virustotal"
+	"cdua-org/ReconSR/modules/vuln_lookup"
 	"cdua-org/ReconSR/modules/whois"
 	"cdua-org/ReconSR/schema"
 )
@@ -30,5 +31,6 @@ var ModuleRegistry = []schema.Module{
 	shodan.New(),
 	subdomain_hierarchy.New(),
 	virustotal.New(),
+	vuln_lookup.New(),
 	whois.New(),
 }
