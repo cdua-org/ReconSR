@@ -480,27 +480,23 @@ func printChildren(children []schema.GraphEdge, childPrefix string, adj map[stri
 			}
 		}
 
-		if child.TargetOutOfScope {
+		if visited[targetID] {
 			childConn := child.Context
 			formattedChildConn := ""
 			if childConn != "" {
 				formattedChildConn = fmt.Sprintf(" (%s%s%s)", colorMagenta, childConn, colorReset)
 			}
-			fmt.Printf("%s%s %s%s%s %s\n", childPrefix, childMarker, targetTypeStr, colorBlue+targetValue+colorReset, formattedChildConn, colorBlue+i18n.T["LBL_OUT_OF_SCOPE"]+colorReset)
-		} else if child.TargetDepthLimitReached {
-			childConn := child.Context
-			formattedChildConn := ""
-			if childConn != "" {
-				formattedChildConn = fmt.Sprintf(" (%s%s%s)", colorMagenta, childConn, colorReset)
+			nodeColor := colorYellow
+			suffix := ""
+			if child.TargetOutOfScope {
+				nodeColor = colorBlue
+				suffix = " " + colorBlue + i18n.T["LBL_OUT_OF_SCOPE"] + colorReset
+			} else if child.TargetDepthLimitReached {
+				nodeColor = colorYellow + colorBold
+				suffix = " " + colorYellow + i18n.T["LBL_LIMIT_REACHED"] + colorReset
 			}
-			fmt.Printf("%s%s %s%s%s %s\n", childPrefix, childMarker, targetTypeStr, colorYellow+colorBold+targetValue+colorReset, formattedChildConn, colorYellow+i18n.T["LBL_LIMIT_REACHED"]+colorReset)
-		} else if visited[targetID] {
-			childConn := child.Context
-			formattedChildConn := ""
-			if childConn != "" {
-				formattedChildConn = fmt.Sprintf(" (%s%s%s)", colorMagenta, childConn, colorReset)
-			}
-			fmt.Printf("%s%s %s%s%s %s\n", childPrefix, childMarker, targetTypeStr, colorYellow+targetValue+colorReset, formattedChildConn, colorCyan+"(seen)"+colorReset)
+			suffix += " " + colorCyan + "(seen)" + colorReset
+			fmt.Printf("%s%s %s%s%s%s\n", childPrefix, childMarker, targetTypeStr, nodeColor+targetValue+colorReset, formattedChildConn, suffix)
 		} else {
 			printNode(targetID, targetValue, targetType, child.TargetOutOfScope, child.TargetDepthLimitReached, childPrefix, childMarker, child.Context, isChildLast, adj, visited, nodeProperties)
 		}
