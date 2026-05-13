@@ -1,0 +1,68 @@
+{
+    "data": {
+      "ipAddress": "192.0.2.1",
+      "isPublic": true,
+      "ipVersion": 4,
+      "isWhitelisted": false,
+      "abuseConfidenceScore": 100,
+      "countryCode": "XX",
+      "countryName": "FakeCountry1",
+      "usageType": "Data Center/Web Hosting/Transit",
+      "isp": "Example ISP LLC",
+      "domain": "example.com",
+      "hostnames": [
+        "node1.example.com",
+        "mail.example.org"
+      ],
+      "isTor": false,
+      "totalReports": 315,
+      "numDistinctUsers": 99,
+      "lastReportedAt": "2023-10-15T12:00:00+00:00",
+      "reports": [
+        {
+          "reportedAt": "2023-10-15T12:00:00+00:00",
+          "comment": "724  requests with url.path *.alfa\n415  requests with url.path */wp-plain.php\nMultiple line breaks\nand special chars: `~!@#$%^&*()_+",
+          "categories": [
+            18,
+            22
+          ],
+          "reporterId": 1,
+          "reporterCountryCode": "ZZ",
+          "reporterCountryName": "FakeCountry2"
+        },
+        {
+          "reportedAt": "2023-10-14T08:30:00+00:00",
+          "comment": "Fail2Ban: nginx-4xx | Failures: 10 | Log: /csbceiny.php?Fox=d3wL7 /plugins/content/apismtp/apismtp.php?test=hello /wp-content/plugins/apikey/apikey.php.suspected?test=hello /wp-content/plugins/apikey/apikey.php?test=hello /wp-content/plugins/fix/up.php",
+          "categories": [
+            18,
+            21
+          ],
+          "reporterId": 2,
+          "reporterCountryCode": "YY",
+          "reporterCountryName": "FakeCountry3"
+        },
+        {
+          "reportedAt": "2023-10-13T16:45:12+00:00",
+          "comment": "Shield Guard: Blocklist: IP signalée (blocklist_de) | Chemin suspect: /wp-plain.php | SQLi dans 'COOKIE:ON' and some Unicode: こんにちは !🌍",
+          "categories": [
+            18,
+            10,
+            21
+          ],
+          "reporterId": 3,
+          "reporterCountryCode": "WW",
+          "reporterCountryName": "FakeCountry4"
+        },
+        {
+          "reportedAt": "2023-10-12T05:51:11+00:00",
+          "comment": "2026/05/13 05:16:52 [error] 1115357#1115357: *223251879 access forbidden by rule, client: 192.0.2.1, server: example.com, request: \"GET /wp-content/themes/seotheme/db.php?u HTTP/2.0\", host: \"example.com\", ref... [truncated]",
+          "categories": [
+            16
+          ],
+          "reporterId": 4,
+          "reporterCountryCode": "VV",
+          "reporterCountryName": "FakeCountry5"
+        }
+      ]
+    }
+  }

@@ -124,6 +124,9 @@ var (
 	// MaxRetriesCircl defines maximum attempts for CIRCL API.
 	MaxRetriesCircl = 3
 
+	// AbuseIPDBmaxAgeInDays defines how far back in time we go to fetch reports (default 30, max 365).
+	AbuseIPDBmaxAgeInDays = 30
+
 	// Options acts as a generic configuration dictionary.
 	Options = make(map[string]string)
 
@@ -272,18 +275,19 @@ func initOptionMaps() {
 		"CirclWithSightings":          &CirclWithSightings,
 	}
 	intOptions = map[string]*int{
-		"MaxRetriesCert":       &MaxRetriesCert,
-		"MaxRetriesWhois":      &MaxRetriesWhois,
-		"MaxRetriesDNS":        &MaxRetriesDNS,
-		"MaxRetriesHT":         &MaxRetriesHT,
-		"MaxRetriesIPMeta":     &MaxRetriesIPMeta,
-		"MaxRetriesASNMeta":    &MaxRetriesASNMeta,
-		"MaxRecursionDepth":    &MaxRecursionDepth,
-		"AnubisLimit":          &AnubisLimit,
-		"VirustotalMaxPages":   &VirustotalMaxPages,
-		"ShodanMaxDomainPages": &ShodanMaxDomainPages,
-		"DNSConcurrency":       &DNSConcurrency,
-		"MaxRetriesCircl":      &MaxRetriesCircl,
+		"MaxRetriesCert":        &MaxRetriesCert,
+		"MaxRetriesWhois":       &MaxRetriesWhois,
+		"MaxRetriesDNS":         &MaxRetriesDNS,
+		"MaxRetriesHT":          &MaxRetriesHT,
+		"MaxRetriesIPMeta":      &MaxRetriesIPMeta,
+		"MaxRetriesASNMeta":     &MaxRetriesASNMeta,
+		"MaxRecursionDepth":     &MaxRecursionDepth,
+		"AnubisLimit":           &AnubisLimit,
+		"VirustotalMaxPages":    &VirustotalMaxPages,
+		"ShodanMaxDomainPages":  &ShodanMaxDomainPages,
+		"DNSConcurrency":        &DNSConcurrency,
+		"MaxRetriesCircl":       &MaxRetriesCircl,
+		"AbuseIPDBmaxAgeInDays": &AbuseIPDBmaxAgeInDays,
 	}
 	stringOptions = map[string]*string{
 		"ShodanDomainType": &ShodanDomainType,

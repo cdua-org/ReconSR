@@ -1,0 +1,35 @@
+{
+    "data": {
+      "ipAddress": "192.0.2.3",
+      "isPublic": true,
+      "ipVersion": 4,
+      "isWhitelisted": false,
+      "abuseConfidenceScore": 100,
+      "countryCode": "BB",
+      "countryName": "FakeCountryTor",
+      "usageType": "Reserved",
+      "isp": "Tor Exit Node Provider",
+      "domain": "tor-exit.example.org",
+      "hostnames": [
+        "exit-node.tor-exit.example.org"
+      ],
+      "isTor": true,
+      "totalReports": 50,
+      "numDistinctUsers": 12,
+      "lastReportedAt": "2023-10-16T10:00:00+00:00",
+      "reports": [
+        {
+          "reportedAt": "2023-10-16T10:00:00+00:00",
+          "comment": "Fake malicious activity via Tor",
+          "categories": [
+            9,
+            14,
+            18
+          ],
+          "reporterId": 5,
+          "reporterCountryCode": "CC",
+          "reporterCountryName": "FakeCountry6"
+        }
+      ]
+    }
+  }

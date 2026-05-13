@@ -1,0 +1,22 @@
+{
+    "data": {
+      "ipAddress": "192.0.2.2",
+      "isPublic": true,
+      "ipVersion": 4,
+      "isWhitelisted": true,
+      "abuseConfidenceScore": 0,
+      "countryCode": "AA",
+      "countryName": "FakeCountryWhitelisted",
+      "usageType": "Search Engine Spider",
+      "isp": "Search Engine Provider LLC",
+      "domain": "spider.example.com",
+      "hostnames": [
+        "crawl-192-0-2-2.spider.example.com"
+      ],
+      "isTor": false,
+      "totalReports": 0,
+      "numDistinctUsers": 0,
+      "lastReportedAt": null,
+      "reports": []
+    }
+  }

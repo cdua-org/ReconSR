@@ -1,6 +1,7 @@
 package dispatcher
 
 import (
+	"cdua-org/ReconSR/modules/abuseipdb"
 	"cdua-org/ReconSR/modules/anubis"
 	"cdua-org/ReconSR/modules/asn_metadata"
 	"cdua-org/ReconSR/modules/dns"
@@ -19,6 +20,7 @@ import (
 )
 
 var ModuleRegistry = []schema.Module{
+	abuseipdb.New(),
 	anubis.New(),
 	asn_metadata.New(),
 	dns.New(),

@@ -107,4 +107,8 @@ const (
 	TypeCWE                   = "cwe"
 	TypeSSVC                  = "ssvc"
 	TypeKEV                   = "kev"
+	TypeAbuseScore            = "abuse_score"
+	TypeUsageType             = "usage_type"
+	TypeTotalReports          = "total_reports"
+	TypeAbuseReport           = "abuse_report"
 )

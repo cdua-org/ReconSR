@@ -123,6 +123,13 @@ ShodanIPHistory=false
 # Return only ports and general host information without full banners for Shodan IP lookups (default: false)
 ShodanIPMinify=false
 
+
+### AbuseIPDB Options ###
+
+# Determines how far back in time we go to fetch reports, in days (default: 30, min: 1, max: 365)
+AbuseIPDBmaxAgeInDays=30
+
+
 ### CIRCL Options ###
 
 # Include metadata for CIRCL vulnerabilities (default: true)
@@ -142,6 +149,7 @@ CirclWithSightings=false
 
 # Maximum retry attempts for CIRCL API requests (default: 3)
 MaxRetriesCircl=3
+
 
 [DoH]
 https://dns.cloudflare.com/dns-query
