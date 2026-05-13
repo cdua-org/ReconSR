@@ -154,7 +154,7 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 					errors = append(errors, schema.ProcessorToRepoError{
 						Function:  exec.Function,
 						ErrorType: "invalid_tag_format",
-						ErrorText: fmt.Sprintf("function %q returned invalid tag %q: tags must contain only [a-z0-9_-]", exec.Function, t),
+						ErrorText: fmt.Sprintf("function %q returned invalid tag %q: tags must contain only [a-z0-9_.-]", exec.Function, t),
 					})
 					functionHasErrors[exec.Function] = true
 					tagError = true

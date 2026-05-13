@@ -22,13 +22,13 @@ type Result struct {
 	Anchor    string
 }
 
-// ValidateTag ensures a tag contains only [a-z0-9_-] characters.
+// ValidateTag ensures a tag contains only [a-z0-9_.-] characters.
 func ValidateTag(tag string) error {
 	if tag == "" {
 		return ErrInvalidTag
 	}
 	for _, r := range tag {
-		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
+		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.') {
 			return ErrInvalidTag
 		}
 	}

@@ -147,7 +147,7 @@ func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 
 ### 4.3 Conditional Filtering and Execution Ordering (`RequiredTags`)
 
-The `RequiredTags` field provides a mechanism for controlling exactly when a function executes. This allows a strict execution order (chaining) to be established between functions and state or success markers to be passed. For instance, Function A can perform a basic check and attach a specific tag upon success (e.g., `{"dns_resolved"}`). Function B can then require this tag, ensuring it only runs after Function A has successfully validated the entity.
+The `RequiredTags` field provides a mechanism for controlling exactly when a function executes. This allows a strict execution order (chaining) to be established between functions and state or success markers to be passed. For instance, Function A can perform a basic check and attach a specific technical tag upon success (e.g., `{".dns_resolved"}`). Function B can then require this tag, ensuring it only runs after Function A has successfully validated the entity.
 
 To implement these conditions, `RequiredTags` utilizes a `[][]string` format evaluated as a logical **OR of ANDs (including NOT)**:
 - **Inner arrays** represent tags joined by logical **AND**.
@@ -207,7 +207,7 @@ Excluding domains known to be parked or dead from scanning.
 "heavy_scan": {
     InputTypes: []string{"domain"},
     RequiredTags: [][]string{
-        {"!parked", "!dead"}, // Execute ONLY if it LACKS both tags
+        {"!.parked", "!.dead"}, // Execute ONLY if it LACKS both tags
     },
 }
 ```
@@ -218,8 +218,8 @@ Scanning active web servers on either HTTP or HTTPS.
 "web_scan": {
     InputTypes: []string{"domain", "ipv4"},
     RequiredTags: [][]string{
-        {"web_active", "http"},  // Execute if it has BOTH "web_active" AND "http"
-        {"web_active", "https"}, // OR if it has BOTH "web_active" AND "https"
+        {".web_active", ".http"},  // Execute if it has BOTH ".web_active" AND ".http"
+        {".web_active", ".https"}, // OR if it has BOTH ".web_active" AND ".https"
     },
 }
 ```
@@ -273,7 +273,7 @@ execError := schema.ModuleExecution{
 | **`Value`** | **Mandatory** | The extracted value (e.g., `"192.0.2.1"`). While standard extraction is necessary, syntactic errors within the entity itself must not be auto-corrected or cleaned. Malformed data must be preserved exactly as found to allow analysts to identify real-world configuration errors. If a function identifies a malformed entity but can infer the intended correct value, it may return both: the malformed entity as the primary finding, and the corrected entity linked to the malformed one via the `Source` field (Refer to Section 5.3). |
 | **`Category`**| **Optional** | Controls visual representation on the graph UI. `"node"` (default) renders as a standalone, connectable entity. `"property"` renders as an attribute within the parent node's modal window (e.g., a DMARC record or ASN). Note: This does not affect data processing; further modules can process both nodes and properties equally. |
 | **`Context`** | **Optional** | A human-readable description of the semantic relationship between the source and the discovered entity (e.g., specifying if an extracted email is a "rua reporting address" or an "admin contact"). This field must not be used for technical debugging details. If the relationship is already obvious from the entity's `Type`, this field must be omitted to prevent redundant UI labels (e.g., writing "DMARC Record" for a `dmarc` type). |
-| **`Tags`** | **Optional** | An array of internal tags to assign to the entity. Tags are invisible to the researcher and are used strictly for inter-function routing and establishing execution order (Refer to Section 4.3). Multiple tags can be assigned simultaneously. Tags must be restricted to those explicitly expected by other functions. **Format Constraint:** Tags must consist only of the characters `a-z0-9_-`. Providing a malformed tag will cause the core system to reject the result and generate a function error. |
+| **`Tags`** | **Optional** | An array of tags to assign to the entity. **Format Constraint:** Tags must consist only of the characters `a-z0-9_.-`. Providing a malformed tag will cause the core system to reject the result and generate a function error.<br><br>**Technical Tags (Prefixed with `.`):** Tags starting with a dot (e.g., `.dns_resolved`) are strictly for internal system use, such as inter-function routing and establishing execution order (Refer to Section 4.3). These technical tags are completely invisible to the user. Multiple tags can be assigned simultaneously, but they must be restricted to those explicitly expected by other functions.<br><br>**Display Tags (No Prefix):** Tags that do not start with a dot are treated as user-facing "subtypes". They are displayed to the user in the UI as supplementary information alongside the primary entity type. |
 | **`Applied`** | **Optional** | (Defaults to `false`). If `true`, instructs the core not to execute the current function on this specific result again. This prevents redundant reprocessing of results (e.g., when a function decomposes a long subdomain like `a.b.c.com` into `b.c.com` and `c.com`, setting `Applied` ensures the function is not re-run on those extracted parts). |
 | **`OutOfScope`**| **Optional** | (Defaults to `false`). If `true`, instructs the core to record the result in the database (for visual graphing) but to exclude it from being routed to modules to discover new relationships. Useful for filtering out "noise" infrastructure (e.g., registrar domains, CDN IPs). |
 | **`Source`** | **Optional** | A pointer to `schema.EntityRef{Type, Value}`. Specifies the immediate parent of the discovered entity. This is used when a function discovers a sequential chain of relationships (e.g., Target -> Property -> Node) rather than a flat "star" topology radiating directly from the input target. If the finding connects directly to the input target, this field must be omitted. Detailed chaining patterns are covered in Section 5.3. |
@@ -290,7 +290,7 @@ results := []schema.ModuleResult{
                 Value:    parsedDomain,
                 Category: "node", // Default value, shown for clarity
                 Context:  "Related organizational domain",
-                Tags:     []string{"verified"},
+                Tags:     []string{".verified"},
                 Applied:  true,
         },
         {
