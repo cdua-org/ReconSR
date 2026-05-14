@@ -9,8 +9,10 @@ import (
 	"strings"
 	"sync"
 
+	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
+	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
@@ -123,6 +125,10 @@ func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
 				Value:    res.record,
 			},
 		)
+
+		if srvHost, ok := buildSRVHostResult(res.host, target); ok {
+			exec.Results = append(exec.Results, srvHost)
+		}
 	}
 
 	if rawDataBuilder.Len() > 0 {
@@ -131,6 +137,25 @@ func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
 
 	log.Printf("get_srv target=%q results=%d", target, len(exec.Results))
 	return exec
+}
+
+func buildSRVHostResult(host, target string) (schema.ModuleResult, bool) {
+	res, err := validator.Validate(constants.TypeDomain, host)
+	if err != nil {
+		log.Printf("get_srv skipping invalid srv host target=%q entity=%q err=%v", target, host, err)
+		return schema.ModuleResult{}, false
+	}
+
+	isOOS := orgdomain.IsOutOfScope(res.Value, target)
+	log.Printf("get_srv target=%q entity=%q oos=%v", target, res.Value, isOOS)
+
+	return schema.ModuleResult{
+		Type:       constants.TypeDomain,
+		Category:   constants.CategoryNode,
+		Value:      res.Value,
+		Tags:       []string{constants.TagSRV},
+		OutOfScope: isOOS,
+	}, true
 }
 
 func parseSRVHost(data string) (string, error) {

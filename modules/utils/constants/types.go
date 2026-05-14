@@ -89,7 +89,6 @@ const (
 	TypeCPE23                 = "cpe23"
 	TypeVerified              = "verified"
 	TypeSummary               = "summary"
-	TypeSRVHost               = "srv_host"
 	TypeLastSeen              = "last_seen"
 	TypeShodanDomain          = "shodan_domain"
 	TypeDate                  = "date"

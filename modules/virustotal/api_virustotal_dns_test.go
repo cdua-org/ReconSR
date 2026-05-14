@@ -202,3 +202,19 @@ func TestParseDNSRecordCAAAddsAuthorityNode(t *testing.T) {
 	})
 	assertFixtureResultSource(t, source, authority.Source)
 }
+
+func TestParseDNSRecordSRVAddsPropertyAndHostNode(t *testing.T) {
+	rec := loadFixtureDNSRecord(t, "domain_page1.json", fixtureDomainTarget, "SRV", nil)
+	source := &schema.EntityRef{Type: constants.TypeDomain, Value: fixtureDomainTarget}
+	results := parseDNSRecordFromFixture(t, fixtureDomainTarget, source, rec)
+
+	requireResult(t, results, "srv property", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeSRV && result.Category == constants.CategoryProperty && result.Value == "10 50 5060 sip.example.com."
+	})
+
+	srvHost := requireResult(t, results, "srv host node", func(result schema.ModuleResult) bool {
+		hasSRVTag := slices.Contains(result.Tags, constants.TagSRV)
+		return result.Type == constants.TypeDomain && result.Category == constants.CategoryNode && result.Value == "sip.example.com" && hasSRVTag
+	})
+	assertFixtureResultSource(t, source, srvHost.Source)
+}

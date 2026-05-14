@@ -330,6 +330,12 @@
           "flag": 0,
           "tag": "issuewild",
           "value": "wild-backup-ca.example.net"
+        },
+        {
+          "type": "SRV",
+          "ttl": 300,
+          "priority": 10,
+          "value": "50 5060 sip.example.com."
         }
       ],
       "tld": "com",
@@ -425,7 +431,9 @@
         "harmless": 86,
         "malicious": 20
       },
-      "tags": ["suspicious-udp"],
+      "tags": [
+        "suspicious-udp"
+      ],
       "rdap": {
         "handle": "2724960_DOMAIN_COM-VRSN",
         "ldh_name": "target-example.com",

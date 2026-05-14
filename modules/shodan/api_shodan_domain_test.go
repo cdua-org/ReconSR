@@ -159,9 +159,12 @@ func assertShodanDomainSOA(t *testing.T, results []schema.ModuleResult) {
 func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	srvHost := requireModuleResult(t, results, constants.TypeSRVHost, "sip.example.com")
+	srvHost := requireModuleResult(t, results, constants.TypeDomain, "sip.example.com")
 	if srvHost.Category != constants.CategoryNode || srvHost.OutOfScope {
-		t.Fatal("expected in-scope srv_host node")
+		t.Fatal("expected in-scope srv host node")
+	}
+	if !slices.Contains(srvHost.Tags, constants.TagSRV) {
+		t.Fatalf("expected srv host to have tag %q, got tags %v", constants.TagSRV, srvHost.Tags)
 	}
 
 	caaAuth := requireModuleResultWithContext(t, results, constants.TypeCertAuthority, "ca.example.net", "CAA Record")

@@ -363,9 +363,10 @@ func appendShodanSRVResult(exec *schema.ModuleExecution, value, target string, s
 		host := strings.TrimSuffix(parts[3], ".")
 		if validated, err := validator.Validate(constants.TypeDomain, host); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       constants.TypeSRVHost,
+				Type:       constants.TypeDomain,
 				Category:   constants.CategoryNode,
 				Value:      validated.Value,
+				Tags:       []string{constants.TagSRV},
 				OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 				Source:     source,
 			})

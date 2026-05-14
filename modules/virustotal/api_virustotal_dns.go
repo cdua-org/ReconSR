@@ -38,6 +38,8 @@ func (m *module) parseDNSRecord(rec map[string]any, target string, src *schema.E
 		m.appendVTTXTResult(exec, src, recordValue)
 	case "CAA":
 		m.appendVTCAAResults(exec, src, rec)
+	case "SRV":
+		m.appendVTSRVResults(exec, target, src, rec, recordValue)
 	default:
 		dbg.Printf("parseDNSRecord target=%q type=%q fallback=true value=%q", target, recordType, recordValue)
 		exec.Results = append(exec.Results, schema.ModuleResult{
@@ -232,6 +234,43 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, src *schema.En
 		Value:      validated.Value,
 		Context:    "Authorized CA (" + tag + ")",
 		OutOfScope: true,
+		Source:     src,
+	})
+}
+
+func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any, value string) {
+	srvValue := value
+	if priority, ok := formatVTInt(rec["priority"]); ok {
+		if !strings.HasPrefix(value, priority+" ") {
+			srvValue = priority + " " + value
+		}
+	}
+
+	exec.Results = append(exec.Results, schema.ModuleResult{
+		Type:     constants.TypeSRV,
+		Category: constants.CategoryProperty,
+		Value:    srvValue,
+		Source:   src,
+	})
+
+	parts := strings.Fields(value)
+	if len(parts) < 1 {
+		return
+	}
+	host := strings.TrimSuffix(parts[len(parts)-1], ".")
+
+	validated, err := validator.Validate(constants.TypeDomain, host)
+	if err != nil {
+		dbg.Printf("appendVTSRVResults target=%q host=%q err=%v", target, host, err)
+		return
+	}
+
+	exec.Results = append(exec.Results, schema.ModuleResult{
+		Type:       constants.TypeDomain,
+		Category:   constants.CategoryNode,
+		Value:      validated.Value,
+		Tags:       []string{constants.TagSRV},
+		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     src,
 	})
 }
