@@ -17,28 +17,28 @@ func parseShodanAPIIP(exec *schema.ModuleExecution, rawBody []byte, target strin
 		return
 	}
 
-	extractIPDomains(exec, payload.Domains, payload.Tags)
-	extractIPASN(exec, payload.ASN, payload.Tags)
-	extractIPProperties(exec, &payload, payload.Tags, target)
-	extractIPLastUpdate(exec, payload.LastUpdate, payload.Tags, target)
-	extractIPHostnames(exec, payload.Hostnames, payload.Tags)
-	extractIPBanners(exec, payload.Data, payload.Tags, target)
+	appendShodanTagResults(exec, payload.Tags)
+	extractIPDomains(exec, payload.Domains)
+	extractIPASN(exec, payload.ASN)
+	extractIPProperties(exec, &payload, target)
+	extractIPLastUpdate(exec, payload.LastUpdate, target)
+	extractIPHostnames(exec, payload.Hostnames)
+	extractIPBanners(exec, payload.Data, target)
 }
 
-func extractIPDomains(exec *schema.ModuleExecution, domains, tags []string) {
+func extractIPDomains(exec *schema.ModuleExecution, domains []string) {
 	for _, domain := range domains {
 		if val, err := validator.Validate(constants.TypeDomain, domain); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeShodanDomain,
 				Category: constants.CategoryNode,
 				Value:    val.Value,
-				Tags:     tags,
 			})
 		}
 	}
 }
 
-func extractIPASN(exec *schema.ModuleExecution, asn string, tags []string) {
+func extractIPASN(exec *schema.ModuleExecution, asn string) {
 	if asn == "" {
 		return
 	}
@@ -48,19 +48,18 @@ func extractIPASN(exec *schema.ModuleExecution, asn string, tags []string) {
 		Type:     constants.TypeASN,
 		Category: constants.CategoryNode,
 		Value:    asnNumber,
-		Tags:     tags,
 	})
 }
 
-func extractIPProperties(exec *schema.ModuleExecution, payload *shodanIPResponse, tags []string, target string) {
-	appendIPProperty(exec, constants.TypeOrg, payload.Org, tags, "Organization for "+target)
+func extractIPProperties(exec *schema.ModuleExecution, payload *shodanIPResponse, target string) {
+	appendIPProperty(exec, constants.TypeOrg, payload.Org, "Organization for "+target)
 	if !strings.EqualFold(payload.ISP, payload.Org) {
-		appendIPProperty(exec, constants.TypeISP, payload.ISP, tags, "ISP for "+target)
+		appendIPProperty(exec, constants.TypeISP, payload.ISP, "ISP for "+target)
 	}
-	appendIPProperty(exec, constants.TypeOS, payload.OS, tags, "OS for "+target)
+	appendIPProperty(exec, constants.TypeOS, payload.OS, "OS for "+target)
 }
 
-func appendIPProperty(exec *schema.ModuleExecution, resultType, value string, tags []string, context string) {
+func appendIPProperty(exec *schema.ModuleExecution, resultType, value, context string) {
 	if value == "" {
 		return
 	}
@@ -70,11 +69,10 @@ func appendIPProperty(exec *schema.ModuleExecution, resultType, value string, ta
 		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  context,
-		Tags:     tags,
 	})
 }
 
-func extractIPLastUpdate(exec *schema.ModuleExecution, lastUpdate string, tags []string, target string) {
+func extractIPLastUpdate(exec *schema.ModuleExecution, lastUpdate, target string) {
 	if lastUpdate == "" {
 		return
 	}
@@ -84,11 +82,10 @@ func extractIPLastUpdate(exec *schema.ModuleExecution, lastUpdate string, tags [
 		Category: constants.CategoryProperty,
 		Value:    lastUpdate,
 		Context:  "Last Update for " + target,
-		Tags:     tags,
 	})
 }
 
-func extractIPHostnames(exec *schema.ModuleExecution, hostnames, tags []string) {
+func extractIPHostnames(exec *schema.ModuleExecution, hostnames []string) {
 	for _, hostname := range hostnames {
 		if hostname == "" {
 			continue
@@ -98,7 +95,6 @@ func extractIPHostnames(exec *schema.ModuleExecution, hostnames, tags []string) 
 			Type:     constants.TypePTR,
 			Category: constants.CategoryProperty,
 			Value:    hostname,
-			Tags:     tags,
 		})
 	}
 }

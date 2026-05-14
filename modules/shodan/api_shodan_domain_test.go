@@ -18,7 +18,7 @@ func TestParseShodanAPIDomain(t *testing.T) {
 	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIDomain}
 	parseShodanAPIDomain(&exec, rawBody, rootDomainValue)
 
-	assertShodanDomainTags(t, exec.Results, rootDomainValue)
+	requireTagPropertyResults(t, exec.Results, "tag1", "tag2")
 	assertShodanDomainSubdomainChain(t, exec.Results)
 	assertShodanDomainRootRecords(t, exec.Results)
 	assertShodanDomainMXRecords(t, exec.Results)
@@ -29,15 +29,6 @@ func TestParseShodanAPIDomain(t *testing.T) {
 	assertShodanDomainAdvancedRecords2(t, exec.Results)
 	assertShodanDomainInvalidSubdomains(t, exec.Results)
 	assertShodanDomainLastSeen(t, exec.Results, rootDomainValue)
-}
-
-func assertShodanDomainTags(t *testing.T, results []schema.ModuleResult, rootDomainValue string) {
-	t.Helper()
-
-	domainResult := requireModuleResult(t, results, constants.TypeDomain, rootDomainValue)
-	if len(domainResult.Tags) != 2 || domainResult.Tags[0] != "tag1" || domainResult.Tags[1] != "tag2" {
-		t.Fatalf("expected tags [tag1, tag2], got %v", domainResult.Tags)
-	}
 }
 
 func assertShodanDomainSubdomainChain(t *testing.T, results []schema.ModuleResult) {

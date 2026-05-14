@@ -20,7 +20,7 @@ var (
 	shodanDomainPatternRegex   = regexp.MustCompile(`(?i)(?:\*\.)?(?:[a-z0-9-]+\.)+[a-z]{2,63}`)
 )
 
-func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, tags []string, source *schema.EntityRef, target string) {
+func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, source *schema.EntityRef, target string) {
 	if banner.Details == nil || banner.Details.SSL == nil {
 		return
 	}
@@ -30,14 +30,14 @@ func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, tags
 			continue
 		}
 
-		sources := parseSubjectAltName(exec, extension.Data, tags)
-		appendSubjectAltNameMetadata(exec, banner.Details.SSL, tags, sources, target)
+		sources := parseSubjectAltName(exec, extension.Data)
+		appendSubjectAltNameMetadata(exec, banner.Details.SSL, sources, target)
 	}
 
-	appendBannerSSLProperties(exec, banner.Details.SSL, tags, source, target)
+	appendBannerSSLProperties(exec, banner.Details.SSL, source, target)
 }
 
-func parseSubjectAltName(exec *schema.ModuleExecution, value string, tags []string) []schema.EntityRef {
+func parseSubjectAltName(exec *schema.ModuleExecution, value string) []schema.EntityRef {
 	normalized := shodanEscapedSequenceRegex.ReplaceAllString(value, " ")
 	matches := shodanDomainPatternRegex.FindAllString(normalized, -1)
 	seen := make(map[string]struct{}, len(matches))
@@ -58,7 +58,6 @@ func parseSubjectAltName(exec *schema.ModuleExecution, value string, tags []stri
 			Type:     resultType,
 			Category: constants.CategoryNode,
 			Value:    resultValue,
-			Tags:     tags,
 		})
 		sources = append(sources, schema.EntityRef{Type: resultType, Value: resultValue})
 	}
@@ -85,7 +84,7 @@ func classifySubjectAltName(match string) (resultType, resultValue string, ok bo
 	return constants.TypeWildcardSANDomain, "*." + validated.Value, true
 }
 
-func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBanner, tags []string, sources []schema.EntityRef, target string) {
+func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBanner, sources []schema.EntityRef, target string) {
 	if len(sources) == 0 {
 		return
 	}
@@ -96,13 +95,13 @@ func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBa
 
 	for i := range sources {
 		source := &sources[i]
-		appendSubjectAltNameProperty(exec, constants.TypeCertIssuer, issuerValue, tags, source, "Cert Issuer for "+target)
-		appendSubjectAltNameProperty(exec, constants.TypeCertNotAfter, notAfterValue, tags, source, "Cert Expiration for "+target)
-		appendSubjectAltNameProperty(exec, constants.TypeTLSVersions, tlsVersionsValue, tags, source, "TLS Versions for "+target)
+		appendSubjectAltNameProperty(exec, constants.TypeCertIssuer, issuerValue, source, "Cert Issuer for "+target)
+		appendSubjectAltNameProperty(exec, constants.TypeCertNotAfter, notAfterValue, source, "Cert Expiration for "+target)
+		appendSubjectAltNameProperty(exec, constants.TypeTLSVersions, tlsVersionsValue, source, "TLS Versions for "+target)
 	}
 }
 
-func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, value string, tags []string, source *schema.EntityRef, context string) {
+func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, value string, source *schema.EntityRef, context string) {
 	if value == "" {
 		return
 	}
@@ -112,23 +111,22 @@ func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, valu
 		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  context,
-		Tags:     tags,
 		Source:   source,
 	})
 }
 
-func appendBannerSSLProperties(exec *schema.ModuleExecution, ssl *shodanSSLBanner, tags []string, source *schema.EntityRef, target string) {
+func appendBannerSSLProperties(exec *schema.ModuleExecution, ssl *shodanSSLBanner, source *schema.EntityRef, target string) {
 	if ssl == nil {
 		return
 	}
 
 	for _, fingerprint := range ssl.CertFingerprintValues {
-		appendBannerSSLProperty(exec, constants.TypeCertFingerprint, fingerprint, tags, source, "Cert Fingerprint for "+target)
+		appendBannerSSLProperty(exec, constants.TypeCertFingerprint, fingerprint, source, "Cert Fingerprint for "+target)
 	}
-	appendBannerSSLProperty(exec, constants.TypeJARM, ssl.JARMValue, tags, source, "JARM for "+target)
+	appendBannerSSLProperty(exec, constants.TypeJARM, ssl.JARMValue, source, "JARM for "+target)
 }
 
-func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value string, tags []string, source *schema.EntityRef, context string) {
+func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value string, source *schema.EntityRef, context string) {
 	if value == "" {
 		return
 	}
@@ -138,7 +136,6 @@ func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value str
 		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  context,
-		Tags:     tags,
 		Source:   source,
 	})
 }

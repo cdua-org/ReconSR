@@ -22,7 +22,7 @@ func TestParseShodanAPIIP(t *testing.T) {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
 
-	requireTaggedResults(t, exec.Results, "faketag")
+	requireTagPropertyResults(t, exec.Results, "faketag")
 	assertShodanIPServiceChain(t, exec.Results, targetIP, service)
 	assertShodanIPCoreResults(t, exec.Results)
 	assertShodanIPResultTypeAbsent(t, exec.Results, constants.TypeHeartbleed)

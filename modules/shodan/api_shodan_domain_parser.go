@@ -20,14 +20,7 @@ func parseShodanAPIDomain(exec *schema.ModuleExecution, rawBody []byte, target s
 		return
 	}
 
-	if len(payload.Tags) > 0 {
-		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     constants.TypeDomain,
-			Category: constants.CategoryNode,
-			Value:    target,
-			Tags:     payload.Tags,
-		})
-	}
+	appendShodanTagResults(exec, payload.Tags)
 
 	for _, record := range payload.Data {
 		processShodanDomainRecord(exec, record, target)

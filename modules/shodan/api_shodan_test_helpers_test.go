@@ -2,8 +2,10 @@ package shodan
 
 import (
 	"os"
+	"slices"
 	"testing"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -44,13 +46,25 @@ func requireModuleResult(t *testing.T, results []schema.ModuleResult, resultType
 	return result
 }
 
-func requireTaggedResults(t *testing.T, results []schema.ModuleResult, expectedTag string) {
+func requireTagPropertyResults(t *testing.T, results []schema.ModuleResult, expectedTags ...string) {
 	t.Helper()
 
+	actualTags := make([]string, 0, len(expectedTags))
 	for _, result := range results {
-		if len(result.Tags) != 1 || result.Tags[0] != expectedTag {
-			t.Fatalf("expected tag %q, got %+v", expectedTag, result.Tags)
+		if len(result.Tags) > 0 {
+			t.Fatalf("expected no system tags assigned via Tags field, got %+v", result)
 		}
+		if result.Type != constants.TypeTag {
+			continue
+		}
+		if result.Category != constants.CategoryProperty {
+			t.Fatalf("expected tag result to be a property, got %+v", result)
+		}
+		actualTags = append(actualTags, result.Value)
+	}
+
+	if !slices.Equal(actualTags, expectedTags) {
+		t.Fatalf("expected informational tags %v, got %v", expectedTags, actualTags)
 	}
 }
 
