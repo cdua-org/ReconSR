@@ -25,7 +25,6 @@ const (
 	TypeCAA                   = "caa"
 	TypeCert                  = "cert"
 	TypeCertAuthority         = "cert_authority"
-	TypeCNAMETarget           = "cname_target"
 	TypeDKIM                  = "dkim"
 	TypeDMARC                 = "dmarc"
 	TypeHINFO                 = "hinfo"

@@ -1,6 +1,7 @@
 package virustotal
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -22,8 +23,11 @@ func TestModuleExecDomainFixtureContract(t *testing.T) {
 	t.Run("subdomain extraction", func(t *testing.T) {
 		assertDomainSubdomainExtraction(t, run.exec.Results)
 	})
-	t.Run("dns and threat extraction", func(t *testing.T) {
-		assertDomainDNSAndThreatExtraction(t, run.exec.Results)
+	t.Run("dns extraction", func(t *testing.T) {
+		assertDomainDNSExtraction(t, run.exec.Results)
+	})
+	t.Run("threat extraction", func(t *testing.T) {
+		assertDomainThreatExtraction(t, run.exec.Results)
 	})
 	t.Run("stable metadata extraction", func(t *testing.T) {
 		assertDomainStableMetadataExtraction(t, run.exec.Results)
@@ -111,7 +115,7 @@ func assertDomainSubdomainExtraction(t *testing.T, results []schema.ModuleResult
 	}
 }
 
-func assertDomainDNSAndThreatExtraction(t *testing.T, results []schema.ModuleResult) {
+func assertDomainDNSExtraction(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
 	deepA := requireResult(t, results, "deep A record linked to api subdomain", func(result schema.ModuleResult) bool {
@@ -127,18 +131,12 @@ func assertDomainDNSAndThreatExtraction(t *testing.T, results []schema.ModuleRes
 	if deepCNAME.Category != constants.CategoryNode {
 		t.Fatalf("expected deep CNAME to be a node, got %+v", deepCNAME)
 	}
+	if !slices.Contains(deepCNAME.Tags, constants.TagCNAME) {
+		t.Fatalf("expected deep CNAME to have tag %q, got tags %v", constants.TagCNAME, deepCNAME.Tags)
+	}
 	if deepCNAME.OutOfScope {
 		t.Fatalf("expected deep CNAME to remain in scope relative to root domain, got %+v", deepCNAME)
 	}
-
-	deepThreat := requireResult(t, results, "deep threat score linked to vpn subdomain", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeVTThreatScore && result.Source != nil && result.Source.Value == fixtureVPNSubdomain
-	})
-	if !strings.Contains(deepThreat.Context, "SyntheticEngineVPNA") || !strings.Contains(deepThreat.Context, "SyntheticEngineVPNB") {
-		t.Fatalf("expected malicious and suspicious engine names in threat context, got %+v", deepThreat)
-	}
-
-	assertTagResult(t, results, "suspicious-udp")
 
 	requireResult(t, results, "CAA property", func(result schema.ModuleResult) bool {
 		return result.Type == constants.TypeCAA && strings.Contains(result.Value, "ca.example.org")
@@ -150,6 +148,19 @@ func assertDomainDNSAndThreatExtraction(t *testing.T, results []schema.ModuleRes
 	if caaAuthority.Category != constants.CategoryNode {
 		t.Fatalf("expected cert_authority to be a node, got %+v", caaAuthority)
 	}
+}
+
+func assertDomainThreatExtraction(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	deepThreat := requireResult(t, results, "deep threat score linked to vpn subdomain", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeVTThreatScore && result.Source != nil && result.Source.Value == fixtureVPNSubdomain
+	})
+	if !strings.Contains(deepThreat.Context, "SyntheticEngineVPNA") || !strings.Contains(deepThreat.Context, "SyntheticEngineVPNB") {
+		t.Fatalf("expected malicious and suspicious engine names in threat context, got %+v", deepThreat)
+	}
+
+	assertTagResult(t, results, "suspicious-udp")
 }
 
 func assertDomainStableMetadataExtraction(t *testing.T, results []schema.ModuleResult) {

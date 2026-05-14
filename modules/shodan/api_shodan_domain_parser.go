@@ -155,21 +155,18 @@ func appendShodanCNAMEResult(exec *schema.ModuleExecution, value, target string,
 	}
 
 	isOOS := orgdomain.IsOutOfScope(validated.Value, target)
-	resultType := validated.Type
-	if isOOS {
-		resultType = constants.TypeCNAMETarget
-	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:       resultType,
+		Type:       validated.Type,
 		Category:   constants.CategoryNode,
 		Value:      validated.Value,
+		Tags:       []string{constants.TagCNAME},
 		Context:    "CNAME Record",
 		OutOfScope: isOOS,
 		Source:     source,
 	})
 
-	return &schema.EntityRef{Type: resultType, Value: validated.Value}
+	return &schema.EntityRef{Type: validated.Type, Value: validated.Value}
 }
 
 func appendShodanMXResult(exec *schema.ModuleExecution, record shodanDomainRecord, value, target string, source *schema.EntityRef) *schema.EntityRef {

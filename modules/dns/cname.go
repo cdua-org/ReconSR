@@ -93,15 +93,12 @@ func buildCNAMEResult(cname, target, relationContext string) (schema.ModuleResul
 	}
 
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
-	resultType := res.Type
-	if isOOS {
-		resultType = constants.TypeCNAMETarget
-	}
 
 	return schema.ModuleResult{
-		Type:       resultType,
+		Type:       res.Type,
 		Category:   constants.CategoryNode,
 		Value:      res.Value,
+		Tags:       []string{constants.TagCNAME},
 		Context:    relationContext,
 		OutOfScope: isOOS,
 	}, true

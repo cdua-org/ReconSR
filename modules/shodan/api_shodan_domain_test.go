@@ -98,9 +98,12 @@ func assertShodanDomainMXRecords(t *testing.T, results []schema.ModuleResult) {
 func assertShodanDomainCNAMERecords(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	cnameResult := requireModuleResult(t, results, constants.TypeCNAMETarget, "edge.example.net")
+	cnameResult := requireModuleResult(t, results, constants.TypeSubdomain, "edge.example.net")
 	if !cnameResult.OutOfScope {
 		t.Fatal("expected external CNAME target to be out of scope")
+	}
+	if !slices.Contains(cnameResult.Tags, constants.TagCNAME) {
+		t.Fatalf("expected cname target to have tag %q, got tags %v", constants.TagCNAME, cnameResult.Tags)
 	}
 	if cnameResult.Context != "CNAME Record" {
 		t.Fatalf("expected CNAME Record context, got %q", cnameResult.Context)

@@ -37,6 +37,9 @@ func TestBuildCNAMEResultInScopeSubdomain(t *testing.T) {
 	if result.Type != constants.TypeSubdomain {
 		t.Fatalf("expected subdomain type, got %q", result.Type)
 	}
+	if !slices.Contains(result.Tags, constants.TagCNAME) {
+		t.Fatalf("missing tag %q", constants.TagCNAME)
+	}
 	if result.Value != "cdn.example.com" {
 		t.Fatalf("expected normalized value, got %q", result.Value)
 	}
@@ -50,8 +53,11 @@ func TestBuildCNAMEResultOutOfScope(t *testing.T) {
 	if !ok {
 		t.Fatal("expected valid CNAME result")
 	}
-	if result.Type != constants.TypeCNAMETarget {
-		t.Fatalf("expected cname_target type, got %q", result.Type)
+	if result.Type != constants.TypeSubdomain {
+		t.Fatalf("expected subdomain type, got %q", result.Type)
+	}
+	if !slices.Contains(result.Tags, constants.TagCNAME) {
+		t.Fatalf("missing tag %q", constants.TagCNAME)
 	}
 	if result.Value != "vendor.foo.example.net" {
 		t.Fatalf("expected normalized value, got %q", result.Value)
