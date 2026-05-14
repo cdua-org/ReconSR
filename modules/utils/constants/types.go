@@ -30,7 +30,6 @@ const (
 	TypeDMARC                 = "dmarc"
 	TypeHINFO                 = "hinfo"
 	TypeNAPTR                 = "naptr"
-	TypeNAPTRTarget           = "naptr_target"
 	TypeDNSKEY                = "dnskey"
 	TypeDomainKey             = "domainkey"
 	TypeDS                    = "ds"

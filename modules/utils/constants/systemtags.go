@@ -6,4 +6,5 @@ const (
 	TagDNSBad = ".dns_bad"
 	TagMX     = "mx"
 	TagSRV    = "srv"
+	TagNAPTR  = "naptr"
 )

@@ -106,9 +106,10 @@ func buildNAPTRTargetResult(source *schema.EntityRef, target, replacement string
 	isOOS := orgdomain.IsOutOfScope(scopeTarget, target)
 
 	return &schema.ModuleResult{
-		Type:       constants.TypeNAPTRTarget,
+		Type:       constants.TypeDomain,
 		Category:   constants.CategoryNode,
 		Value:      normalizedTarget,
+		Tags:       []string{constants.TagNAPTR},
 		Context:    "Replacement Target",
 		OutOfScope: isOOS,
 		Source:     source,

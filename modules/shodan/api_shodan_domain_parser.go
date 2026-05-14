@@ -430,9 +430,10 @@ func appendShodanNAPTRResult(exec *schema.ModuleExecution, value, target string,
 
 		if valid {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       constants.TypeNAPTRTarget,
+				Type:       constants.TypeDomain,
 				Category:   constants.CategoryNode,
 				Value:      validatedValue,
+				Tags:       []string{constants.TagNAPTR},
 				Context:    "NAPTR Target",
 				OutOfScope: orgdomain.IsOutOfScope(validatedValue, target),
 				Source:     source,

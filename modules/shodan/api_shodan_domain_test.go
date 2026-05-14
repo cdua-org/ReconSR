@@ -181,9 +181,12 @@ func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleRes
 func assertShodanDomainAdvancedRecords2(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	naptrTarget := requireModuleResultWithContext(t, results, constants.TypeNAPTRTarget, "_sip._udp.example.com", "NAPTR Target")
+	naptrTarget := requireModuleResultWithContext(t, results, constants.TypeDomain, "_sip._udp.example.com", "NAPTR Target")
 	if naptrTarget.Category != constants.CategoryNode || naptrTarget.OutOfScope {
-		t.Fatal("expected in-scope naptr_target node")
+		t.Fatal("expected in-scope naptr target node")
+	}
+	if !slices.Contains(naptrTarget.Tags, constants.TagNAPTR) {
+		t.Fatalf("expected naptr target to have tag %q, got tags %v", constants.TagNAPTR, naptrTarget.Tags)
 	}
 
 	rpEmail := requireModuleResultWithContext(t, results, constants.TypeEmail, "admin@example.com", "RP Administrator Email")

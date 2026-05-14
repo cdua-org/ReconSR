@@ -150,8 +150,11 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 			if result == nil {
 				t.Fatal("expected naptr target result")
 			}
-			if result.Type != constants.TypeNAPTRTarget {
+			if result.Type != constants.TypeDomain {
 				t.Fatalf("unexpected type: %s", result.Type)
+			}
+			if !slices.Contains(result.Tags, constants.TagNAPTR) {
+				t.Fatalf("missing tag %q", constants.TagNAPTR)
 			}
 			if result.Value != tt.wantValue {
 				t.Fatalf("unexpected value: %s", result.Value)
