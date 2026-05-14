@@ -3,6 +3,7 @@ package shodan
 import (
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -82,12 +83,15 @@ func assertShodanDomainMXRecords(t *testing.T, results []schema.ModuleResult) {
 		t.Fatalf("expected MX property linked to mail subdomain, got %+v", mxProp.Source)
 	}
 
-	mxHost := requireModuleResult(t, results, constants.TypeMXHost, "mx.example.com")
+	mxHost := requireModuleResult(t, results, constants.TypeDomain, "mx.example.com")
 	if mxHost.Category != constants.CategoryNode {
-		t.Fatalf("expected mx_host category to be node, got %q", mxHost.Category)
+		t.Fatalf("expected mx host category to be node, got %q", mxHost.Category)
+	}
+	if !slices.Contains(mxHost.Tags, constants.TagMX) {
+		t.Fatalf("expected mx host to have tag %q, got tags %v", constants.TagMX, mxHost.Tags)
 	}
 	if mxHost.OutOfScope {
-		t.Fatal("expected in-scope mx_host")
+		t.Fatal("expected in-scope mx host")
 	}
 }
 

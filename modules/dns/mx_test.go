@@ -81,8 +81,11 @@ func TestBuildMXHostResult(t *testing.T) {
 			if !tt.wantOK {
 				return
 			}
-			if result.Type != constants.TypeMXHost {
-				t.Fatalf("buildMXHostResult() type = %q, want %q", result.Type, constants.TypeMXHost)
+			if result.Type != constants.TypeDomain {
+				t.Fatalf("buildMXHostResult() type = %q, want %q", result.Type, constants.TypeDomain)
+			}
+			if !slices.Contains(result.Tags, constants.TagMX) {
+				t.Fatalf("buildMXHostResult() missing tag %q", constants.TagMX)
 			}
 			if result.Value != tt.wantValue {
 				t.Fatalf("buildMXHostResult() value = %q, want %q", result.Value, tt.wantValue)

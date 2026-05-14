@@ -52,7 +52,10 @@ func requireTagPropertyResults(t *testing.T, results []schema.ModuleResult, expe
 	actualTags := make([]string, 0, len(expectedTags))
 	for _, result := range results {
 		if len(result.Tags) > 0 {
-			t.Fatalf("expected no system tags assigned via Tags field, got %+v", result)
+			hasOnlyMXTag := len(result.Tags) == 1 && result.Tags[0] == constants.TagMX
+			if !hasOnlyMXTag {
+				t.Fatalf("expected no system tags assigned via Tags field, got %+v", result)
+			}
 		}
 		if result.Type != constants.TypeTag {
 			continue

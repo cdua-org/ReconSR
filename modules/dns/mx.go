@@ -88,7 +88,7 @@ func getMXData(ctx context.Context, target string) schema.ModuleExecution {
 func buildMXHostResult(host, target string) (schema.ModuleResult, bool) {
 	res, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
-		log.Printf("get_mx skipping invalid mx_host target=%q entity=%q err=%v", target, host, err)
+		log.Printf("get_mx skipping invalid mx host target=%q entity=%q err=%v", target, host, err)
 		return schema.ModuleResult{}, false
 	}
 
@@ -96,9 +96,10 @@ func buildMXHostResult(host, target string) (schema.ModuleResult, bool) {
 	log.Printf("get_mx target=%q entity=%q oos=%v", target, res.Value, isOOS)
 
 	return schema.ModuleResult{
-		Type:       constants.TypeMXHost,
+		Type:       constants.TypeDomain,
 		Category:   constants.CategoryNode,
 		Value:      res.Value,
+		Tags:       []string{constants.TagMX},
 		OutOfScope: isOOS,
 	}, true
 }

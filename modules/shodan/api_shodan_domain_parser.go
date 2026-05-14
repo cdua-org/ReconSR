@@ -193,9 +193,10 @@ func appendShodanMXResult(exec *schema.ModuleExecution, record shodanDomainRecor
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:       constants.TypeMXHost,
+		Type:       constants.TypeDomain,
 		Category:   constants.CategoryNode,
 		Value:      validated.Value,
+		Tags:       []string{constants.TagMX},
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     source,
 	})

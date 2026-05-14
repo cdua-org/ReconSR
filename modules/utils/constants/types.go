@@ -40,7 +40,6 @@ const (
 	TypeIPSECGateway          = "ipsec_gateway"
 	TypeLOC                   = "loc"
 	TypeMX                    = "mx"
-	TypeMXHost                = "mx_host"
 	TypeNS                    = "ns"
 	TypeNSEC                  = "nsec"
 	TypeOrganization          = "organization"

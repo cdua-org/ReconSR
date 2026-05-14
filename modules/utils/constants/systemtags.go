@@ -4,4 +4,5 @@ package constants
 const (
 	TagDNSOK  = ".dns_ok"
 	TagDNSBad = ".dns_bad"
+	TagMX     = "mx"
 )

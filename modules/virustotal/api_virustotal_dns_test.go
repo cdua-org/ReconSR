@@ -2,6 +2,7 @@ package virustotal
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -152,7 +153,8 @@ func TestParseDNSRecordMXAddsPropertyAndHostNode(t *testing.T) {
 	})
 
 	mxHost := requireResult(t, results, "mx host node", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeMXHost && result.Category == constants.CategoryNode && result.Value == fixtureMailSubdomain
+		hasMXTag := slices.Contains(result.Tags, constants.TagMX)
+		return result.Type == constants.TypeDomain && result.Category == constants.CategoryNode && result.Value == fixtureMailSubdomain && hasMXTag
 	})
 	assertFixtureResultSource(t, source, mxHost.Source)
 }
