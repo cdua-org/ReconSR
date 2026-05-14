@@ -11,22 +11,28 @@ import (
 
 func (m *module) extractIPMetadata(attr map[string]any, target string, exec *schema.ModuleExecution) {
 	tags := extractVTTags(attr)
+	for _, tag := range tags {
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeTag,
+			Category: constants.CategoryProperty,
+			Value:    tag,
+		})
+	}
 
 	if asn, ok := formatVTInt(attr["asn"]); ok {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeASN,
 			Category: constants.CategoryNode,
 			Value:    asn,
-			Tags:     tags,
 		})
 	}
 
 	if network, ok := attr["network"].(string); ok {
-		appendVTProperty(exec, constants.TypeCIDR, network, "Network CIDR for "+target, tags, nil)
+		appendVTProperty(exec, constants.TypeCIDR, network, "Network CIDR for "+target, nil)
 	}
 
 	if asOwner, ok := attr["as_owner"].(string); ok {
-		appendVTProperty(exec, constants.TypeOrg, asOwner, "AS Owner for "+target, tags, nil)
+		appendVTProperty(exec, constants.TypeOrg, asOwner, "AS Owner for "+target, nil)
 	}
 
 	var geoParts []string
@@ -37,16 +43,16 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 		geoParts = append(geoParts, "Continent: "+continent)
 	}
 	if len(geoParts) > 0 {
-		appendVTProperty(exec, constants.TypeGeo, strings.Join(geoParts, " | "), "Geo Location for "+target, tags, nil)
+		appendVTProperty(exec, constants.TypeGeo, strings.Join(geoParts, " | "), "Geo Location for "+target, nil)
 	}
 
 	if jarm, ok := attr["jarm"].(string); ok {
-		appendVTProperty(exec, constants.TypeJARM, jarm, "JARM for "+target, tags, nil)
+		appendVTProperty(exec, constants.TypeJARM, jarm, "JARM for "+target, nil)
 	}
 
 	if lastUpdateRaw, ok := attr["last_modification_date"].(float64); ok {
 		formattedDate := time.Unix(int64(lastUpdateRaw), 0).UTC().Format(time.RFC3339)
-		appendVTProperty(exec, constants.TypeLastUpdate, formattedDate, "Last Update for "+target, tags, nil)
+		appendVTProperty(exec, constants.TypeLastUpdate, formattedDate, "Last Update for "+target, nil)
 	}
 
 	m.extractThreatScore(attr, nil, exec)

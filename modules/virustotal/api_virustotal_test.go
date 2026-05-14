@@ -237,24 +237,6 @@ func assertNoResult(t *testing.T, results []schema.ModuleResult, description str
 	}
 }
 
-func hasAllTags(result *schema.ModuleResult, tags ...string) bool {
-	if len(tags) == 0 {
-		return true
-	}
-
-	seen := make(map[string]struct{}, len(result.Tags))
-	for _, tag := range result.Tags {
-		seen[tag] = struct{}{}
-	}
-	for _, tag := range tags {
-		if _, ok := seen[tag]; !ok {
-			return false
-		}
-	}
-
-	return true
-}
-
 func resultTextContains(result *schema.ModuleResult, parts ...string) bool {
 	text := result.Type + "\n" + result.Value + "\n" + result.Context
 	for _, part := range parts {
@@ -291,6 +273,17 @@ func assertMinimumGap(t *testing.T, earlier, later vtMockRequest, label string) 
 	const minGap = 5 * time.Millisecond
 	if gap := later.at.Sub(earlier.at); gap < minGap {
 		t.Fatalf("expected %s gap >= %s, got %s", label, minGap, gap)
+	}
+}
+
+func assertTagResult(t *testing.T, results []schema.ModuleResult, expectedTag string) {
+	t.Helper()
+
+	tagResult := requireResult(t, results, "tag "+expectedTag, func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeTag && result.Value == expectedTag
+	})
+	if tagResult.Category != constants.CategoryProperty {
+		t.Fatalf("expected tag to be property, got %+v", tagResult)
 	}
 }
 

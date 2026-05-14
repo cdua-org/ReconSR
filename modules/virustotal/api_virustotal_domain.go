@@ -16,6 +16,13 @@ const vtTimeFormat = "2006-01-02 15:04:05"
 
 func (m *module) extractDomainMetadata(attr map[string]any, target string, exec *schema.ModuleExecution) {
 	tags := extractVTTags(attr)
+	for _, tag := range tags {
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeTag,
+			Category: constants.CategoryProperty,
+			Value:    tag,
+		})
+	}
 
 	if records, ok := attr["last_dns_records"].([]any); ok {
 		for _, r := range records {
@@ -26,13 +33,13 @@ func (m *module) extractDomainMetadata(attr map[string]any, target string, exec 
 	}
 
 	m.extractThreatScore(attr, nil, exec)
-	appendDomainCategories(exec, attr, tags)
-	appendDomainReputation(exec, attr, tags)
-	appendDomainPopularityRanks(exec, attr, tags)
-	appendDomainJARM(exec, attr, target, tags)
-	appendDomainCrowdsourcedContext(exec, attr, tags)
-	appendDomainLastUpdate(exec, attr, target, tags)
-	appendDomainCertificateSummary(exec, attr, target, tags)
+	appendDomainCategories(exec, attr)
+	appendDomainReputation(exec, attr)
+	appendDomainPopularityRanks(exec, attr)
+	appendDomainJARM(exec, attr, target)
+	appendDomainCrowdsourcedContext(exec, attr)
+	appendDomainLastUpdate(exec, attr, target)
+	appendDomainCertificateSummary(exec, attr, target)
 
 	if _, ok := attr["whois"]; ok {
 		dbg.Printf("extractDomainMetadata target=%q ignored_field=whois", target)
@@ -48,7 +55,7 @@ func (m *module) extractDomainMetadata(attr map[string]any, target string, exec 
 	}
 }
 
-func appendDomainCategories(exec *schema.ModuleExecution, attr map[string]any, tags []string) {
+func appendDomainCategories(exec *schema.ModuleExecution, attr map[string]any) {
 	categories, ok := attr["categories"].(map[string]any)
 	if !ok || len(categories) == 0 {
 		return
@@ -65,11 +72,11 @@ func appendDomainCategories(exec *schema.ModuleExecution, attr map[string]any, t
 		if !ok {
 			continue
 		}
-		appendVTProperty(exec, constants.TypeInfo, category, "VirusTotal Category by "+provider, tags, nil)
+		appendVTProperty(exec, constants.TypeInfo, category, "VirusTotal Category by "+provider, nil)
 	}
 }
 
-func appendDomainReputation(exec *schema.ModuleExecution, attr map[string]any, tags []string) {
+func appendDomainReputation(exec *schema.ModuleExecution, attr map[string]any) {
 	reputationFloat, ok := attr["reputation"].(float64)
 	if !ok {
 		return
@@ -81,10 +88,10 @@ func appendDomainReputation(exec *schema.ModuleExecution, attr map[string]any, t
 	}
 
 	value := fmt.Sprintf("%d (Malicious/Suspicious)", reputation)
-	appendVTProperty(exec, constants.TypeVTReputation, value, "VirusTotal Community Reputation", tags, nil)
+	appendVTProperty(exec, constants.TypeVTReputation, value, "VirusTotal Community Reputation", nil)
 }
 
-func appendDomainPopularityRanks(exec *schema.ModuleExecution, attr map[string]any, tags []string) {
+func appendDomainPopularityRanks(exec *schema.ModuleExecution, attr map[string]any) {
 	popularityRanks, ok := attr["popularity_ranks"].(map[string]any)
 	if !ok || len(popularityRanks) == 0 {
 		return
@@ -105,20 +112,20 @@ func appendDomainPopularityRanks(exec *schema.ModuleExecution, attr map[string]a
 		if !ok {
 			continue
 		}
-		appendVTProperty(exec, constants.TypeInfo, rank, "VirusTotal Popularity Rank by "+provider, tags, nil)
+		appendVTProperty(exec, constants.TypeInfo, rank, "VirusTotal Popularity Rank by "+provider, nil)
 	}
 }
 
-func appendDomainJARM(exec *schema.ModuleExecution, attr map[string]any, target string, tags []string) {
+func appendDomainJARM(exec *schema.ModuleExecution, attr map[string]any, target string) {
 	jarm, ok := attr["jarm"].(string)
 	if !ok {
 		return
 	}
 
-	appendVTProperty(exec, constants.TypeJARM, jarm, "JARM for "+target, tags, nil)
+	appendVTProperty(exec, constants.TypeJARM, jarm, "JARM for "+target, nil)
 }
 
-func appendDomainCrowdsourcedContext(exec *schema.ModuleExecution, attr map[string]any, tags []string) {
+func appendDomainCrowdsourcedContext(exec *schema.ModuleExecution, attr map[string]any) {
 	entries, ok := attr["crowdsourced_context"].([]any)
 	if !ok || len(entries) == 0 {
 		return
@@ -145,37 +152,37 @@ func appendDomainCrowdsourcedContext(exec *schema.ModuleExecution, attr map[stri
 		if resultContext == "" {
 			resultContext = "VirusTotal Crowdsourced Context"
 		}
-		appendVTProperty(exec, constants.TypeSummary, value, resultContext, tags, nil)
+		appendVTProperty(exec, constants.TypeSummary, value, resultContext, nil)
 	}
 }
 
-func appendDomainLastUpdate(exec *schema.ModuleExecution, attr map[string]any, target string, tags []string) {
+func appendDomainLastUpdate(exec *schema.ModuleExecution, attr map[string]any, target string) {
 	lastUpdateRaw, ok := attr["last_modification_date"].(float64)
 	if !ok {
 		return
 	}
 
 	formattedDate := time.Unix(int64(lastUpdateRaw), 0).UTC().Format(time.RFC3339)
-	appendVTProperty(exec, constants.TypeLastUpdate, formattedDate, "Last Update for "+target, tags, nil)
+	appendVTProperty(exec, constants.TypeLastUpdate, formattedDate, "Last Update for "+target, nil)
 }
 
-func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[string]any, target string, tags []string) {
+func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[string]any, target string) {
 	certificate, ok := attr["last_https_certificate"].(map[string]any)
 	if !ok {
 		return
 	}
 
-	sources := appendVTCertificateSANs(exec, certificate, target, tags)
+	sources := appendVTCertificateSANs(exec, certificate, target)
 	issuer := formatVTCertificateIssuer(certificate)
 	notAfter := extractVTCertificateNotAfter(certificate)
 
 	if len(sources) == 0 {
-		appendVTProperty(exec, constants.TypeCertIssuer, issuer, "Cert Issuer for "+target, tags, nil)
-		appendVTProperty(exec, constants.TypeCertNotAfter, notAfter, "Cert Expiration for "+target, tags, nil)
+		appendVTProperty(exec, constants.TypeCertIssuer, issuer, "Cert Issuer for "+target, nil)
+		appendVTProperty(exec, constants.TypeCertNotAfter, notAfter, "Cert Expiration for "+target, nil)
 	} else {
 		for _, source := range sources {
-			appendVTProperty(exec, constants.TypeCertIssuer, issuer, "Cert Issuer for "+target, tags, source)
-			appendVTProperty(exec, constants.TypeCertNotAfter, notAfter, "Cert Expiration for "+target, tags, source)
+			appendVTProperty(exec, constants.TypeCertIssuer, issuer, "Cert Issuer for "+target, source)
+			appendVTProperty(exec, constants.TypeCertNotAfter, notAfter, "Cert Expiration for "+target, source)
 		}
 	}
 
@@ -190,11 +197,11 @@ func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[strin
 			algo = suffix
 		}
 
-		appendVTProperty(exec, constants.TypeCertFingerprint, algo+":"+strVal, "Cert Fingerprint for "+target, tags, nil)
+		appendVTProperty(exec, constants.TypeCertFingerprint, algo+":"+strVal, "Cert Fingerprint for "+target, nil)
 	}
 }
 
-func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[string]any, target string, tags []string) []*schema.EntityRef {
+func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[string]any, target string) []*schema.EntityRef {
 	extensions, ok := certificate["extensions"].(map[string]any)
 	if !ok {
 		return nil
@@ -229,7 +236,6 @@ func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[strin
 				Type:     resultType,
 				Category: constants.CategoryNode,
 				Value:    resultValue,
-				Tags:     tags,
 				Source: &schema.EntityRef{
 					Type:  constants.TypeDomain,
 					Value: target,
@@ -382,7 +388,14 @@ func (m *module) extractSubdomain(item map[string]any, parent string, disableCer
 
 	if notAfterStr != "" {
 		tags := extractVTTags(attr)
-		appendVTProperty(exec, constants.TypeCertNotAfter, notAfterStr, "Cert Expiration for "+validatedSubdomain.Value, tags, subRef)
+		for _, tag := range tags {
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     constants.TypeTag,
+				Category: constants.CategoryProperty,
+				Value:    tag,
+			})
+		}
+		appendVTProperty(exec, constants.TypeCertNotAfter, notAfterStr, "Cert Expiration for "+validatedSubdomain.Value, subRef)
 		if isExpired {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeStatus,

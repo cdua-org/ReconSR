@@ -11,7 +11,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func appendVTProperty(exec *schema.ModuleExecution, resultType, value, resultContext string, tags []string, source *schema.EntityRef) {
+func appendVTProperty(exec *schema.ModuleExecution, resultType, value, resultContext string, source *schema.EntityRef) {
 	trimmedValue := strings.TrimSpace(value)
 	if trimmedValue == "" {
 		return
@@ -22,7 +22,6 @@ func appendVTProperty(exec *schema.ModuleExecution, resultType, value, resultCon
 		Category: constants.CategoryProperty,
 		Value:    trimmedValue,
 		Context:  strings.TrimSpace(resultContext),
-		Tags:     tags,
 		Source:   source,
 	})
 }

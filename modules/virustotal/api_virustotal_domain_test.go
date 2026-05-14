@@ -138,6 +138,8 @@ func assertDomainDNSAndThreatExtraction(t *testing.T, results []schema.ModuleRes
 		t.Fatalf("expected malicious and suspicious engine names in threat context, got %+v", deepThreat)
 	}
 
+	assertTagResult(t, results, "suspicious-udp")
+
 	requireResult(t, results, "CAA property", func(result schema.ModuleResult) bool {
 		return result.Type == constants.TypeCAA && strings.Contains(result.Value, "ca.example.org")
 	})

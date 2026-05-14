@@ -98,9 +98,8 @@ func assertIPMetadataExtractionCore(t *testing.T, results []schema.ModuleResult)
 		return result.Type == constants.TypeLastUpdate && strings.Contains(result.Value, "2026-02-13T16:30:00Z")
 	})
 
-	requireResult(t, results, "tag propagation", func(result schema.ModuleResult) bool {
-		return hasAllTags(&result, "synthetic", "network")
-	})
+	assertTagResult(t, results, "synthetic")
+	assertTagResult(t, results, "network")
 
 	threat := requireResult(t, results, "ip threat score", func(result schema.ModuleResult) bool {
 		return result.Type == constants.TypeVTThreatScore

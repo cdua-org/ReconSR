@@ -425,7 +425,7 @@
         "harmless": 86,
         "malicious": 20
       },
-      "tags": [],
+      "tags": ["suspicious-udp"],
       "rdap": {
         "handle": "2724960_DOMAIN_COM-VRSN",
         "ldh_name": "target-example.com",
