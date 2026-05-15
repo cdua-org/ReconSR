@@ -32,7 +32,7 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 	}
 
 	if asOwner, ok := attr["as_owner"].(string); ok {
-		appendVTProperty(exec, constants.TypeOrg, asOwner, "AS Owner for "+target, nil)
+		appendVTProperty(exec, constants.TypeOrganization, asOwner, "AS Owner for "+target, nil)
 	}
 
 	var geoParts []string

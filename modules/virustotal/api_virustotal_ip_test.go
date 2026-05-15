@@ -114,7 +114,7 @@ func assertIPMetadataExtractionGeo(t *testing.T, results []schema.ModuleResult) 
 	t.Helper()
 
 	requireResult(t, results, "as owner result", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeOrg && result.Value == "Example Network Operations"
+		return result.Type == constants.TypeOrganization && result.Value == "Example Network Operations"
 	})
 
 	requireResult(t, results, "geo result", func(result schema.ModuleResult) bool {

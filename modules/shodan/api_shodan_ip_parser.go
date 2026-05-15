@@ -53,7 +53,7 @@ func extractIPASN(exec *schema.ModuleExecution, asn string) {
 }
 
 func extractIPProperties(exec *schema.ModuleExecution, payload *shodanIPResponse, target string) {
-	appendIPProperty(exec, constants.TypeOrg, payload.Org, "Organization for "+target)
+	appendIPProperty(exec, constants.TypeOrganization, payload.Org, "Organization for "+target)
 	if !strings.EqualFold(payload.ISP, payload.Org) {
 		appendIPProperty(exec, constants.TypeISP, payload.ISP, "ISP for "+target)
 	}

@@ -70,7 +70,6 @@ const (
 	TypeTLSVersions           = "tls_versions"
 	TypeWebServer             = "web_server"
 	TypeISP                   = "isp"
-	TypeOrg                   = "organization"
 	TypeOS                    = "os"
 	TypeGeo                   = "geo"
 	TypeHash                  = "hash"

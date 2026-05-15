@@ -148,7 +148,7 @@ func assertShodanIPCoreResults(t *testing.T, results []schema.ModuleResult) {
 		t.Fatalf("expected validated PTR domain to have tag %q, got tags %v", constants.TagReverseIP, ptrDomain.Tags)
 	}
 	requireModuleResult(t, results, constants.TypeISP, "Fake ISP")
-	requireModuleResult(t, results, constants.TypeOrg, "Fake Org")
+	requireModuleResult(t, results, constants.TypeOrganization, "Fake Org")
 	requireModuleResult(t, results, constants.TypeOS, "FakeOS")
 	requireModuleResult(t, results, constants.TypePort, "443/tcp")
 	requireModuleResult(t, results, constants.TypeLastUpdate, "2027-05-05T16:15:08Z")
