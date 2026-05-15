@@ -44,44 +44,55 @@ func parseSubjectAltName(exec *schema.ModuleExecution, value string) []schema.En
 	sources := make([]schema.EntityRef, 0, len(matches))
 
 	for _, match := range matches {
-		resultType, resultValue, ok := classifySubjectAltName(match)
+		resultType, resultValue, wildcardContext, ok := classifySubjectAltName(match)
 		if !ok {
 			continue
 		}
-		cacheKey := resultType + ":" + resultValue
+		cacheKey := resultType + ":" + resultValue + ":" + wildcardContext
 		if _, exists := seen[cacheKey]; exists {
 			continue
 		}
 		seen[cacheKey] = struct{}{}
 
-		exec.Results = append(exec.Results, schema.ModuleResult{
+		result := schema.ModuleResult{
 			Type:     resultType,
 			Category: constants.CategoryNode,
 			Value:    resultValue,
-		})
+			Tags:     []string{constants.TagSan},
+		}
+		if wildcardContext != "" {
+			result.Tags = append(result.Tags, constants.TagWildcard)
+			result.Context = wildcardContext
+		}
+
+		exec.Results = append(exec.Results, result)
 		sources = append(sources, schema.EntityRef{Type: resultType, Value: resultValue})
 	}
 
 	return sources
 }
 
-func classifySubjectAltName(match string) (resultType, resultValue string, ok bool) {
-	isWildcard := strings.HasPrefix(match, "*.")
-	candidate := strings.TrimPrefix(match, "*.")
+func classifySubjectAltName(match string) (resultType, resultValue, wildcardContext string, ok bool) {
+	candidate := match
+	isWildcard := false
+	if trimmedWildcard, found := strings.CutPrefix(match, "*."); found {
+		candidate = trimmedWildcard
+		isWildcard = true
+	}
 	if candidate == "" {
-		return "", "", false
+		return "", "", "", false
 	}
 
 	validated, err := validator.Validate(constants.TypeDomain, candidate)
 	if err != nil {
-		return "", "", false
+		return "", "", "", false
 	}
 
-	if !isWildcard {
-		return constants.TypeSANDomain, validated.Value, true
+	if isWildcard {
+		wildcardContext = "*." + validated.Value
 	}
 
-	return constants.TypeWildcardSANDomain, "*." + validated.Value, true
+	return validated.Type, validated.Value, wildcardContext, true
 }
 
 func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBanner, sources []schema.EntityRef, target string) {

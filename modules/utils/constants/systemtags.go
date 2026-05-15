@@ -12,6 +12,7 @@ const (
 	TagCNAME     = "cname"
 	TagCAA       = "caa"
 	TagHIP       = "hip"
+	TagSan       = "san"
 	TagWildcard  = "wildcard"
 	TagPDNS      = "passive_dns"
 	TagReverseIP = "reverse_ip"

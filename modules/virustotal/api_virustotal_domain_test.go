@@ -93,15 +93,30 @@ func assertDomainSubdomainExtraction(t *testing.T, results []schema.ModuleResult
 		t.Fatalf("expected subdomain source to point to root domain, got %s", describeSource(subdomain.Source))
 	}
 
+	assertDomainWildcardSAN(t, results)
+	assertDomainRegularSAN(t, results)
+	assertDomainOutOfScopeSAN(t, results)
+}
+
+func assertDomainWildcardSAN(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
 	wildcardSAN := requireResult(t, results, "wildcard SAN node", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeSubdomain && result.Value == "partners.target-example.com" && slices.Contains(result.Tags, constants.TagWildcard)
+		return result.Type == constants.TypeSubdomain && result.Value == "partners.target-example.com"
 	})
 	if wildcardSAN.Category != constants.CategoryNode {
 		t.Fatalf("expected wildcard SAN to be a node, got %+v", wildcardSAN)
 	}
+	if !slices.Contains(wildcardSAN.Tags, constants.TagSan) || !slices.Contains(wildcardSAN.Tags, constants.TagWildcard) {
+		t.Fatalf("expected SAN and wildcard tags, got %+v", wildcardSAN.Tags)
+	}
 	if wildcardSAN.Context != "*.partners.target-example.com" {
 		t.Fatalf("expected wildcard SAN context, got %q", wildcardSAN.Context)
 	}
+}
+
+func assertDomainRegularSAN(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
 
 	loginSAN := requireResult(t, results, "regular SAN node", func(result schema.ModuleResult) bool {
 		return result.Type == constants.TypeSubdomain && result.Value == "login.target-example.com"
@@ -109,12 +124,25 @@ func assertDomainSubdomainExtraction(t *testing.T, results []schema.ModuleResult
 	if loginSAN.Category != constants.CategoryNode {
 		t.Fatalf("expected SAN to be a node, got %+v", loginSAN)
 	}
+	if !slices.Contains(loginSAN.Tags, constants.TagSan) {
+		t.Fatalf("expected SAN tag, got %+v", loginSAN.Tags)
+	}
+}
+
+func assertDomainOutOfScopeSAN(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
 
 	oosSAN := requireResult(t, results, "out of scope SAN node", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeSANDomain && result.Value == "example.net"
+		return result.Type == constants.TypeDomain && result.Value == "example.net"
 	})
 	if oosSAN.Category != constants.CategoryNode {
 		t.Fatalf("expected out-of-scope SAN to be a node, got %+v", oosSAN)
+	}
+	if !slices.Contains(oosSAN.Tags, constants.TagSan) {
+		t.Fatalf("expected SAN tag, got %+v", oosSAN.Tags)
+	}
+	if !oosSAN.OutOfScope {
+		t.Fatalf("expected out-of-scope SAN to be marked out of scope, got %+v", oosSAN)
 	}
 }
 

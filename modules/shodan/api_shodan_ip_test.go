@@ -129,15 +129,15 @@ func assertShodanIPPortSource(t *testing.T, results []schema.ModuleResult, resul
 func assertShodanIPCoreResults(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	sanResult := requireModuleResult(t, results, constants.TypeSANDomain, "tls.sandbox.example.com")
+	sanResult := requireModuleResultWithTag(t, results, constants.TypeSubdomain, "tls.sandbox.example.com", constants.TagSan)
 	if sanResult.Source != nil {
 		t.Fatalf("expected SAN to be attached directly to target IP, got %+v", sanResult.Source)
 	}
-	assertShodanIPResultSource(t, results, constants.TypeCertIssuer, "O: Example Test CA | CN: Example Issuer | C: ZZ", constants.TypeSANDomain, "tls.sandbox.example.com")
-	assertShodanIPResultSource(t, results, constants.TypeCertNotAfter, "2027-07-20T19:44:15Z", constants.TypeSANDomain, "tls.sandbox.example.com")
-	assertShodanIPResultSource(t, results, constants.TypeTLSVersions, "TLSv1.2, TLSv1.3", constants.TypeSANDomain, "tls.sandbox.example.com")
+	assertShodanIPResultSource(t, results, constants.TypeCertIssuer, "O: Example Test CA | CN: Example Issuer | C: ZZ", constants.TypeSubdomain, "tls.sandbox.example.com")
+	assertShodanIPResultSource(t, results, constants.TypeCertNotAfter, "2027-07-20T19:44:15Z", constants.TypeSubdomain, "tls.sandbox.example.com")
+	assertShodanIPResultSource(t, results, constants.TypeTLSVersions, "TLSv1.2, TLSv1.3", constants.TypeSubdomain, "tls.sandbox.example.com")
 
-	requireModuleResult(t, results, constants.TypeSANDomain, "alt.sandbox.example.com")
+	requireModuleResultWithTag(t, results, constants.TypeSubdomain, "alt.sandbox.example.com", constants.TagSan)
 	shodanDomain := requireModuleResult(t, results, constants.TypeSubdomain, "fake.example.com")
 	if !slices.Contains(shodanDomain.Tags, constants.TagReverseIP) {
 		t.Fatalf("expected shodan domain to have tag %q, got tags %v", constants.TagReverseIP, shodanDomain.Tags)
@@ -170,18 +170,23 @@ func TestParseShodanAPIIPParsesEscapedSubjectAltName(t *testing.T) {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
 
-	wildcardResult := requireModuleResult(t, exec.Results, constants.TypeWildcardSANDomain, wildcardSAN)
+	wildcardResult := requireModuleResultWithTag(t, exec.Results, constants.TypeSubdomain, "wild.sandbox.example.com", constants.TagSan)
 	if wildcardResult.Source != nil {
 		t.Fatalf("expected wildcard SAN to be attached directly to target IP, got %+v", wildcardResult.Source)
+	}
+	if !slices.Contains(wildcardResult.Tags, constants.TagWildcard) {
+		t.Fatalf("expected wildcard SAN tag, got %+v", wildcardResult.Tags)
+	}
+	if wildcardResult.Context != wildcardSAN {
+		t.Fatalf("expected wildcard SAN context, got %q", wildcardResult.Context)
 	}
 	requireModuleResult(t, exec.Results, constants.TypePort, "443/tcp")
 	assertShodanIPResultSource(t, exec.Results, constants.TypeCertFingerprint, "sha1:00112233445566778899aabbccddeeff00112233", constants.TypePort, "443/tcp")
 	assertShodanIPResultSource(t, exec.Results, constants.TypeCertFingerprint, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", constants.TypePort, "443/tcp")
-	assertShodanIPResultSource(t, exec.Results, constants.TypeCertIssuer, "O: Example Test CA | CN: Example Issuer | C: ZZ", constants.TypeWildcardSANDomain, wildcardSAN)
-	assertShodanIPResultSource(t, exec.Results, constants.TypeCertNotAfter, "2027-07-20T19:44:15Z", constants.TypeWildcardSANDomain, wildcardSAN)
-	assertShodanIPResultSource(t, exec.Results, constants.TypeTLSVersions, "TLSv1.2, TLSv1.3", constants.TypeWildcardSANDomain, wildcardSAN)
-	requireModuleResult(t, exec.Results, constants.TypeSANDomain, "wild.sandbox.example.com")
-	if _, ok := findModuleResult(exec.Results, constants.TypeSANDomain, "twild.sandbox.example.com"); ok {
+	assertShodanIPResultSource(t, exec.Results, constants.TypeCertIssuer, "O: Example Test CA | CN: Example Issuer | C: ZZ", constants.TypeSubdomain, "wild.sandbox.example.com")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeCertNotAfter, "2027-07-20T19:44:15Z", constants.TypeSubdomain, "wild.sandbox.example.com")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeTLSVersions, "TLSv1.2, TLSv1.3", constants.TypeSubdomain, "wild.sandbox.example.com")
+	if _, ok := findModuleResult(exec.Results, constants.TypeSubdomain, "twild.sandbox.example.com"); ok {
 		t.Fatalf("expected escaped SAN data to avoid bogus tnewton.ua result, got %+v", exec.Results)
 	}
 }

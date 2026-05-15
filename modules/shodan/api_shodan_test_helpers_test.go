@@ -56,6 +56,7 @@ func allowedDNSResultTags() []string {
 		constants.TagCNAME,
 		constants.TagCAA,
 		constants.TagHIP,
+		constants.TagSan,
 		constants.TagWildcard,
 		constants.TagReverseIP,
 	}

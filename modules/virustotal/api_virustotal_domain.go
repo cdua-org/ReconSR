@@ -219,7 +219,7 @@ func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[strin
 		if !ok {
 			continue
 		}
-		resultType, resultValue, wildcardContext, valid := classifyVTCertificateSAN(san, target)
+		resultType, resultValue, wildcardContext, valid := classifyVTCertificateSAN(san)
 		if !valid {
 			continue
 		}
@@ -231,20 +231,22 @@ func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[strin
 		seen[cacheKey] = struct{}{}
 
 		var src *schema.EntityRef
-		if resultType != constants.TypeDomain || wildcardContext != "" {
+		if resultValue != target || wildcardContext != "" {
 			result := schema.ModuleResult{
-				Type:     resultType,
-				Category: constants.CategoryNode,
-				Value:    resultValue,
+				Type:       resultType,
+				Category:   constants.CategoryNode,
+				Value:      resultValue,
+				Tags:       []string{constants.TagSan},
+				OutOfScope: orgdomain.IsOutOfScope(resultValue, target),
 			}
-			if resultType != constants.TypeDomain {
+			if resultValue != target {
 				result.Source = &schema.EntityRef{
 					Type:  constants.TypeDomain,
 					Value: target,
 				}
 			}
 			if wildcardContext != "" {
-				result.Tags = []string{constants.TagWildcard}
+				result.Tags = append(result.Tags, constants.TagWildcard)
 				result.Context = wildcardContext
 			}
 			exec.Results = append(exec.Results, result)
@@ -257,10 +259,12 @@ func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[strin
 	return sources
 }
 
-func classifyVTCertificateSAN(value, target string) (resultType, resultValue, wildcardContext string, ok bool) {
+func classifyVTCertificateSAN(value string) (resultType, resultValue, wildcardContext string, ok bool) {
 	trimmedValue := strings.TrimSpace(value)
-	isWildcard := strings.HasPrefix(trimmedValue, "*.")
-	candidate := strings.TrimPrefix(trimmedValue, "*.")
+	candidate := trimmedValue
+	if trimmedWildcard, found := strings.CutPrefix(trimmedValue, "*."); found {
+		candidate = trimmedWildcard
+	}
 	if candidate == "" {
 		return "", "", "", false
 	}
@@ -270,23 +274,11 @@ func classifyVTCertificateSAN(value, target string) (resultType, resultValue, wi
 		return "", "", "", false
 	}
 
-	if isWildcard {
+	if candidate != trimmedValue {
 		wildcardContext = "*." + validated.Value
 	}
 
-	if validated.Value == target {
-		return constants.TypeDomain, validated.Value, wildcardContext, true
-	}
-
-	if !orgdomain.IsOutOfScope(validated.Value, target) {
-		return constants.TypeSubdomain, validated.Value, wildcardContext, true
-	}
-
-	if !isWildcard {
-		return constants.TypeSANDomain, validated.Value, "", true
-	}
-
-	return constants.TypeWildcardSANDomain, "*." + validated.Value, "", true
+	return validated.Type, validated.Value, wildcardContext, true
 }
 
 func formatVTCertificateIssuer(certificate map[string]any) string {
