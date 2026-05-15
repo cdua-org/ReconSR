@@ -295,6 +295,25 @@ func (m *module) result(typ, category, value, ctx string, oos bool, anchor *sche
 	return res
 }
 
+func buildWhoisServerResult(host, target string) (schema.ModuleResult, bool) {
+	res, err := validator.Validate(constants.TypeDomain, host)
+	if err != nil {
+		dbg.Printf("buildWhoisServerResult skipping invalid whois server target=%q entity=%q err=%v", target, host, err)
+		return schema.ModuleResult{}, false
+	}
+
+	isOOS := orgdomain.IsOutOfScope(res.Value, target)
+	dbg.Printf("buildWhoisServerResult target=%q entity=%q oos=%v", target, res.Value, isOOS)
+
+	return schema.ModuleResult{
+		Type:       res.Type,
+		Category:   constants.CategoryNode,
+		Value:      res.Value,
+		Tags:       []string{constants.TagWhoisServer},
+		OutOfScope: isOOS,
+	}, true
+}
+
 func (m *module) buildMetadataResults(metadata *Metadata, target, sourceCtx string, registrarAnchor *schema.EntityRef) []schema.ModuleResult {
 	results := make([]schema.ModuleResult, 0, 15)
 
@@ -302,8 +321,11 @@ func (m *module) buildMetadataResults(metadata *Metadata, target, sourceCtx stri
 		results = append(results, m.result(constants.TypeURL, constants.CategoryProperty, metadata.RegistrarURL, "Registrar URL ("+sourceCtx+")", true, registrarAnchor))
 	}
 	if metadata.WhoisServer != "" {
-		if res, err := validator.Validate(constants.TypeDomain, metadata.WhoisServer); err == nil {
-			results = append(results, m.result(constants.TypeWhoisServer, constants.CategoryNode, res.Value, "Whois Server ("+sourceCtx+")", true, registrarAnchor))
+		if result, ok := buildWhoisServerResult(metadata.WhoisServer, target); ok {
+			result.Context = "Whois Server (" + sourceCtx + ")"
+			result.Applied = true
+			result.Source = registrarAnchor
+			results = append(results, result)
 		}
 	}
 	if metadata.IANAID != "" {

@@ -16,7 +16,6 @@ const (
 	TypeWhoisTech             = "whois_tech"
 	TypeWhoisBilling          = "whois_billing"
 	TypeWhoisAbuse            = "whois_abuse"
-	TypeWhoisServer           = "whois_server"
 	TypeCertExpiredSubdomains = "cert_expired_subdomains"
 	TypeCertNotAfter          = "cert_not_after"
 	TypeDomainCertNotAfter    = "domain_cert_not_after"
