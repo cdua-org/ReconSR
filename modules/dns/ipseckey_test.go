@@ -110,21 +110,30 @@ func TestClassifyIPSECKEYGateway(t *testing.T) {
 			wantOOS:   false,
 		},
 		{
-			name:      "domain gateway becomes ipsec gateway",
+			name:      "domain gateway stays domain",
+			gwType:    "3",
+			gateway:   "example.info",
+			wantOK:    true,
+			wantType:  constants.TypeDomain,
+			wantValue: "example.info",
+			wantOOS:   true,
+		},
+		{
+			name:      "subdomain gateway becomes tagged subdomain",
 			gwType:    "3",
 			gateway:   "vpn-gateway.example.com",
 			wantOK:    true,
-			wantType:  constants.TypeIPSECGateway,
+			wantType:  constants.TypeSubdomain,
 			wantValue: "vpn-gateway.example.com",
 			wantOOS:   false,
 		},
 		{
-			name:      "external domain gateway stays out of scope",
+			name:      "external subdomain gateway stays out of scope",
 			gwType:    "3",
-			gateway:   "vpn-gateway.example.net",
+			gateway:   "vpn-gateway.example.edu",
 			wantOK:    true,
-			wantType:  constants.TypeIPSECGateway,
-			wantValue: "vpn-gateway.example.net",
+			wantType:  constants.TypeSubdomain,
+			wantValue: "vpn-gateway.example.edu",
 			wantOOS:   true,
 		},
 		{
@@ -155,6 +164,9 @@ func TestClassifyIPSECKEYGateway(t *testing.T) {
 			}
 			if got.Value != tt.wantValue {
 				t.Fatalf("classifyIPSECKEYGateway() value = %q, want %q", got.Value, tt.wantValue)
+			}
+			if !slices.Contains(got.Tags, constants.TagIPSECKEY) {
+				t.Fatalf("classifyIPSECKEYGateway() missing tag %q", constants.TagIPSECKEY)
 			}
 			if got.OutOfScope != tt.wantOOS {
 				t.Fatalf("classifyIPSECKEYGateway() out_of_scope = %v, want %v", got.OutOfScope, tt.wantOOS)
@@ -189,19 +201,19 @@ func TestBuildIPSECKEYResults(t *testing.T) {
 			wantNodeOOS:   false,
 		},
 		{
-			name:          "in scope domain gateway produces ipsec gateway node",
+			name:          "in scope domain gateway produces tagged subdomain node",
 			parsed:        "10 3 2 branch-vpn.example.com AQID",
 			wantLen:       2,
-			wantNodeType:  constants.TypeIPSECGateway,
+			wantNodeType:  constants.TypeSubdomain,
 			wantNodeValue: "branch-vpn.example.com",
 			wantNodeOOS:   false,
 		},
 		{
-			name:          "external domain gateway produces out of scope ipsec gateway node",
-			parsed:        "10 3 2 branch-vpn.example.net AQID",
+			name:          "external domain gateway produces out of scope subdomain node",
+			parsed:        "10 3 2 branch-vpn.example.edu AQID",
 			wantLen:       2,
-			wantNodeType:  constants.TypeIPSECGateway,
-			wantNodeValue: "branch-vpn.example.net",
+			wantNodeType:  constants.TypeSubdomain,
+			wantNodeValue: "branch-vpn.example.edu",
 			wantNodeOOS:   true,
 		},
 		{
@@ -215,10 +227,10 @@ func TestBuildIPSECKEYResults(t *testing.T) {
 			wantLen: 1,
 		},
 		{
-			name:          "domain gateway from parsed wire format produces ipsec gateway node",
+			name:          "domain gateway from parsed wire format produces tagged subdomain node",
 			parsed:        parseIPSECKEY("\\# 23 0A03020376706E076578616D706C6503636F6D00010203"),
 			wantLen:       2,
-			wantNodeType:  constants.TypeIPSECGateway,
+			wantNodeType:  constants.TypeSubdomain,
 			wantNodeValue: "vpn.example.com",
 			wantNodeOOS:   false,
 		},
@@ -260,6 +272,9 @@ func TestBuildIPSECKEYResults(t *testing.T) {
 			}
 			if node.Value != tt.wantNodeValue {
 				t.Fatalf("buildIPSECKEYResults() node value = %q, want %q", node.Value, tt.wantNodeValue)
+			}
+			if !slices.Contains(node.Tags, constants.TagIPSECKEY) {
+				t.Fatalf("buildIPSECKEYResults() node missing tag %q", constants.TagIPSECKEY)
 			}
 			if node.OutOfScope != tt.wantNodeOOS {
 				t.Fatalf("buildIPSECKEYResults() node out_of_scope = %v, want %v", node.OutOfScope, tt.wantNodeOOS)

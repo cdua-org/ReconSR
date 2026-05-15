@@ -134,15 +134,12 @@ func mapIPSECKEYContext(precedence, gwTypeStr, algStr string) (ctx, gwTypeName s
 
 func classifyIPSECKEYGateway(gwTypeStr, gateway, target string) (schema.ModuleResult, bool) {
 	var validationType string
-	emittedType := constants.TypeIPSECGateway
 
 	switch gwTypeStr {
 	case "1":
 		validationType = constants.TypeIPv4
-		emittedType = constants.TypeIP
 	case "2":
 		validationType = constants.TypeIPv6
-		emittedType = constants.TypeIP
 	case "3":
 		validationType = ipsecGatewayDomainValidation
 	default:
@@ -154,12 +151,16 @@ func classifyIPSECKEYGateway(gwTypeStr, gateway, target string) (schema.ModuleRe
 		return schema.ModuleResult{}, false
 	}
 
-	if (validationType == constants.TypeIPv4 || validationType == constants.TypeIPv6) && res.Type != validationType {
-		return schema.ModuleResult{}, false
+	emittedType := res.Type
+	if validationType == constants.TypeIPv4 || validationType == constants.TypeIPv6 {
+		if res.Type != validationType {
+			return schema.ModuleResult{}, false
+		}
+		emittedType = constants.TypeIP
 	}
 
 	isOOS := false
-	if emittedType == constants.TypeIPSECGateway {
+	if validationType == constants.TypeDomain {
 		isOOS = orgdomain.IsOutOfScope(res.Value, target)
 	}
 
@@ -167,6 +168,7 @@ func classifyIPSECKEYGateway(gwTypeStr, gateway, target string) (schema.ModuleRe
 		Type:       emittedType,
 		Category:   constants.CategoryNode,
 		Value:      res.Value,
+		Tags:       []string{constants.TagIPSECKEY},
 		OutOfScope: isOOS,
 	}, true
 }

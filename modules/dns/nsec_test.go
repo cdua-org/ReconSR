@@ -46,31 +46,31 @@ func TestGetNSECDataEmpty(t *testing.T) {
 }
 
 func TestExtractNSECDomainWildcard(t *testing.T) {
-	rootResult := extractNSECDomain("*.example.com.", "example.com", "missing.example.com", "NSEC Next Domain")
+	rootResult := extractNSECDomain("*.example.org.", "example.org", "missing.example.net", "NSEC Next Domain")
 	if rootResult == nil {
 		t.Fatal("expected wildcard root domain result")
 	}
 	if rootResult.Type != constants.TypeDomain {
 		t.Fatalf("expected normalized root domain type, got %q", rootResult.Type)
 	}
-	if rootResult.Value != "example.com" {
+	if rootResult.Value != "example.org" {
 		t.Fatalf("expected normalized root wildcard value, got %q", rootResult.Value)
 	}
 
-	result := extractNSECDomain("*.wild.example.com.", "example.com", "missing.example.com", "NSEC Next Domain")
+	result := extractNSECDomain("*.wild.example.net.", "example.net", "missing.example.edu", "NSEC Next Domain")
 	if result == nil {
 		t.Fatal("expected wildcard NSEC domain result")
 	}
 	if result.Type != constants.TypeSubdomain {
 		t.Fatalf("expected normalized subdomain type, got %q", result.Type)
 	}
-	if result.Value != "wild.example.com" {
+	if result.Value != "wild.example.net" {
 		t.Fatalf("expected normalized wildcard value, got %q", result.Value)
 	}
 	if !slices.Contains(result.Tags, constants.TagWildcard) {
 		t.Fatalf("expected wildcard tag, got %+v", result.Tags)
 	}
-	if result.Context != "*.wild.example.com" {
+	if result.Context != "*.wild.example.net" {
 		t.Fatalf("expected full wildcard context, got %q", result.Context)
 	}
 }

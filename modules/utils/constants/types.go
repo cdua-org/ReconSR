@@ -31,7 +31,6 @@ const (
 	TypeDS                    = "ds"
 	TypeHIP                   = "hip"
 	TypeIPSECKEY              = "ipseckey"
-	TypeIPSECGateway          = "ipsec_gateway"
 	TypeLOC                   = "loc"
 	TypeMX                    = "mx"
 	TypeNSEC                  = "nsec"
