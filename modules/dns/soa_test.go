@@ -109,12 +109,16 @@ func TestBuildSOAPrimaryNSResultSkipsInvalidAndNormalizes(t *testing.T) {
 		t.Fatal("expected primary NS result")
 	}
 
-	if result.Type != constants.TypeNS {
-		t.Fatalf("expected type ns, got %q", result.Type)
+	if result.Type != constants.TypeSubdomain {
+		t.Fatalf("expected type subdomain, got %q", result.Type)
 	}
 
 	if result.Value != "ns1.example.com" {
 		t.Fatalf("expected normalized NS value, got %q", result.Value)
+	}
+
+	if !slices.Contains(result.Tags, constants.TagNS) {
+		t.Fatalf("expected ns tag, got %v", result.Tags)
 	}
 
 	if result.Context != "Primary NS" {

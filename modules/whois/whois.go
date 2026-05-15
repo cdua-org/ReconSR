@@ -17,6 +17,7 @@ import (
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
+	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
@@ -322,20 +323,20 @@ func (m *module) buildMetadataResults(metadata *Metadata, target, sourceCtx stri
 		results = append(results, m.result(constants.TypeDate, constants.CategoryProperty, metadata.ExpirationDate, "Expiration Date ("+sourceCtx+")", false, nil))
 	}
 	for _, ns := range metadata.NameServers {
-		oos := !strings.HasSuffix(strings.ToLower(ns), "."+strings.ToLower(target))
-		typ := constants.TypeNS
-		category := constants.CategoryNode
 		if !strings.Contains(ns, ".") {
-			typ = constants.TypeHandle
-			category = constants.CategoryProperty
-		} else {
-			if res, err := validator.Validate(constants.TypeDomain, ns); err == nil {
-				ns = res.Value
-			} else {
-				continue
-			}
+			oos := !strings.HasSuffix(strings.ToLower(ns), "."+strings.ToLower(target))
+			results = append(results, m.result(constants.TypeHandle, constants.CategoryProperty, ns, "Name Server ("+sourceCtx+")", oos, nil))
+			continue
 		}
-		results = append(results, m.result(typ, category, ns, "Name Server ("+sourceCtx+")", oos, nil))
+
+		res, err := validator.Validate(constants.TypeDomain, ns)
+		if err != nil {
+			continue
+		}
+
+		result := m.result(res.Type, constants.CategoryNode, res.Value, "Name Server ("+sourceCtx+")", orgdomain.IsOutOfScope(res.Value, target), nil)
+		result.Tags = []string{constants.TagNS}
+		results = append(results, result)
 	}
 	for _, st := range metadata.DomainStatus {
 		results = append(results, m.result(constants.TypeStatus, constants.CategoryProperty, st, "Domain Status ("+sourceCtx+")", false, nil))

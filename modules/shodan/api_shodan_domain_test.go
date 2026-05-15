@@ -66,7 +66,7 @@ func assertShodanDomainRootRecords(t *testing.T, results []schema.ModuleResult) 
 		t.Fatalf("expected root AAAA record linked to target, got %+v", rootIPv6.Source)
 	}
 
-	nsResult := requireModuleResultWithContext(t, results, constants.TypeNS, "ns1.example.com", "NS Record")
+	nsResult := requireModuleResultWithTag(t, results, constants.TypeSubdomain, "ns1.example.com", constants.TagNS)
 	if nsResult.Source == nil || nsResult.Source.Type != constants.TypeSubdomain || nsResult.Source.Value != "ns1.example.com" {
 		t.Fatalf("expected NS record linked to ns1 subdomain, got %+v", nsResult.Source)
 	}
@@ -145,7 +145,10 @@ func assertShodanDomainSOA(t *testing.T, results []schema.ModuleResult) {
 		t.Fatalf("expected root SOA serial linked to target, got %+v", soaSerial.Source)
 	}
 
-	primaryNS := requireModuleResultWithContext(t, results, constants.TypeNS, "ns1.example.com", "Primary NS")
+	primaryNS := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "ns1.example.com", "Primary NS")
+	if !slices.Contains(primaryNS.Tags, constants.TagNS) {
+		t.Fatalf("expected SOA primary NS to have tag %q, got %v", constants.TagNS, primaryNS.Tags)
+	}
 	if primaryNS.Source != nil {
 		t.Fatalf("expected SOA primary NS linked to target, got %+v", primaryNS.Source)
 	}

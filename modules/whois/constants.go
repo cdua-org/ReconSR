@@ -14,6 +14,7 @@ const (
 	whoisFieldURL               = "url"
 	whoisFieldStatus            = "status"
 	whoisFieldWhoisServer       = "whoisserver"
+	whoisFieldNameServer        = "nameserver"
 	whoisFieldIANAID            = "ianaid"
 	whoisFieldDNSSEC            = "dnssec"
 	whoisFieldCreation          = "creation"

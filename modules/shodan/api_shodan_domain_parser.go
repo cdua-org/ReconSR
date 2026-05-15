@@ -208,15 +208,15 @@ func appendShodanNSResult(exec *schema.ModuleExecution, value, target string, so
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:       constants.TypeNS,
+		Type:       validated.Type,
 		Category:   constants.CategoryNode,
 		Value:      validated.Value,
-		Context:    "NS Record",
+		Tags:       []string{constants.TagNS},
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     source,
 	})
 
-	return &schema.EntityRef{Type: constants.TypeNS, Value: validated.Value}
+	return &schema.EntityRef{Type: validated.Type, Value: validated.Value}
 }
 
 func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainRecord, value string, source *schema.EntityRef) *schema.EntityRef {
@@ -271,9 +271,10 @@ func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRec
 	validatedNS, err := validator.Validate(constants.TypeDomain, primaryNS)
 	if err == nil {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:       constants.TypeNS,
+			Type:       validatedNS.Type,
 			Category:   constants.CategoryNode,
 			Value:      validatedNS.Value,
+			Tags:       []string{constants.TagNS},
 			Context:    "Primary NS",
 			OutOfScope: orgdomain.IsOutOfScope(validatedNS.Value, target),
 			Source:     source,

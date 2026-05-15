@@ -99,7 +99,7 @@ var whoisPatterns = map[string]*regexp.Regexp{
 	whoisFieldCreation:    regexp.MustCompile(`(?i)(Creation|Created(?:\s+On)?|Registered(?:\s+on)?|Activated|Registration\s+Time|Registered\s+Time)(?:\s+Date)?\s*:\s+(.*)`),
 	whoisFieldUpdated:     regexp.MustCompile(`(?i)(Updated|Last[\s-]+Updated|Last[\s-]+Update|Last\s+Modified|Modified|Changed)(?:\s+(?:Date|On))?(?:\s*:\s*|\s+)(.*)`),
 	whoisFieldExpiration:  regexp.MustCompile(`(?i)(Registry\s+Expiry|Expiration|Expiry|Expire|Expires|Expiration\s+Time|paid-till|Renewal\s+Date)(?:\s+Date)?\s*:\s+(.*)`),
-	constants.TypeNS:      regexp.MustCompile(`(?i)(Name\s+Server|nserver|nameservers?|DNS)\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
+	whoisFieldNameServer:  regexp.MustCompile(`(?i)(Name\s+Server|nserver|nameservers?|DNS)\s*:\s+([a-zA-Z0-9][a-zA-Z0-9.-]*)`),
 	whoisFieldStatus:      regexp.MustCompile(`(?i)(Domain\s+)?(Status|State)\s*:\s+(.*)`),
 
 	// Registrant contact (ICANN standard)
@@ -312,7 +312,7 @@ func isFooterMarker(line string) bool {
 
 func isDomainLevelKey(key string) bool {
 	switch key {
-	case constants.TypeDomain, whoisFieldStatus, constants.TypeNS, whoisFieldDNSSEC, whoisFieldCreation, whoisFieldUpdated, whoisFieldExpiration,
+	case constants.TypeDomain, whoisFieldStatus, whoisFieldNameServer, whoisFieldDNSSEC, whoisFieldCreation, whoisFieldUpdated, whoisFieldExpiration,
 		whoisFieldWhoisServer, whoisFieldIANAID, whoisFieldURL:
 		return true
 	}
@@ -414,7 +414,7 @@ func applyContinuation(m *Metadata, lastKey, currentRole, val string) {
 		m.Billing.Address = appendUnique(m.Billing.Address, val)
 	case whoisFieldJP2Address, whoisFieldJP2PostalCode, whoisFieldKRRegZip:
 		m.Registrant.Address = appendUnique(m.Registrant.Address, val)
-	case constants.TypeNS:
+	case whoisFieldNameServer:
 		addNameServer(m, strings.Fields(val)[0])
 	}
 }
@@ -717,7 +717,7 @@ func applyDomainMatch(m *Metadata, key, val string) {
 		if m.ExpirationDate == "" {
 			m.ExpirationDate = val
 		}
-	case constants.TypeNS:
+	case whoisFieldNameServer:
 		addNameServer(m, val)
 	case whoisFieldStatus:
 		if !slices.Contains(m.DomainStatus, val) {

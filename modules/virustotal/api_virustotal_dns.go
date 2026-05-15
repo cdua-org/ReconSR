@@ -123,10 +123,10 @@ func (m *module) appendVTNSResult(exec *schema.ModuleExecution, target string, s
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:       constants.TypeNS,
+		Type:       validated.Type,
 		Category:   constants.CategoryNode,
 		Value:      validated.Value,
-		Context:    "NS Record",
+		Tags:       []string{constants.TagNS},
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     src,
 	})

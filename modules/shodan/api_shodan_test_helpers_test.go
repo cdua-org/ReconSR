@@ -49,6 +49,7 @@ func requireModuleResult(t *testing.T, results []schema.ModuleResult, resultType
 func allowedDNSResultTags() []string {
 	return []string{
 		constants.TagMX,
+		constants.TagNS,
 		constants.TagSRV,
 		constants.TagNAPTR,
 		constants.TagRP,
@@ -94,6 +95,19 @@ func requireModuleResultWithContext(t *testing.T, results []schema.ModuleResult,
 	}
 
 	t.Fatalf("expected result %s=%q context=%q not found", resultType, value, context)
+	return schema.ModuleResult{}
+}
+
+func requireModuleResultWithTag(t *testing.T, results []schema.ModuleResult, resultType, value, tag string) schema.ModuleResult {
+	t.Helper()
+
+	for _, result := range results {
+		if result.Type == resultType && result.Value == value && slices.Contains(result.Tags, tag) {
+			return result
+		}
+	}
+
+	t.Fatalf("expected result %s=%q tag=%q not found", resultType, value, tag)
 	return schema.ModuleResult{}
 }
 

@@ -75,10 +75,10 @@ func buildNSResult(rawNS, target string) (schema.ModuleResult, bool) {
 
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
 	return schema.ModuleResult{
-		Type:       constants.TypeNS,
+		Type:       res.Type,
 		Category:   constants.CategoryNode,
 		Value:      res.Value,
-		Context:    "NS Record",
+		Tags:       []string{constants.TagNS},
 		OutOfScope: isOOS,
 	}, true
 }

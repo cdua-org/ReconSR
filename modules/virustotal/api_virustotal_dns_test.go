@@ -165,7 +165,8 @@ func TestParseDNSRecordNSYieldsNode(t *testing.T) {
 	results := parseDNSRecordFromFixture(t, fixtureAPISubdomain, source, rec)
 
 	nsResult := requireResult(t, results, "ns node", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeNS && result.Category == constants.CategoryNode && result.Value == "ns1.target-example.com"
+		hasNSTag := slices.Contains(result.Tags, constants.TagNS)
+		return result.Type == constants.TypeSubdomain && result.Category == constants.CategoryNode && result.Value == "ns1.target-example.com" && hasNSTag
 	})
 	assertFixtureResultSource(t, source, nsResult.Source)
 }
@@ -180,7 +181,8 @@ func TestParseDNSRecordSOAAddsPropertyAndPrimaryNSNode(t *testing.T) {
 	})
 
 	nsResult := requireResult(t, results, "soa primary ns node", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeNS && result.Category == constants.CategoryNode && result.Value == "ns1-39.example-dns.com"
+		hasNSTag := slices.Contains(result.Tags, constants.TagNS)
+		return result.Type == constants.TypeSubdomain && result.Category == constants.CategoryNode && result.Value == "ns1-39.example-dns.com" && hasNSTag
 	})
 	assertFixtureResultSource(t, source, nsResult.Source)
 }

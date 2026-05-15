@@ -118,9 +118,10 @@ func buildSOAPrimaryNSResult(rawNS, target string) *schema.ModuleResult {
 	log.Printf("get_soa target=%q entity=%q oos=%v", target, res.Value, isOOS)
 
 	return &schema.ModuleResult{
-		Type:       constants.TypeNS,
+		Type:       res.Type,
 		Category:   constants.CategoryNode,
 		Value:      res.Value,
+		Tags:       []string{constants.TagNS},
 		Context:    "Primary NS",
 		OutOfScope: isOOS,
 	}

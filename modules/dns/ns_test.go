@@ -29,8 +29,8 @@ func TestGetNSData(t *testing.T) {
 		t.Logf("Network resolution error: %v", *res.Error)
 	case len(res.Results) == 0:
 		t.Error("expected at least one NS for example.com")
-	case res.Results[0].Type != constants.TypeNS:
-		t.Errorf("unexpected type: %s", res.Results[0].Type)
+	case !slices.Contains(res.Results[0].Tags, constants.TagNS):
+		t.Errorf("expected ns tag, got %v", res.Results[0].Tags)
 	}
 }
 
@@ -39,14 +39,14 @@ func TestBuildNSResultInScope(t *testing.T) {
 	if !ok {
 		t.Fatal("expected valid NS result")
 	}
-	if result.Type != constants.TypeNS {
-		t.Fatalf("expected ns type, got %q", result.Type)
+	if result.Type != constants.TypeSubdomain {
+		t.Fatalf("expected subdomain type, got %q", result.Type)
 	}
 	if result.Value != "ns1.example.com" {
 		t.Fatalf("expected normalized value, got %q", result.Value)
 	}
-	if result.Context != "NS Record" {
-		t.Fatalf("unexpected context: got %q", result.Context)
+	if !slices.Contains(result.Tags, constants.TagNS) {
+		t.Fatalf("expected ns tag, got %v", result.Tags)
 	}
 	if result.OutOfScope {
 		t.Fatal("expected in-scope NS to stay in scope")
