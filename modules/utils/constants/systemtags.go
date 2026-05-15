@@ -8,4 +8,5 @@ const (
 	TagSRV    = "srv"
 	TagNAPTR  = "naptr"
 	TagCNAME  = "cname"
+	TagCAA    = "caa"
 )

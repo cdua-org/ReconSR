@@ -24,7 +24,6 @@ const (
 	TypeDomainCertNotAfter    = "domain_cert_not_after"
 	TypeCAA                   = "caa"
 	TypeCert                  = "cert"
-	TypeCertAuthority         = "cert_authority"
 	TypeDKIM                  = "dkim"
 	TypeDMARC                 = "dmarc"
 	TypeHINFO                 = "hinfo"

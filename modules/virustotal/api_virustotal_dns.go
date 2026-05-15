@@ -226,9 +226,10 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, src *schema.En
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:       constants.TypeCertAuthority,
+		Type:       validated.Type,
 		Category:   constants.CategoryNode,
 		Value:      validated.Value,
+		Tags:       []string{constants.TagCAA},
 		Context:    "Authorized CA (" + tag + ")",
 		OutOfScope: true,
 		Source:     src,

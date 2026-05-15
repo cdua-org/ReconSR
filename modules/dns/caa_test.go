@@ -40,13 +40,13 @@ func TestParseCAARecord(t *testing.T) {
 		{
 			name:           "issue basic",
 			record:         issueRecord,
-			expectedTypes:  []string{constants.TypeCAA, constants.TypeCertAuthority},
+			expectedTypes:  []string{constants.TypeCAA, constants.TypeSubdomain},
 			expectedValues: []string{issueRecord, authorityDomain},
 		},
 		{
 			name:           "issue normalizes authority domain",
 			record:         `0 issue "CA.EXAMPLE.COM"`,
-			expectedTypes:  []string{constants.TypeCAA, constants.TypeCertAuthority},
+			expectedTypes:  []string{constants.TypeCAA, constants.TypeSubdomain},
 			expectedValues: []string{`0 issue "CA.EXAMPLE.COM"`, "ca.example.com"},
 		},
 		{
@@ -58,13 +58,13 @@ func TestParseCAARecord(t *testing.T) {
 		{
 			name:           "issue with parameters",
 			record:         `0 issue "ca.example.net; cansignhttpexchanges=yes"`,
-			expectedTypes:  []string{constants.TypeCAA, constants.TypeCertAuthority},
+			expectedTypes:  []string{constants.TypeCAA, constants.TypeSubdomain},
 			expectedValues: []string{`0 issue "ca.example.net; cansignhttpexchanges=yes"`, "ca.example.net"},
 		},
 		{
 			name:           "hex encoded issue",
 			record:         `\# 21 00 05 69 73 73 75 65 63 61 2e 65 78 61 6d 70 6c 65 2e 63 6f 6d`,
-			expectedTypes:  []string{constants.TypeCAA, constants.TypeCertAuthority},
+			expectedTypes:  []string{constants.TypeCAA, constants.TypeSubdomain},
 			expectedValues: []string{issueRecord, authorityDomain},
 		},
 		{

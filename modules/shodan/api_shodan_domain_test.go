@@ -170,9 +170,12 @@ func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleRes
 		t.Fatalf("expected srv host to have tag %q, got tags %v", constants.TagSRV, srvHost.Tags)
 	}
 
-	caaAuth := requireModuleResultWithContext(t, results, constants.TypeCertAuthority, "ca.example.net", "CAA Record")
+	caaAuth := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "ca.example.net", "CAA Record")
 	if caaAuth.Category != constants.CategoryNode || !caaAuth.OutOfScope {
 		t.Fatal("expected out-of-scope cert_authority node")
+	}
+	if !slices.Contains(caaAuth.Tags, constants.TagCAA) {
+		t.Fatalf("expected cert_authority to have tag %q, got tags %v", constants.TagCAA, caaAuth.Tags)
 	}
 
 	uriEndpoint := requireModuleResultWithContext(t, results, constants.TypeURL, "https://example.com/api", "URI Endpoint")

@@ -198,7 +198,7 @@ func TestParseDNSRecordCAAAddsAuthorityNode(t *testing.T) {
 	})
 
 	authority := requireResult(t, results, "cert authority node", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeCertAuthority && result.Category == constants.CategoryNode && result.Value == "mail-ca.example.org"
+		return result.Type == constants.TypeSubdomain && result.Category == constants.CategoryNode && result.Value == "mail-ca.example.org" && slices.Contains(result.Tags, constants.TagCAA)
 	})
 	assertFixtureResultSource(t, source, authority.Source)
 }

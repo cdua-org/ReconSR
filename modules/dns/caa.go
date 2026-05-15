@@ -96,9 +96,10 @@ func buildCAAAuthorityResult(tag, val string) (schema.ModuleResult, bool) {
 	}
 
 	return schema.ModuleResult{
-		Type:       constants.TypeCertAuthority,
+		Type:       res.Type,
 		Category:   constants.CategoryNode,
 		Value:      res.Value,
+		Tags:       []string{constants.TagCAA},
 		Context:    "Authorized CA" + " (" + tag + ")",
 		OutOfScope: true,
 	}, true

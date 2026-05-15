@@ -143,7 +143,7 @@ func assertDomainDNSExtraction(t *testing.T, results []schema.ModuleResult) {
 	})
 
 	caaAuthority := requireResult(t, results, "CAA authority node", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeCertAuthority && result.Value == "ca.example.org"
+		return result.Type == constants.TypeSubdomain && result.Value == "ca.example.org" && slices.Contains(result.Tags, constants.TagCAA)
 	})
 	if caaAuthority.Category != constants.CategoryNode {
 		t.Fatalf("expected cert_authority to be a node, got %+v", caaAuthority)

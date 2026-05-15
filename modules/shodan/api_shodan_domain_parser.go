@@ -379,9 +379,10 @@ func appendShodanCAAResult(exec *schema.ModuleExecution, value, target string, s
 		issuer := strings.Trim(parts[2], "\"")
 		if validated, err := validator.Validate(constants.TypeDomain, issuer); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       constants.TypeCertAuthority,
+				Type:       validated.Type,
 				Category:   constants.CategoryNode,
 				Value:      validated.Value,
+				Tags:       []string{constants.TagCAA},
 				Context:    "CAA Record",
 				OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 				Source:     source,
