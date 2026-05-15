@@ -2,13 +2,15 @@ package constants
 
 // TagDNSOK and related constants define standardized tag values used by modules to report findings and routing prerequisites consistently.
 const (
-	TagDNSOK  = ".dns_ok"
-	TagDNSBad = ".dns_bad"
-	TagMX     = "mx"
-	TagSRV    = "srv"
-	TagNAPTR  = "naptr"
-	TagRP     = "rp"
-	TagCNAME  = "cname"
-	TagCAA    = "caa"
-	TagHIP    = "hip"
+	TagDNSOK     = ".dns_ok"
+	TagDNSBad    = ".dns_bad"
+	TagMX        = "mx"
+	TagSRV       = "srv"
+	TagNAPTR     = "naptr"
+	TagRP        = "rp"
+	TagCNAME     = "cname"
+	TagCAA       = "caa"
+	TagHIP       = "hip"
+	TagPDNS      = "passive_dns"
+	TagReverseIP = "reverse_ip"
 )

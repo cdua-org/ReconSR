@@ -75,9 +75,10 @@ func (m *module) extractIPResolution(item map[string]any, _ string, exec *schema
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     constants.TypePDNSRecord,
+		Type:     validated.Type,
 		Category: constants.CategoryNode,
 		Value:    validated.Value,
 		Context:  "VirusTotal Passive DNS",
+		Tags:     []string{constants.TagPDNS},
 	})
 }

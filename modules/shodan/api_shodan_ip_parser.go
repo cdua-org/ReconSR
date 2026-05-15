@@ -30,9 +30,10 @@ func extractIPDomains(exec *schema.ModuleExecution, domains []string) {
 	for _, domain := range domains {
 		if val, err := validator.Validate(constants.TypeDomain, domain); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:     constants.TypeShodanDomain,
+				Type:     val.Type,
 				Category: constants.CategoryNode,
 				Value:    val.Value,
+				Tags:     []string{constants.TagReverseIP},
 			})
 		}
 	}
@@ -87,14 +88,30 @@ func extractIPLastUpdate(exec *schema.ModuleExecution, lastUpdate, target string
 
 func extractIPHostnames(exec *schema.ModuleExecution, hostnames []string) {
 	for _, hostname := range hostnames {
-		if hostname == "" {
-			continue
-		}
-
-		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     constants.TypePTR,
-			Category: constants.CategoryProperty,
-			Value:    hostname,
-		})
+		appendReverseIPHostnameResult(exec, hostname, "Shodan PTR")
 	}
+}
+
+func appendReverseIPHostnameResult(exec *schema.ModuleExecution, hostname, context string) {
+	if hostname == "" {
+		return
+	}
+
+	if validated, err := validator.Validate(constants.TypeDomain, hostname); err == nil {
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     validated.Type,
+			Category: constants.CategoryNode,
+			Value:    validated.Value,
+			Context:  context,
+			Tags:     []string{constants.TagReverseIP},
+		})
+		return
+	}
+
+	exec.Results = append(exec.Results, schema.ModuleResult{
+		Type:     constants.TypePTR,
+		Category: constants.CategoryProperty,
+		Value:    hostname,
+		Context:  context,
+	})
 }

@@ -1,6 +1,7 @@
 package virustotal
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -131,18 +132,24 @@ func assertIPPassiveDNSExtraction(t *testing.T, results []schema.ModuleResult) {
 		fixtureAPISubdomain,
 	} {
 		result := requireResult(t, results, "passive dns result for "+host, func(result schema.ModuleResult) bool {
-			return result.Type == constants.TypePDNSRecord && result.Value == host
+			return result.Type == constants.TypeSubdomain && result.Value == host
 		})
 		if result.Category != constants.CategoryNode {
 			t.Fatalf("expected passive dns to be node, got %+v", result)
 		}
+		if !slices.Contains(result.Tags, constants.TagPDNS) {
+			t.Fatalf("expected passive dns to have tag %q, got tags %v", constants.TagPDNS, result.Tags)
+		}
 	}
 
 	oosPDNS := requireResult(t, results, "out of scope passive dns", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypePDNSRecord && result.Value == "example.net"
+		return result.Type == constants.TypeDomain && result.Value == "example.net"
 	})
 	if oosPDNS.Category != constants.CategoryNode {
 		t.Fatalf("expected out of scope passive dns to be node, got %+v", oosPDNS)
+	}
+	if !slices.Contains(oosPDNS.Tags, constants.TagPDNS) {
+		t.Fatalf("expected out of scope passive dns to have tag %q, got tags %v", constants.TagPDNS, oosPDNS.Tags)
 	}
 }
 

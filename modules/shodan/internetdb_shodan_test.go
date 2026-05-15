@@ -235,8 +235,11 @@ func TestGetInternetDB_Success(t *testing.T) {
 		typesCount[res.Type]++
 	}
 
-	if typesCount[constants.TypePTR] != 1 {
-		t.Errorf("expected 1 ptr result, got %d", typesCount[constants.TypePTR])
+	if typesCount[constants.TypeSubdomain] != 1 {
+		t.Errorf("expected 1 reverse IP subdomain result, got %d", typesCount[constants.TypeSubdomain])
+	}
+	if typesCount[constants.TypePTR] != 0 {
+		t.Errorf("expected 0 ptr results for valid hostnames, got %d", typesCount[constants.TypePTR])
 	}
 	if typesCount["port"] != 3 {
 		t.Errorf("expected 3 port results, got %d", typesCount["port"])

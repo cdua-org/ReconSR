@@ -3,6 +3,7 @@ package shodan
 import (
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -137,9 +138,15 @@ func assertShodanIPCoreResults(t *testing.T, results []schema.ModuleResult) {
 	assertShodanIPResultSource(t, results, constants.TypeTLSVersions, "TLSv1.2, TLSv1.3", constants.TypeSANDomain, "tls.sandbox.example.com")
 
 	requireModuleResult(t, results, constants.TypeSANDomain, "alt.sandbox.example.com")
-	requireModuleResult(t, results, constants.TypeShodanDomain, "fake.example.com")
+	shodanDomain := requireModuleResult(t, results, constants.TypeSubdomain, "fake.example.com")
+	if !slices.Contains(shodanDomain.Tags, constants.TagReverseIP) {
+		t.Fatalf("expected shodan domain to have tag %q, got tags %v", constants.TagReverseIP, shodanDomain.Tags)
+	}
 	requireModuleResult(t, results, constants.TypeASN, "99999")
-	requireModuleResult(t, results, constants.TypePTR, "ptr.fake.example.com")
+	ptrDomain := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "ptr.fake.example.com", "Shodan PTR")
+	if !slices.Contains(ptrDomain.Tags, constants.TagReverseIP) {
+		t.Fatalf("expected validated PTR domain to have tag %q, got tags %v", constants.TagReverseIP, ptrDomain.Tags)
+	}
 	requireModuleResult(t, results, constants.TypeISP, "Fake ISP")
 	requireModuleResult(t, results, constants.TypeOrg, "Fake Org")
 	requireModuleResult(t, results, constants.TypeOS, "FakeOS")
@@ -204,6 +211,20 @@ func TestParseShodanAPIIPSkipsDuplicateWebServerValue(t *testing.T) {
 	assertShodanIPResultSource(t, exec.Results, constants.TypeHash, "3333333", constants.TypePort, "443/tcp https")
 	assertShodanIPResultSource(t, exec.Results, constants.TypeCPE, "cpe:/a:f5:nginx", constants.TypePort, "443/tcp https")
 	assertShodanIPResultSource(t, exec.Results, constants.TypeCPE23, "cpe:2.3:a:f5:nginx", constants.TypePort, "443/tcp https")
+}
+
+func TestAppendReverseIPHostnameResultKeepsInvalidPTRProperty(t *testing.T) {
+	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
+
+	appendReverseIPHostnameResult(&exec, "invalid ptr hostname", "Synthetic PTR")
+
+	result := requireModuleResultWithContext(t, exec.Results, constants.TypePTR, "invalid ptr hostname", "Synthetic PTR")
+	if result.Category != constants.CategoryProperty {
+		t.Fatalf("expected invalid PTR hostname to stay property, got %+v", result)
+	}
+	if len(result.Tags) > 0 {
+		t.Fatalf("expected invalid PTR hostname to have no tags, got %v", result.Tags)
+	}
 }
 
 func assertShodanIPResultSource(t *testing.T, results []schema.ModuleResult, resultType, value, sourceType, sourceValue string) {

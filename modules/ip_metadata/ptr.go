@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 
+	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
@@ -98,16 +99,32 @@ func getPTRData(target string) (execution schema.ModuleExecution) {
 	}
 
 	for _, name := range names {
-		name = strings.TrimSuffix(name, ".")
-		if name == "" {
-			continue
-		}
-		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:     constants.TypePTR,
-			Category: constants.CategoryProperty,
-			Value:    name,
-		})
+		appendPTRResult(&execution, name)
 	}
 
 	return execution
+}
+
+func appendPTRResult(execution *schema.ModuleExecution, name string) {
+	name = strings.TrimSuffix(name, ".")
+	if name == "" {
+		return
+	}
+
+	if validated, err := validator.Validate(constants.TypeDomain, name); err == nil {
+		execution.Results = append(execution.Results, schema.ModuleResult{
+			Type:     validated.Type,
+			Category: constants.CategoryNode,
+			Value:    validated.Value,
+			Context:  "PTR Record",
+			Tags:     []string{constants.TagReverseIP},
+		})
+		return
+	}
+
+	execution.Results = append(execution.Results, schema.ModuleResult{
+		Type:     constants.TypePTR,
+		Category: constants.CategoryProperty,
+		Value:    name,
+	})
 }

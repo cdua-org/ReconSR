@@ -108,8 +108,34 @@ func TestGetPTRData(t *testing.T) {
 	if len(res.Results) == 0 {
 		t.Fatal("expected at least one PTR record")
 	}
+	if res.Results[0].Type != constants.TypeSubdomain {
+		t.Errorf("expected type %q, got %q", constants.TypeSubdomain, res.Results[0].Type)
+	}
+	if !slices.Contains(res.Results[0].Tags, constants.TagReverseIP) {
+		t.Errorf("expected tag %q, got %v", constants.TagReverseIP, res.Results[0].Tags)
+	}
+}
+
+func TestGetPTRDataInvalidPTRHostname(t *testing.T) {
+	setPTRQueryMock(t, func(string) ([]string, error) {
+		return []string{"invalid ptr hostname."}, nil
+	})
+
+	res := getPTRData("198.51.100.2")
+	if res.Error != nil {
+		t.Fatalf("expected no error, got: %v", *res.Error)
+	}
+	if len(res.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(res.Results))
+	}
 	if res.Results[0].Type != constants.TypePTR {
 		t.Errorf("expected type %q, got %q", constants.TypePTR, res.Results[0].Type)
+	}
+	if res.Results[0].Category != constants.CategoryProperty {
+		t.Errorf("expected category %q, got %q", constants.CategoryProperty, res.Results[0].Category)
+	}
+	if len(res.Results[0].Tags) > 0 {
+		t.Errorf("expected no tags for invalid PTR hostname, got %v", res.Results[0].Tags)
 	}
 }
 
