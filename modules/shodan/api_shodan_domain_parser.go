@@ -28,7 +28,7 @@ func parseShodanAPIDomain(exec *schema.ModuleExecution, rawBody []byte, target s
 }
 
 func processShodanDomainRecord(exec *schema.ModuleExecution, record shodanDomainRecord, target string) {
-	fqdn, entityType, isValidNode, ok := buildShodanFQDN(target, record.Subdomain)
+	fqdn, entityType, wildcardContext, isValidNode, ok := buildShodanFQDN(target, record.Subdomain)
 	if !ok {
 		return
 	}
@@ -36,7 +36,7 @@ func processShodanDomainRecord(exec *schema.ModuleExecution, record shodanDomain
 	var source *schema.EntityRef
 	if isValidNode {
 		if record.Type != "TXT" || !strings.HasPrefix(record.Subdomain, "_") {
-			source = appendShodanSubdomain(exec, fqdn, entityType, target)
+			source = appendShodanSubdomain(exec, fqdn, entityType, target, wildcardContext)
 		}
 	}
 	value := strings.TrimSpace(record.Value)
@@ -48,7 +48,7 @@ func processShodanDomainRecord(exec *schema.ModuleExecution, record shodanDomain
 	appendShodanLastSeen(exec, record.LastSeen, lastSeenSource, fqdn)
 }
 
-func buildShodanFQDN(target, subdomain string) (resultValue, resultType string, isValidNode, ok bool) {
+func buildShodanFQDN(target, subdomain string) (resultValue, resultType, wildcardContext string, isValidNode, ok bool) {
 	fqdn := target
 	if subdomain != "" && subdomain != "@" {
 		fqdn = subdomain + "." + target
@@ -65,7 +65,7 @@ func buildShodanFQDN(target, subdomain string) (resultValue, resultType string, 
 			resultType = constants.TypeSubdomain
 			isValidNode = false
 		} else {
-			return "", "", false, false
+			return "", "", "", false, false
 		}
 	} else {
 		resultValue = validated.Value
@@ -73,29 +73,30 @@ func buildShodanFQDN(target, subdomain string) (resultValue, resultType string, 
 	}
 
 	if isWildcard {
-		resultValue = "*." + resultValue
-		if resultType == constants.TypeDomain {
-			resultType = constants.TypeWildcardDomain
-		} else {
-			resultType = constants.TypeWildcardSubdomain
-		}
+		wildcardContext = "*." + resultValue
 	}
 
-	return resultValue, resultType, isValidNode, true
+	return resultValue, resultType, wildcardContext, isValidNode, true
 }
 
-func appendShodanSubdomain(exec *schema.ModuleExecution, fqdn, entityType, target string) *schema.EntityRef {
-	if fqdn == target {
+func appendShodanSubdomain(exec *schema.ModuleExecution, fqdn, entityType, target, wildcardContext string) *schema.EntityRef {
+	if fqdn == target && wildcardContext == "" {
 		return nil
 	}
 
-	exec.Results = append(exec.Results, schema.ModuleResult{
+	result := schema.ModuleResult{
 		Type:       entityType,
 		Category:   constants.CategoryNode,
 		Value:      fqdn,
 		Context:    "Shodan DNS",
 		OutOfScope: orgdomain.IsOutOfScope(fqdn, target),
-	})
+	}
+	if wildcardContext != "" {
+		result.Tags = []string{constants.TagWildcard}
+		result.Context = wildcardContext
+	}
+
+	exec.Results = append(exec.Results, result)
 
 	return &schema.EntityRef{Type: entityType, Value: fqdn}
 }

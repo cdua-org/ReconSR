@@ -169,22 +169,24 @@ func extractNSECDomain(raw, target, nxTarget, contextDesc string) *schema.Module
 		return nil
 	}
 
-	if _, err := validator.Validate(constants.TypeDomain, domain); err != nil {
-		return nil
-	}
-
-	if strings.EqualFold(domain, target) || strings.EqualFold(domain, nxTarget) {
-		return nil
-	}
-
-	if !strings.HasSuffix(strings.ToLower(domain), "."+strings.ToLower(target)) {
-		return nil
-	}
-
 	isWildcard := strings.HasPrefix(domain, "*.")
 	cleanDomain := domain
 	if isWildcard {
 		cleanDomain = strings.TrimPrefix(domain, "*.")
+	}
+
+	if _, err := validator.Validate(constants.TypeDomain, cleanDomain); err != nil {
+		return nil
+	}
+
+	if !isWildcard && (strings.EqualFold(cleanDomain, target) || strings.EqualFold(cleanDomain, nxTarget)) {
+		return nil
+	}
+
+	if !strings.EqualFold(cleanDomain, target) {
+		if !strings.HasSuffix(strings.ToLower(cleanDomain), "."+strings.ToLower(target)) {
+			return nil
+		}
 	}
 
 	org := orgdomain.GetOrganizationalDomain(cleanDomain)
@@ -197,19 +199,17 @@ func extractNSECDomain(raw, target, nxTarget, contextDesc string) *schema.Module
 		resType = constants.TypeDomain
 	}
 
-	if isWildcard {
-		if resType == constants.TypeDomain {
-			resType = constants.TypeWildcardDomain
-		} else {
-			resType = constants.TypeWildcardSubdomain
-		}
-	}
-
-	return &schema.ModuleResult{
+	result := schema.ModuleResult{
 		Type:       resType,
 		Category:   constants.CategoryNode,
-		Value:      domain,
+		Value:      cleanDomain,
 		Context:    contextDesc,
-		OutOfScope: orgdomain.IsOutOfScope(domain, target),
+		OutOfScope: orgdomain.IsOutOfScope(cleanDomain, target),
 	}
+	if isWildcard {
+		result.Tags = []string{constants.TagWildcard}
+		result.Context = domain
+	}
+
+	return &result
 }

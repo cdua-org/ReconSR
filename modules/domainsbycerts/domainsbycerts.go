@@ -280,18 +280,22 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 			continue
 		}
 
-		resultType := constants.TypeSubdomain
-		if strings.HasPrefix(subdomain, "*.") {
-			resultType = constants.TypeWildcardSubdomain
-		}
-
-		results = append(results, schema.ModuleResult{
-			Type:     resultType,
+		resultValue := subdomain
+		result := schema.ModuleResult{
+			Type:     constants.TypeSubdomain,
 			Category: constants.CategoryNode,
-			Value:    subdomain,
+			Value:    resultValue,
 			Context:  identity.source,
 			Applied:  true,
-		})
+		}
+		if trimmedWildcard, ok := strings.CutPrefix(subdomain, "*."); ok {
+			resultValue = trimmedWildcard
+			result.Value = resultValue
+			result.Tags = []string{constants.TagWildcard}
+			result.Context = subdomain
+		}
+
+		results = append(results, result)
 
 		if identity.notAfter.IsZero() {
 			continue
@@ -303,8 +307,8 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 			Category: constants.CategoryProperty,
 			Value:    dateVal,
 			Source: &schema.EntityRef{
-				Type:  resultType,
-				Value: subdomain,
+				Type:  constants.TypeSubdomain,
+				Value: resultValue,
 			},
 		})
 

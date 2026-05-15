@@ -94,10 +94,13 @@ func assertDomainSubdomainExtraction(t *testing.T, results []schema.ModuleResult
 	}
 
 	wildcardSAN := requireResult(t, results, "wildcard SAN node", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeWildcardSubdomain && result.Value == "*.partners.target-example.com"
+		return result.Type == constants.TypeSubdomain && result.Value == "partners.target-example.com" && slices.Contains(result.Tags, constants.TagWildcard)
 	})
 	if wildcardSAN.Category != constants.CategoryNode {
 		t.Fatalf("expected wildcard SAN to be a node, got %+v", wildcardSAN)
+	}
+	if wildcardSAN.Context != "*.partners.target-example.com" {
+		t.Fatalf("expected wildcard SAN context, got %q", wildcardSAN.Context)
 	}
 
 	loginSAN := requireResult(t, results, "regular SAN node", func(result schema.ModuleResult) bool {

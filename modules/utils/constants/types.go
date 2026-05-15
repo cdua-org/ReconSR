@@ -5,8 +5,6 @@ package constants
 const (
 	TypeDomain                = "domain"
 	TypeSubdomain             = "subdomain"
-	TypeWildcardDomain        = "wildcard_domain"
-	TypeWildcardSubdomain     = "wildcard_subdomain"
 	TypeIP                    = "ip"
 	TypeIPv4                  = "ipv4"
 	TypeIPv6                  = "ipv6"

@@ -113,19 +113,25 @@ func assertShodanDomainCNAMERecords(t *testing.T, results []schema.ModuleResult)
 func assertShodanDomainWildcards(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	wildcardDomain := requireModuleResult(t, results, constants.TypeWildcardDomain, "*.example.com")
+	wildcardDomain := requireModuleResultWithTag(t, results, constants.TypeDomain, "example.com", constants.TagWildcard)
 	if wildcardDomain.Source != nil {
 		t.Fatalf("expected direct wildcard domain relation, got %+v", wildcardDomain.Source)
 	}
-
-	wildcardIP := requireModuleResult(t, results, constants.TypeIPv4, "198.51.100.26")
-	if wildcardIP.Source == nil || wildcardIP.Source.Type != constants.TypeWildcardDomain || wildcardIP.Source.Value != "*.example.com" {
-		t.Fatalf("expected wildcard A record linked to wildcard_domain, got %+v", wildcardIP.Source)
+	if wildcardDomain.Context != "*.example.com" {
+		t.Fatalf("expected wildcard domain context, got %q", wildcardDomain.Context)
 	}
 
-	wildcardSubdomain := requireModuleResult(t, results, constants.TypeWildcardSubdomain, "*.dev.example.com")
+	wildcardIP := requireModuleResult(t, results, constants.TypeIPv4, "198.51.100.26")
+	if wildcardIP.Source == nil || wildcardIP.Source.Type != constants.TypeDomain || wildcardIP.Source.Value != "example.com" {
+		t.Fatalf("expected wildcard A record linked to tagged domain, got %+v", wildcardIP.Source)
+	}
+
+	wildcardSubdomain := requireModuleResultWithTag(t, results, constants.TypeSubdomain, "dev.example.com", constants.TagWildcard)
 	if wildcardSubdomain.Source != nil {
 		t.Fatalf("expected direct wildcard subdomain relation, got %+v", wildcardSubdomain.Source)
+	}
+	if wildcardSubdomain.Context != "*.dev.example.com" {
+		t.Fatalf("expected wildcard subdomain context, got %q", wildcardSubdomain.Context)
 	}
 }
 

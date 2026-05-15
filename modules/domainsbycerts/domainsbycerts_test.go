@@ -1,11 +1,13 @@
 package domainsbycerts
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/schema"
 )
 
 const (
@@ -262,7 +264,7 @@ func TestFormatResults_CertExpiredFiltering(t *testing.T) {
 	var subdomains, emails, certExpired, certNotAfter, emailNotAfter, statuses int
 	for _, r := range results {
 		switch r.Type {
-		case constants.TypeSubdomain, constants.TypeWildcardSubdomain:
+		case constants.TypeSubdomain:
 			subdomains++
 		case constants.TypeEmail:
 			emails++
@@ -319,7 +321,7 @@ func TestFormatResults_DisableCertExpiredSubdomains(t *testing.T) {
 	var subdomains, emails, certExpired, certNotAfter, emailNotAfter, statuses int
 	for _, r := range results {
 		switch r.Type {
-		case constants.TypeSubdomain, constants.TypeWildcardSubdomain:
+		case constants.TypeSubdomain:
 			subdomains++
 		case constants.TypeEmail:
 			emails++
@@ -352,6 +354,46 @@ func TestFormatResults_DisableCertExpiredSubdomains(t *testing.T) {
 	if statuses != 2 {
 		t.Errorf("with ghost disabled: expected 2 status results, got %d", statuses)
 	}
+}
+
+func TestFormatResults_WildcardSubdomain(t *testing.T) {
+	future := time.Now().Add(30 * 24 * time.Hour)
+	classified := classifiedIdentities{
+		subdomains: map[string]classifiedIdentity{
+			"*.wild.example.com": {notAfter: future, source: srcCrtsh},
+		},
+		emails: make(map[string]classifiedIdentity),
+	}
+
+	results := formatResults(classified, false)
+	wildcard := findDomainCertResult(results, constants.TypeSubdomain, "wild.example.com")
+	if wildcard == nil {
+		t.Fatalf("expected normalized wildcard subdomain result, got %+v", results)
+	}
+	if !slices.Contains(wildcard.Tags, constants.TagWildcard) {
+		t.Fatalf("expected wildcard tag, got %+v", wildcard.Tags)
+	}
+	if wildcard.Context != "*.wild.example.com" {
+		t.Fatalf("expected full wildcard context, got %q", wildcard.Context)
+	}
+
+	certDate := findDomainCertResult(results, constants.TypeCertNotAfter, future.Format(time.RFC3339))
+	if certDate == nil || certDate.Source == nil {
+		t.Fatalf("expected certificate date sourced from wildcard, got %+v", certDate)
+	}
+	if certDate.Source.Type != constants.TypeSubdomain || certDate.Source.Value != "wild.example.com" {
+		t.Fatalf("expected certificate date source to use normalized wildcard, got %+v", certDate.Source)
+	}
+}
+
+func findDomainCertResult(results []schema.ModuleResult, resultType, value string) *schema.ModuleResult {
+	for i := range results {
+		if results[i].Type == resultType && results[i].Value == value {
+			return &results[i]
+		}
+	}
+
+	return nil
 }
 
 func TestModuleCapabilities(t *testing.T) {

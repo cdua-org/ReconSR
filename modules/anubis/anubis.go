@@ -2,7 +2,6 @@
 package anubis
 
 import (
-	"cdua-org/ReconSR/modules/utils/constants"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
@@ -190,24 +190,26 @@ func getDomains(target string) schema.ModuleExecution {
 			continue
 		}
 
+		resultValue := cleanDomain
 		if seen[domain] {
 			continue
 		}
 		seen[domain] = true
 		processedCount++
 
-		resType := constants.TypeSubdomain
-		if isWildcard {
-			resType = constants.TypeWildcardSubdomain
-		}
-
-		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     resType,
+		result := schema.ModuleResult{
+			Type:     constants.TypeSubdomain,
 			Category: constants.CategoryNode,
-			Value:    domain,
+			Value:    resultValue,
 			Context:  anubisContext,
 			Applied:  true,
-		})
+		}
+		if isWildcard {
+			result.Tags = []string{constants.TagWildcard}
+			result.Context = domain
+		}
+
+		exec.Results = append(exec.Results, result)
 	}
 
 	dbg.Printf("target=%q raw_count=%d processed_count=%d", target, len(subdomains), processedCount)
