@@ -57,14 +57,16 @@ func TestBuildSRVHostResult(t *testing.T) {
 		host      string
 		target    string
 		wantValue string
+		wantType  string
 		wantOK    bool
 		wantOOS   bool
 	}{
 		{
 			name:      "valid host gets normalized",
-			host:      "sip.example.com.",
+			host:      "SIP.EXAMPLE.COM.",
 			target:    targetDomain,
 			wantValue: "sip.example.com",
+			wantType:  constants.TypeSubdomain,
 			wantOK:    true,
 			wantOOS:   false,
 		},
@@ -73,6 +75,7 @@ func TestBuildSRVHostResult(t *testing.T) {
 			host:      "sip.otherdomain.com",
 			target:    targetDomain,
 			wantValue: "sip.otherdomain.com",
+			wantType:  constants.TypeSubdomain,
 			wantOK:    true,
 			wantOOS:   true,
 		},
@@ -95,8 +98,8 @@ func TestBuildSRVHostResult(t *testing.T) {
 			if !tt.wantOK {
 				return
 			}
-			if result.Type != constants.TypeDomain {
-				t.Fatalf("buildSRVHostResult() type = %q, want %q", result.Type, constants.TypeDomain)
+			if result.Type != tt.wantType {
+				t.Fatalf("buildSRVHostResult() type = %q, want %q", result.Type, tt.wantType)
 			}
 			if !slices.Contains(result.Tags, constants.TagSRV) {
 				t.Fatalf("buildSRVHostResult() missing tag %q", constants.TagSRV)

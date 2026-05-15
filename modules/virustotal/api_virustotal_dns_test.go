@@ -154,7 +154,7 @@ func TestParseDNSRecordMXAddsPropertyAndHostNode(t *testing.T) {
 
 	mxHost := requireResult(t, results, "mx host node", func(result schema.ModuleResult) bool {
 		hasMXTag := slices.Contains(result.Tags, constants.TagMX)
-		return result.Type == constants.TypeDomain && result.Category == constants.CategoryNode && result.Value == fixtureMailSubdomain && hasMXTag
+		return result.Type == constants.TypeSubdomain && result.Category == constants.CategoryNode && result.Value == fixtureMailSubdomain && hasMXTag
 	})
 	assertFixtureResultSource(t, source, mxHost.Source)
 }
@@ -214,7 +214,7 @@ func TestParseDNSRecordSRVAddsPropertyAndHostNode(t *testing.T) {
 
 	srvHost := requireResult(t, results, "srv host node", func(result schema.ModuleResult) bool {
 		hasSRVTag := slices.Contains(result.Tags, constants.TagSRV)
-		return result.Type == constants.TypeDomain && result.Category == constants.CategoryNode && result.Value == "sip.example.com" && hasSRVTag
+		return result.Type == constants.TypeSubdomain && result.Category == constants.CategoryNode && result.Value == "sip.example.com" && hasSRVTag
 	})
 	assertFixtureResultSource(t, source, srvHost.Source)
 }

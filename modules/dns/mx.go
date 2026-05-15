@@ -96,7 +96,7 @@ func buildMXHostResult(host, target string) (schema.ModuleResult, bool) {
 	log.Printf("get_mx target=%q entity=%q oos=%v", target, res.Value, isOOS)
 
 	return schema.ModuleResult{
-		Type:       constants.TypeDomain,
+		Type:       res.Type,
 		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		Tags:       []string{constants.TagMX},

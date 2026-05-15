@@ -59,28 +59,28 @@ func extractNAPTRServiceAndReplacement(parsed string) (service, replacement stri
 	return service, replacement, true
 }
 
-func normalizeNAPTRTarget(replacement string) (normalizedTarget, scopeTarget string, ok bool) {
+func normalizeNAPTRTarget(replacement string) (normalizedTarget, scopeTarget, resultType string, ok bool) {
 	replacement = strings.TrimSpace(strings.TrimSuffix(replacement, "."))
 	if replacement == "" || replacement == "." || strings.ContainsAny(replacement, " \"") {
-		return "", "", false
+		return "", "", "", false
 	}
 
 	if res, err := validator.Validate(constants.TypeDomain, replacement); err == nil {
-		return res.Value, res.Value, true
+		return res.Value, res.Value, res.Type, true
 	}
 
 	labels := strings.Split(replacement, ".")
 	if len(labels) < 4 || !strings.HasPrefix(labels[0], "_") || !strings.HasPrefix(labels[1], "_") {
-		return "", "", false
+		return "", "", "", false
 	}
 
 	baseDomain := strings.Join(labels[2:], ".")
 	res, err := validator.Validate(constants.TypeDomain, baseDomain)
 	if err != nil {
-		return "", "", false
+		return "", "", "", false
 	}
 
-	return labels[0] + "." + labels[1] + "." + res.Value, res.Value, true
+	return labels[0] + "." + labels[1] + "." + res.Value, res.Value, constants.TypeSubdomain, true
 }
 
 func buildNAPTRServiceResult(parsed, service string) schema.ModuleResult {
@@ -97,7 +97,7 @@ func buildNAPTRServiceResult(parsed, service string) schema.ModuleResult {
 }
 
 func buildNAPTRTargetResult(source *schema.EntityRef, target, replacement string) *schema.ModuleResult {
-	normalizedTarget, scopeTarget, ok := normalizeNAPTRTarget(replacement)
+	normalizedTarget, scopeTarget, resultType, ok := normalizeNAPTRTarget(replacement)
 	if !ok {
 		log.Printf("get_naptr skipping invalid replacement target=%q entity=%q", target, replacement)
 		return nil
@@ -106,7 +106,7 @@ func buildNAPTRTargetResult(source *schema.EntityRef, target, replacement string
 	isOOS := orgdomain.IsOutOfScope(scopeTarget, target)
 
 	return &schema.ModuleResult{
-		Type:       constants.TypeDomain,
+		Type:       resultType,
 		Category:   constants.CategoryNode,
 		Value:      normalizedTarget,
 		Tags:       []string{constants.TagNAPTR},

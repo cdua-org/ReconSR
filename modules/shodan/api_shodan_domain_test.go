@@ -83,7 +83,7 @@ func assertShodanDomainMXRecords(t *testing.T, results []schema.ModuleResult) {
 		t.Fatalf("expected MX property linked to mail subdomain, got %+v", mxProp.Source)
 	}
 
-	mxHost := requireModuleResult(t, results, constants.TypeDomain, "mx.example.com")
+	mxHost := requireModuleResult(t, results, constants.TypeSubdomain, "mx.example.com")
 	if mxHost.Category != constants.CategoryNode {
 		t.Fatalf("expected mx host category to be node, got %q", mxHost.Category)
 	}
@@ -162,7 +162,7 @@ func assertShodanDomainSOA(t *testing.T, results []schema.ModuleResult) {
 func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	srvHost := requireModuleResult(t, results, constants.TypeDomain, "sip.example.com")
+	srvHost := requireModuleResult(t, results, constants.TypeSubdomain, "sip.example.com")
 	if srvHost.Category != constants.CategoryNode || srvHost.OutOfScope {
 		t.Fatal("expected in-scope srv host node")
 	}
@@ -184,7 +184,7 @@ func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleRes
 func assertShodanDomainAdvancedRecords2(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	naptrTarget := requireModuleResultWithContext(t, results, constants.TypeDomain, "_sip._udp.example.com", "NAPTR Target")
+	naptrTarget := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "_sip._udp.example.com", "NAPTR Target")
 	if naptrTarget.Category != constants.CategoryNode || naptrTarget.OutOfScope {
 		t.Fatal("expected in-scope naptr target node")
 	}

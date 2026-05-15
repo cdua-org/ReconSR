@@ -190,7 +190,7 @@ func appendShodanMXResult(exec *schema.ModuleExecution, record shodanDomainRecor
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:       constants.TypeDomain,
+		Type:       validated.Type,
 		Category:   constants.CategoryNode,
 		Value:      validated.Value,
 		Tags:       []string{constants.TagMX},
@@ -360,7 +360,7 @@ func appendShodanSRVResult(exec *schema.ModuleExecution, value, target string, s
 		host := strings.TrimSuffix(parts[3], ".")
 		if validated, err := validator.Validate(constants.TypeDomain, host); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       constants.TypeDomain,
+				Type:       validated.Type,
 				Category:   constants.CategoryNode,
 				Value:      validated.Value,
 				Tags:       []string{constants.TagSRV},
@@ -415,19 +415,22 @@ func appendShodanNAPTRResult(exec *schema.ModuleExecution, value, target string,
 	if len(parts) >= 6 {
 		targetNode := strings.TrimSuffix(parts[5], ".")
 		validatedValue := targetNode
+		validatedType := constants.TypeSubdomain
 		valid := false
 
 		if validated, err := validator.Validate(constants.TypeDomain, targetNode); err == nil {
 			validatedValue = validated.Value
+			validatedType = validated.Type
 			valid = true
 		} else if strings.Contains(targetNode, "_") {
 			validatedValue = strings.ToLower(targetNode)
+			validatedType = constants.TypeSubdomain
 			valid = true
 		}
 
 		if valid {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       constants.TypeDomain,
+				Type:       validatedType,
 				Category:   constants.CategoryNode,
 				Value:      validatedValue,
 				Tags:       []string{constants.TagNAPTR},

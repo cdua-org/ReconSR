@@ -50,9 +50,9 @@ func TestExtractNAPTRServiceAndReplacement(t *testing.T) {
 	}{
 		{
 			name:                "quoted regexp field",
-			parsed:              "100 10 \"s\" \"SIP+D2U\" \"!^.*$!sip:customer@example.com!\" sip.example.com.",
+			parsed:              "100 10 \"s\" \"SIP+D2U\" \"!^.*$!sip:customer@example.com!\" sip1.example.com.",
 			wantService:         "SIP+D2U",
-			wantReplacement:     "sip.example.com.",
+			wantReplacement:     "sip1.example.com.",
 			wantParsedSucceeded: true,
 		},
 		{
@@ -118,6 +118,7 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 		target      string
 		replacement string
 		wantValue   string
+		wantType    string
 		wantOOS     bool
 	}{
 		{
@@ -125,6 +126,7 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 			target:      "target.naptr.example.com",
 			replacement: "SIP.EXAMPLE.COM.",
 			wantValue:   "sip.example.com",
+			wantType:    constants.TypeSubdomain,
 			wantOOS:     false,
 		},
 		{
@@ -132,6 +134,7 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 			target:      "example.net",
 			replacement: "_sip._tcp.example.net.",
 			wantValue:   "_sip._tcp.example.net",
+			wantType:    constants.TypeSubdomain,
 			wantOOS:     false,
 		},
 		{
@@ -139,6 +142,7 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 			target:      "target.naptr.example.com",
 			replacement: "_sips._tcp.voice.example.org.",
 			wantValue:   "_sips._tcp.voice.example.org",
+			wantType:    constants.TypeSubdomain,
 			wantOOS:     true,
 		},
 	}
@@ -150,7 +154,7 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 			if result == nil {
 				t.Fatal("expected naptr target result")
 			}
-			if result.Type != constants.TypeDomain {
+			if result.Type != tt.wantType {
 				t.Fatalf("unexpected type: %s", result.Type)
 			}
 			if !slices.Contains(result.Tags, constants.TagNAPTR) {

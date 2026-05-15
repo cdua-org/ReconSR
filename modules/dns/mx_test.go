@@ -55,6 +55,7 @@ func TestBuildMXHostResult(t *testing.T) {
 		name      string
 		host      string
 		wantValue string
+		wantType  string
 		wantOK    bool
 		wantOOS   bool
 	}{
@@ -62,6 +63,7 @@ func TestBuildMXHostResult(t *testing.T) {
 			name:      "valid host gets normalized",
 			host:      "MAIL.EXAMPLE.COM",
 			wantOK:    true,
+			wantType:  constants.TypeSubdomain,
 			wantValue: "mail.example.com",
 			wantOOS:   false,
 		},
@@ -81,8 +83,8 @@ func TestBuildMXHostResult(t *testing.T) {
 			if !tt.wantOK {
 				return
 			}
-			if result.Type != constants.TypeDomain {
-				t.Fatalf("buildMXHostResult() type = %q, want %q", result.Type, constants.TypeDomain)
+			if result.Type != tt.wantType {
+				t.Fatalf("buildMXHostResult() type = %q, want %q", result.Type, tt.wantType)
 			}
 			if !slices.Contains(result.Tags, constants.TagMX) {
 				t.Fatalf("buildMXHostResult() missing tag %q", constants.TagMX)

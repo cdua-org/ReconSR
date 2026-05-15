@@ -106,7 +106,7 @@ func (m *module) appendVTMXResults(exec *schema.ModuleExecution, target string, 
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:       constants.TypeDomain,
+		Type:       validated.Type,
 		Category:   constants.CategoryNode,
 		Value:      validated.Value,
 		Tags:       []string{constants.TagMX},
@@ -263,7 +263,7 @@ func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string,
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:       constants.TypeDomain,
+		Type:       validated.Type,
 		Category:   constants.CategoryNode,
 		Value:      validated.Value,
 		Tags:       []string{constants.TagSRV},
