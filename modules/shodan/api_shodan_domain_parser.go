@@ -486,9 +486,10 @@ func appendShodanHIPResult(exec *schema.ModuleExecution, value, target string, s
 			rvNode := strings.TrimSuffix(rv, ".")
 			if validated, err := validator.Validate(constants.TypeDomain, rvNode); err == nil {
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:       constants.TypeHIPServer,
+					Type:       validated.Type,
 					Category:   constants.CategoryNode,
 					Value:      validated.Value,
+					Tags:       []string{constants.TagHIP},
 					Context:    "HIP Rendezvous Server",
 					OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 					Source:     ref,

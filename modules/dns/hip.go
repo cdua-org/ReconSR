@@ -125,9 +125,10 @@ func buildHIPRendezvousResult(rawRV, target string, hipSource *schema.EntityRef)
 	log.Printf("get_hip target=%q rv=%q oos=%v", target, res.Value, isOOS)
 
 	return &schema.ModuleResult{
-		Type:       constants.TypeHIPServer,
+		Type:       res.Type,
 		Category:   constants.CategoryNode,
 		Value:      res.Value,
+		Tags:       []string{constants.TagHIP},
 		Context:    "HIP Rendezvous Server",
 		OutOfScope: isOOS,
 		Source:     hipSource,

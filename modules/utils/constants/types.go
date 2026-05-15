@@ -32,7 +32,6 @@ const (
 	TypeDomainKey             = "domainkey"
 	TypeDS                    = "ds"
 	TypeHIP                   = "hip"
-	TypeHIPServer             = "hip_server"
 	TypeIPSECKEY              = "ipseckey"
 	TypeIPSECGateway          = "ipsec_gateway"
 	TypeLOC                   = "loc"

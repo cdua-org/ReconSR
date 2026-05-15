@@ -204,13 +204,19 @@ func assertShodanDomainAdvancedRecords2(t *testing.T, results []schema.ModuleRes
 		t.Fatal("expected in-scope rp_domain node")
 	}
 
-	hipServer1 := requireModuleResultWithContext(t, results, constants.TypeHIPServer, "rv1.example.net", "HIP Rendezvous Server")
+	hipServer1 := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "rv1.example.net", "HIP Rendezvous Server")
 	if hipServer1.Category != constants.CategoryNode || !hipServer1.OutOfScope {
 		t.Fatal("expected out-of-scope hip_server node")
 	}
-	hipServer2 := requireModuleResultWithContext(t, results, constants.TypeHIPServer, "rv2.example.com", "HIP Rendezvous Server")
+	if !slices.Contains(hipServer1.Tags, constants.TagHIP) {
+		t.Fatalf("expected hip_server1 to have tag %q, got tags %v", constants.TagHIP, hipServer1.Tags)
+	}
+	hipServer2 := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "rv2.example.com", "HIP Rendezvous Server")
 	if hipServer2.Category != constants.CategoryNode || hipServer2.OutOfScope {
 		t.Fatal("expected in-scope hip_server node")
+	}
+	if !slices.Contains(hipServer2.Tags, constants.TagHIP) {
+		t.Fatalf("expected hip_server2 to have tag %q, got tags %v", constants.TagHIP, hipServer2.Tags)
 	}
 }
 

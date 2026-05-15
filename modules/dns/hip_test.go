@@ -141,8 +141,11 @@ func assertHIPResults(t *testing.T, results []schema.ModuleResult, wantPubKey, w
 	}
 
 	nodeResult := results[1]
-	if nodeResult.Type != constants.TypeHIPServer {
-		t.Fatalf("node Type = %q, want %q", nodeResult.Type, constants.TypeHIPServer)
+	if nodeResult.Type != constants.TypeSubdomain {
+		t.Fatalf("node Type = %q, want %q", nodeResult.Type, constants.TypeSubdomain)
+	}
+	if !slices.Contains(nodeResult.Tags, constants.TagHIP) {
+		t.Fatalf("node Tags missing %q", constants.TagHIP)
 	}
 	if nodeResult.Category != constants.CategoryNode {
 		t.Fatalf("node Category = %q, want %q", nodeResult.Category, constants.CategoryNode)

@@ -52,7 +52,7 @@ func requireTagPropertyResults(t *testing.T, results []schema.ModuleResult, expe
 	actualTags := make([]string, 0, len(expectedTags))
 	for _, result := range results {
 		if len(result.Tags) > 0 {
-			hasOnlyAllowedTag := len(result.Tags) == 1 && (result.Tags[0] == constants.TagMX || result.Tags[0] == constants.TagSRV || result.Tags[0] == constants.TagNAPTR || result.Tags[0] == constants.TagCNAME || result.Tags[0] == constants.TagCAA)
+			hasOnlyAllowedTag := len(result.Tags) == 1 && (result.Tags[0] == constants.TagMX || result.Tags[0] == constants.TagSRV || result.Tags[0] == constants.TagNAPTR || result.Tags[0] == constants.TagCNAME || result.Tags[0] == constants.TagCAA || result.Tags[0] == constants.TagHIP)
 			if !hasOnlyAllowedTag {
 				t.Fatalf("expected no system tags assigned via Tags field, got %+v", result)
 			}

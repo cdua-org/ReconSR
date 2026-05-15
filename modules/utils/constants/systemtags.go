@@ -9,4 +9,5 @@ const (
 	TagNAPTR  = "naptr"
 	TagCNAME  = "cname"
 	TagCAA    = "caa"
+	TagHIP    = "hip"
 )
