@@ -46,13 +46,25 @@ func requireModuleResult(t *testing.T, results []schema.ModuleResult, resultType
 	return result
 }
 
+func allowedDNSResultTags() []string {
+	return []string{
+		constants.TagMX,
+		constants.TagSRV,
+		constants.TagNAPTR,
+		constants.TagRP,
+		constants.TagCNAME,
+		constants.TagCAA,
+		constants.TagHIP,
+	}
+}
+
 func requireTagPropertyResults(t *testing.T, results []schema.ModuleResult, expectedTags ...string) {
 	t.Helper()
 
 	actualTags := make([]string, 0, len(expectedTags))
 	for _, result := range results {
 		if len(result.Tags) > 0 {
-			hasOnlyAllowedTag := len(result.Tags) == 1 && (result.Tags[0] == constants.TagMX || result.Tags[0] == constants.TagSRV || result.Tags[0] == constants.TagNAPTR || result.Tags[0] == constants.TagCNAME || result.Tags[0] == constants.TagCAA || result.Tags[0] == constants.TagHIP)
+			hasOnlyAllowedTag := len(result.Tags) == 1 && slices.Contains(allowedDNSResultTags(), result.Tags[0])
 			if !hasOnlyAllowedTag {
 				t.Fatalf("expected no system tags assigned via Tags field, got %+v", result)
 			}

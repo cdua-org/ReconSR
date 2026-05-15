@@ -199,9 +199,12 @@ func assertShodanDomainAdvancedRecords2(t *testing.T, results []schema.ModuleRes
 	if rpEmail.Category != constants.CategoryNode || rpEmail.OutOfScope {
 		t.Fatal("expected in-scope email node for RP")
 	}
-	rpDomain := requireModuleResultWithContext(t, results, constants.TypeRPDomain, "admin-txt.example.com", "RP TXT Reference Domain")
+	rpDomain := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "admin-txt.example.com", "RP TXT Reference Domain")
 	if rpDomain.Category != constants.CategoryNode || rpDomain.OutOfScope {
-		t.Fatal("expected in-scope rp_domain node")
+		t.Fatal("expected in-scope RP domain node")
+	}
+	if !slices.Contains(rpDomain.Tags, constants.TagRP) {
+		t.Fatalf("expected RP domain to have tag %q, got tags %v", constants.TagRP, rpDomain.Tags)
 	}
 
 	hipServer1 := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "rv1.example.net", "HIP Rendezvous Server")

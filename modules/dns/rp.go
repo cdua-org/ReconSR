@@ -66,9 +66,10 @@ func processRPTXTDomain(txtDomain, target string) []schema.ModuleResult {
 	log.Printf("get_rp target=%q entity=%q oos=%v", target, res.Value, isOOS)
 
 	results = append(results, schema.ModuleResult{
-		Type:       constants.TypeRPDomain,
+		Type:       res.Type,
 		Category:   constants.CategoryNode,
 		Value:      res.Value,
+		Tags:       []string{constants.TagRP},
 		Context:    "RP TXT Reference Domain",
 		OutOfScope: isOOS,
 	})

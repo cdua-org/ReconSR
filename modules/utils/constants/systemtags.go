@@ -7,6 +7,7 @@ const (
 	TagMX     = "mx"
 	TagSRV    = "srv"
 	TagNAPTR  = "naptr"
+	TagRP     = "rp"
 	TagCNAME  = "cname"
 	TagCAA    = "caa"
 	TagHIP    = "hip"

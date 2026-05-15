@@ -466,9 +466,10 @@ func appendShodanRPResult(exec *schema.ModuleExecution, value, target string, so
 		txtDomain := strings.TrimSuffix(parts[1], ".")
 		if validated, err := validator.Validate(constants.TypeDomain, txtDomain); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       constants.TypeRPDomain,
+				Type:       validated.Type,
 				Category:   constants.CategoryNode,
 				Value:      validated.Value,
+				Tags:       []string{constants.TagRP},
 				Context:    "RP TXT Reference Domain",
 				OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 				Source:     ref,

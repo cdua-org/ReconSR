@@ -45,7 +45,6 @@ const (
 	TypeCIDR                  = "cidr"
 	TypePTR                   = "ptr"
 	TypeRP                    = "rp"
-	TypeRPDomain              = "rp_domain"
 	TypeSOA                   = "soa"
 	TypeSPF                   = "spf"
 	TypeSRV                   = "srv"

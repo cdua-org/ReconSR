@@ -135,8 +135,11 @@ func TestProcessRPTXTDomain(t *testing.T) {
 			}
 
 			result := results[0]
-			if result.Type != constants.TypeRPDomain {
-				t.Fatalf("unexpected type: got %q want %q", result.Type, constants.TypeRPDomain)
+			if result.Type != constants.TypeSubdomain {
+				t.Fatalf("unexpected type: got %q want %q", result.Type, constants.TypeSubdomain)
+			}
+			if !slices.Contains(result.Tags, constants.TagRP) {
+				t.Fatalf("missing tag %q", constants.TagRP)
 			}
 			if result.Category != constants.CategoryNode {
 				t.Fatalf("unexpected category: got %q want %q", result.Category, constants.CategoryNode)
@@ -239,18 +242,21 @@ func assertRPEmail(t *testing.T, results []schema.ModuleResult, expected *rpReco
 func assertRPDomain(t *testing.T, results []schema.ModuleResult, expected *rpRecordExpectation) {
 	t.Helper()
 
-	rpDomain, ok := findResult(results, constants.TypeRPDomain, expected.wantRPDomain)
+	rpDomain, ok := findResult(results, constants.TypeSubdomain, expected.wantRPDomain)
 	if !ok {
-		t.Fatalf("missing rp_domain result %q", expected.wantRPDomain)
+		t.Fatalf("missing RP domain result %q", expected.wantRPDomain)
+	}
+	if !slices.Contains(rpDomain.Tags, constants.TagRP) {
+		t.Fatalf("missing tag %q", constants.TagRP)
 	}
 
 	if rpDomain.Category != constants.CategoryNode {
-		t.Fatalf("unexpected rp_domain category: got %q want %q", rpDomain.Category, constants.CategoryNode)
+		t.Fatalf("unexpected RP domain category: got %q want %q", rpDomain.Category, constants.CategoryNode)
 	}
 	if rpDomain.OutOfScope != expected.wantRPDomainOOS {
-		t.Fatalf("unexpected rp_domain OutOfScope: got %v want %v", rpDomain.OutOfScope, expected.wantRPDomainOOS)
+		t.Fatalf("unexpected RP domain OutOfScope: got %v want %v", rpDomain.OutOfScope, expected.wantRPDomainOOS)
 	}
-	assertRPSource(t, rpDomain.Source, expected.record, "rp_domain")
+	assertRPSource(t, rpDomain.Source, expected.record, "RP domain")
 }
 
 func assertRPSource(t *testing.T, source *schema.EntityRef, record, entityType string) {
