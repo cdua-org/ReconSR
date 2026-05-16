@@ -16,6 +16,7 @@ const (
 	TagSan         = "san"
 	TagWildcard    = "wildcard"
 	TagPDNS        = "passive_dns"
+	TagNSEC        = "nsec"
 	TagReverseIP   = "reverse_ip"
 	TagWhoisServer = "whois_server"
 )

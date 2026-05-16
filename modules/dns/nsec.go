@@ -108,6 +108,8 @@ func collectNSECRecords(records []resolver.DoHDnsRecord, target, nxTarget, conte
 }
 
 func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.ModuleResult {
+	rec.Name = strings.TrimSuffix(rec.Name, ".")
+
 	nsecRes := schema.ModuleResult{
 		Type:     constants.TypeNSEC,
 		Category: constants.CategoryProperty,
@@ -141,27 +143,38 @@ func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.Mo
 }
 
 func parseNSECRecord(rec resolver.DoHDnsRecord, target, nxTarget, contextDesc string) []schema.ModuleResult {
+	rec.Name = strings.TrimSuffix(rec.Name, ".")
+	parts := strings.Fields(rec.Data)
+	if len(parts) > 0 {
+		parts[0] = strings.TrimSuffix(parts[0], ".")
+		rec.Data = strings.Join(parts, " ")
+	}
+
+	var results []schema.ModuleResult
+
+	var nsecSource *schema.EntityRef
+	if r := extractNSECDomain(rec.Name, target, nxTarget, "NSEC Current Subdomain"); r != nil {
+		results = append(results, *r)
+		nsecSource = &schema.EntityRef{Type: r.Type, Value: r.Value}
+		log.Printf("get_nsec target=%q current=%q oos=%v", target, r.Value, r.OutOfScope)
+	}
+
 	nsecRes := schema.ModuleResult{
 		Type:     constants.TypeNSEC,
 		Category: constants.CategoryProperty,
 		Value:    rec.Name + " NSEC " + rec.Data,
 		Context:  contextDesc,
+		Source:   nsecSource,
 	}
-	results := []schema.ModuleResult{nsecRes}
-	source := &schema.EntityRef{Type: nsecRes.Type, Value: nsecRes.Value}
+	results = append(results, nsecRes)
 
+	nsecPropertyRef := &schema.EntityRef{Type: nsecRes.Type, Value: nsecRes.Value}
 	if nextDomain := dnsutils.ParseNSEC(rec.Data); nextDomain != "" {
 		if r := extractNSECDomain(nextDomain, target, nxTarget, "NSEC Leaked Subdomain"); r != nil {
-			r.Source = source
+			r.Source = nsecPropertyRef
 			log.Printf("get_nsec target=%q leaked=%q oos=%v", target, r.Value, r.OutOfScope)
 			results = append(results, *r)
 		}
-	}
-
-	if r := extractNSECDomain(rec.Name, target, nxTarget, "NSEC Current Subdomain"); r != nil {
-		r.Source = source
-		log.Printf("get_nsec target=%q current=%q oos=%v", target, r.Value, r.OutOfScope)
-		results = append(results, *r)
 	}
 
 	return results
@@ -187,12 +200,6 @@ func extractNSECDomain(raw, target, nxTarget, contextDesc string) *schema.Module
 		return nil
 	}
 
-	if !strings.EqualFold(cleanDomain, target) {
-		if !strings.HasSuffix(strings.ToLower(cleanDomain), "."+strings.ToLower(target)) {
-			return nil
-		}
-	}
-
 	org := orgdomain.GetOrganizationalDomain(cleanDomain)
 	if org == "" {
 		org = cleanDomain
@@ -209,9 +216,10 @@ func extractNSECDomain(raw, target, nxTarget, contextDesc string) *schema.Module
 		Value:      cleanDomain,
 		Context:    contextDesc,
 		OutOfScope: orgdomain.IsOutOfScope(cleanDomain, target),
+		Tags:       []string{constants.TagNSEC},
 	}
 	if isWildcard {
-		result.Tags = []string{constants.TagWildcard}
+		result.Tags = append(result.Tags, constants.TagWildcard)
 		result.Context = domain
 	}
 

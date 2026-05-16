@@ -58,6 +58,9 @@ func TestExtractNSECDomainWildcard(t *testing.T) {
 	if rootResult.Value != "example.org" {
 		t.Fatalf("expected normalized root wildcard value, got %q", rootResult.Value)
 	}
+	if !slices.Contains(rootResult.Tags, constants.TagNSEC) {
+		t.Fatalf("expected nsec tag on root result, got %+v", rootResult.Tags)
+	}
 
 	result := extractNSECDomain("*.wild.example.net.", "example.net", "missing.example.edu", "NSEC Next Domain")
 	if result == nil {
@@ -71,6 +74,9 @@ func TestExtractNSECDomainWildcard(t *testing.T) {
 	}
 	if !slices.Contains(result.Tags, constants.TagWildcard) {
 		t.Fatalf("expected wildcard tag, got %+v", result.Tags)
+	}
+	if !slices.Contains(result.Tags, constants.TagNSEC) {
+		t.Fatalf("expected nsec tag, got %+v", result.Tags)
 	}
 	if result.Context != "*.wild.example.net" {
 		t.Fatalf("expected full wildcard context, got %q", result.Context)
@@ -97,23 +103,36 @@ func TestParseNSECRecordSource(t *testing.T) {
 
 	results := parseNSECRecord(rec, "example.com", "nx.example.com", "NSEC Context")
 
-	if len(results) < 2 {
-		t.Fatalf("expected at least 2 results, got %d", len(results))
+	if len(results) < 3 {
+		t.Fatalf("expected at least 3 results, got %d", len(results))
 	}
 
-	primary := results[0]
+	// 1. Current Subdomain
+	currentSub := results[0]
+	if currentSub.Type != constants.TypeSubdomain || currentSub.Value != "current.example.com" {
+		t.Fatalf("expected current subdomain, got %s %s", currentSub.Type, currentSub.Value)
+	}
+
+	// 2. NSEC Property
+	primary := results[1]
 	if primary.Type != constants.TypeNSEC {
 		t.Fatalf("expected primary result to be NSEC, got %s", primary.Type)
 	}
 
+	if primary.Value != "current.example.com NSEC next.example.com A AAAA RRSIG NSEC" {
+		t.Errorf("expected normalized value without trailing dots, got %q", primary.Value)
+	}
+
+	if primary.Source == nil || primary.Source.Value != "current.example.com" {
+		t.Errorf("expected NSEC property to have Source = current.example.com, got %v", primary.Source)
+	}
+
+	// 3. Leaked Subdomain
+	leakedSub := results[2]
 	expectedSource := &schema.EntityRef{Type: primary.Type, Value: primary.Value}
 
-	for i := 1; i < len(results); i++ {
-		if results[i].Source == nil {
-			t.Errorf("expected Source to be set for result %d", i)
-		} else if results[i].Source.Type != expectedSource.Type || results[i].Source.Value != expectedSource.Value {
-			t.Errorf("expected Source %v, got %v", expectedSource, results[i].Source)
-		}
+	if leakedSub.Source == nil || leakedSub.Source.Type != expectedSource.Type || leakedSub.Source.Value != expectedSource.Value {
+		t.Errorf("expected Source %v, got %v", expectedSource, leakedSub.Source)
 	}
 }
 
@@ -132,6 +151,10 @@ func TestParseNSEC3RecordSource(t *testing.T) {
 	primary := results[0]
 	if primary.Type != constants.TypeNSEC {
 		t.Fatalf("expected primary result to be NSEC, got %s", primary.Type)
+	}
+
+	if primary.Value != "0p9mhaveqvm6t7v8pon2iu430l8kcmpo.example.com NSEC3 1 0 10 AABBCCDD EEFF00112233 A RRSIG" {
+		t.Errorf("expected normalized NSEC3 value without trailing dots, got %q", primary.Value)
 	}
 
 	expectedSource := &schema.EntityRef{Type: primary.Type, Value: primary.Value}
