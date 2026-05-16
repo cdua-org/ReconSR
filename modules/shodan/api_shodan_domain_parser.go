@@ -443,20 +443,23 @@ func appendShodanCAAResult(exec *schema.ModuleExecution, value, target string, s
 }
 
 func appendShodanURIResult(exec *schema.ModuleExecution, value, _ string, source *schema.EntityRef) *schema.EntityRef {
-	ref := appendShodanGenericDNSResult(exec, "URI", value, source)
-	parts := strings.SplitN(value, " ", 3)
-	if len(parts) >= 3 {
-		uri := strings.Trim(parts[2], "\"")
-		if uri != "" {
-			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:     constants.TypeURL,
-				Category: constants.CategoryProperty,
-				Value:    uri,
-				Context:  "URI Endpoint",
-				Source:   source,
-			})
-		}
+	parsed := dnsutils.ParseURI(value)
+	if parsed == nil {
+		return appendShodanGenericDNSResult(exec, "URI", value, source)
 	}
+
+	ref := appendShodanGenericDNSResult(exec, "URI", parsed.Formatted, source)
+
+	if parsed.Target != "" {
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeURL,
+			Category: constants.CategoryProperty,
+			Value:    parsed.Target,
+			Context:  "URI Endpoint",
+			Source:   ref,
+		})
+	}
+
 	return ref
 }
 

@@ -7,22 +7,9 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
+	"cdua-org/ReconSR/schema"
 )
-
-func TestParseURI(t *testing.T) {
-	raw := "\\# 43 000a000168747470733a2f2f6f73696e742e6578616d706c652e636f6d2f746573742d656e64706f696e74"
-	expected := `10 1 "https://osint.example.com/test-endpoint"`
-
-	parsed := parseURI(raw)
-	if parsed != expected {
-		t.Errorf("parseURI() = %q, want %q", parsed, expected)
-	}
-
-	normal := `10 1 "https://example.com"`
-	if parseURI(normal) != normal {
-		t.Errorf("expected already-decoded string to remain unmodified")
-	}
-}
 
 func TestGetURIDataEmpty(t *testing.T) {
 	execution := getURIData(context.Background(), "example.com")
@@ -54,5 +41,35 @@ func TestURICapabilities(t *testing.T) {
 
 	if !slices.Contains(caps.Functions, constants.FuncGetURI) {
 		t.Error("expected get_uri in capabilities")
+	}
+}
+
+func TestBuildURIResults(t *testing.T) {
+	parsed := &dnsutils.URIRecord{
+		Priority:  "10",
+		Weight:    "100",
+		Target:    "https://example.com",
+		Formatted: "10 100 \"https://example.com\"",
+	}
+	source := &schema.EntityRef{Type: constants.TypeURI, Value: parsed.Formatted}
+
+	results := buildURIResults(parsed, source)
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	res := results[0]
+	if res.Type != constants.TypeURL {
+		t.Errorf("expected type %s, got %s", constants.TypeURL, res.Type)
+	}
+	if res.Value != parsed.Target {
+		t.Errorf("expected value %s, got %s", parsed.Target, res.Value)
+	}
+	if res.Source == nil {
+		t.Fatal("expected source to be set")
+	}
+	if res.Source.Type != constants.TypeURI || res.Source.Value != parsed.Formatted {
+		t.Errorf("expected source to be %s: %s, got %s: %s", constants.TypeURI, parsed.Formatted, res.Source.Type, res.Source.Value)
 	}
 }

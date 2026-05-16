@@ -199,6 +199,9 @@ func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleRes
 	if uriEndpoint.Category != constants.CategoryProperty {
 		t.Fatal("expected url property")
 	}
+	if uriEndpoint.Source == nil || uriEndpoint.Source.Type != constants.TypeURI {
+		t.Fatalf("expected URI endpoint to be linked to URI record, got %+v", uriEndpoint.Source)
+	}
 }
 
 func assertShodanDomainAdvancedRecords2(t *testing.T, results []schema.ModuleResult) {

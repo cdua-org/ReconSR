@@ -2,9 +2,6 @@ package dns
 
 import (
 	"context"
-	"encoding/binary"
-	"fmt"
-	"strings"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
@@ -12,19 +9,6 @@ import (
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
-
-func parseURI(raw string) string {
-	data, ok := dnsutils.DecodeWireFormat(raw, 4)
-	if !ok {
-		return raw
-	}
-
-	priority := binary.BigEndian.Uint16(data[0:2])
-	weight := binary.BigEndian.Uint16(data[2:4])
-	uri := string(data[4:])
-
-	return fmt.Sprintf("%d %d %q", priority, weight, uri)
-}
 
 func getURIData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetURI)
@@ -46,32 +30,36 @@ func getURIData(ctx context.Context, target string) schema.ModuleExecution {
 	log.Printf("get_uri target=%q records=%d", target, len(records))
 
 	for _, rec := range records {
-		parsed := parseURI(rec)
+		parsed := dnsutils.ParseURI(rec)
+		if parsed == nil {
+			continue
+		}
 
-		exec.Results = append(exec.Results, schema.ModuleResult{
+		uriRes := schema.ModuleResult{
 			Type:     constants.TypeURI,
 			Category: constants.CategoryProperty,
-			Value:    parsed,
+			Value:    parsed.Formatted,
 			Context:  "URI Record",
-		})
-
-		parts := strings.SplitN(parsed, " ", 3)
-		if len(parts) < 3 {
-			continue
 		}
+		exec.Results = append(exec.Results, uriRes)
 
-		uri := strings.Trim(parts[2], "\"")
-		if uri == "" {
-			continue
-		}
-
-		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     constants.TypeURL,
-			Category: constants.CategoryProperty,
-			Value:    uri,
-			Context:  "URI Endpoint",
-		})
+		source := &schema.EntityRef{Type: uriRes.Type, Value: uriRes.Value}
+		exec.Results = append(exec.Results, buildURIResults(parsed, source)...)
 	}
 
 	return exec
+}
+
+func buildURIResults(parsed *dnsutils.URIRecord, source *schema.EntityRef) []schema.ModuleResult {
+	var results []schema.ModuleResult
+	if parsed.Target != "" {
+		results = append(results, schema.ModuleResult{
+			Type:     constants.TypeURL,
+			Category: constants.CategoryProperty,
+			Value:    parsed.Target,
+			Context:  "URI Endpoint",
+			Source:   source,
+		})
+	}
+	return results
 }
