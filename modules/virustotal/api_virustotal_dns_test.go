@@ -195,14 +195,15 @@ func TestParseDNSRecordCAAAddsAuthorityNode(t *testing.T) {
 	source := &schema.EntityRef{Type: constants.TypeSubdomain, Value: fixtureMailSubdomain}
 	results := parseDNSRecordFromFixture(t, fixtureMailSubdomain, source, rec)
 
-	requireResult(t, results, "caa property", func(result schema.ModuleResult) bool {
+	caaProp := requireResult(t, results, "caa property", func(result schema.ModuleResult) bool {
 		return result.Type == constants.TypeCAA && result.Category == constants.CategoryProperty && result.Value == `0 issue "mail-ca.example.org"`
 	})
+	caaRef := &schema.EntityRef{Type: constants.TypeCAA, Value: caaProp.Value}
 
 	authority := requireResult(t, results, "cert authority node", func(result schema.ModuleResult) bool {
 		return result.Type == constants.TypeSubdomain && result.Category == constants.CategoryNode && result.Value == "mail-ca.example.org" && slices.Contains(result.Tags, constants.TagCAA)
 	})
-	assertFixtureResultSource(t, source, authority.Source)
+	assertFixtureResultSource(t, caaRef, authority.Source)
 }
 
 func TestParseDNSRecordSRVAddsPropertyAndHostNode(t *testing.T) {

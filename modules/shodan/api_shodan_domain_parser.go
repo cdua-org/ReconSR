@@ -411,22 +411,45 @@ func appendShodanSRVResult(exec *schema.ModuleExecution, value, target string, s
 }
 
 func appendShodanCAAResult(exec *schema.ModuleExecution, value, target string, source *schema.EntityRef) *schema.EntityRef {
-	ref := appendShodanGenericDNSResult(exec, "CAA", value, source)
-	parts := strings.Fields(value)
-	if len(parts) >= 3 {
-		issuer := strings.Trim(parts[2], "\"")
-		if validated, err := validator.Validate(constants.TypeDomain, issuer); err == nil {
-			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       validated.Type,
-				Category:   constants.CategoryNode,
-				Value:      validated.Value,
-				Tags:       []string{constants.TagCAA},
-				Context:    "CAA Record",
-				OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
-				Source:     source,
-			})
+	normalized, tag, parsedVal, matched := dnsutils.ParseCAA(value)
+	ref := appendShodanGenericDNSResult(exec, "CAA", normalized, source)
+
+	if !matched {
+		return ref
+	}
+
+	switch tag {
+	case "issue", "issuewild", "issuemail":
+		domain := dnsutils.ExtractCAAAuthority(parsedVal)
+		if domain != "" {
+			if validated, err := validator.Validate(constants.TypeDomain, domain); err == nil {
+				exec.Results = append(exec.Results, schema.ModuleResult{
+					Type:       validated.Type,
+					Category:   constants.CategoryNode,
+					Value:      validated.Value,
+					Tags:       []string{constants.TagCAA},
+					Context:    "Authorized CA (" + tag + ")",
+					OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
+					Source:     ref,
+				})
+			}
+		}
+	case "iodef":
+		email := dnsutils.ExtractCAAIodefEmail(parsedVal)
+		if email != "" {
+			if validated, err := validator.Validate(constants.TypeEmail, email); err == nil {
+				exec.Results = append(exec.Results, schema.ModuleResult{
+					Type:       validated.Type,
+					Category:   constants.CategoryNode,
+					Value:      validated.Value,
+					Context:    "CAA Violation Report",
+					OutOfScope: orgdomain.IsEmailOutOfScope(validated.Value, target),
+					Source:     ref,
+				})
+			}
 		}
 	}
+
 	return ref
 }
 

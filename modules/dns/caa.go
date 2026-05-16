@@ -2,10 +2,6 @@ package dns
 
 import (
 	"context"
-	"errors"
-	"regexp"
-	"strconv"
-	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -14,8 +10,6 @@ import (
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
-
-var caaRegex = regexp.MustCompile(`(?i)^\d+\s+(issue|issuewild|iodef|issuemail)\s+"(.*)"$`)
 
 func getCAAData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetCAA)
@@ -37,44 +31,36 @@ func getCAAData(ctx context.Context, target string) schema.ModuleExecution {
 	log.Printf("get_caa target=%q records=%d", target, len(records))
 
 	for _, rec := range records {
-		results := parseCAARecord(rec)
-		exec.Results = append(exec.Results, results...)
+		exec.Results = append(exec.Results, processCAARecord(rec)...)
 	}
 
 	return exec
 }
 
-func parseCAARecord(data string) []schema.ModuleResult {
-	if strings.HasPrefix(data, "\\#") {
-		if decoded, err := decodeHexCAA(data); err == nil {
-			data = decoded
-		}
-	}
+func processCAARecord(data string) []schema.ModuleResult {
+	normalized, tag, val, matched := dnsutils.ParseCAA(data)
 
 	results := make([]schema.ModuleResult, 0, 2)
-	results = append(results, schema.ModuleResult{
+	caaResult := schema.ModuleResult{
 		Type:     constants.TypeCAA,
 		Category: constants.CategoryProperty,
-		Value:    data,
-	})
+		Value:    normalized,
+	}
+	results = append(results, caaResult)
 
-	matches := caaRegex.FindStringSubmatch(data)
-	if len(matches) < 3 {
+	if !matched {
 		return results
 	}
 
-	tag := strings.ToLower(strings.TrimSpace(matches[1]))
-	val := strings.TrimSpace(matches[2])
+	source := &schema.EntityRef{Type: caaResult.Type, Value: caaResult.Value}
 
 	switch tag {
 	case "issue", "issuewild", "issuemail":
-		result, ok := buildCAAAuthorityResult(tag, val)
-		if ok {
+		if result, ok := buildCAAAuthorityResult(tag, val, source); ok {
 			results = append(results, result)
 		}
 	case "iodef":
-		result, ok := buildCAAIodefEmailResult(val)
-		if ok {
+		if result, ok := buildCAAIodefEmailResult(val, source); ok {
 			results = append(results, result)
 		}
 	}
@@ -82,9 +68,8 @@ func parseCAARecord(data string) []schema.ModuleResult {
 	return results
 }
 
-func buildCAAAuthorityResult(tag, val string) (schema.ModuleResult, bool) {
-	parts := strings.SplitN(val, ";", 2)
-	domain := strings.TrimSpace(parts[0])
+func buildCAAAuthorityResult(tag, val string, source *schema.EntityRef) (schema.ModuleResult, bool) {
+	domain := dnsutils.ExtractCAAAuthority(val)
 	if domain == "" {
 		return schema.ModuleResult{}, false
 	}
@@ -102,15 +87,12 @@ func buildCAAAuthorityResult(tag, val string) (schema.ModuleResult, bool) {
 		Tags:       []string{constants.TagCAA},
 		Context:    "Authorized CA" + " (" + tag + ")",
 		OutOfScope: true,
+		Source:     source,
 	}, true
 }
 
-func buildCAAIodefEmailResult(val string) (schema.ModuleResult, bool) {
-	if len(val) < len("mailto:") || !strings.EqualFold(val[:len("mailto:")], "mailto:") {
-		return schema.ModuleResult{}, false
-	}
-
-	email := strings.TrimSpace(strings.TrimPrefix(val[len("mailto:"):], "//"))
+func buildCAAIodefEmailResult(val string, source *schema.EntityRef) (schema.ModuleResult, bool) {
+	email := dnsutils.ExtractCAAIodefEmail(val)
 	if email == "" {
 		return schema.ModuleResult{}, false
 	}
@@ -127,23 +109,6 @@ func buildCAAIodefEmailResult(val string) (schema.ModuleResult, bool) {
 		Value:      res.Value,
 		Context:    "CAA Violation Report",
 		OutOfScope: true,
+		Source:     source,
 	}, true
-}
-
-func decodeHexCAA(raw string) (string, error) {
-	data, ok := dnsutils.DecodeWireFormat(raw, 2)
-	if !ok {
-		return "", errors.New("invalid or too short CAA wire format")
-	}
-
-	flags := data[0]
-	tagLen := int(data[1])
-	if len(data) < 2+tagLen {
-		return "", errors.New("tag length mismatch")
-	}
-
-	tag := string(data[2 : 2+tagLen])
-	value := string(data[2+tagLen:])
-
-	return strconv.Itoa(int(flags)) + " " + tag + " \"" + value + "\"", nil
 }

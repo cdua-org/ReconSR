@@ -6,6 +6,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/schema"
 )
@@ -37,7 +38,7 @@ func (m *module) parseDNSRecord(rec map[string]any, target string, src *schema.E
 	case "TXT":
 		m.appendVTTXTResult(exec, src, recordValue)
 	case "CAA":
-		m.appendVTCAAResults(exec, src, rec)
+		m.appendVTCAAResults(exec, target, src, rec)
 	case "SRV":
 		m.appendVTSRVResults(exec, target, src, rec, recordValue)
 	default:
@@ -183,7 +184,7 @@ func (m *module) appendVTTXTResult(exec *schema.ModuleExecution, src *schema.Ent
 	})
 }
 
-func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, src *schema.EntityRef, rec map[string]any) {
+func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any) {
 	flagValue := "0"
 	if flag, ok := formatVTInt(rec["flag"]); ok {
 		flagValue = flag
@@ -207,6 +208,8 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, src *schema.En
 		propertyValue = fmt.Sprintf("%s %s %q", flagValue, tag, value)
 	}
 
+	caaRef := &schema.EntityRef{Type: constants.TypeCAA, Value: propertyValue}
+
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeCAA,
 		Category: constants.CategoryProperty,
@@ -214,26 +217,47 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, src *schema.En
 		Source:   src,
 	})
 
-	if tag != "issue" && tag != "issuewild" && tag != "issuemail" {
-		return
-	}
+	switch tag {
+	case "issue", "issuewild", "issuemail":
+		authority := dnsutils.ExtractCAAAuthority(value)
+		if authority == "" {
+			return
+		}
+		validated, err := validator.Validate(constants.TypeDomain, authority)
+		if err != nil {
+			dbg.Printf("appendVTCAAResults authority=%q tag=%q err=%v", authority, tag, err)
+			return
+		}
 
-	authority := strings.TrimSpace(strings.SplitN(value, ";", 2)[0])
-	validated, err := validator.Validate(constants.TypeDomain, authority)
-	if err != nil {
-		dbg.Printf("appendVTCAAResults authority=%q tag=%q err=%v", authority, tag, err)
-		return
-	}
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:       validated.Type,
+			Category:   constants.CategoryNode,
+			Value:      validated.Value,
+			Tags:       []string{constants.TagCAA},
+			Context:    "Authorized CA (" + tag + ")",
+			OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
+			Source:     caaRef,
+		})
+	case "iodef":
+		email := dnsutils.ExtractCAAIodefEmail(value)
+		if email == "" {
+			return
+		}
+		validated, err := validator.Validate(constants.TypeEmail, email)
+		if err != nil {
+			dbg.Printf("appendVTCAAResults email=%q tag=%q err=%v", email, tag, err)
+			return
+		}
 
-	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:       validated.Type,
-		Category:   constants.CategoryNode,
-		Value:      validated.Value,
-		Tags:       []string{constants.TagCAA},
-		Context:    "Authorized CA (" + tag + ")",
-		OutOfScope: true,
-		Source:     src,
-	})
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:       validated.Type,
+			Category:   constants.CategoryNode,
+			Value:      validated.Value,
+			Context:    "CAA Violation Report",
+			OutOfScope: orgdomain.IsEmailOutOfScope(validated.Value, target),
+			Source:     caaRef,
+		})
+	}
 }
 
 func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any, value string) {

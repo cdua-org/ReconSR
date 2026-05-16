@@ -25,7 +25,7 @@ func resultValues(results []schema.ModuleResult) []string {
 	return values
 }
 
-func TestParseCAARecord(t *testing.T) {
+func TestProcessCAARecord(t *testing.T) {
 	const (
 		authorityDomain = "ca.example.com"
 		issueRecord     = `0 issue "ca.example.com"`
@@ -89,12 +89,20 @@ func TestParseCAARecord(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := parseCAARecord(tt.record)
+			results := processCAARecord(tt.record)
 			if got := resultTypes(results); !slices.Equal(got, tt.expectedTypes) {
 				t.Fatalf("unexpected result types: got %v want %v", got, tt.expectedTypes)
 			}
 			if got := resultValues(results); !slices.Equal(got, tt.expectedValues) {
 				t.Fatalf("unexpected result values: got %v want %v", got, tt.expectedValues)
+			}
+
+			if len(results) > 1 {
+				for _, res := range results[1:] {
+					if res.Source == nil || res.Source.Type != constants.TypeCAA || res.Source.Value != results[0].Value {
+						t.Errorf("expected source to point to CAA property, got %+v", res.Source)
+					}
+				}
 			}
 		})
 	}
