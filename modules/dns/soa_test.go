@@ -2,109 +2,16 @@ package dns
 
 import (
 	"context"
-	"reflect"
 	"slices"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/schema"
 )
 
-func TestParseSOA(t *testing.T) {
-	tests := []struct {
-		expected *SOA
-		name     string
-		input    string
-	}{
-		{
-			name:  "valid SOA",
-			input: "ns1.example.com. hostmaster.example.com. 2024031501 7200 3600 1209600 86400",
-			expected: &SOA{
-				NS:      "ns1.example.com.",
-				Mbox:    "hostmaster.example.com.",
-				Serial:  2024031501,
-				Refresh: 7200,
-				Retry:   3600,
-				Expire:  1209600,
-				MinTTL:  86400,
-			},
-		},
-		{
-			name:  "minimal SOA",
-			input: "ns.example.com. admin.example.com. 1 100 200 300 400",
-			expected: &SOA{
-				NS:      "ns.example.com.",
-				Mbox:    "admin.example.com.",
-				Serial:  1,
-				Refresh: 100,
-				Retry:   200,
-				Expire:  300,
-				MinTTL:  400,
-			},
-		},
-		{
-			name:     "invalid too few fields",
-			input:    "ns.example.com. admin.example.com.",
-			expected: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := parseSOA(tt.input)
-			if !reflect.DeepEqual(got, tt.expected) {
-				t.Errorf("parseSOA() = %+v, want %+v", got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestFormatMbox(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"opsmail.example.com.", "opsmail@example.com"},
-		{"adminbox.example.com.", "adminbox@example.com"},
-		{"dnsbox.example.net.", "dnsbox@example.net"},
-		{"no.dot.email", "no@dot.email"},
-		{"single.word", "single@word"},
-		{"nodotsatall", "nodotsatall"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := formatMbox(tt.input)
-			if got != tt.expected {
-				t.Errorf("formatMbox(%q) = %q, want %q", tt.input, got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestParseUint(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected uint32
-	}{
-		{"12345", 12345},
-		{"0", 0},
-		{"4294967295", 4294967295},
-		{"invalid", 0},
-		{"", 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := parseUint(tt.input)
-			if got != tt.expected {
-				t.Errorf("parseUint(%q) = %d, want %d", tt.input, got, tt.expected)
-			}
-		})
-	}
-}
-
 func TestBuildSOAPrimaryNSResultSkipsInvalidAndNormalizes(t *testing.T) {
-	result := buildSOAPrimaryNSResult("NS1.EXAMPLE.COM.", "primary.soa.example.com")
+	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: "soa"}
+	result := buildSOAPrimaryNSResult("NS1.EXAMPLE.COM.", "primary.soa.example.com", soaRef)
 	if result == nil {
 		t.Fatal("expected primary NS result")
 	}
@@ -129,13 +36,18 @@ func TestBuildSOAPrimaryNSResultSkipsInvalidAndNormalizes(t *testing.T) {
 		t.Fatal("expected in-scope NS")
 	}
 
-	if buildSOAPrimaryNSResult(".bad.example.com.", "primary.soa.example.com") != nil {
+	if result.Source != soaRef {
+		t.Fatal("expected source reference")
+	}
+
+	if buildSOAPrimaryNSResult(".bad.example.com.", "primary.soa.example.com", soaRef) != nil {
 		t.Fatal("expected invalid primary NS to be skipped")
 	}
 }
 
 func TestBuildSOAResponsibleEmailResultSkipsInvalidAndUsesValidatedType(t *testing.T) {
-	result := buildSOAResponsibleEmailResult(`"john".example.com.`, "responsible.soa.example.com")
+	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: "soa"}
+	result := buildSOAResponsibleEmailResult(`"john".example.com.`, "responsible.soa.example.com", soaRef)
 	if result == nil {
 		t.Fatal("expected responsible email result")
 	}
@@ -156,7 +68,11 @@ func TestBuildSOAResponsibleEmailResultSkipsInvalidAndUsesValidatedType(t *testi
 		t.Fatal("expected in-scope responsible email")
 	}
 
-	if buildSOAResponsibleEmailResult("bad..example.com.", "responsible.soa.example.com") != nil {
+	if result.Source != soaRef {
+		t.Fatal("expected source reference")
+	}
+
+	if buildSOAResponsibleEmailResult("bad..example.com.", "responsible.soa.example.com", soaRef) != nil {
 		t.Fatal("expected invalid responsible email to be skipped")
 	}
 }

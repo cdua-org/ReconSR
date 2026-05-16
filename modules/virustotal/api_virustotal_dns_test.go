@@ -176,15 +176,23 @@ func TestParseDNSRecordSOAAddsPropertyAndPrimaryNSNode(t *testing.T) {
 	source := &schema.EntityRef{Type: constants.TypeDomain, Value: fixtureDomainTarget}
 	results := parseDNSRecordFromFixture(t, fixtureDomainTarget, source, rec)
 
-	requireResult(t, results, "soa property", func(result schema.ModuleResult) bool {
+	soaProp := requireResult(t, results, "soa property", func(result schema.ModuleResult) bool {
 		return result.Type == constants.TypeSOA && result.Category == constants.CategoryProperty && result.Value == "ns1-39.example-dns.com. exampledns-hostmaster.target-example.com. 1 3600 300 2419200 300"
 	})
+	assertFixtureResultSource(t, source, soaProp.Source)
 
-	nsResult := requireResult(t, results, "soa primary ns node", func(result schema.ModuleResult) bool {
+	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: soaProp.Value}
+
+	nsResult := requireResult(t, results, "primary ns node", func(result schema.ModuleResult) bool {
 		hasNSTag := slices.Contains(result.Tags, constants.TagNS)
 		return result.Type == constants.TypeSubdomain && result.Category == constants.CategoryNode && result.Value == "ns1-39.example-dns.com" && hasNSTag
 	})
-	assertFixtureResultSource(t, source, nsResult.Source)
+	assertFixtureResultSource(t, soaRef, nsResult.Source)
+
+	emailResult := requireResult(t, results, "responsible email node", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeEmail && result.Category == constants.CategoryNode && result.Value == "exampledns-hostmaster@target-example.com"
+	})
+	assertFixtureResultSource(t, soaRef, emailResult.Source)
 }
 
 func TestParseDNSRecordCAAAddsAuthorityNode(t *testing.T) {

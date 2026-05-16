@@ -7,22 +7,12 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
-
-// SOA represents the parsed SOA record data.
-type SOA struct {
-	NS      string
-	Mbox    string
-	Serial  uint32
-	Refresh uint32
-	Retry   uint32
-	Expire  uint32
-	MinTTL  uint32
-}
 
 func getSOAData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetSOA)
@@ -42,9 +32,9 @@ func getSOAData(ctx context.Context, target string) schema.ModuleExecution {
 	modutil.SetRawFromBytes(&exec, raw)
 
 	var soaRaw string
-	var soa *SOA
+	var soa *dnsutils.SOA
 	for _, rec := range records {
-		soa = parseSOA(rec)
+		soa = dnsutils.ParseSOA(rec)
 		if soa != nil {
 			soaRaw = rec
 			break
@@ -55,16 +45,18 @@ func getSOAData(ctx context.Context, target string) schema.ModuleExecution {
 		return exec
 	}
 
+	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: soaRaw}
+
 	exec.Results = append(exec.Results,
 		schema.ModuleResult{Type: constants.TypeSOA, Category: constants.CategoryProperty, Value: soaRaw},
-		schema.ModuleResult{Type: constants.TypeSOA, Category: constants.CategoryProperty, Value: strconv.FormatUint(uint64(soa.Serial), 10), Context: "Serial"},
+		schema.ModuleResult{Type: constants.TypeSOA, Category: constants.CategoryProperty, Value: strconv.FormatUint(uint64(soa.Serial), 10), Context: "Serial", Source: soaRef},
 	)
 
-	if result := buildSOAPrimaryNSResult(soa.NS, target); result != nil {
+	if result := buildSOAPrimaryNSResult(soa.NS, target, soaRef); result != nil {
 		exec.Results = append(exec.Results, *result)
 	}
 
-	if result := buildSOAResponsibleEmailResult(soa.Mbox, target); result != nil {
+	if result := buildSOAResponsibleEmailResult(soa.Mbox, target, soaRef); result != nil {
 		exec.Results = append(exec.Results, *result)
 	}
 
@@ -73,40 +65,7 @@ func getSOAData(ctx context.Context, target string) schema.ModuleExecution {
 	return exec
 }
 
-func parseSOA(data string) *SOA {
-	parts := strings.Fields(data)
-	if len(parts) < 7 {
-		return nil
-	}
-
-	return &SOA{
-		NS:      parts[0],
-		Mbox:    parts[1],
-		Serial:  parseUint(parts[2]),
-		Refresh: parseUint(parts[3]),
-		Retry:   parseUint(parts[4]),
-		Expire:  parseUint(parts[5]),
-		MinTTL:  parseUint(parts[6]),
-	}
-}
-
-func parseUint(s string) uint32 {
-	v, err := strconv.ParseUint(s, 10, 32)
-	if err != nil {
-		return 0
-	}
-	return uint32(v)
-}
-
-func formatMbox(mbox string) string {
-	mbox = strings.TrimSuffix(mbox, ".")
-	if before, _, found := strings.Cut(mbox, "."); found {
-		return before + "@" + mbox[len(before)+1:]
-	}
-	return mbox
-}
-
-func buildSOAPrimaryNSResult(rawNS, target string) *schema.ModuleResult {
+func buildSOAPrimaryNSResult(rawNS, target string, source *schema.EntityRef) *schema.ModuleResult {
 	primaryNS := strings.TrimSuffix(rawNS, ".")
 	res, err := validator.Validate(constants.TypeDomain, primaryNS)
 	if err != nil {
@@ -124,11 +83,12 @@ func buildSOAPrimaryNSResult(rawNS, target string) *schema.ModuleResult {
 		Tags:       []string{constants.TagNS},
 		Context:    "Primary NS",
 		OutOfScope: isOOS,
+		Source:     source,
 	}
 }
 
-func buildSOAResponsibleEmailResult(rawMbox, target string) *schema.ModuleResult {
-	responsibleEmail := formatMbox(rawMbox)
+func buildSOAResponsibleEmailResult(rawMbox, target string, source *schema.EntityRef) *schema.ModuleResult {
+	responsibleEmail := dnsutils.FormatSOAMbox(rawMbox)
 	res, err := validator.Validate(constants.TypeEmail, responsibleEmail)
 	if err != nil {
 		log.Printf("get_soa skipping invalid responsible email target=%q email=%q err=%v", target, responsibleEmail, err)
@@ -144,5 +104,6 @@ func buildSOAResponsibleEmailResult(rawMbox, target string) *schema.ModuleResult
 		Value:      res.Value,
 		Context:    "Responsible Email",
 		OutOfScope: isOOS,
+		Source:     source,
 	}
 }

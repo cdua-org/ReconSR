@@ -147,21 +147,21 @@ func assertShodanDomainSOA(t *testing.T, results []schema.ModuleResult) {
 	}
 
 	soaSerial := requireModuleResultWithContext(t, results, constants.TypeSOA, "1234567890", "Serial")
-	if soaSerial.Source != nil {
-		t.Fatalf("expected root SOA serial linked to target, got %+v", soaSerial.Source)
+	if soaSerial.Source == nil || soaSerial.Source.Type != constants.TypeSOA || soaSerial.Source.Value != soaRaw.Value {
+		t.Fatalf("expected SOA serial linked to SOA property, got %+v", soaSerial.Source)
 	}
 
 	primaryNS := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "ns1.example.com", "Primary NS")
 	if !slices.Contains(primaryNS.Tags, constants.TagNS) {
 		t.Fatalf("expected SOA primary NS to have tag %q, got %v", constants.TagNS, primaryNS.Tags)
 	}
-	if primaryNS.Source != nil {
-		t.Fatalf("expected SOA primary NS linked to target, got %+v", primaryNS.Source)
+	if primaryNS.Source == nil || primaryNS.Source.Type != constants.TypeSOA || primaryNS.Source.Value != soaRaw.Value {
+		t.Fatalf("expected SOA primary NS linked to SOA property, got %+v", primaryNS.Source)
 	}
 
 	email := requireModuleResultWithContext(t, results, constants.TypeEmail, "dns@example.net", "Responsible Email")
-	if email.Source != nil {
-		t.Fatalf("expected SOA email linked to target, got %+v", email.Source)
+	if email.Source == nil || email.Source.Type != constants.TypeSOA || email.Source.Value != soaRaw.Value {
+		t.Fatalf("expected SOA email linked to SOA property, got %+v", email.Source)
 	}
 	if !email.OutOfScope {
 		t.Fatal("expected SOA responsible email to be out of scope")

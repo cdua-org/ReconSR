@@ -301,7 +301,7 @@ func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRec
 			Category: constants.CategoryProperty,
 			Value:    strconv.FormatUint(record.Options.Serial, 10),
 			Context:  "Serial",
-			Source:   source,
+			Source:   soaRef,
 		})
 	}
 
@@ -314,12 +314,12 @@ func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRec
 			Tags:       []string{constants.TagNS},
 			Context:    "Primary NS",
 			OutOfScope: orgdomain.IsOutOfScope(validatedNS.Value, target),
-			Source:     source,
+			Source:     soaRef,
 		})
 	}
 
 	if record.Options != nil && record.Options.Hostmaster != "" {
-		email := formatShodanSOAMbox(record.Options.Hostmaster)
+		email := dnsutils.FormatSOAMbox(record.Options.Hostmaster)
 		validatedEmail, emailErr := validator.Validate(constants.TypeEmail, email)
 		if emailErr == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
@@ -328,7 +328,7 @@ func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRec
 				Value:      validatedEmail.Value,
 				Context:    "Responsible Email",
 				OutOfScope: orgdomain.IsEmailOutOfScope(validatedEmail.Value, target),
-				Source:     source,
+				Source:     soaRef,
 			})
 		}
 	}
@@ -352,15 +352,6 @@ func buildShodanSOARaw(primaryNS string, opts *shodanDomainRecordOptions) string
 	return fmt.Sprintf("%s %s %d %d %d %d %d",
 		primaryNS, hostmaster,
 		opts.Serial, opts.Refresh, opts.Retry, opts.Expires, opts.MinTTL)
-}
-
-func formatShodanSOAMbox(hostmaster string) string {
-	hostmaster = strings.TrimSuffix(hostmaster, ".")
-	if before, after, found := strings.Cut(hostmaster, "."); found {
-		return before + "@" + after
-	}
-
-	return hostmaster
 }
 
 func appendShodanGenericDNSResult(exec *schema.ModuleExecution, recordType, value string, source *schema.EntityRef) *schema.EntityRef {

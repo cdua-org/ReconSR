@@ -135,11 +135,15 @@ func (m *module) appendVTNSResult(exec *schema.ModuleExecution, target string, s
 
 func (m *module) appendVTSOAResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any) {
 	parts := make([]string, 0, 7)
+	var rawNS, rawRname string
+
 	if primaryNS, ok := rec["value"].(string); ok && strings.TrimSpace(primaryNS) != "" {
-		parts = append(parts, ensureFQDN(primaryNS))
+		rawNS = ensureFQDN(primaryNS)
+		parts = append(parts, rawNS)
 	}
 	if rname, ok := rec["rname"].(string); ok && strings.TrimSpace(rname) != "" {
-		parts = append(parts, ensureFQDN(rname))
+		rawRname = ensureFQDN(rname)
+		parts = append(parts, rawRname)
 	}
 	for _, field := range []string{"serial", "refresh", "retry", "expire", "minimum"} {
 		if fieldValue, ok := formatVTInt(rec[field]); ok {
@@ -150,15 +154,32 @@ func (m *module) appendVTSOAResults(exec *schema.ModuleExecution, target string,
 		return
 	}
 
+	soaRaw := strings.Join(parts, " ")
+	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: soaRaw}
+
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeSOA,
 		Category: constants.CategoryProperty,
-		Value:    strings.Join(parts, " "),
+		Value:    soaRaw,
 		Source:   src,
 	})
 
-	if primaryNS, ok := rec["value"].(string); ok {
-		m.appendVTNSResult(exec, target, src, ensureFQDN(primaryNS))
+	if rawNS != "" {
+		m.appendVTNSResult(exec, target, soaRef, rawNS)
+	}
+
+	if rawRname != "" {
+		email := dnsutils.FormatSOAMbox(rawRname)
+		if validated, err := validator.Validate(constants.TypeEmail, email); err == nil {
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:       validated.Type,
+				Category:   constants.CategoryNode,
+				Value:      validated.Value,
+				Context:    "Responsible Email",
+				OutOfScope: orgdomain.IsEmailOutOfScope(validated.Value, target),
+				Source:     soaRef,
+			})
+		}
 	}
 }
 
