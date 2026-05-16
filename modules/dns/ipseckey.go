@@ -2,11 +2,7 @@ package dns
 
 import (
 	"context"
-	"encoding/base64"
-	"fmt"
-	"net"
 	"strconv"
-	"strings"
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -30,87 +26,6 @@ var ipseckeyGatewayTypes = map[byte]string{
 	1: "IPv4",
 	2: "IPv6",
 	3: "Domain",
-}
-
-type wireDomainDecodeResult struct {
-	domain     string
-	nextOffset int
-	ok         bool
-}
-
-func decodeWireDomain(data []byte, offset int) wireDomainDecodeResult {
-	if offset >= len(data) {
-		return wireDomainDecodeResult{}
-	}
-
-	labels := make([]string, 0, 4)
-	for offset < len(data) {
-		labelLen := int(data[offset])
-		offset++
-
-		if labelLen == 0 {
-			if len(labels) == 0 {
-				return wireDomainDecodeResult{domain: ".", nextOffset: offset, ok: true}
-			}
-			return wireDomainDecodeResult{domain: strings.Join(labels, "."), nextOffset: offset, ok: true}
-		}
-
-		if labelLen&0xC0 != 0 || labelLen > 63 || offset+labelLen > len(data) {
-			return wireDomainDecodeResult{}
-		}
-
-		labels = append(labels, string(data[offset:offset+labelLen]))
-		offset += labelLen
-	}
-
-	return wireDomainDecodeResult{}
-}
-
-func parseIPSECKEY(raw string) string {
-	data, ok := dnsutils.DecodeWireFormat(raw, 3)
-	if !ok {
-		return raw
-	}
-
-	precedence := data[0]
-	gwType := data[1]
-	alg := data[2]
-
-	var gw string
-	var pubKeyBytes []byte
-
-	offset := 3
-	switch gwType {
-	case 0:
-		gw = "."
-		pubKeyBytes = data[offset:]
-	case 1:
-		if len(data) < offset+4 {
-			return raw
-		}
-		gw = net.IP(data[offset : offset+4]).String()
-		pubKeyBytes = data[offset+4:]
-	case 2:
-		if len(data) < offset+16 {
-			return raw
-		}
-		gw = net.IP(data[offset : offset+16]).String()
-		pubKeyBytes = data[offset+16:]
-	case 3:
-		decodedDomain := decodeWireDomain(data, offset)
-		if !decodedDomain.ok {
-			return raw
-		}
-		gw = decodedDomain.domain
-		pubKeyBytes = data[decodedDomain.nextOffset:]
-	default:
-		gw = "<unknown>"
-		pubKeyBytes = data[offset:]
-	}
-
-	pubKeyBase64 := base64.StdEncoding.EncodeToString(pubKeyBytes)
-
-	return fmt.Sprintf("%d %d %d %s %s", precedence, gwType, alg, gw, pubKeyBase64)
 }
 
 func mapIPSECKEYContext(precedence, gwTypeStr, algStr string) (ctx, gwTypeName string) {
@@ -173,37 +88,26 @@ func classifyIPSECKEYGateway(gwTypeStr, gateway, target string) (schema.ModuleRe
 	}, true
 }
 
-func buildIPSECKEYResults(parsed, target string) []schema.ModuleResult {
-	parts := strings.Fields(parsed)
-	if len(parts) < 5 {
+func buildIPSECKEYResults(parsed *dnsutils.IPSECKEYRecord, target string, source *schema.EntityRef) []schema.ModuleResult {
+	if parsed == nil {
 		return nil
 	}
 
-	precedence := parts[0]
-	gwTypeStr := parts[1]
-	algStr := parts[2]
-	gateway := parts[3]
-	pubKey := strings.Join(parts[4:], "")
+	_, gwTypeName := mapIPSECKEYContext(parsed.Precedence, parsed.GatewayType, parsed.Algorithm)
 
-	ctxStr, gwTypeName := mapIPSECKEYContext(precedence, gwTypeStr, algStr)
-	results := make([]schema.ModuleResult, 0, 2)
-	results = append(results, schema.ModuleResult{
-		Type:     constants.TypeIPSECKEY,
-		Category: constants.CategoryProperty,
-		Value:    pubKey,
-		Context:  ctxStr,
-	})
+	results := make([]schema.ModuleResult, 0, 1)
 
-	if gateway == "." || gateway == "<wire_domain>" || gateway == "<unknown>" {
+	if parsed.Gateway == "." || parsed.Gateway == "<wire_domain>" || parsed.Gateway == "<unknown>" {
 		return results
 	}
 
-	gatewayResult, ok := classifyIPSECKEYGateway(gwTypeStr, gateway, target)
+	gatewayResult, ok := classifyIPSECKEYGateway(parsed.GatewayType, parsed.Gateway, target)
 	if !ok {
 		return results
 	}
 
 	gatewayResult.Context = "IPSECKEY Gateway (" + gwTypeName + ")"
+	gatewayResult.Source = source
 	results = append(results, gatewayResult)
 
 	return results
@@ -226,7 +130,22 @@ func getIPSECKEYData(ctx context.Context, target string) schema.ModuleExecution 
 	modutil.SetRawFromBytes(&exec, raw)
 
 	for _, rec := range records {
-		exec.Results = append(exec.Results, buildIPSECKEYResults(parseIPSECKEY(rec), target)...)
+		parsed := dnsutils.ParseIPSECKEY(rec)
+		if parsed == nil {
+			continue
+		}
+
+		ctxStr, _ := mapIPSECKEYContext(parsed.Precedence, parsed.GatewayType, parsed.Algorithm)
+		ipseckeyRes := schema.ModuleResult{
+			Type:     constants.TypeIPSECKEY,
+			Category: constants.CategoryProperty,
+			Value:    parsed.Formatted,
+			Context:  ctxStr,
+		}
+		exec.Results = append(exec.Results, ipseckeyRes)
+
+		source := &schema.EntityRef{Type: ipseckeyRes.Type, Value: ipseckeyRes.Value}
+		exec.Results = append(exec.Results, buildIPSECKEYResults(parsed, target, source)...)
 	}
 
 	log.Printf("get_ipseckey target=%q records=%d", target, len(records))
