@@ -2,15 +2,14 @@ package dns
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -94,7 +93,7 @@ func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
 			}
 
 			for _, rec := range records {
-				host, parseErr := parseSRVHost(rec)
+				host, parseErr := dnsutils.ParseSRVHost(rec)
 				if parseErr == nil {
 					resChan <- srvResult{prefix: pfx, record: rec, host: host}
 				}
@@ -118,15 +117,15 @@ func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
 		rawDataBuilder.WriteString(": ")
 		rawDataBuilder.WriteString(res.record)
 
-		exec.Results = append(exec.Results,
-			schema.ModuleResult{
-				Type:     constants.TypeSRV,
-				Category: constants.CategoryProperty,
-				Value:    res.record,
-			},
-		)
+		srvRes := schema.ModuleResult{
+			Type:     constants.TypeSRV,
+			Category: constants.CategoryProperty,
+			Value:    res.record,
+		}
+		exec.Results = append(exec.Results, srvRes)
 
-		if srvHost, ok := buildSRVHostResult(res.host, target); ok {
+		source := &schema.EntityRef{Type: srvRes.Type, Value: srvRes.Value}
+		if srvHost, ok := buildSRVHostResult(res.host, target, source); ok {
 			exec.Results = append(exec.Results, srvHost)
 		}
 	}
@@ -139,7 +138,7 @@ func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
 	return exec
 }
 
-func buildSRVHostResult(host, target string) (schema.ModuleResult, bool) {
+func buildSRVHostResult(host, target string, source *schema.EntityRef) (schema.ModuleResult, bool) {
 	res, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
 		log.Printf("get_srv skipping invalid srv host target=%q entity=%q err=%v", target, host, err)
@@ -155,27 +154,8 @@ func buildSRVHostResult(host, target string) (schema.ModuleResult, bool) {
 		Value:      res.Value,
 		Tags:       []string{constants.TagSRV},
 		OutOfScope: isOOS,
+		Source:     source,
 	}, true
-}
-
-func parseSRVHost(data string) (string, error) {
-	parts := strings.Fields(data)
-	if len(parts) < 4 {
-		return "", errors.New("invalid SRV record format")
-	}
-
-	host := strings.TrimSuffix(parts[3], ".")
-	if host == "" {
-		return "", errors.New("invalid SRV host")
-	}
-
-	for i := range 3 {
-		if _, err := strconv.ParseUint(parts[i], 10, 16); err != nil {
-			return "", fmt.Errorf("invalid numeric field %d: %w", i, err)
-		}
-	}
-
-	return host, nil
 }
 
 func makeSRVFallback(domain string) func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {

@@ -289,6 +289,8 @@ func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string,
 		}
 	}
 
+	srvRef := &schema.EntityRef{Type: constants.TypeSRV, Value: srvValue}
+
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeSRV,
 		Category: constants.CategoryProperty,
@@ -296,11 +298,11 @@ func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string,
 		Source:   src,
 	})
 
-	parts := strings.Fields(value)
-	if len(parts) < 1 {
+	host, err := dnsutils.ParseSRVHost(srvValue)
+	if err != nil {
+		dbg.Printf("appendVTSRVResults target=%q err=%v", target, err)
 		return
 	}
-	host := strings.TrimSuffix(parts[len(parts)-1], ".")
 
 	validated, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
@@ -314,6 +316,6 @@ func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string,
 		Value:      validated.Value,
 		Tags:       []string{constants.TagSRV},
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
-		Source:     src,
+		Source:     srvRef,
 	})
 }

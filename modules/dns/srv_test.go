@@ -2,56 +2,17 @@ package dns
 
 import (
 	"context"
-	"reflect"
 	"slices"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/schema"
 )
-
-func TestParseSRVHost(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-		wantErr  bool
-	}{
-		{
-			name:     "valid SRV record",
-			input:    "10 50 5060 sipserver.example.com.",
-			expected: "sipserver.example.com",
-			wantErr:  false,
-		},
-		{
-			name:     "invalid - too few fields",
-			input:    "10 50 5060",
-			expected: "",
-			wantErr:  true,
-		},
-		{
-			name:     "invalid - non-numeric port",
-			input:    "10 50 sip sipserver.example.com.",
-			expected: "",
-			wantErr:  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseSRVHost(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("parseSRVHost() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.expected) {
-				t.Errorf("parseSRVHost() = %+v, want %+v", got, tt.expected)
-			}
-		})
-	}
-}
 
 func TestBuildSRVHostResult(t *testing.T) {
 	const targetDomain = "example.com"
+	srvRef := &schema.EntityRef{Type: constants.TypeSRV, Value: "10 50 5060 sip.example.com"}
+
 	tests := []struct {
 		name      string
 		host      string
@@ -91,7 +52,7 @@ func TestBuildSRVHostResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, ok := buildSRVHostResult(tt.host, tt.target)
+			result, ok := buildSRVHostResult(tt.host, tt.target, srvRef)
 			if ok != tt.wantOK {
 				t.Fatalf("buildSRVHostResult() ok = %v, want %v", ok, tt.wantOK)
 			}
@@ -109,6 +70,9 @@ func TestBuildSRVHostResult(t *testing.T) {
 			}
 			if result.OutOfScope != tt.wantOOS {
 				t.Fatalf("buildSRVHostResult() out_of_scope = %v, want %v", result.OutOfScope, tt.wantOOS)
+			}
+			if result.Source != srvRef {
+				t.Fatalf("buildSRVHostResult() source = %+v, want %+v", result.Source, srvRef)
 			}
 		})
 	}

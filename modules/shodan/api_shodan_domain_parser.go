@@ -384,9 +384,7 @@ func appendShodanLastSeen(exec *schema.ModuleExecution, lastSeen string, source 
 
 func appendShodanSRVResult(exec *schema.ModuleExecution, value, target string, source *schema.EntityRef) *schema.EntityRef {
 	ref := appendShodanGenericDNSResult(exec, "SRV", value, source)
-	parts := strings.Fields(value)
-	if len(parts) >= 4 {
-		host := strings.TrimSuffix(parts[3], ".")
+	if host, err := dnsutils.ParseSRVHost(value); err == nil {
 		if validated, err := validator.Validate(constants.TypeDomain, host); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validated.Type,
@@ -394,7 +392,7 @@ func appendShodanSRVResult(exec *schema.ModuleExecution, value, target string, s
 				Value:      validated.Value,
 				Tags:       []string{constants.TagSRV},
 				OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
-				Source:     source,
+				Source:     ref,
 			})
 		}
 	}
