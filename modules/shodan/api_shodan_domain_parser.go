@@ -8,6 +8,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/schema"
@@ -114,7 +115,7 @@ func processShodanDNSRecord(exec *schema.ModuleExecution, record shodanDomainRec
 	case "SOA":
 		return appendShodanSOAResults(exec, record, value, target, source)
 	case "TXT":
-		return appendShodanTXTResult(exec, record, value, source)
+		return appendShodanTXTResult(exec, record, value, target, source)
 	case "SRV":
 		return appendShodanSRVResult(exec, value, target, source)
 	case "CAA":
@@ -220,7 +221,7 @@ func appendShodanNSResult(exec *schema.ModuleExecution, value, target string, so
 	return &schema.EntityRef{Type: validated.Type, Value: validated.Value}
 }
 
-func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainRecord, value string, source *schema.EntityRef) *schema.EntityRef {
+func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainRecord, value, target string, source *schema.EntityRef) *schema.EntityRef {
 	resultType := constants.TypeTXT
 	contextStr := ""
 
@@ -237,6 +238,8 @@ func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainReco
 		contextStr = record.Subdomain
 	}
 
+	ref := &schema.EntityRef{Type: resultType, Value: value}
+
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
 		Category: constants.CategoryProperty,
@@ -245,7 +248,40 @@ func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainReco
 		Source:   source,
 	})
 
-	return &schema.EntityRef{Type: resultType, Value: value}
+	if resultType == constants.TypeDMARC {
+		parsed := dnsutils.ParseDMARC(value)
+		for _, key := range []string{"ruf", "rua"} {
+			val, ok := parsed[key]
+			if !ok {
+				continue
+			}
+			emails := dnsutils.ExtractDMARCEmails(val)
+			for i, email := range emails {
+				validatedEmail, err := validator.Validate(constants.TypeEmail, email)
+				if err != nil {
+					continue
+				}
+
+				isOOS := orgdomain.IsEmailOutOfScope(validatedEmail.Value, target)
+
+				contextMsg := "DMARC " + strings.ToUpper(key)
+				if len(emails) > 1 {
+					contextMsg = fmt.Sprintf("DMARC %s #%d", strings.ToUpper(key), i+1)
+				}
+
+				exec.Results = append(exec.Results, schema.ModuleResult{
+					Type:       validatedEmail.Type,
+					Category:   constants.CategoryNode,
+					Value:      validatedEmail.Value,
+					Context:    contextMsg,
+					OutOfScope: isOOS,
+					Source:     ref,
+				})
+			}
+		}
+	}
+
+	return ref
 }
 
 func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRecord, primaryNS, target string, source *schema.EntityRef) *schema.EntityRef {

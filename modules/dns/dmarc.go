@@ -8,6 +8,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -48,15 +49,16 @@ func getDMARCData(ctx context.Context, target string) schema.ModuleExecution {
 	}
 
 	for _, rec := range dmarcRecords {
-		exec.Results = append(exec.Results, schema.ModuleResult{
+		dmarcRes := schema.ModuleResult{
 			Type:     constants.TypeDMARC,
 			Category: constants.CategoryProperty,
 			Value:    rec,
-		})
+		}
+		exec.Results = append(exec.Results, dmarcRes)
 
-		parsed := parseDMARC(rec)
-
-		exec.Results = append(exec.Results, processDMARCEmails(target, parsed)...)
+		parsed := dnsutils.ParseDMARC(rec)
+		source := &schema.EntityRef{Type: dmarcRes.Type, Value: dmarcRes.Value}
+		exec.Results = append(exec.Results, processDMARCEmails(target, parsed, source)...)
 	}
 
 	log.Printf("get_dmarc success for target=%q results=%d", target, len(exec.Results))
@@ -75,49 +77,14 @@ func filterDMARC(records []string) []string {
 	return dmarc
 }
 
-func parseDMARC(record string) map[string]string {
-	result := make(map[string]string)
-
-	record = strings.TrimSpace(record)
-	for part := range strings.SplitSeq(record, ";") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-
-		if idx := strings.Index(part, "="); idx > 0 {
-			key := strings.TrimSpace(part[:idx])
-			value := strings.TrimSpace(part[idx+1:])
-			result[key] = value
-		}
-	}
-
-	return result
-}
-
-func extractEmails(val string) []string {
-	val = strings.TrimSpace(val)
-	val = strings.TrimPrefix(val, "mailto:")
-
-	var emails []string
-	for part := range strings.SplitSeq(val, ",") {
-		part = strings.TrimSpace(part)
-		part = strings.TrimPrefix(part, "mailto:")
-		if part != "" && strings.Contains(part, "@") {
-			emails = append(emails, part)
-		}
-	}
-	return emails
-}
-
-func processDMARCEmails(target string, parsed map[string]string) []schema.ModuleResult {
+func processDMARCEmails(target string, parsed map[string]string, source *schema.EntityRef) []schema.ModuleResult {
 	var results []schema.ModuleResult
 	for _, key := range []string{"ruf", "rua"} {
 		val, ok := parsed[key]
 		if !ok {
 			continue
 		}
-		emails := extractEmails(val)
+		emails := dnsutils.ExtractDMARCEmails(val)
 		for i, email := range emails {
 			validatedEmail, err := validator.Validate(constants.TypeEmail, email)
 			if err != nil {
@@ -139,6 +106,7 @@ func processDMARCEmails(target string, parsed map[string]string) []schema.Module
 				Value:      validatedEmail.Value,
 				Context:    contextMsg,
 				OutOfScope: isOOS,
+				Source:     source,
 			})
 		}
 	}
