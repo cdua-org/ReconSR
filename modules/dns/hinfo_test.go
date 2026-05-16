@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
+	"cdua-org/ReconSR/schema"
 )
 
 func TestGetHINFODataEmpty(t *testing.T) {
@@ -39,5 +41,29 @@ func TestHINFOCapabilities(t *testing.T) {
 
 	if !slices.Contains(caps.Functions, constants.FuncGetHINFO) {
 		t.Error("expected get_hinfo in capabilities")
+	}
+}
+
+func TestBuildHINFOResults(t *testing.T) {
+	parsed := &dnsutils.HINFORecord{
+		CPU:       "INTEL",
+		OS:        "UNIX",
+		Formatted: "\"INTEL\" \"UNIX\"",
+	}
+	source := &schema.EntityRef{Type: constants.TypeHINFO, Value: parsed.Formatted}
+
+	results := buildHINFOResults(parsed, source)
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+
+	for _, res := range results {
+		if res.Source == nil {
+			t.Fatalf("expected source to be set for %s", res.Value)
+		}
+		if res.Source.Type != constants.TypeHINFO || res.Source.Value != parsed.Formatted {
+			t.Errorf("expected source to be %s: %s, got %s: %s", constants.TypeHINFO, parsed.Formatted, res.Source.Type, res.Source.Value)
+		}
 	}
 }

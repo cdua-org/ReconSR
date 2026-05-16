@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
@@ -30,36 +31,45 @@ func getHINFOData(ctx context.Context, target string) schema.ModuleExecution {
 	modutil.SetRawFromBytes(&exec, raw)
 
 	for _, rec := range records {
-		exec.Results = append(exec.Results, schema.ModuleResult{
+		parsed := dnsutils.ParseHINFO(rec)
+		if parsed == nil {
+			continue
+		}
+
+		hinfoRes := schema.ModuleResult{
 			Type:     constants.TypeHINFO,
 			Category: constants.CategoryProperty,
-			Value:    rec,
+			Value:    parsed.Formatted,
 			Context:  "Hardware & OS Info (HINFO)",
-		})
-
-		parts := strings.Fields(rec)
-		if len(parts) >= 2 {
-			cpu := strings.Trim(parts[0], "\"")
-			osStr := strings.Trim(strings.Join(parts[1:], " "), "\"")
-
-			if cpu != "" && cpu != "ANY" && !strings.Contains(cpu, "cloudflare") {
-				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     constants.TypeHINFO,
-					Category: constants.CategoryProperty,
-					Value:    cpu,
-					Context:  "HINFO Extracted CPU",
-				})
-			}
-			if osStr != "" && osStr != "ANY" && !strings.Contains(osStr, "cloudflare") {
-				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     constants.TypeHINFO,
-					Category: constants.CategoryProperty,
-					Value:    osStr,
-					Context:  "HINFO Extracted OS",
-				})
-			}
 		}
+		exec.Results = append(exec.Results, hinfoRes)
+
+		source := &schema.EntityRef{Type: hinfoRes.Type, Value: hinfoRes.Value}
+		exec.Results = append(exec.Results, buildHINFOResults(parsed, source)...)
 	}
 
 	return exec
+}
+
+func buildHINFOResults(parsed *dnsutils.HINFORecord, source *schema.EntityRef) []schema.ModuleResult {
+	var results []schema.ModuleResult
+	if parsed.CPU != "" && parsed.CPU != "ANY" && !strings.Contains(parsed.CPU, "cloudflare") {
+		results = append(results, schema.ModuleResult{
+			Type:     constants.TypeHINFO,
+			Category: constants.CategoryProperty,
+			Value:    parsed.CPU,
+			Context:  "HINFO Extracted CPU",
+			Source:   source,
+		})
+	}
+	if parsed.OS != "" && parsed.OS != "ANY" && !strings.Contains(parsed.OS, "cloudflare") {
+		results = append(results, schema.ModuleResult{
+			Type:     constants.TypeHINFO,
+			Category: constants.CategoryProperty,
+			Value:    parsed.OS,
+			Context:  "HINFO Extracted OS",
+			Source:   source,
+		})
+	}
+	return results
 }
