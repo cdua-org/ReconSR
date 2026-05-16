@@ -28,6 +28,7 @@ type ModuleFunction struct {
 }
 
 type RepoToDispatcherBatchItem struct {
+	SourceEntityID     int64            `json:"SourceEntityID"`
 	Entity             Entity           `json:"Entity"`
 	OutOfScope         bool             `json:"OutOfScope"`
 	DepthStrict        int              `json:"DepthStrict"`
@@ -109,6 +110,7 @@ type ProcessorInputError struct {
 type ProcessorInputData struct {
 	ProjectID          string                    `json:"ProjectID"`
 	ModuleName         string                    `json:"ModuleName"`
+	SourceEntityID     int64                     `json:"SourceEntityID"`
 	SourceEntity       Entity                    `json:"SourceEntity"`
 	Executions         []ProcessorInputExecution `json:"Executions"`
 	RequestedFunctions []string                  `json:"RequestedFunctions,omitempty"`
@@ -131,8 +133,6 @@ type ProcessorToRepoValidResult struct {
 	Applied     bool     `json:"Applied,omitempty"`
 	OutOfScope  bool     `json:"OutOfScope,omitempty"`
 	Tags        []string `json:"Tags,omitempty"`
-	CostStrict  int      `json:"CostStrict"`
-	CostRelaxed int      `json:"CostRelaxed"`
 	Anchor      string   `json:"Anchor,omitempty"`
 }
 
@@ -150,6 +150,7 @@ type ResultGroup struct {
 type ProcessorToRepoData struct {
 	ProjectID               string                 `json:"ProjectID"`
 	ModuleName              string                 `json:"ModuleName"`
+	SourceEntityID          int64                  `json:"SourceEntityID"`
 	SourceEntity            Entity                 `json:"SourceEntity"`
 	Groups                  []ResultGroup          `json:"Groups"`
 	FunctionsWithoutResults []string               `json:"FunctionsWithoutResults"`
@@ -158,12 +159,13 @@ type ProcessorToRepoData struct {
 }
 
 type NodeData struct {
-	Type         string `json:"Type"`
-	Value        string `json:"Value"`
-	Category     string `json:"Category"`
-	OutOfScope   bool   `json:"OutOfScope"`
-	DepthStrict  int    `json:"DepthStrict"`
-	DepthRelaxed int    `json:"DepthRelaxed"`
+	Type         string   `json:"Type"`
+	Value        string   `json:"Value"`
+	Category     string   `json:"Category"`
+	OutOfScope   bool     `json:"OutOfScope"`
+	DepthStrict  int      `json:"DepthStrict"`
+	DepthRelaxed int      `json:"DepthRelaxed"`
+	Subtypes     []string `json:"Subtypes,omitempty"`
 }
 
 type EdgeData struct {

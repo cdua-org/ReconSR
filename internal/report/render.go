@@ -138,25 +138,31 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	statsByCat := make(map[string]map[string]int)
 	totalsByCat := make(map[string]int)
 
+	processEntity := func(id, eType, category string) {
+		if !nodes[id] {
+			nodes[id] = true
+			if statsByCat[category] == nil {
+				statsByCat[category] = make(map[string]int)
+			}
+			statsByCat[category][eType]++
+			totalsByCat[category]++
+		}
+	}
+
 	for _, edge := range graph.Edges {
 		src := edge.SourceID
 		dst := edge.TargetID
-
-		processEntity := func(id, eType, category string) {
-			if !nodes[id] {
-				nodes[id] = true
-				if statsByCat[category] == nil {
-					statsByCat[category] = make(map[string]int)
-				}
-				statsByCat[category][eType]++
-				totalsByCat[category]++
-			}
-		}
 
 		srcNode := graph.Nodes[src]
 		dstNode := graph.Nodes[dst]
 		processEntity(src, srcNode.Type, srcNode.Category)
 		processEntity(dst, dstNode.Type, dstNode.Category)
+	}
+
+	for id, n := range graph.Nodes {
+		if n.Category != "property" {
+			processEntity(id, n.Type, n.Category)
+		}
 	}
 
 	fmt.Printf("\n"+colorCyan+colorBold+"--- %s: %s ---"+colorReset+"\n", i18n.T["LBL_RESULTS_FOR"], graph.ProjectName)
@@ -311,20 +317,13 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 		}
 	}
 
-	var initialTargetID string
-	var initialTargetType string
-	for _, edge := range graph.Edges {
-		srcNode := graph.Nodes[edge.SourceID]
-		if srcNode.Value == graph.InitialTarget {
-			initialTargetID = edge.SourceID
-			initialTargetType = srcNode.Type
+	var initialTargetID, initialTargetType string
+	for id, n := range graph.Nodes {
+		if n.Value == graph.InitialTarget && n.Category != "property" {
+			initialTargetID = id
+			initialTargetType = n.Type
 			break
 		}
-	}
-
-	if initialTargetID == "" {
-		initialTargetID = "unknown:" + graph.InitialTarget
-		initialTargetType = "unknown"
 	}
 
 	initialOutOfScope := false
@@ -363,7 +362,16 @@ func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, 
 		if nodeType == "invalid" {
 			typeStr = fmt.Sprintf("[%s%s%s] ", colorRed, strings.ToUpper(nodeType), colorReset)
 		} else {
-			typeStr = fmt.Sprintf("[%s%s%s] ", colorCyan, strings.ToUpper(nodeType), colorReset)
+			typeStr = fmt.Sprintf("[%s%s%s]", colorCyan, strings.ToUpper(nodeType), colorReset)
+
+			if n, ok := graph.Nodes[nodeID]; ok && len(n.Subtypes) > 0 {
+				var subtypeStrs []string
+				for _, st := range n.Subtypes {
+					subtypeStrs = append(subtypeStrs, fmt.Sprintf("[%s%s%s]", colorCyan, strings.ToUpper(st), colorReset))
+				}
+				typeStr += strings.Join(subtypeStrs, "")
+			}
+			typeStr += " "
 		}
 	}
 
@@ -508,7 +516,16 @@ func printChildren(children []schema.EdgeData, childPrefix string, adj map[strin
 			if targetType == "invalid" {
 				targetTypeStr = fmt.Sprintf("[%s%s%s] ", colorRed, strings.ToUpper(targetType), colorReset)
 			} else {
-				targetTypeStr = fmt.Sprintf("[%s%s%s] ", colorCyan, strings.ToUpper(targetType), colorReset)
+				targetTypeStr = fmt.Sprintf("[%s%s%s]", colorCyan, strings.ToUpper(targetType), colorReset)
+
+				if len(targetNode.Subtypes) > 0 {
+					var subtypeStrs []string
+					for _, st := range targetNode.Subtypes {
+						subtypeStrs = append(subtypeStrs, fmt.Sprintf("[%s%s%s]", colorCyan, strings.ToUpper(st), colorReset))
+					}
+					targetTypeStr += strings.Join(subtypeStrs, "")
+				}
+				targetTypeStr += " "
 			}
 		}
 

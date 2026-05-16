@@ -194,6 +194,22 @@
             .icon-btn.active {
                 color: #38bdf8;
             }
+            .icon-btn.state-none,
+            .icon-btn.state-none:hover {
+                color: #64748b;
+            }
+            .icon-btn.state-partial,
+            .icon-btn.state-partial:hover {
+                color: #fbbf24;
+            }
+            .icon-btn.state-filtered,
+            .icon-btn.state-filtered:hover {
+                color: #fef08a;
+            }
+            .icon-btn.state-all,
+            .icon-btn.state-all:hover {
+                color: #38bdf8;
+            }
 
             #modal {
                 display: none;
@@ -525,7 +541,7 @@
                         <span class="stat-badge">{{ .OutOfScopeCount }}</span>
                         <div style="width: 18px; display: inline-block"></div>
                         <div
-                            class="icon-btn"
+                            class="icon-btn visibility-eye"
                             id="toggle-oos-btn"
                             title="Toggle Out of Scope Visibility"
                         >
@@ -562,7 +578,7 @@
                         <span class="stat-badge">{{ .LimitReachedCount }}</span>
                         <div style="width: 18px; display: inline-block"></div>
                         <div
-                            class="icon-btn active"
+                            class="icon-btn visibility-eye active"
                             id="toggle-limit-reached-btn"
                             title="Toggle Depth Limit Reached Visibility"
                         >
@@ -629,7 +645,7 @@
                         align-items: center;
                     "
                 >
-                    <span>Node Types</span>
+                    <span>Nodes</span>
                     <div style="display: flex; gap: 8px">
                         <div
                             class="icon-btn active"
@@ -650,7 +666,7 @@
                             </svg>
                         </div>
                         <div
-                            class="icon-btn active"
+                            class="icon-btn visibility-eye active"
                             id="toggle-all-vis-btn"
                             title="Toggle All Visibility"
                         >
@@ -674,64 +690,167 @@
                 </div>
 
                 {{range .Stats}} {{if ne .Type "root"}}
-                <div class="meta-item">
-                    <div class="meta-item-left">
-                        <span
-                            style="
-                                color: #cbd5e1;
-                                font-size: 0.95rem;
-                                text-transform: capitalize;
-                                user-select: none;
-                            "
-                            >{{.Type}}</span
-                        >
-                    </div>
-                    <div class="meta-item-controls">
-                        <span
-                            class="stat-badge type-stat-badge"
-                            data-type="{{.Type}}"
-                            >{{.Count}}</span
-                        >
-                        <div
-                            class="icon-btn active label-toggle-btn"
-                            data-type="{{.Type}}"
-                            title="Toggle Label"
-                        >
-                            <svg
-                                width="18"
-                                height="18"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
+                <div class="meta-item-group" style="margin-bottom: 10px">
+                    <div
+                        class="meta-item"
+                        style="{{if .Subtypes}}cursor: pointer;{{end}} margin-bottom: 10px;"
+                        {{if
+                        .Subtypes}}
+                        onclick="
+                            if (event.target.closest('.meta-item-controls'))
+                                return;
+                            const st = this.nextElementSibling;
+                            const isHidden = st.style.display === 'none';
+                            st.style.display = isHidden ? 'block' : 'none';
+                            this.querySelector('.expander').innerText = isHidden
+                                ? '▼'
+                                : '▶';
+                        "
+                        {{end}}
+                    >
+                        <div class="meta-item-left">
+                            <span
+                                style="
+                                    color: #cbd5e1;
+                                    font-size: 0.95rem;
+                                    text-transform: capitalize;
+                                    user-select: none;
+                                "
+                                >{{.Type}}{{if .Subtypes}}<span
+                                    class="expander"
+                                    style="
+                                        font-size: 0.7em;
+                                        margin-left: 6px;
+                                        color: #64748b;
+                                    "
+                                    >▶</span
+                                >{{end}}</span
                             >
-                                <path d="M4 7V4h16v3M12 4v16M8 20h8" />
-                            </svg>
                         </div>
-                        <div
-                            class="icon-btn active vis-toggle-btn"
-                            data-type="{{.Type}}"
-                            title="Toggle Visibility"
-                        >
-                            <svg
-                                width="18"
-                                height="18"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
+                        <div class="meta-item-controls">
+                            <span
+                                class="stat-badge type-stat-badge"
+                                data-type="{{.Type}}"
+                                data-total-count="{{.Count}}"
+                                >{{.Count}}</span
                             >
-                                <path
-                                    d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-                                ></path>
-                                <circle cx="12" cy="12" r="3"></circle>
-                            </svg>
+                            <div
+                                class="icon-btn active label-toggle-btn"
+                                data-type="{{.Type}}"
+                                title="Toggle Label"
+                            >
+                                <svg
+                                    width="18"
+                                    height="18"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path d="M4 7V4h16v3M12 4v16M8 20h8" />
+                                </svg>
+                            </div>
+                            <div
+                                class="icon-btn active visibility-eye vis-toggle-btn"
+                                data-type="{{.Type}}"
+                                title="Toggle Visibility"
+                            >
+                                <svg
+                                    width="18"
+                                    height="18"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path
+                                        d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                                    ></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                            </div>
                         </div>
                     </div>
+                    {{if .Subtypes}}
+                    <div
+                        class="subtypes-container"
+                        style="display: none; margin-top: 0px"
+                    >
+                        {{$parentType := .Type}} {{range .Subtypes}}
+                        <div class="meta-item" style="margin-bottom: 10px">
+                            <div
+                                class="meta-item-left"
+                                style="
+                                    padding-left: 15px;
+                                    border-left: 2px solid #334155;
+                                    margin-left: 5px;
+                                "
+                            >
+                                <span
+                                    style="
+                                        color: #94a3b8;
+                                        font-size: 0.85rem;
+                                        text-transform: capitalize;
+                                        user-select: none;
+                                    "
+                                    >{{.Type}}</span
+                                >
+                            </div>
+                            <div class="meta-item-controls">
+                                <span
+                                    class="stat-badge type-stat-badge"
+                                    data-type="{{$parentType}}:{{.Type}}"
+                                    data-total-count="{{.Count}}"
+                                    >{{.Count}}</span
+                                >
+                                <div
+                                    class="icon-btn active label-toggle-btn"
+                                    data-type="{{$parentType}}:{{.Type}}"
+                                    title="Toggle Label"
+                                >
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="M4 7V4h16v3M12 4v16M8 20h8" />
+                                    </svg>
+                                </div>
+                                <div
+                                    class="icon-btn active visibility-eye vis-toggle-btn"
+                                    data-type="{{$parentType}}:{{.Type}}"
+                                    title="Toggle Visibility"
+                                >
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path
+                                            d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                                        ></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        {{end}}
+                    </div>
+                    {{end}}
                 </div>
                 {{end}} {{end}}
             </div>
@@ -1223,16 +1342,72 @@
                             nodes.update(updateObj);
                         }
                     });
-                    const hiddenLabelTypes = new Set();
+                    function syncAllLabelButtons() {
+                        const currentNodes = nodes.get();
+                        document.querySelectorAll('.label-toggle-btn').forEach(btn => {
+                            const btnType = btn.getAttribute('data-type');
+                            if (btnType === 'root') return;
 
-                    function updateNodeLabels(targetGroup) {
-                        const updates = [];
-                        nodes.forEach(n => {
-                            if (targetGroup && n.group !== targetGroup) return;
-                            const isHidden = hiddenLabelTypes.has(n.group);
-                            updates.push({ id: n.id, font: { size: isHidden ? 0 : 16 } });
+                            const isGroup = !btnType.includes(':');
+                            const [g, s] = btnType.split(':');
+
+                            let totalVisibleNodes = 0;
+                            let labeledVisibleNodes = 0;
+
+                            for (let i = 0; i < currentNodes.length; i++) {
+                                const n = currentNodes[i];
+                                if (n.hidden) continue;
+
+                                let matches = false;
+                                if (isGroup && n.group === btnType) matches = true;
+                                if (!isGroup && n.group === g && n.subtypes && n.subtypes.includes(s)) matches = true;
+
+                                if (matches) {
+                                    totalVisibleNodes++;
+                                    if (!n.font || n.font.size !== 0) {
+                                        labeledVisibleNodes++;
+                                    }
+                                }
+                            }
+
+                            btn.classList.remove('active', 'state-partial');
+                            if (totalVisibleNodes > 0) {
+                                if (labeledVisibleNodes === totalVisibleNodes) {
+                                    btn.classList.add('active');
+                                } else if (labeledVisibleNodes > 0) {
+                                    btn.classList.add('state-partial');
+                                }
+                            }
                         });
-                        nodes.update(updates);
+
+                        const toggleAllLabelsBtn = document.getElementById('toggle-all-labels-btn');
+                        if (toggleAllLabelsBtn) {
+                            const rootNode = initialNodes.find(n => n.shape === 'diamond') || initialNodes[0];
+                            const rootType = rootNode ? rootNode.group : null;
+
+                            let totalVisibleNodes = 0;
+                            let labeledVisibleNodes = 0;
+
+                            for (let i = 0; i < currentNodes.length; i++) {
+                                const n = currentNodes[i];
+                                if (n.group === rootType) continue;
+                                if (n.hidden) continue;
+
+                                totalVisibleNodes++;
+                                if (!n.font || n.font.size !== 0) {
+                                    labeledVisibleNodes++;
+                                }
+                            }
+
+                            toggleAllLabelsBtn.classList.remove('active', 'state-partial');
+                            if (totalVisibleNodes > 0) {
+                                if (labeledVisibleNodes === totalVisibleNodes) {
+                                    toggleAllLabelsBtn.classList.add('active');
+                                } else if (labeledVisibleNodes > 0) {
+                                    toggleAllLabelsBtn.classList.add('state-partial');
+                                }
+                            }
+                        }
                     }
 
                     const edgeLabelBtn = document.getElementById('toggle-edge-labels-btn');
@@ -1251,30 +1426,125 @@
                         });
                     }
 
-                    const hiddenTypes = new Set();
+                    const hiddenNodes = new Set();
+                    let currentVisibilityStats = {
+                        all: { total: 0, visible: 0 },
+                        oos: { total: 0, visible: 0 },
+                        limit: { total: 0, visible: 0 }
+                    };
+                    let currentVisibleTypeCounts = {};
+                    let currentEffectiveTotalTypeCounts = {};
+                    let showOOS = false;
+                    let showLimitReached = true;
+
+                    function syncVisibilityButtons(visibilityStats, visibleTypeCounts, effectiveTotalTypeCounts) {
+                        const setState = function(btn, visibleCount, totalCount, isGlobalOn) {
+                            if (!btn) return;
+
+                            btn.classList.remove('state-none', 'state-partial', 'state-all', 'state-filtered');
+
+                            if (isGlobalOn === false) {
+                                btn.classList.add('state-none');
+                            } else if (totalCount <= 0) {
+                                btn.classList.add('state-none');
+                            } else if (visibleCount >= totalCount) {
+                                btn.classList.add('state-all');
+                            } else if (visibleCount <= 0) {
+                                btn.classList.add(isGlobalOn === true ? 'state-filtered' : 'state-none');
+                            } else {
+                                btn.classList.add('state-partial');
+                            }
+
+                            btn.title = 'Visible: ' + visibleCount + ' | Hidden: ' + Math.max(totalCount - visibleCount, 0) + ' | Total: ' + totalCount;
+                        };
+
+                        setState(document.getElementById('toggle-all-vis-btn'), visibilityStats.all.visible, visibilityStats.all.effectiveTotal);
+                        setState(document.getElementById('toggle-oos-btn'), visibilityStats.oos.visible, visibilityStats.oos.total, showOOS);
+                        setState(document.getElementById('toggle-limit-reached-btn'), visibilityStats.limit.visible, visibilityStats.limit.total, showLimitReached);
+
+                        document.querySelectorAll('.vis-toggle-btn').forEach(btn => {
+                            const type = btn.getAttribute('data-type');
+                            if (!type) return;
+
+                            const totalCount = effectiveTotalTypeCounts[type] || 0;
+                            const visibleCount = visibleTypeCounts[type] || 0;
+
+                            setState(btn, visibleCount, totalCount);
+                        });
+                    }
+
                     document.addEventListener('click', function(e) {
                         const labelBtn = e.target.closest('.label-toggle-btn');
                         if (labelBtn) {
                             const type = labelBtn.getAttribute('data-type');
-                            labelBtn.classList.toggle('active');
-                            if (labelBtn.classList.contains('active')) {
-                                hiddenLabelTypes.delete(type);
-                            } else {
-                                hiddenLabelTypes.add(type);
+                            if (type === 'root') return;
+
+                            const isGroup = !type.includes(':');
+                            const [g, s] = type.split(':');
+
+                            const currentNodes = nodes.get();
+
+                            let anyVisible = false;
+                            for (let i = 0; i < currentNodes.length; i++) {
+                                const n = currentNodes[i];
+                                if (n.hidden) continue;
+
+                                let matches = false;
+                                if (isGroup && n.group === type) matches = true;
+                                if (!isGroup && n.group === g && n.subtypes && n.subtypes.includes(s)) matches = true;
+
+                                if (matches && (!n.font || n.font.size !== 0)) {
+                                    anyVisible = true;
+                                    break;
+                                }
                             }
-                            updateNodeLabels(type);
+
+                            const targetSize = anyVisible ? 0 : 16;
+                            const updates = [];
+
+                            for (let i = 0; i < currentNodes.length; i++) {
+                                const n = currentNodes[i];
+                                if (n.hidden) continue;
+
+                                let matches = false;
+                                if (isGroup && n.group === type) matches = true;
+                                if (!isGroup && n.group === g && n.subtypes && n.subtypes.includes(s)) matches = true;
+
+                                if (matches) {
+                                    updates.push({ id: n.id, font: { size: targetSize } });
+                                }
+                            }
+
+                            if (updates.length > 0) {
+                                nodes.update(updates);
+                            }
+
+                            syncAllLabelButtons();
                             return;
                         }
 
                         const visBtn = e.target.closest('.vis-toggle-btn');
                         if (visBtn) {
                             const type = visBtn.getAttribute('data-type');
-                            visBtn.classList.toggle('active');
-                            if (visBtn.classList.contains('active')) {
-                                hiddenTypes.delete(type);
-                            } else {
-                                hiddenTypes.add(type);
-                            }
+                            if (!type) return;
+
+                            const visibleCount = currentVisibleTypeCounts[type] || 0;
+                            const actionHide = visibleCount > 0;
+
+                            initialNodes.forEach(n => {
+                                const scopes = [n.group];
+                                if (n.subtypes) {
+                                    n.subtypes.forEach(st => scopes.push(n.group + ":" + st));
+                                }
+                                if (scopes.includes(type)) {
+                                    if (actionHide) {
+                                        hiddenNodes.add(n.id);
+                                    } else {
+                                        hiddenNodes.delete(n.id);
+                                    }
+                                }
+                            });
+
                             applyTimeFilter();
                             return;
                         }
@@ -1283,48 +1553,52 @@
                         if (toggleAllLabelsBtn) {
                             const rootNode = initialNodes.find(n => n.shape === 'diamond') || initialNodes[0];
                             const rootType = rootNode ? rootNode.group : null;
-                            const allLabelBtns = document.querySelectorAll('.label-toggle-btn');
 
-                            toggleAllLabelsBtn.classList.toggle('active');
-                            const targetActive = toggleAllLabelsBtn.classList.contains('active');
+                            const currentNodes = nodes.get();
+                            let anyVisible = false;
+                            for (let i = 0; i < currentNodes.length; i++) {
+                                const n = currentNodes[i];
+                                if (n.hidden) continue;
+                                if (n.group === rootType) continue;
+                                if (!n.font || n.font.size !== 0) {
+                                    anyVisible = true;
+                                    break;
+                                }
+                            }
 
-                            allLabelBtns.forEach(b => {
-                                const type = b.getAttribute('data-type');
-                                if (type === rootType) return;
+                            const targetSize = anyVisible ? 0 : 16;
+                            const updates = [];
 
-                                if (targetActive) {
-                                    b.classList.add('active');
-                                    hiddenLabelTypes.delete(type);
-                                } else {
-                                    b.classList.remove('active');
-                                    hiddenLabelTypes.add(type);
+                            currentNodes.forEach(n => {
+                                if (n.hidden) return;
+                                if (n.group !== rootType) {
+                                    updates.push({ id: n.id, font: { size: targetSize } });
                                 }
                             });
-                            updateNodeLabels();
+
+                            if (updates.length > 0) {
+                                nodes.update(updates);
+                            }
+
+                            syncAllLabelButtons();
                             return;
                         }
 
                         const toggleAllVisBtn = e.target.closest('#toggle-all-vis-btn');
                         if (toggleAllVisBtn) {
-                            const rootNode = initialNodes.find(n => n.shape === 'diamond') || initialNodes[0];
-                            const rootType = rootNode ? rootNode.group : null;
-                            const allVisBtns = document.querySelectorAll('.vis-toggle-btn');
+                            const allVisibleCount = currentVisibilityStats.all.visible || 0;
+                            const actionHide = allVisibleCount > 0;
 
-                            toggleAllVisBtn.classList.toggle('active');
-                            const targetActive = toggleAllVisBtn.classList.contains('active');
-
-                            allVisBtns.forEach(b => {
-                                const type = b.getAttribute('data-type');
-                                if (type === rootType) return;
-
-                                if (targetActive) {
-                                    b.classList.add('active');
-                                    hiddenTypes.delete(type);
-                                } else {
-                                    b.classList.remove('active');
-                                    hiddenTypes.add(type);
+                            initialNodes.forEach(n => {
+                                if (n.group !== 'root') {
+                                    if (actionHide) {
+                                        hiddenNodes.add(n.id);
+                                    } else {
+                                        hiddenNodes.delete(n.id);
+                                    }
                                 }
                             });
+
                             applyTimeFilter();
                             return;
                         }
@@ -1333,7 +1607,12 @@
                     const oosBtn = document.getElementById('toggle-oos-btn');
                     if (oosBtn) {
                         oosBtn.addEventListener('click', function() {
-                            this.classList.toggle('active');
+                            showOOS = !showOOS;
+                            if (showOOS) {
+                                initialNodes.forEach(n => {
+                                    if (n.outOfScope) hiddenNodes.delete(n.id);
+                                });
+                            }
                             applyTimeFilter();
                         });
                     }
@@ -1341,14 +1620,17 @@
                     const limitReachedBtn = document.getElementById('toggle-limit-reached-btn');
                     if (limitReachedBtn) {
                         limitReachedBtn.addEventListener('click', function() {
-                            this.classList.toggle('active');
+                            showLimitReached = !showLimitReached;
+                            if (showLimitReached) {
+                                initialNodes.forEach(n => {
+                                    if (n.depthLimitReached) hiddenNodes.delete(n.id);
+                                });
+                            }
                             applyTimeFilter();
                         });
                     }
 
                     function applyTimeFilter() {
-                        const showOOS = oosBtn ? oosBtn.classList.contains('active') : false;
-                        const showLimitReached = limitReachedBtn ? limitReachedBtn.classList.contains('active') : false;
                         const activeNodes = new Set();
                         const visibleNodes = new Set();
 
@@ -1363,22 +1645,60 @@
 
                         const nodeUpdates = [];
                         const visibleTypeCounts = {};
+                        const effectiveTotalTypeCounts = {};
+                        const visibilityStats = {
+                            all: { total: 0, visible: 0, effectiveTotal: 0 },
+                            oos: { total: 0, visible: 0 },
+                            limit: { total: 0, visible: 0 }
+                        };
+
                         nodes.forEach(n => {
-                            let hiddenForCount = !activeNodes.has(n.id);
+                            let hiddenByTime = !activeNodes.has(n.id);
+                            let hiddenByOOS = n.outOfScope && !showOOS;
+                            let hiddenByLimit = n.depthLimitReached && !showLimitReached;
 
-                            if (n.outOfScope) {
-                                if (!showOOS) hiddenForCount = true;
-                            } else if (n.depthLimitReached) {
-                                if (!showLimitReached) hiddenForCount = true;
+                            let hiddenForCount = hiddenByTime || hiddenByOOS || hiddenByLimit;
+
+                            if (n.outOfScope && !hiddenByTime && !hiddenByLimit) {
+                                visibilityStats.oos.total++;
+                            }
+                            if (n.depthLimitReached && !hiddenByTime && !hiddenByOOS) {
+                                visibilityStats.limit.total++;
+                            }
+                            if (n.group !== 'root') {
+                                visibilityStats.all.total++;
+                                if (!hiddenForCount) {
+                                    visibilityStats.all.effectiveTotal++;
+                                    effectiveTotalTypeCounts[n.group] = (effectiveTotalTypeCounts[n.group] || 0) + 1;
+                                    if (n.subtypes) {
+                                        n.subtypes.forEach(st => {
+                                            const key = n.group + ":" + st;
+                                            effectiveTotalTypeCounts[key] = (effectiveTotalTypeCounts[key] || 0) + 1;
+                                        });
+                                    }
+                                }
                             }
 
-                            if (!hiddenForCount && n.group !== 'root') {
+                            let hidden = hiddenForCount || hiddenNodes.has(n.id);
+
+                            if (!hiddenForCount && !hidden && n.group !== 'root') {
                                 visibleTypeCounts[n.group] = (visibleTypeCounts[n.group] || 0) + 1;
+                                if (n.subtypes) {
+                                    n.subtypes.forEach(st => {
+                                        const key = n.group + ":" + st;
+                                        visibleTypeCounts[key] = (visibleTypeCounts[key] || 0) + 1;
+                                    });
+                                }
                             }
 
-                            let hidden = hiddenForCount;
-                            if (hiddenTypes.has(n.group)) {
-                                hidden = true;
+                            if (!hidden && n.group !== 'root') {
+                                visibilityStats.all.visible++;
+                            }
+                            if (!hidden && n.outOfScope) {
+                                visibilityStats.oos.visible++;
+                            }
+                            if (!hidden && n.depthLimitReached) {
+                                visibilityStats.limit.visible++;
                             }
 
                             nodeUpdates.push({ id: n.id, hidden: hidden });
@@ -1390,10 +1710,25 @@
 
                         document.querySelectorAll('.type-stat-badge').forEach(badge => {
                             const type = badge.getAttribute('data-type');
-                            if (type) {
-                                badge.innerText = visibleTypeCounts[type] || 0;
+                            if (!type) return;
+
+                            const totalCount = effectiveTotalTypeCounts[type] || 0;
+                            const visibleCount = visibleTypeCounts[type] || 0;
+                            const hiddenCount = totalCount - visibleCount;
+
+                            if (hiddenCount > 0) {
+                                badge.innerText = visibleCount + ' / ' + totalCount;
+                            } else {
+                                badge.innerText = String(totalCount);
                             }
+                            badge.title = 'Visible: ' + visibleCount + ' | Hidden: ' + hiddenCount + ' | Total: ' + totalCount;
                         });
+
+                        currentVisibilityStats = visibilityStats;
+                        currentVisibleTypeCounts = visibleTypeCounts;
+                        currentEffectiveTotalTypeCounts = effectiveTotalTypeCounts;
+                        syncVisibilityButtons(visibilityStats, visibleTypeCounts, effectiveTotalTypeCounts);
+                        syncAllLabelButtons();
 
                         const adjOut = {};
                         activeEdges.forEach(e => {

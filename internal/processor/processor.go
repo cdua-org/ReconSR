@@ -227,13 +227,6 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 					cat = "node"
 				}
 
-				costStrict := 1
-				costRelaxed := 1
-				if cat == "property" {
-					costStrict = 0
-					costRelaxed = 0
-				}
-
 				targetAnchor := targetRef.Anchor
 
 				aggregatedGroups[srcRefVal][resKey] = &schema.ProcessorToRepoValidResult{
@@ -245,8 +238,6 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 					Applied:     applied,
 					OutOfScope:  res.OutOfScope || scopemanager.IsOutOfScope(targetRef.Type, targetRef.Value),
 					Tags:        validTags,
-					CostStrict:  costStrict,
-					CostRelaxed: costRelaxed,
 					Anchor:      targetAnchor,
 				}
 			}
@@ -289,6 +280,7 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 		repoData := &schema.ProcessorToRepoData{
 			ProjectID:               data.ProjectID,
 			ModuleName:              data.ModuleName,
+			SourceEntityID:          data.SourceEntityID,
 			SourceEntity:            data.SourceEntity,
 			Groups:                  groups,
 			FunctionsWithoutResults: functionsWithoutResults,

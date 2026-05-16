@@ -412,7 +412,7 @@ func Dispatch(data *schema.RepoToDispatcherData, out chan<- *schema.ProcessorToR
 					for _, fn := range entry.functions {
 						modFn := schema.ModuleFunction{ModuleName: entry.mod.Name(), Function: fn}
 						if _, done := completedSet[modFn]; !done {
-							key := fmt.Sprintf("%s|%s|%s|%s|%s", data.ProjectID, item.Entity.Type, item.Entity.Value, entry.mod.Name(), fn)
+							key := fmt.Sprintf("%s|%d|%s|%s|%s|%s", data.ProjectID, item.SourceEntityID, item.Entity.Type, item.Entity.Value, entry.mod.Name(), fn)
 							if _, loaded := inFlight.LoadOrStore(key, struct{}{}); !loaded {
 								pending = append(pending, fn)
 								flightKeys = append(flightKeys, key)
@@ -529,6 +529,7 @@ func Dispatch(data *schema.RepoToDispatcherData, out chan<- *schema.ProcessorToR
 								processorData := &schema.ProcessorInputData{
 									ProjectID:  data.ProjectID,
 									ModuleName: entry.mod.Name(),
+									SourceEntityID: item.SourceEntityID,
 									SourceEntity: schema.Entity{
 										Type:  item.Entity.Type,
 										Value: item.Entity.Value,
@@ -566,6 +567,7 @@ func Dispatch(data *schema.RepoToDispatcherData, out chan<- *schema.ProcessorToR
 							processorData := &schema.ProcessorInputData{
 								ProjectID:  data.ProjectID,
 								ModuleName: entry.mod.Name(),
+								SourceEntityID: item.SourceEntityID,
 								SourceEntity: schema.Entity{
 									Type:  item.Entity.Type,
 									Value: item.Entity.Value,

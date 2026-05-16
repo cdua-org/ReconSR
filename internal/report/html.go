@@ -27,8 +27,9 @@ func init() {
 }
 
 type statItem struct {
-	Type  string
-	Count int
+	Type     string
+	Count    int
+	Subtypes []statItem
 }
 
 type reportTemplateData struct {
@@ -74,6 +75,7 @@ type visNode struct {
 	DepthLimitReached bool              `json:"depthLimitReached"`
 	Color             map[string]string `json:"color,omitempty"`
 	BorderWidth       int               `json:"borderWidth,omitempty"`
+	Subtypes          []string          `json:"subtypes,omitempty"`
 }
 
 type visEdge struct {
@@ -288,6 +290,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 				OutOfScope:        srcNode.OutOfScope,
 				DepthLimitReached: srcLimitReached,
 				BorderWidth:       borderWidth,
+				Subtypes:          srcNode.Subtypes,
 			}
 			nodesMap[srcID] = node
 		}
@@ -310,6 +313,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 				OutOfScope:        targetNode.OutOfScope,
 				DepthLimitReached: targetLimitReached,
 				BorderWidth:       borderWidth,
+				Subtypes:          targetNode.Subtypes,
 			}
 			nodesMap[dstID] = node
 		}
@@ -379,17 +383,49 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		visEdges = append(visEdges, *e)
 	}
 
+	for id, n := range graph.Nodes {
+		if n.Category == "property" {
+			continue
+		}
+		if _, exists := nodesMap[id]; !exists {
+			title := fmt.Sprintf("Type: %s\nValue: %s", n.Type, n.Value)
+			var borderWidth int = 2
+			limitReached := isLimitReached(id)
+			if n.OutOfScope {
+				title += "\nOut of Scope: Yes"
+			} else if limitReached {
+				title += "\nDepth Limit Reached: Yes"
+			}
+			nodesMap[id] = visNode{
+				ID:                id,
+				Label:             n.Value,
+				Group:             n.Type,
+				Title:             title,
+				Properties:        nodeProperties[id],
+				Executions:        nodeExecutions[id],
+				OutOfScope:        n.OutOfScope,
+				DepthLimitReached: limitReached,
+				BorderWidth:       borderWidth,
+				Subtypes:          n.Subtypes,
+			}
+		}
+	}
+
 	var initialTargetID string
-	for _, edge := range graph.Edges {
-		srcNode := graph.Nodes[edge.SourceID]
-		if srcNode.Value == graph.InitialTarget {
-			initialTargetID = edge.SourceID
+	for id, n := range graph.Nodes {
+		if n.Value == graph.InitialTarget && n.Category != "property" {
+			initialTargetID = id
 			break
 		}
 	}
 
+	type typeStats struct {
+		Count    int
+		Subtypes map[string]int
+	}
+
 	visNodes := make([]interface{}, 0, len(nodesMap))
-	statsMap := make(map[string]int)
+	statsMap := make(map[string]*typeStats)
 	outOfScopeCount := 0
 	limitReachedCount := 0
 	for _, n := range nodesMap {
@@ -419,19 +455,45 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 				},
 			})
 		} else {
-			statsMap[n.Group]++
+			ts, ok := statsMap[n.Group]
+			if !ok {
+				ts = &typeStats{Subtypes: make(map[string]int)}
+				statsMap[n.Group] = ts
+			}
+			ts.Count++
+			for _, st := range n.Subtypes {
+				ts.Subtypes[st]++
+			}
 			visNodes = append(visNodes, n)
 		}
 	}
 
 	var stats []statItem
-	for t, count := range statsMap {
+	for t, ts := range statsMap {
+		var subItems []statItem
+		for st, count := range ts.Subtypes {
+			subItems = append(subItems, statItem{
+				Type:  html.EscapeString(st),
+				Count: count,
+			})
+		}
+		slices.SortFunc(subItems, func(a, b statItem) int {
+			return strings.Compare(a.Type, b.Type)
+		})
+
 		stats = append(stats, statItem{
-			Type:  html.EscapeString(t),
-			Count: count,
+			Type:     html.EscapeString(t),
+			Count:    ts.Count,
+			Subtypes: subItems,
 		})
 	}
 	slices.SortFunc(stats, func(a, b statItem) int {
+		if a.Type == "invalid" {
+			return 1
+		}
+		if b.Type == "invalid" {
+			return -1
+		}
 		return strings.Compare(a.Type, b.Type)
 	})
 
