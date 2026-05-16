@@ -9,6 +9,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -107,30 +108,32 @@ func collectNSECRecords(records []resolver.DoHDnsRecord, target, nxTarget, conte
 }
 
 func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.ModuleResult {
-	results := []schema.ModuleResult{
-		{
-			Type:     constants.TypeNSEC,
-			Category: constants.CategoryProperty,
-			Value:    rec.Name + " NSEC3 " + rec.Data,
-			Context:  contextDesc,
-		},
-	}
-
-	hashPart, _, _ := strings.Cut(rec.Name, ".")
-	results = append(results, schema.ModuleResult{
+	nsecRes := schema.ModuleResult{
 		Type:     constants.TypeNSEC,
 		Category: constants.CategoryProperty,
-		Value:    hashPart,
-		Context:  "NSEC3 Hash",
-	})
+		Value:    rec.Name + " NSEC3 " + rec.Data,
+		Context:  contextDesc,
+	}
+	results := []schema.ModuleResult{nsecRes}
+	source := &schema.EntityRef{Type: nsecRes.Type, Value: nsecRes.Value}
 
-	parts := strings.Fields(rec.Data)
-	if len(parts) >= 5 {
+	if hashPart := dnsutils.ExtractNSEC3Hash(rec.Name); hashPart != "" {
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypeNSEC,
 			Category: constants.CategoryProperty,
-			Value:    parts[4],
+			Value:    hashPart,
+			Context:  "NSEC3 Hash",
+			Source:   source,
+		})
+	}
+
+	if nextHash := dnsutils.ParseNSEC3(rec.Data); nextHash != "" {
+		results = append(results, schema.ModuleResult{
+			Type:     constants.TypeNSEC,
+			Category: constants.CategoryProperty,
+			Value:    nextHash,
 			Context:  "NSEC3 Next Hash",
+			Source:   source,
 		})
 	}
 
@@ -138,24 +141,25 @@ func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.Mo
 }
 
 func parseNSECRecord(rec resolver.DoHDnsRecord, target, nxTarget, contextDesc string) []schema.ModuleResult {
-	results := []schema.ModuleResult{
-		{
-			Type:     constants.TypeNSEC,
-			Category: constants.CategoryProperty,
-			Value:    rec.Name + " NSEC " + rec.Data,
-			Context:  contextDesc,
-		},
+	nsecRes := schema.ModuleResult{
+		Type:     constants.TypeNSEC,
+		Category: constants.CategoryProperty,
+		Value:    rec.Name + " NSEC " + rec.Data,
+		Context:  contextDesc,
 	}
+	results := []schema.ModuleResult{nsecRes}
+	source := &schema.EntityRef{Type: nsecRes.Type, Value: nsecRes.Value}
 
-	parts := strings.Fields(rec.Data)
-	if len(parts) > 0 {
-		if r := extractNSECDomain(parts[0], target, nxTarget, "NSEC Leaked Subdomain"); r != nil {
+	if nextDomain := dnsutils.ParseNSEC(rec.Data); nextDomain != "" {
+		if r := extractNSECDomain(nextDomain, target, nxTarget, "NSEC Leaked Subdomain"); r != nil {
+			r.Source = source
 			log.Printf("get_nsec target=%q leaked=%q oos=%v", target, r.Value, r.OutOfScope)
 			results = append(results, *r)
 		}
 	}
 
 	if r := extractNSECDomain(rec.Name, target, nxTarget, "NSEC Current Subdomain"); r != nil {
+		r.Source = source
 		log.Printf("get_nsec target=%q current=%q oos=%v", target, r.Value, r.OutOfScope)
 		results = append(results, *r)
 	}

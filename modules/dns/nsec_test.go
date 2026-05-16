@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/resolver"
+	"cdua-org/ReconSR/schema"
 )
 
 func TestGetNSECData(t *testing.T) {
@@ -84,5 +86,61 @@ func TestNSECCapabilities(t *testing.T) {
 
 	if !slices.Contains(caps.Functions, constants.FuncGetNSEC) {
 		t.Error("expected get_nsec in capabilities")
+	}
+}
+
+func TestParseNSECRecordSource(t *testing.T) {
+	rec := resolver.DoHDnsRecord{
+		Name: "current.example.com.",
+		Data: "next.example.com. A AAAA RRSIG NSEC",
+	}
+
+	results := parseNSECRecord(rec, "example.com", "nx.example.com", "NSEC Context")
+
+	if len(results) < 2 {
+		t.Fatalf("expected at least 2 results, got %d", len(results))
+	}
+
+	primary := results[0]
+	if primary.Type != constants.TypeNSEC {
+		t.Fatalf("expected primary result to be NSEC, got %s", primary.Type)
+	}
+
+	expectedSource := &schema.EntityRef{Type: primary.Type, Value: primary.Value}
+
+	for i := 1; i < len(results); i++ {
+		if results[i].Source == nil {
+			t.Errorf("expected Source to be set for result %d", i)
+		} else if results[i].Source.Type != expectedSource.Type || results[i].Source.Value != expectedSource.Value {
+			t.Errorf("expected Source %v, got %v", expectedSource, results[i].Source)
+		}
+	}
+}
+
+func TestParseNSEC3RecordSource(t *testing.T) {
+	rec := resolver.DoHDnsRecord{
+		Name: "0p9mhaveqvm6t7v8pon2iu430l8kcmpo.example.com.",
+		Data: "1 0 10 AABBCCDD EEFF00112233 A RRSIG",
+	}
+
+	results := parseNSEC3Record(rec, "NSEC3 Context")
+
+	if len(results) < 2 {
+		t.Fatalf("expected at least 2 results, got %d", len(results))
+	}
+
+	primary := results[0]
+	if primary.Type != constants.TypeNSEC {
+		t.Fatalf("expected primary result to be NSEC, got %s", primary.Type)
+	}
+
+	expectedSource := &schema.EntityRef{Type: primary.Type, Value: primary.Value}
+
+	for i := 1; i < len(results); i++ {
+		if results[i].Source == nil {
+			t.Errorf("expected Source to be set for result %d", i)
+		} else if results[i].Source.Type != expectedSource.Type || results[i].Source.Value != expectedSource.Value {
+			t.Errorf("expected Source %v, got %v", expectedSource, results[i].Source)
+		}
 	}
 }
