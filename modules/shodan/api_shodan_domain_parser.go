@@ -284,8 +284,53 @@ func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainReco
 			}
 		}
 	}
+	if resultType == constants.TypeSPF {
+		for _, ent := range dnsutils.ParseSPF(value) {
+			spfResult, ok := buildShodanSPFEntityResult(ref, ent, target)
+			if ok {
+				exec.Results = append(exec.Results, spfResult)
+			}
+		}
+	}
 
 	return ref
+}
+
+func buildShodanSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity, target string) (schema.ModuleResult, bool) {
+	switch ent.Kind {
+	case dnsutils.SPFEntityIP4, dnsutils.SPFEntityIP6:
+		validated, err := validator.Validate(constants.TypeIP, ent.Value)
+		if err != nil {
+			return schema.ModuleResult{}, false
+		}
+		return schema.ModuleResult{
+			Type:     validated.Type,
+			Category: constants.CategoryNode,
+			Value:    validated.Value,
+			Tags:     []string{constants.TagSPF},
+			Context:  "SPF " + ent.Mechanism,
+			Source:   source,
+		}, true
+	case dnsutils.SPFEntityDomain:
+		validated, err := validator.Validate(constants.TypeDomain, ent.Value)
+		if err != nil {
+			return schema.ModuleResult{}, false
+		}
+		if validated.Value == target {
+			return schema.ModuleResult{}, false
+		}
+		return schema.ModuleResult{
+			Type:       validated.Type,
+			Category:   constants.CategoryNode,
+			Value:      validated.Value,
+			Tags:       []string{constants.TagSPF},
+			Context:    "SPF " + ent.Mechanism,
+			OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
+			Source:     source,
+		}, true
+	default:
+		return schema.ModuleResult{}, false
+	}
 }
 
 func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRecord, primaryNS, target string, source *schema.EntityRef) *schema.EntityRef {

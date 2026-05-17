@@ -109,7 +109,7 @@
           {
             "type": "TXT",
             "ttl": 3009,
-            "value": "v=spf1 include:_spf.api.target-example.com include:_spf.example.net -all"
+            "value": "v=spf1 ip4:192.0.2.50 include:_spf.api.target-example.com include:_spf.example.net redirect=fallback.example.edu -all"
           },
           {
             "type": "TXT",
@@ -221,6 +221,11 @@
             "flag": 0,
             "tag": "issuewild",
             "value": "mail-wild-ca.example.net"
+          },
+          {
+            "type": "TXT",
+            "ttl": 3600,
+            "value": "v=spf1 ip6:2001:db8:cafe::/48 mx:mx.example.org -all"
           }
         ],
         "last_dns_records_date": 1770001300,

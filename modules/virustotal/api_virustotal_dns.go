@@ -36,7 +36,7 @@ func (m *module) parseDNSRecord(rec map[string]any, target string, src *schema.E
 	case "SOA":
 		m.appendVTSOAResults(exec, target, src, rec)
 	case "TXT":
-		m.appendVTTXTResult(exec, src, recordValue)
+		m.appendVTTXTResult(exec, target, src, recordValue)
 	case "CAA":
 		m.appendVTCAAResults(exec, target, src, rec)
 	case "SRV":
@@ -197,7 +197,7 @@ func ensureFQDN(s string) string {
 	return s
 }
 
-func (m *module) appendVTTXTResult(exec *schema.ModuleExecution, src *schema.EntityRef, value string) {
+func (m *module) appendVTTXTResult(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string) {
 	resultType := constants.TypeTXT
 	if strings.HasPrefix(strings.ToLower(value), "v=spf1") {
 		resultType = constants.TypeSPF
@@ -209,6 +209,53 @@ func (m *module) appendVTTXTResult(exec *schema.ModuleExecution, src *schema.Ent
 		Value:    value,
 		Source:   src,
 	})
+
+	if resultType == constants.TypeSPF {
+		spfRef := &schema.EntityRef{Type: constants.TypeSPF, Value: value}
+		for _, ent := range dnsutils.ParseSPF(value) {
+			spfResult, ok := buildVTSPFEntityResult(spfRef, ent, target)
+			if ok {
+				exec.Results = append(exec.Results, spfResult)
+			}
+		}
+	}
+}
+
+func buildVTSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity, target string) (schema.ModuleResult, bool) {
+	switch ent.Kind {
+	case dnsutils.SPFEntityIP4, dnsutils.SPFEntityIP6:
+		validated, err := validator.Validate(constants.TypeIP, ent.Value)
+		if err != nil {
+			return schema.ModuleResult{}, false
+		}
+		return schema.ModuleResult{
+			Type:     validated.Type,
+			Category: constants.CategoryNode,
+			Value:    validated.Value,
+			Tags:     []string{constants.TagSPF},
+			Context:  "SPF " + ent.Mechanism,
+			Source:   source,
+		}, true
+	case dnsutils.SPFEntityDomain:
+		validated, err := validator.Validate(constants.TypeDomain, ent.Value)
+		if err != nil {
+			return schema.ModuleResult{}, false
+		}
+		if validated.Value == target {
+			return schema.ModuleResult{}, false
+		}
+		return schema.ModuleResult{
+			Type:       validated.Type,
+			Category:   constants.CategoryNode,
+			Value:      validated.Value,
+			Tags:       []string{constants.TagSPF},
+			Context:    "SPF " + ent.Mechanism,
+			OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
+			Source:     source,
+		}, true
+	default:
+		return schema.ModuleResult{}, false
+	}
 }
 
 func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any) {

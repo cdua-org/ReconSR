@@ -2,7 +2,7 @@
   "tags": ["tag1", "tag2"],
   "data": [
     {"subdomain":"www","type":"A","value":"198.51.100.25","last_seen":"2026-05-02T12:30:00.000000"},
-    {"subdomain":"www","type":"TXT","value":"v=spf1 -all","last_seen":"2026-05-02T12:31:00.000000"},
+    {"subdomain":"www","type":"TXT","value":"v=spf1 ip4:198.51.100.30 include:spf.example.org -all","last_seen":"2026-05-02T12:31:00.000000"},
     {"subdomain":"mail","type":"MX","value":"mx.example.com","options":{"priority":10},"last_seen":"2026-05-02T12:32:00.000000"},
     {"subdomain":"cdn","type":"CNAME","value":"edge.example.net","last_seen":"2026-05-02T12:33:00.000000"},
     {"subdomain":"","type":"AAAA","value":"2001:db8::10","last_seen":"2026-05-02T12:34:00.000000"},

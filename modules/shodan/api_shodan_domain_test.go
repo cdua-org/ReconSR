@@ -21,6 +21,7 @@ func TestParseShodanAPIDomain(t *testing.T) {
 
 	requireTagPropertyResults(t, exec.Results, "tag1", "tag2")
 	assertShodanDomainSubdomainChain(t, exec.Results)
+	assertShodanDomainSPF(t, exec.Results)
 	assertShodanDomainRootRecords(t, exec.Results)
 	assertShodanDomainMXRecords(t, exec.Results)
 	assertShodanDomainCNAMERecords(t, exec.Results)
@@ -52,13 +53,34 @@ func assertShodanDomainSubdomainChain(t *testing.T, results []schema.ModuleResul
 	if wwwIPv4.Context != "A/AAAA Record" {
 		t.Fatalf("expected A/AAAA Record context, got %q", wwwIPv4.Context)
 	}
+}
 
-	wwwSPF := requireModuleResult(t, results, constants.TypeSPF, "v=spf1 -all")
-	if wwwSPF.Source == nil || wwwSPF.Source.Type != constants.TypeSubdomain || wwwSPF.Source.Value != wwwSubdomainValue {
-		t.Fatalf("expected SPF record linked to www subdomain, got %+v", wwwSPF.Source)
+func assertShodanDomainSPF(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	spfValue := "v=spf1 ip4:198.51.100.30 include:spf.example.org -all"
+	wwwSPF := requireModuleResult(t, results, constants.TypeSPF, spfValue)
+	if wwwSPF.Source == nil || wwwSPF.Source.Type != constants.TypeSubdomain {
+		t.Fatalf("expected SPF record linked to a subdomain, got %+v", wwwSPF.Source)
 	}
 	if wwwSPF.Category != constants.CategoryProperty {
 		t.Fatalf("expected SPF category to be property, got %q", wwwSPF.Category)
+	}
+
+	spfIP := requireModuleResultWithTag(t, results, constants.TypeIPv4, "198.51.100.30", constants.TagSPF)
+	if spfIP.Source == nil || spfIP.Source.Type != constants.TypeSPF || spfIP.Source.Value != spfValue {
+		t.Fatalf("expected SPF IP linked to SPF record, got %+v", spfIP.Source)
+	}
+	if spfIP.Context != "SPF ip4" {
+		t.Fatalf("expected SPF ip4 context, got %q", spfIP.Context)
+	}
+
+	spfInclude := requireModuleResultWithTag(t, results, constants.TypeSubdomain, "spf.example.org", constants.TagSPF)
+	if spfInclude.Source == nil || spfInclude.Source.Type != constants.TypeSPF || spfInclude.Source.Value != spfValue {
+		t.Fatalf("expected SPF include linked to SPF record, got %+v", spfInclude.Source)
+	}
+	if !spfInclude.OutOfScope {
+		t.Fatal("expected SPF include domain to be out of scope")
 	}
 }
 

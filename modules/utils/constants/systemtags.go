@@ -19,4 +19,5 @@ const (
 	TagNSEC        = "nsec"
 	TagReverseIP   = "reverse_ip"
 	TagWhoisServer = "whois_server"
+	TagSPF         = "spf"
 )

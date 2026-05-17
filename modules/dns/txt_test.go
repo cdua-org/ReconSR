@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/schema"
 )
 
 func TestGetTXTDataEmpty(t *testing.T) {
@@ -41,4 +42,67 @@ func TestTXTCapabilities(t *testing.T) {
 	if !slices.Contains(caps.Functions, constants.FuncGetTXT) {
 		t.Error("expected get_txt in capabilities")
 	}
+}
+
+func TestBuildSPFEntityResults(t *testing.T) {
+	spf := "v=spf1 ip4:198.51.100.10 ip6:2001:db8::1 include:spf.example.net a:web.example.org mx:relay.example.edu -all"
+	source := &schema.EntityRef{Type: constants.TypeSPF, Value: spf}
+
+	results := buildSPFEntityResults(source, spf, "example.com")
+
+	requireSPFResult(t, results, constants.TypeIPv4, "198.51.100.10", "SPF ip4", false)
+	requireSPFResult(t, results, constants.TypeIPv6, "2001:db8::1", "SPF ip6", false)
+	requireSPFResult(t, results, constants.TypeSubdomain, "spf.example.net", "SPF include", true)
+	requireSPFResult(t, results, constants.TypeSubdomain, "web.example.org", "SPF a", true)
+	requireSPFResult(t, results, constants.TypeSubdomain, "relay.example.edu", "SPF mx", true)
+
+	for _, res := range results {
+		if !slices.Contains(res.Tags, constants.TagSPF) {
+			t.Fatalf("expected tag %q on result %q, got %v", constants.TagSPF, res.Value, res.Tags)
+		}
+		if res.Source == nil || res.Source.Type != constants.TypeSPF {
+			t.Fatalf("expected source linked to SPF record, got %+v", res.Source)
+		}
+	}
+}
+
+func TestBuildSPFEntityResultsSelfReferentialSkipped(t *testing.T) {
+	spf := "v=spf1 include:samehost.example.com redirect=samehost.example.com -all"
+	source := &schema.EntityRef{Type: constants.TypeSPF, Value: spf}
+
+	results := buildSPFEntityResults(source, spf, "samehost.example.com")
+
+	for _, res := range results {
+		if res.Value == "samehost.example.com" {
+			t.Fatal("expected self-referential SPF domain to NOT be emitted")
+		}
+	}
+}
+
+func TestBuildSPFEntityResultsEmptySPF(t *testing.T) {
+	spf := "v=spf1 -all"
+	source := &schema.EntityRef{Type: constants.TypeSPF, Value: spf}
+
+	results := buildSPFEntityResults(source, spf, "example.com")
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results for empty SPF, got %d", len(results))
+	}
+}
+
+func requireSPFResult(t *testing.T, results []schema.ModuleResult, wantType, wantValue, wantContext string, wantOOS bool) {
+	t.Helper()
+
+	for _, res := range results {
+		if res.Type == wantType && res.Value == wantValue {
+			if res.Context != wantContext {
+				t.Fatalf("result %q context = %q, want %q", wantValue, res.Context, wantContext)
+			}
+			if res.OutOfScope != wantOOS {
+				t.Fatalf("result %q out_of_scope = %v, want %v", wantValue, res.OutOfScope, wantOOS)
+			}
+			return
+		}
+	}
+
+	t.Fatalf("expected SPF result type=%q value=%q not found", wantType, wantValue)
 }
