@@ -60,6 +60,8 @@ func allowedDNSResultTags() []string {
 		constants.TagSan,
 		constants.TagWildcard,
 		constants.TagReverseIP,
+		constants.TagPDNS,
+		constants.TagHistorical,
 	}
 }
 
@@ -67,11 +69,18 @@ func requireTagPropertyResults(t *testing.T, results []schema.ModuleResult, expe
 	t.Helper()
 
 	actualTags := make([]string, 0, len(expectedTags))
+	allowed := allowedDNSResultTags()
 	for _, result := range results {
 		if len(result.Tags) > 0 {
-			hasOnlyAllowedTag := len(result.Tags) == 1 && slices.Contains(allowedDNSResultTags(), result.Tags[0])
-			if !hasOnlyAllowedTag {
-				t.Fatalf("expected no system tags assigned via Tags field, got %+v", result)
+			allAllowed := true
+			for _, tag := range result.Tags {
+				if !slices.Contains(allowed, tag) {
+					allAllowed = false
+					break
+				}
+			}
+			if !allAllowed {
+				t.Fatalf("expected only allowed system tags assigned via Tags field, got %+v", result)
 			}
 		}
 		if result.Type != constants.TypeTag {

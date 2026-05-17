@@ -11,6 +11,7 @@ import (
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -90,10 +91,14 @@ func appendShodanSubdomain(exec *schema.ModuleExecution, fqdn, entityType, targe
 		Category:   constants.CategoryNode,
 		Value:      fqdn,
 		Context:    "Shodan DNS",
+		Tags:       []string{constants.TagPDNS},
 		OutOfScope: orgdomain.IsOutOfScope(fqdn, target),
 	}
+	if resolver.ShodanDomainHistory {
+		result.Tags = append(result.Tags, constants.TagHistorical)
+	}
 	if wildcardContext != "" {
-		result.Tags = []string{constants.TagWildcard}
+		result.Tags = append(result.Tags, constants.TagWildcard)
 		result.Context = wildcardContext
 	}
 

@@ -36,6 +36,33 @@ func TestParseShodanAPIDomain(t *testing.T) {
 	assertShodanDomainInvalidSubdomains(t, exec.Results)
 	assertShodanDomainLastSeen(t, exec.Results, rootDomainValue)
 	assertShodanDomainSelfReferentialSkipped(t, exec.Results, rootDomainValue)
+
+	wwwSubdomain := requireModuleResult(t, exec.Results, constants.TypeSubdomain, "www.example.com")
+	if !slices.Contains(wwwSubdomain.Tags, constants.TagPDNS) {
+		t.Fatalf("expected passive_dns tag, got %v", wwwSubdomain.Tags)
+	}
+	if slices.Contains(wwwSubdomain.Tags, constants.TagHistorical) {
+		t.Fatalf("did not expect historical tag, got %v", wwwSubdomain.Tags)
+	}
+}
+
+func TestParseShodanAPIDomainHistorical(t *testing.T) {
+	resolver.ShodanDomainHistory = true
+	defer func() { resolver.ShodanDomainHistory = false }()
+
+	rootDomainValue := "example.net"
+	rawBody := loadShodanFixture(t, "domain.json")
+
+	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIDomain}
+	parseShodanAPIDomain(&exec, rawBody, rootDomainValue)
+
+	wwwSubdomain := requireModuleResult(t, exec.Results, constants.TypeSubdomain, "www.example.net")
+	if !slices.Contains(wwwSubdomain.Tags, constants.TagHistorical) {
+		t.Fatalf("expected historical tag, got %v", wwwSubdomain.Tags)
+	}
+	if !slices.Contains(wwwSubdomain.Tags, constants.TagPDNS) {
+		t.Fatalf("expected passive_dns tag, got %v", wwwSubdomain.Tags)
+	}
 }
 
 func assertShodanDomainSubdomainChain(t *testing.T, results []schema.ModuleResult) {
