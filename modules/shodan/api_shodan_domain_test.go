@@ -26,8 +26,12 @@ func TestParseShodanAPIDomain(t *testing.T) {
 	assertShodanDomainCNAMERecords(t, exec.Results)
 	assertShodanDomainWildcards(t, exec.Results)
 	assertShodanDomainSOA(t, exec.Results)
-	assertShodanDomainAdvancedRecords1(t, exec.Results)
-	assertShodanDomainAdvancedRecords2(t, exec.Results)
+	assertShodanDomainSRV(t, exec.Results)
+	assertShodanDomainCAA(t, exec.Results)
+	assertShodanDomainURI(t, exec.Results)
+	assertShodanDomainNAPTR(t, exec.Results)
+	assertShodanDomainRP(t, exec.Results)
+	assertShodanDomainHIP(t, exec.Results)
 	assertShodanDomainInvalidSubdomains(t, exec.Results)
 	assertShodanDomainLastSeen(t, exec.Results, rootDomainValue)
 }
@@ -168,7 +172,7 @@ func assertShodanDomainSOA(t *testing.T, results []schema.ModuleResult) {
 	}
 }
 
-func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleResult) {
+func assertShodanDomainSRV(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
 	srvProp := requireModuleResult(t, results, constants.TypeSRV, "10 100 5060 sip.example.com")
@@ -186,6 +190,10 @@ func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleRes
 	if srvHost.Source == nil || srvHost.Source.Type != constants.TypeSRV || srvHost.Source.Value != srvProp.Value {
 		t.Fatalf("expected srv host to be linked to srv property, got %+v", srvHost.Source)
 	}
+}
+
+func assertShodanDomainCAA(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
 
 	caaAuth := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "ca.example.net", "Authorized CA (issue)")
 	if caaAuth.Category != constants.CategoryNode || !caaAuth.OutOfScope {
@@ -194,6 +202,10 @@ func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleRes
 	if !slices.Contains(caaAuth.Tags, constants.TagCAA) {
 		t.Fatalf("expected cert_authority to have tag %q, got tags %v", constants.TagCAA, caaAuth.Tags)
 	}
+}
+
+func assertShodanDomainURI(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
 
 	uriEndpoint := requireModuleResultWithContext(t, results, constants.TypeURL, "https://example.com/api", "URI Endpoint")
 	if uriEndpoint.Category != constants.CategoryProperty {
@@ -204,16 +216,64 @@ func assertShodanDomainAdvancedRecords1(t *testing.T, results []schema.ModuleRes
 	}
 }
 
-func assertShodanDomainAdvancedRecords2(t *testing.T, results []schema.ModuleResult) {
+func assertShodanDomainNAPTR(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	naptrTarget := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "_sip._udp.example.com", "NAPTR Target")
+	naptrTarget := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "sip.example.com", "NAPTR Target (_sip._tcp.sip.example.com.)")
 	if naptrTarget.Category != constants.CategoryNode || naptrTarget.OutOfScope {
-		t.Fatal("expected in-scope naptr target node")
+		t.Fatal("expected in-scope naptr target node for valid subdomain")
+	}
+
+	naptrTarget2 := requireModuleResultWithContext(t, results, constants.TypeDomain, "example.net", "NAPTR Target (_sip._udp.example.net.)")
+	if naptrTarget2.Category != constants.CategoryNode || !naptrTarget2.OutOfScope {
+		t.Fatal("expected out-of-scope naptr target node for external domain")
 	}
 	if !slices.Contains(naptrTarget.Tags, constants.TagNAPTR) {
 		t.Fatalf("expected naptr target to have tag %q, got tags %v", constants.TagNAPTR, naptrTarget.Tags)
 	}
+	if naptrTarget.Source == nil || naptrTarget.Source.Type != constants.TypeNAPTR {
+		t.Fatalf("expected naptr target to be linked to naptr service or record, got %+v", naptrTarget.Source)
+	}
+}
+
+func TestShodanNAPTRSelfReferentialSkip(t *testing.T) {
+	exec := &schema.ModuleExecution{}
+	sourceDomain := &schema.EntityRef{Type: constants.TypeSubdomain, Value: "node.example.org"}
+	rawNaptr := "100 50 \"s\" \"SIP+D2U\" \"\" _sip._udp.example.org."
+
+	appendShodanNAPTRResult(exec, rawNaptr, "example.org", sourceDomain)
+
+	for _, res := range exec.Results {
+		if res.Type == constants.TypeDomain && res.Value == "example.org" {
+			t.Fatal("expected self-referential NAPTR target to NOT be emitted as a node")
+		}
+	}
+}
+
+func TestAppendShodanNAPTRResultRegexp(t *testing.T) {
+	exec := &schema.ModuleExecution{}
+	sourceDomain := &schema.EntityRef{Type: constants.TypeDomain, Value: "example.edu"}
+	rawNaptr := "10 100 \"u\" \"E2U+sip\" \"!^.*$!sip:info@example.edu!\" ."
+
+	ref := appendShodanNAPTRResult(exec, rawNaptr, "example.edu", sourceDomain)
+
+	if ref == nil || ref.Type != constants.TypeNAPTR {
+		t.Fatalf("expected ref type NAPTR, got %+v", ref)
+	}
+
+	regexpProp := requireModuleResultWithContext(t, exec.Results, constants.TypeNAPTR, "!^.*$!sip:info@example.edu!", "NAPTR Regexp")
+	if regexpProp.Source == nil || regexpProp.Source.Value != "E2U+sip" {
+		t.Fatalf("expected regexp to link to service, got %+v", regexpProp.Source)
+	}
+
+	targetProp := requireModuleResultWithContext(t, exec.Results, constants.TypeURL, "sip:info@example.edu", "NAPTR Regexp Target")
+	if targetProp.Source == nil || targetProp.Source.Value != "!^.*$!sip:info@example.edu!" {
+		t.Fatalf("expected target to link to regexp, got %+v", targetProp.Source)
+	}
+}
+
+func assertShodanDomainRP(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
 
 	rpEmail := requireModuleResultWithContext(t, results, constants.TypeEmail, "admin@example.com", "RP Administrator Email")
 	if rpEmail.Category != constants.CategoryNode || rpEmail.OutOfScope {
@@ -226,6 +286,10 @@ func assertShodanDomainAdvancedRecords2(t *testing.T, results []schema.ModuleRes
 	if !slices.Contains(rpDomain.Tags, constants.TagRP) {
 		t.Fatalf("expected RP domain to have tag %q, got tags %v", constants.TagRP, rpDomain.Tags)
 	}
+}
+
+func assertShodanDomainHIP(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
 
 	hipServer1 := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "rv1.example.net", "HIP Rendezvous Server")
 	if hipServer1.Category != constants.CategoryNode || !hipServer1.OutOfScope {

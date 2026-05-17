@@ -6,62 +6,16 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
-func parseNAPTRRecord(raw string) string {
-	if strings.HasPrefix(raw, "\\# ") {
-		return raw
-	}
-	return raw
-}
-
-func parseNativeNAPTR(parsed string) []string {
-	var parts []string
-	var current strings.Builder
-	inQuotes := false
-
-	for _, r := range parsed {
-		switch {
-		case r == '"':
-			inQuotes = !inQuotes
-			current.WriteRune(r)
-		case r == ' ' && !inQuotes:
-			if current.Len() > 0 {
-				parts = append(parts, current.String())
-				current.Reset()
-			}
-		default:
-			current.WriteRune(r)
-		}
-	}
-	if current.Len() > 0 {
-		parts = append(parts, current.String())
-	}
-	return parts
-}
-
-func extractNAPTRServiceAndReplacement(parsed string) (service, replacement string, ok bool) {
-	parts := parseNativeNAPTR(parsed)
-	if len(parts) < 5 {
-		return "", "", false
-	}
-
-	service = strings.Trim(parts[3], "\"")
-	replacement = parts[len(parts)-1]
-	if replacement == service {
-		return service, "", true
-	}
-
-	return service, replacement, true
-}
-
 func normalizeNAPTRTarget(replacement string) (normalizedTarget, scopeTarget, resultType string, ok bool) {
-	replacement = strings.TrimSpace(strings.TrimSuffix(replacement, "."))
-	if replacement == "" || replacement == "." || strings.ContainsAny(replacement, " \"") {
+	replacement = dnsutils.CleanSRVTarget(replacement)
+	if replacement == "" || strings.ContainsAny(replacement, " \"") {
 		return "", "", "", false
 	}
 
@@ -69,18 +23,7 @@ func normalizeNAPTRTarget(replacement string) (normalizedTarget, scopeTarget, re
 		return res.Value, res.Value, res.Type, true
 	}
 
-	labels := strings.Split(replacement, ".")
-	if len(labels) < 4 || !strings.HasPrefix(labels[0], "_") || !strings.HasPrefix(labels[1], "_") {
-		return "", "", "", false
-	}
-
-	baseDomain := strings.Join(labels[2:], ".")
-	res, err := validator.Validate(constants.TypeDomain, baseDomain)
-	if err != nil {
-		return "", "", "", false
-	}
-
-	return labels[0] + "." + labels[1] + "." + res.Value, res.Value, constants.TypeSubdomain, true
+	return "", "", "", false
 }
 
 func buildNAPTRServiceResult(parsed, service string) schema.ModuleResult {
@@ -98,22 +41,49 @@ func buildNAPTRServiceResult(parsed, service string) schema.ModuleResult {
 
 func buildNAPTRTargetResult(source *schema.EntityRef, target, replacement string) *schema.ModuleResult {
 	normalizedTarget, scopeTarget, resultType, ok := normalizeNAPTRTarget(replacement)
-	if !ok {
-		log.Printf("get_naptr skipping invalid replacement target=%q entity=%q", target, replacement)
+	if !ok || normalizedTarget == target {
 		return nil
 	}
 
-	isOOS := orgdomain.IsOutOfScope(scopeTarget, target)
+	contextStr := "NAPTR Target"
+	if replacement != normalizedTarget && replacement != normalizedTarget+"." {
+		contextStr = "NAPTR Target (" + replacement + ")"
+	}
 
 	return &schema.ModuleResult{
 		Type:       resultType,
 		Category:   constants.CategoryNode,
 		Value:      normalizedTarget,
 		Tags:       []string{constants.TagNAPTR},
-		Context:    "Replacement Target",
-		OutOfScope: isOOS,
+		Context:    contextStr,
+		OutOfScope: orgdomain.IsOutOfScope(scopeTarget, target),
 		Source:     source,
 	}
+}
+
+func buildNAPTRRegexpResults(source *schema.EntityRef, regexpStr, regexpTarget string) []schema.ModuleResult {
+	if regexpStr == "" {
+		return nil
+	}
+	results := []schema.ModuleResult{
+		{
+			Type:     constants.TypeNAPTR,
+			Category: constants.CategoryProperty,
+			Value:    regexpStr,
+			Context:  "NAPTR Regexp",
+			Source:   source,
+		},
+	}
+	if regexpTarget != "" {
+		results = append(results, schema.ModuleResult{
+			Type:     constants.TypeURL,
+			Category: constants.CategoryProperty,
+			Value:    regexpTarget,
+			Context:  "NAPTR Regexp Target",
+			Source:   &schema.EntityRef{Type: constants.TypeNAPTR, Value: regexpStr},
+		})
+	}
+	return results
 }
 
 func getNAPTRData(ctx context.Context, target string) schema.ModuleExecution {
@@ -134,32 +104,40 @@ func getNAPTRData(ctx context.Context, target string) schema.ModuleExecution {
 	modutil.SetRawFromBytes(&exec, raw)
 
 	for _, rec := range records {
-		parsed := parseNAPTRRecord(rec)
+		parsed := dnsutils.ParseNAPTR(rec)
+		if parsed == nil {
+			if strings.HasPrefix(rec, "\\# ") {
+				exec.Results = append(exec.Results, schema.ModuleResult{
+					Type:     constants.TypeNAPTR,
+					Category: constants.CategoryProperty,
+					Value:    rec,
+					Context:  "NAPTR Record",
+				})
+			}
+			continue
+		}
+
 		rawResult := schema.ModuleResult{
 			Type:     constants.TypeNAPTR,
 			Category: constants.CategoryProperty,
-			Value:    parsed,
+			Value:    parsed.Formatted,
 			Context:  "NAPTR Record",
 		}
 		exec.Results = append(exec.Results, rawResult)
 
-		if strings.HasPrefix(parsed, "\\# ") {
-			continue
-		}
-
-		svc, replacement, ok := extractNAPTRServiceAndReplacement(parsed)
-		if !ok {
-			continue
-		}
-
 		targetSource := &schema.EntityRef{Type: rawResult.Type, Value: rawResult.Value}
-		if svc != "" {
-			serviceResult := buildNAPTRServiceResult(parsed, svc)
+		if parsed.Service != "" {
+			serviceResult := buildNAPTRServiceResult(parsed.Formatted, parsed.Service)
 			exec.Results = append(exec.Results, serviceResult)
 			targetSource = &schema.EntityRef{Type: serviceResult.Type, Value: serviceResult.Value}
 		}
 
-		targetResult := buildNAPTRTargetResult(targetSource, target, replacement)
+		if parsed.Regexp != "" {
+			regexpResults := buildNAPTRRegexpResults(targetSource, parsed.Regexp, parsed.RegexpTarget)
+			exec.Results = append(exec.Results, regexpResults...)
+		}
+
+		targetResult := buildNAPTRTargetResult(targetSource, target, parsed.Replacement)
 		if targetResult == nil {
 			continue
 		}

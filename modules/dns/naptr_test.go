@@ -10,84 +10,6 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func TestParseNAPTRRecord(t *testing.T) {
-	const standardRecord = "100 10 \"s\" \"SIP+D2U\" \"!^.*$!sip:customer@example.com!\" _sip._udp.example.com."
-
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			"standard naptr",
-			standardRecord,
-			standardRecord,
-		},
-		{
-			"wire format passthrough",
-			"\\# 20 0064000a0173075349502b4432550000",
-			"\\# 20 0064000a0173075349502b4432550000",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := parseNAPTRRecord(tt.input)
-			if got != tt.expected {
-				t.Errorf("parseNAPTRRecord() = %q, want %q", got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestExtractNAPTRServiceAndReplacement(t *testing.T) {
-	tests := []struct {
-		name                string
-		parsed              string
-		wantService         string
-		wantReplacement     string
-		wantParsedSucceeded bool
-	}{
-		{
-			name:                "quoted regexp field",
-			parsed:              "100 10 \"s\" \"SIP+D2U\" \"!^.*$!sip:customer@example.com!\" sip1.example.com.",
-			wantService:         "SIP+D2U",
-			wantReplacement:     "sip1.example.com.",
-			wantParsedSucceeded: true,
-		},
-		{
-			name:                "empty regexp collapsed by resolver",
-			parsed:              "10 100 s SIP+D2T  _sip._tcp.voice.example.org.",
-			wantService:         "SIP+D2T",
-			wantReplacement:     "_sip._tcp.voice.example.org.",
-			wantParsedSucceeded: true,
-		},
-		{
-			name:                "too short",
-			parsed:              "10 100 s SIP+D2T",
-			wantParsedSucceeded: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotService, gotReplacement, ok := extractNAPTRServiceAndReplacement(tt.parsed)
-			if ok != tt.wantParsedSucceeded {
-				t.Fatalf("extractNAPTRServiceAndReplacement() ok = %v, want %v", ok, tt.wantParsedSucceeded)
-			}
-			if !ok {
-				return
-			}
-			if gotService != tt.wantService {
-				t.Fatalf("unexpected service: %q", gotService)
-			}
-			if gotReplacement != tt.wantReplacement {
-				t.Fatalf("unexpected replacement: %q", gotReplacement)
-			}
-		})
-	}
-}
-
 func TestBuildNAPTRServiceResult(t *testing.T) {
 	const parsedRecord = "100 10 \"s\" \"SIP+D2U\" \"!^.*$!sip:customer@example.com!\" _sip._udp.example.com."
 
@@ -119,31 +41,35 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 		replacement string
 		wantValue   string
 		wantType    string
+		wantContext string
+		wantNil     bool
 		wantOOS     bool
 	}{
 		{
 			name:        "normalizes regular domain replacement",
 			target:      "target.naptr.example.com",
 			replacement: "SIP.EXAMPLE.COM.",
+			wantNil:     false,
 			wantValue:   "sip.example.com",
 			wantType:    constants.TypeSubdomain,
 			wantOOS:     false,
+			wantContext: "NAPTR Target (SIP.EXAMPLE.COM.)",
 		},
 		{
-			name:        "returns full service owner replacement after base-domain validation",
+			name:        "skips self referential replacement after base-domain validation",
 			target:      "example.net",
 			replacement: "_sip._tcp.example.net.",
-			wantValue:   "_sip._tcp.example.net",
-			wantType:    constants.TypeSubdomain,
-			wantOOS:     false,
+			wantNil:     true,
 		},
 		{
 			name:        "marks validated service owner replacement out of scope",
 			target:      "target.naptr.example.com",
 			replacement: "_sips._tcp.voice.example.org.",
-			wantValue:   "_sips._tcp.voice.example.org",
+			wantNil:     false,
+			wantValue:   "voice.example.org",
 			wantType:    constants.TypeSubdomain,
 			wantOOS:     true,
+			wantContext: "NAPTR Target (_sips._tcp.voice.example.org.)",
 		},
 	}
 
@@ -151,6 +77,12 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			source := &schema.EntityRef{Type: constants.TypeNAPTR, Value: "naptr-service"}
 			result := buildNAPTRTargetResult(source, tt.target, tt.replacement)
+			if tt.wantNil {
+				if result != nil {
+					t.Fatalf("expected nil result, got %+v", result)
+				}
+				return
+			}
 			if result == nil {
 				t.Fatal("expected naptr target result")
 			}
@@ -163,8 +95,8 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 			if result.Value != tt.wantValue {
 				t.Fatalf("unexpected value: %s", result.Value)
 			}
-			if result.Context != "Replacement Target" {
-				t.Fatalf("unexpected context: %s", result.Context)
+			if result.Context != tt.wantContext {
+				t.Fatalf("unexpected context: %s, want %s", result.Context, tt.wantContext)
 			}
 			if result.OutOfScope != tt.wantOOS {
 				t.Fatalf("unexpected out_of_scope: %v", result.OutOfScope)
@@ -186,6 +118,37 @@ func TestBuildNAPTRTargetResultInvalid(t *testing.T) {
 		if result := buildNAPTRTargetResult(source, "invalid.naptr.example.com", replacement); result != nil {
 			t.Fatalf("expected nil result for replacement %q", replacement)
 		}
+	}
+}
+
+func TestBuildNAPTRRegexpResults(t *testing.T) {
+	source := &schema.EntityRef{Type: constants.TypeNAPTR, Value: "E2U+sip"}
+
+	results := buildNAPTRRegexpResults(source, "!^.*$!sip:info@example.org!", "sip:info@example.org")
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+
+	regexpProp := results[0]
+	if regexpProp.Type != constants.TypeNAPTR || regexpProp.Value != "!^.*$!sip:info@example.org!" || regexpProp.Context != "NAPTR Regexp" {
+		t.Fatalf("unexpected regexp property: %#v", regexpProp)
+	}
+	if regexpProp.Source == nil || regexpProp.Source.Type != source.Type || regexpProp.Source.Value != source.Value {
+		t.Fatalf("unexpected regexp source: %#v", regexpProp.Source)
+	}
+
+	targetProp := results[1]
+	if targetProp.Type != constants.TypeURL || targetProp.Value != "sip:info@example.org" || targetProp.Context != "NAPTR Regexp Target" {
+		t.Fatalf("unexpected target property: %#v", targetProp)
+	}
+	if targetProp.Source == nil || targetProp.Source.Type != constants.TypeNAPTR || targetProp.Source.Value != "!^.*$!sip:info@example.org!" {
+		t.Fatalf("unexpected target source: %#v", targetProp.Source)
+	}
+
+	// Test without target
+	resultsOnlyRegexp := buildNAPTRRegexpResults(source, "!^.*$!$1!", "")
+	if len(resultsOnlyRegexp) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(resultsOnlyRegexp))
 	}
 }
 

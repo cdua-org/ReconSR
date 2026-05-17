@@ -464,10 +464,47 @@ func appendShodanURIResult(exec *schema.ModuleExecution, value, _ string, source
 }
 
 func appendShodanNAPTRResult(exec *schema.ModuleExecution, value, target string, source *schema.EntityRef) *schema.EntityRef {
-	ref := appendShodanGenericDNSResult(exec, "NAPTR", value, source)
-	parts := strings.Fields(value)
-	if len(parts) >= 6 {
-		targetNode := strings.TrimSuffix(parts[5], ".")
+	parsed := dnsutils.ParseNAPTR(value)
+	if parsed == nil {
+		return appendShodanGenericDNSResult(exec, "NAPTR", value, source)
+	}
+
+	ref := appendShodanGenericDNSResult(exec, "NAPTR", parsed.Formatted, source)
+
+	targetSource := ref
+	if parsed.Service != "" {
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeNAPTR,
+			Category: constants.CategoryProperty,
+			Value:    parsed.Service,
+			Context:  "NAPTR Service",
+			Source:   ref,
+		})
+		targetSource = &schema.EntityRef{Type: constants.TypeNAPTR, Value: parsed.Service}
+	}
+
+	if parsed.Regexp != "" {
+		regexpSource := targetSource
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeNAPTR,
+			Category: constants.CategoryProperty,
+			Value:    parsed.Regexp,
+			Context:  "NAPTR Regexp",
+			Source:   regexpSource,
+		})
+		if parsed.RegexpTarget != "" {
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     constants.TypeURL,
+				Category: constants.CategoryProperty,
+				Value:    parsed.RegexpTarget,
+				Context:  "NAPTR Regexp Target",
+				Source:   &schema.EntityRef{Type: constants.TypeNAPTR, Value: parsed.Regexp},
+			})
+		}
+	}
+
+	if parsed.Replacement != "" {
+		targetNode := dnsutils.CleanSRVTarget(parsed.Replacement)
 		validatedValue := targetNode
 		validatedType := constants.TypeSubdomain
 		valid := false
@@ -476,21 +513,22 @@ func appendShodanNAPTRResult(exec *schema.ModuleExecution, value, target string,
 			validatedValue = validated.Value
 			validatedType = validated.Type
 			valid = true
-		} else if strings.Contains(targetNode, "_") {
-			validatedValue = strings.ToLower(targetNode)
-			validatedType = constants.TypeSubdomain
-			valid = true
 		}
 
-		if valid {
+		if valid && validatedValue != target {
+			contextStr := "NAPTR Target"
+			if parsed.Replacement != validatedValue && parsed.Replacement != validatedValue+"." {
+				contextStr = "NAPTR Target (" + parsed.Replacement + ")"
+			}
+
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validatedType,
 				Category:   constants.CategoryNode,
 				Value:      validatedValue,
 				Tags:       []string{constants.TagNAPTR},
-				Context:    "NAPTR Target",
+				Context:    contextStr,
 				OutOfScope: orgdomain.IsOutOfScope(validatedValue, target),
-				Source:     source,
+				Source:     targetSource,
 			})
 		}
 	}
