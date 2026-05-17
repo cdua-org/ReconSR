@@ -145,6 +145,10 @@ func buildSRVHostResult(host, target string, source *schema.EntityRef) (schema.M
 		return schema.ModuleResult{}, false
 	}
 
+	if res.Value == target {
+		return schema.ModuleResult{}, false
+	}
+
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
 	log.Printf("get_srv target=%q entity=%q oos=%v", target, res.Value, isOOS)
 

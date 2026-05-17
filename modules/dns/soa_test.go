@@ -10,7 +10,7 @@ import (
 )
 
 func TestBuildSOAPrimaryNSResultSkipsInvalidAndNormalizes(t *testing.T) {
-	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: "soa"}
+	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: "ns1.example.com. admin.example.com. 2025010101 3600 900 604800 86400"}
 	result := buildSOAPrimaryNSResult("NS1.EXAMPLE.COM.", "primary.soa.example.com", soaRef)
 	if result == nil {
 		t.Fatal("expected primary NS result")
@@ -45,8 +45,15 @@ func TestBuildSOAPrimaryNSResultSkipsInvalidAndNormalizes(t *testing.T) {
 	}
 }
 
+func TestBuildSOAPrimaryNSResultSelfReferential(t *testing.T) {
+	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: "soa_record"}
+	if buildSOAPrimaryNSResult("example.com.", "example.com", soaRef) != nil {
+		t.Fatal("expected self-referential primary NS to be skipped")
+	}
+}
+
 func TestBuildSOAResponsibleEmailResultSkipsInvalidAndUsesValidatedType(t *testing.T) {
-	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: "soa"}
+	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: "ns2.example.net. hostmaster.example.net. 2025020101 7200 1800 1209600 3600"}
 	result := buildSOAResponsibleEmailResult(`"john".example.com.`, "responsible.soa.example.com", soaRef)
 	if result == nil {
 		t.Fatal("expected responsible email result")

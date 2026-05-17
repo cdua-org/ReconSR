@@ -121,6 +121,10 @@ func buildHIPRendezvousResult(rawRV, target string, hipSource *schema.EntityRef)
 		return nil
 	}
 
+	if res.Value == target {
+		return nil
+	}
+
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
 	log.Printf("get_hip target=%q rv=%q oos=%v", target, res.Value, isOOS)
 

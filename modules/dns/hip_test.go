@@ -105,6 +105,16 @@ func TestBuildHIPResultsInvalidRendezvousSkipsNode(t *testing.T) {
 	}
 }
 
+func TestBuildHIPResultsSelfReferentialSkipsNode(t *testing.T) {
+	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb example.com.", "example.com")
+	if len(results) != 1 {
+		t.Fatalf("buildHIPResults() returned %d results, want 1", len(results))
+	}
+	if results[0].Type != constants.TypeHIP {
+		t.Fatalf("Type = %q, want %q", results[0].Type, constants.TypeHIP)
+	}
+}
+
 func TestBuildHIPResultsNormalizesRendezvousServer(t *testing.T) {
 	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb RV1.EXAMPLE.NET.", "normalize.hip.example.com")
 	if len(results) != 2 {

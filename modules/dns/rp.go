@@ -62,6 +62,10 @@ func processRPTXTDomain(txtDomain, target string) []schema.ModuleResult {
 		return results
 	}
 
+	if res.Value == target {
+		return results
+	}
+
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
 	log.Printf("get_rp target=%q entity=%q oos=%v", target, res.Value, isOOS)
 

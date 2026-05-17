@@ -139,6 +139,35 @@
             "flag": 0,
             "tag": "issuewild",
             "value": "wild-ca.example.net"
+          },
+          {
+            "type": "NS",
+            "ttl": 300,
+            "value": "target-example.com"
+          },
+          {
+            "type": "CNAME",
+            "ttl": 300,
+            "value": "target-example.com"
+          },
+          {
+            "type": "SOA",
+            "ttl": 300,
+            "value": "target-example.com",
+            "rname": "admin.target-example.com"
+          },
+          {
+            "type": "CAA",
+            "ttl": 300,
+            "flag": 0,
+            "tag": "issue",
+            "value": "target-example.com"
+          },
+          {
+            "type": "SRV",
+            "ttl": 300,
+            "priority": 10,
+            "value": "10 5060 target-example.com"
           }
         ],
         "last_analysis_results": {

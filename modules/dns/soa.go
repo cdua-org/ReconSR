@@ -73,6 +73,10 @@ func buildSOAPrimaryNSResult(rawNS, target string, source *schema.EntityRef) *sc
 		return nil
 	}
 
+	if res.Value == target {
+		return nil
+	}
+
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
 	log.Printf("get_soa target=%q entity=%q oos=%v", target, res.Value, isOOS)
 

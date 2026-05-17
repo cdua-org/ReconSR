@@ -10,7 +10,6 @@ import (
 )
 
 func TestBuildSRVHostResult(t *testing.T) {
-	const targetDomain = "example.com"
 	srvRef := &schema.EntityRef{Type: constants.TypeSRV, Value: "10 50 5060 sip.example.com"}
 
 	tests := []struct {
@@ -24,18 +23,18 @@ func TestBuildSRVHostResult(t *testing.T) {
 	}{
 		{
 			name:      "valid host gets normalized",
-			host:      "SIP.EXAMPLE.COM.",
-			target:    targetDomain,
-			wantValue: "sip.example.com",
+			host:      "SIP.SRV1.EXAMPLE.COM.",
+			target:    "srv1.example.com",
+			wantValue: "sip.srv1.example.com",
 			wantType:  constants.TypeSubdomain,
 			wantOK:    true,
 			wantOOS:   false,
 		},
 		{
 			name:      "out of scope host",
-			host:      "sip.otherdomain.com",
-			target:    targetDomain,
-			wantValue: "sip.otherdomain.com",
+			host:      "sip.external.example.org",
+			target:    "srv2.example.com",
+			wantValue: "sip.external.example.org",
 			wantType:  constants.TypeSubdomain,
 			wantOK:    true,
 			wantOOS:   true,
@@ -43,7 +42,15 @@ func TestBuildSRVHostResult(t *testing.T) {
 		{
 			name:      "invalid host is skipped",
 			host:      "invalid_host",
-			target:    targetDomain,
+			target:    "srv-invalid.example.com",
+			wantValue: "",
+			wantOK:    false,
+			wantOOS:   false,
+		},
+		{
+			name:      "self-referential host is skipped",
+			host:      "srv-self.example.com",
+			target:    "srv-self.example.com",
 			wantValue: "",
 			wantOK:    false,
 			wantOOS:   false,

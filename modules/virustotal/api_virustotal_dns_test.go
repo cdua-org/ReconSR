@@ -233,3 +233,36 @@ func TestParseDNSRecordSRVAddsPropertyAndHostNode(t *testing.T) {
 	})
 	assertFixtureResultSource(t, srvRef, srvHost.Source)
 }
+
+func TestParseDNSRecordSelfReferentialSkipped(t *testing.T) {
+	mod := &module{}
+	exec := schema.ModuleExecution{}
+
+	tests := []struct {
+		typ    string
+		val    string
+		rec    map[string]any
+		name   string
+		target string
+	}{
+		{"CNAME", "cname.vt.example.com", map[string]any{}, "test_CNAME", "cname.vt.example.com"},
+		{"NS", "ns.vt.example.com", map[string]any{}, "test_NS", "ns.vt.example.com"},
+		{"SOA", "soa.vt.example.com", map[string]any{"rname": "admin.vt.example.com", "serial": 123}, "test_SOA", "soa.vt.example.com"},
+		{"CAA", "caa.vt.example.com", map[string]any{"tag": "issue"}, "test_CAA", "caa.vt.example.com"},
+		{"SRV", "10 5060 srv.vt.example.com", map[string]any{"priority": 10}, "test_SRV", "srv.vt.example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.rec["type"] = tt.typ
+			tt.rec["value"] = tt.val
+			mod.parseDNSRecord(tt.rec, tt.target, nil, &exec)
+			for _, res := range exec.Results {
+				if res.Category == constants.CategoryNode && res.Value == tt.target {
+					t.Fatalf("expected self-referential %s host to NOT be emitted as a node", tt.name)
+				}
+			}
+			exec.Results = nil
+		})
+	}
+}

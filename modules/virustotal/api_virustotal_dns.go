@@ -74,6 +74,10 @@ func (m *module) appendVTCNAMEResult(exec *schema.ModuleExecution, target string
 		return
 	}
 
+	if validated.Value == target {
+		return
+	}
+
 	isOOS := orgdomain.IsOutOfScope(validated.Value, target)
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
@@ -129,6 +133,10 @@ func (m *module) appendVTNSResult(exec *schema.ModuleExecution, target string, s
 		return
 	}
 
+	if validated.Value == target {
+		return
+	}
+
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:       validated.Type,
 		Category:   constants.CategoryNode,
@@ -177,6 +185,9 @@ func (m *module) appendVTSOAResults(exec *schema.ModuleExecution, target string,
 	if rawRname != "" {
 		email := dnsutils.FormatSOAMbox(rawRname)
 		if validated, err := validator.Validate(constants.TypeEmail, email); err == nil {
+			if validated.Value == target {
+				return
+			}
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validated.Type,
 				Category:   constants.CategoryNode,
@@ -303,6 +314,10 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string,
 			return
 		}
 
+		if validated.Value == target {
+			return
+		}
+
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:       validated.Type,
 			Category:   constants.CategoryNode,
@@ -360,6 +375,10 @@ func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string,
 	validated, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
 		dbg.Printf("appendVTSRVResults target=%q host=%q err=%v", target, host, err)
+		return
+	}
+
+	if validated.Value == target {
 		return
 	}
 

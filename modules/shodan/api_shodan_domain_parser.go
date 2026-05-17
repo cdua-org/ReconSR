@@ -156,6 +156,10 @@ func appendShodanCNAMEResult(exec *schema.ModuleExecution, value, target string,
 		return nil
 	}
 
+	if validated.Value == target {
+		return nil
+	}
+
 	isOOS := orgdomain.IsOutOfScope(validated.Value, target)
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
@@ -210,6 +214,10 @@ func appendShodanMXResult(exec *schema.ModuleExecution, record shodanDomainRecor
 func appendShodanNSResult(exec *schema.ModuleExecution, value, target string, source *schema.EntityRef) *schema.EntityRef {
 	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
+		return nil
+	}
+
+	if validated.Value == target {
 		return nil
 	}
 
@@ -355,7 +363,7 @@ func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRec
 	}
 
 	validatedNS, err := validator.Validate(constants.TypeDomain, primaryNS)
-	if err == nil {
+	if err == nil && validatedNS.Value != target {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:       validatedNS.Type,
 			Category:   constants.CategoryNode,
@@ -434,7 +442,7 @@ func appendShodanLastSeen(exec *schema.ModuleExecution, lastSeen string, source 
 func appendShodanSRVResult(exec *schema.ModuleExecution, value, target string, source *schema.EntityRef) *schema.EntityRef {
 	ref := appendShodanGenericDNSResult(exec, "SRV", value, source)
 	if host, err := dnsutils.ParseSRVHost(value); err == nil {
-		if validated, err := validator.Validate(constants.TypeDomain, host); err == nil {
+		if validated, err := validator.Validate(constants.TypeDomain, host); err == nil && validated.Value != target {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validated.Type,
 				Category:   constants.CategoryNode,
@@ -460,7 +468,7 @@ func appendShodanCAAResult(exec *schema.ModuleExecution, value, target string, s
 	case "issue", "issuewild", "issuemail":
 		domain := dnsutils.ExtractCAAAuthority(parsedVal)
 		if domain != "" {
-			if validated, err := validator.Validate(constants.TypeDomain, domain); err == nil {
+			if validated, err := validator.Validate(constants.TypeDomain, domain); err == nil && validated.Value != target {
 				exec.Results = append(exec.Results, schema.ModuleResult{
 					Type:       validated.Type,
 					Category:   constants.CategoryNode,
@@ -604,7 +612,7 @@ func appendShodanRPResult(exec *schema.ModuleExecution, value, target string, so
 		}
 
 		txtDomain := strings.TrimSuffix(parts[1], ".")
-		if validated, err := validator.Validate(constants.TypeDomain, txtDomain); err == nil {
+		if validated, err := validator.Validate(constants.TypeDomain, txtDomain); err == nil && validated.Value != target {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validated.Type,
 				Category:   constants.CategoryNode,
@@ -625,7 +633,7 @@ func appendShodanHIPResult(exec *schema.ModuleExecution, value, target string, s
 	if len(parts) >= 4 {
 		for _, rv := range parts[3:] {
 			rvNode := strings.TrimSuffix(rv, ".")
-			if validated, err := validator.Validate(constants.TypeDomain, rvNode); err == nil {
+			if validated, err := validator.Validate(constants.TypeDomain, rvNode); err == nil && validated.Value != target {
 				exec.Results = append(exec.Results, schema.ModuleResult{
 					Type:       validated.Type,
 					Category:   constants.CategoryNode,

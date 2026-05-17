@@ -74,6 +74,13 @@ func TestBuildCNAMEResultInvalid(t *testing.T) {
 	}
 }
 
+func TestBuildCNAMEResultSelfReferential(t *testing.T) {
+	_, ok := buildCNAMEResult("example.com.", "example.com", "CNAME Record")
+	if ok {
+		t.Fatal("expected self-referential CNAME to be skipped")
+	}
+}
+
 func TestCNAMECapabilities(t *testing.T) {
 	mod := New()
 	caps, err := mod.Capabilities()

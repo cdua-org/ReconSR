@@ -31,13 +31,13 @@ func getCAAData(ctx context.Context, target string) schema.ModuleExecution {
 	log.Printf("get_caa target=%q records=%d", target, len(records))
 
 	for _, rec := range records {
-		exec.Results = append(exec.Results, processCAARecord(rec)...)
+		exec.Results = append(exec.Results, processCAARecord(rec, target)...)
 	}
 
 	return exec
 }
 
-func processCAARecord(data string) []schema.ModuleResult {
+func processCAARecord(data, target string) []schema.ModuleResult {
 	normalized, tag, val, matched := dnsutils.ParseCAA(data)
 
 	results := make([]schema.ModuleResult, 0, 2)
@@ -56,7 +56,7 @@ func processCAARecord(data string) []schema.ModuleResult {
 
 	switch tag {
 	case "issue", "issuewild", "issuemail":
-		if result, ok := buildCAAAuthorityResult(tag, val, source); ok {
+		if result, ok := buildCAAAuthorityResult(tag, val, target, source); ok {
 			results = append(results, result)
 		}
 	case "iodef":
@@ -68,7 +68,7 @@ func processCAARecord(data string) []schema.ModuleResult {
 	return results
 }
 
-func buildCAAAuthorityResult(tag, val string, source *schema.EntityRef) (schema.ModuleResult, bool) {
+func buildCAAAuthorityResult(tag, val, target string, source *schema.EntityRef) (schema.ModuleResult, bool) {
 	domain := dnsutils.ExtractCAAAuthority(val)
 	if domain == "" {
 		return schema.ModuleResult{}, false
@@ -77,6 +77,10 @@ func buildCAAAuthorityResult(tag, val string, source *schema.EntityRef) (schema.
 	res, err := validator.Validate(constants.TypeDomain, domain)
 	if err != nil {
 		log.Printf("get_caa skipping invalid authority tag=%q entity=%q err=%v", tag, domain, err)
+		return schema.ModuleResult{}, false
+	}
+
+	if res.Value == target {
 		return schema.ModuleResult{}, false
 	}
 

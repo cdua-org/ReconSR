@@ -85,11 +85,17 @@ func TestProcessCAARecord(t *testing.T) {
 			expectedTypes:  []string{constants.TypeCAA},
 			expectedValues: []string{`0 iodef "https://example.com/abuse"`},
 		},
+		{
+			name:           "self-referential authority domain skipped",
+			record:         `0 issue "target.example.net"`,
+			expectedTypes:  []string{constants.TypeCAA},
+			expectedValues: []string{`0 issue "target.example.net"`},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := processCAARecord(tt.record)
+			results := processCAARecord(tt.record, "target.example.net")
 			if got := resultTypes(results); !slices.Equal(got, tt.expectedTypes) {
 				t.Fatalf("unexpected result types: got %v want %v", got, tt.expectedTypes)
 			}

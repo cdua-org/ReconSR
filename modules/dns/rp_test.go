@@ -122,6 +122,11 @@ func TestProcessRPTXTDomain(t *testing.T) {
 			input:       ".",
 			wantResults: 0,
 		},
+		{
+			name:        "self-referential domain",
+			input:       "txt.rp.example.com.",
+			wantResults: 0,
+		},
 	}
 
 	for _, tt := range tests {

@@ -92,6 +92,10 @@ func buildCNAMEResult(cname, target, relationContext string) (schema.ModuleResul
 		return schema.ModuleResult{}, false
 	}
 
+	if res.Value == target {
+		return schema.ModuleResult{}, false
+	}
+
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
 
 	return schema.ModuleResult{

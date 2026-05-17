@@ -62,29 +62,29 @@ func TestBuildMXHostResult(t *testing.T) {
 	}{
 		{
 			name:      "in scope subdomain host",
-			host:      "MAIL.EXAMPLE.COM",
-			target:    "example.com",
+			host:      "MAIL.MX-SCOPE.EXAMPLE.COM",
+			target:    "mx-scope.example.com",
 			wantType:  constants.TypeSubdomain,
-			wantValue: "mail.example.com",
+			wantValue: "mail.mx-scope.example.com",
 		},
 		{
 			name:    "invalid host is skipped",
 			host:    "bad host",
-			target:  "example.net",
+			target:  "mx-invalid.example.com",
 			wantNil: true,
 		},
 		{
 			name:    "self referential host is skipped",
-			host:    "example.edu",
-			target:  "example.edu",
+			host:    "mx-self.example.com",
+			target:  "mx-self.example.com",
 			wantNil: true,
 		},
 		{
 			name:      "out of scope host",
-			host:      "relay.example.edu",
-			target:    "example.com",
+			host:      "relay.mx-external.example.org",
+			target:    "mx-oos.example.com",
 			wantType:  constants.TypeSubdomain,
-			wantValue: "relay.example.edu",
+			wantValue: "relay.mx-external.example.org",
 			wantOOS:   true,
 		},
 	}
@@ -135,7 +135,7 @@ func TestGetMXDataEmpty(t *testing.T) {
 }
 
 func TestGetMXData(t *testing.T) {
-	res := getMXData(context.Background(), "example.com")
+	res := getMXData(context.Background(), "mx-lookup.example.com")
 
 	if res.Error != nil {
 		t.Logf("Network resolution error: %v", *res.Error)

@@ -35,6 +35,7 @@ func TestParseShodanAPIDomain(t *testing.T) {
 	assertShodanDomainHIP(t, exec.Results)
 	assertShodanDomainInvalidSubdomains(t, exec.Results)
 	assertShodanDomainLastSeen(t, exec.Results, rootDomainValue)
+	assertShodanDomainSelfReferentialSkipped(t, exec.Results, rootDomainValue)
 }
 
 func assertShodanDomainSubdomainChain(t *testing.T, results []schema.ModuleResult) {
@@ -489,4 +490,17 @@ func TestGetShodanAPIDomainPagination(t *testing.T) {
 
 	requireModuleResult(t, exec.Results, constants.TypeSubdomain, "page1.example.org")
 	requireModuleResult(t, exec.Results, constants.TypeSubdomain, "page2.example.org")
+}
+
+func assertShodanDomainSelfReferentialSkipped(t *testing.T, results []schema.ModuleResult, target string) {
+	t.Helper()
+
+	for _, res := range results {
+		if res.Category == constants.CategoryNode && res.Value == target {
+			if slices.Contains(res.Tags, constants.TagWildcard) {
+				continue
+			}
+			t.Fatalf("found unexpected self-referential node: %+v", res)
+		}
+	}
 }

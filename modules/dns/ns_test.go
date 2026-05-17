@@ -73,6 +73,13 @@ func TestBuildNSResultInvalid(t *testing.T) {
 	}
 }
 
+func TestBuildNSResultSelfReferential(t *testing.T) {
+	_, ok := buildNSResult("example.com.", "example.com")
+	if ok {
+		t.Fatal("expected self-referential NS to be skipped")
+	}
+}
+
 func TestNSCapabilities(t *testing.T) {
 	mod := New()
 	caps, err := mod.Capabilities()

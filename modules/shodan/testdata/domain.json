@@ -18,6 +18,13 @@
     {"subdomain":"","type":"RP","value":"admin.example.com admin-txt.example.com","last_seen":"2026-05-02T12:43:00.000000"},
     {"subdomain":"host","type":"HIP","value":"2 2001:10... base64... rv1.example.net rv2.example.com","last_seen":"2026-05-02T12:44:00.000000"},
     {"subdomain":"invalid_name.scripts","type":"A","value":"198.51.100.99","last_seen":"2026-05-09T20:11:27.046000"},
-    {"subdomain":"_fake.service.media","type":"TXT","value":"some-txt-record","last_seen":"2026-05-09T20:11:28.000000"}
+    {"subdomain":"_fake.service.media","type":"TXT","value":"some-txt-record","last_seen":"2026-05-09T20:11:28.000000"},
+    {"subdomain":"self-cname","type":"CNAME","value":"example.com","last_seen":"2026-05-02T12:45:00.000000"},
+    {"subdomain":"self-ns","type":"NS","value":"example.com","last_seen":"2026-05-02T12:45:00.000000"},
+    {"subdomain":"self-soa","type":"SOA","value":"example.com","options":{"hostmaster":"dns.example.net","serial":123},"last_seen":"2026-05-02T12:45:00.000000"},
+    {"subdomain":"self-srv","type":"SRV","value":"10 100 5060 example.com","last_seen":"2026-05-02T12:45:00.000000"},
+    {"subdomain":"self-caa","type":"CAA","value":"0 issue \"example.com\"","last_seen":"2026-05-02T12:45:00.000000"},
+    {"subdomain":"self-rp","type":"RP","value":"admin.example.com example.com","last_seen":"2026-05-02T12:45:00.000000"},
+    {"subdomain":"self-hip","type":"HIP","value":"2 2001:10... base64... example.com","last_seen":"2026-05-02T12:45:00.000000"}
   ]
 }
