@@ -271,13 +271,36 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 			Context:  classified.targetSource,
 		})
 	}
+	results = appendSubdomainResults(results, classified.subdomains, now, disableCertExpiredSubdomains, &expiredDomains)
+	results = appendEmailResults(results, classified.emails, now)
 
-	for subdomain, identity := range classified.subdomains {
+	if len(expiredDomains) > 0 {
+		sort.Strings(expiredDomains)
+		results = append(results, schema.ModuleResult{
+			Type:     constants.TypeCertExpiredSubdomains,
+			Category: constants.CategoryProperty,
+			Value:    strings.Join(expiredDomains, ", "),
+			Context:  "Expired Certificates",
+		})
+	}
+
+	dbg.Printf("output: results=%d expiredDomains=%d emails=%d", len(results), len(expiredDomains), len(classified.emails))
+
+	return results
+}
+
+func appendSubdomainResults(results []schema.ModuleResult, subdomains map[string]classifiedIdentity, now time.Time, disableCertExpiredSubdomains bool, expiredDomains *[]string) []schema.ModuleResult {
+	for subdomain, identity := range subdomains {
 		isExpired := !identity.notAfter.IsZero() && !identity.notAfter.After(now)
 
 		if isExpired && !disableCertExpiredSubdomains {
-			expiredDomains = append(expiredDomains, subdomain+" ("+identity.notAfter.Format(time.RFC3339)+")")
+			*expiredDomains = append(*expiredDomains, subdomain+" ("+identity.notAfter.Format(time.RFC3339)+")")
 			continue
+		}
+
+		tags := []string{constants.TagSan, constants.TagCTLog}
+		if isExpired {
+			tags = append(tags, constants.TagHistorical)
 		}
 
 		resultValue := subdomain
@@ -291,9 +314,10 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 		if trimmedWildcard, ok := strings.CutPrefix(subdomain, "*."); ok {
 			resultValue = trimmedWildcard
 			result.Value = resultValue
-			result.Tags = []string{constants.TagWildcard}
+			tags = append(tags, constants.TagWildcard)
 			result.Context = subdomain
 		}
+		result.Tags = tags
 
 		results = append(results, result)
 
@@ -324,9 +348,17 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 			})
 		}
 	}
+	return results
+}
 
-	for email, identity := range classified.emails {
+func appendEmailResults(results []schema.ModuleResult, emails map[string]classifiedIdentity, now time.Time) []schema.ModuleResult {
+	for email, identity := range emails {
 		isExpired := !identity.notAfter.IsZero() && !identity.notAfter.After(now)
+
+		tags := []string{constants.TagSan, constants.TagCTLog}
+		if isExpired {
+			tags = append(tags, constants.TagHistorical)
+		}
 
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypeEmail,
@@ -334,6 +366,7 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 			Value:    email,
 			Context:  identity.source,
 			Applied:  true,
+			Tags:     tags,
 		})
 
 		if identity.notAfter.IsZero() {
@@ -363,19 +396,6 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 			})
 		}
 	}
-
-	if len(expiredDomains) > 0 {
-		sort.Strings(expiredDomains)
-		results = append(results, schema.ModuleResult{
-			Type:     constants.TypeCertExpiredSubdomains,
-			Category: constants.CategoryProperty,
-			Value:    strings.Join(expiredDomains, ", "),
-			Context:  "Expired Certificates",
-		})
-	}
-
-	dbg.Printf("output: results=%d expiredDomains=%d emails=%d", len(results), len(expiredDomains), len(classified.emails))
-
 	return results
 }
 

@@ -270,6 +270,7 @@ func parseHostSearch(body, target string) []schema.ModuleResult {
 				Value:      domainRes.Value,
 				Context:    contextPDNSRecord,
 				OutOfScope: isOOS,
+				Tags:       []string{constants.TagPDNS},
 			})
 			src = &schema.EntityRef{
 				Type:  domainRes.Type,

@@ -203,9 +203,10 @@ func getDomains(target string) schema.ModuleExecution {
 			Value:    resultValue,
 			Context:  anubisContext,
 			Applied:  true,
+			Tags:     []string{constants.TagPDNS},
 		}
 		if isWildcard {
-			result.Tags = []string{constants.TagWildcard}
+			result.Tags = append(result.Tags, constants.TagWildcard)
 			result.Context = domain
 		}
 

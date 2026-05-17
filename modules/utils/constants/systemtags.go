@@ -20,4 +20,6 @@ const (
 	TagReverseIP   = "reverse_ip"
 	TagWhoisServer = "whois_server"
 	TagSPF         = "spf"
+	TagCTLog       = "ct_log"
+	TagHistorical  = "historical"
 )
