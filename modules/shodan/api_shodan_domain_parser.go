@@ -191,13 +191,17 @@ func appendShodanMXResult(exec *schema.ModuleExecution, record shodanDomainRecor
 		return mxRef
 	}
 
+	if validated.Value == target {
+		return mxRef
+	}
+
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:       validated.Type,
 		Category:   constants.CategoryNode,
 		Value:      validated.Value,
 		Tags:       []string{constants.TagMX},
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
-		Source:     source,
+		Source:     mxRef,
 	})
 
 	return mxRef

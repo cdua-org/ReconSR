@@ -2,7 +2,6 @@ package dns
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -11,6 +10,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -68,15 +68,17 @@ func getMXData(ctx context.Context, target string) schema.ModuleExecution {
 	})
 
 	for _, mx := range mxs {
+		mxValue := fmt.Sprintf("%d %s", mx.pref, mx.host)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeMX,
 			Category: constants.CategoryProperty,
-			Value:    fmt.Sprintf("%d %s", mx.pref, mx.host),
+			Value:    mxValue,
 		})
 
-		hostResult, ok := buildMXHostResult(mx.host, target)
-		if ok {
-			exec.Results = append(exec.Results, hostResult)
+		mxRef := &schema.EntityRef{Type: constants.TypeMX, Value: mxValue}
+		hostResult := buildMXHostResult(mxRef, mx.host, target)
+		if hostResult != nil {
+			exec.Results = append(exec.Results, *hostResult)
 		}
 	}
 
@@ -85,36 +87,38 @@ func getMXData(ctx context.Context, target string) schema.ModuleExecution {
 	return exec
 }
 
-func buildMXHostResult(host, target string) (schema.ModuleResult, bool) {
+func buildMXHostResult(source *schema.EntityRef, host, target string) *schema.ModuleResult {
 	res, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
 		log.Printf("get_mx skipping invalid mx host target=%q entity=%q err=%v", target, host, err)
-		return schema.ModuleResult{}, false
+		return nil
+	}
+
+	if res.Value == target {
+		log.Printf("get_mx skipping self-referential mx host target=%q", target)
+		return nil
 	}
 
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
 	log.Printf("get_mx target=%q entity=%q oos=%v", target, res.Value, isOOS)
 
-	return schema.ModuleResult{
+	return &schema.ModuleResult{
 		Type:       res.Type,
 		Category:   constants.CategoryNode,
 		Value:      res.Value,
 		Tags:       []string{constants.TagMX},
 		OutOfScope: isOOS,
-	}, true
+		Source:     source,
+	}
 }
 
 func parseMX(data string) (mxRecord, error) {
+	host, err := dnsutils.ParseMXHost(data)
+	if err != nil {
+		return mxRecord{}, fmt.Errorf("parse mx host: %w", err)
+	}
+
 	parts := strings.Fields(data)
-	if len(parts) < 2 {
-		return mxRecord{}, errors.New("invalid MX record format")
-	}
-
-	host := strings.TrimSuffix(parts[1], ".")
-	if host == "" {
-		return mxRecord{}, errors.New("invalid MX record format")
-	}
-
 	pref, err := strconv.ParseUint(parts[0], 10, 16)
 	if err != nil {
 		return mxRecord{}, fmt.Errorf("parse priority: %w", err)

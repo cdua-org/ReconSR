@@ -97,6 +97,9 @@ func assertShodanDomainMXRecords(t *testing.T, results []schema.ModuleResult) {
 	if mxHost.OutOfScope {
 		t.Fatal("expected in-scope mx host")
 	}
+	if mxHost.Source == nil || mxHost.Source.Type != constants.TypeMX || mxHost.Source.Value != "10 mx.example.com" {
+		t.Fatalf("expected mx host linked to MX record, got %+v", mxHost.Source)
+	}
 }
 
 func assertShodanDomainCNAMERecords(t *testing.T, results []schema.ModuleResult) {

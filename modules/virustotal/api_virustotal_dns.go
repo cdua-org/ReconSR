@@ -100,9 +100,15 @@ func (m *module) appendVTMXResults(exec *schema.ModuleExecution, target string, 
 		Source:   src,
 	})
 
+	mxRef := &schema.EntityRef{Type: constants.TypeMX, Value: mxValue}
+
 	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
 		dbg.Printf("appendVTMXResults target=%q value=%q err=%v", target, value, err)
+		return
+	}
+
+	if validated.Value == target {
 		return
 	}
 
@@ -112,7 +118,7 @@ func (m *module) appendVTMXResults(exec *schema.ModuleExecution, target string, 
 		Value:      validated.Value,
 		Tags:       []string{constants.TagMX},
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
-		Source:     src,
+		Source:     mxRef,
 	})
 }
 

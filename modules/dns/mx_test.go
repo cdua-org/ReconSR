@@ -2,11 +2,11 @@ package dns
 
 import (
 	"context"
-	"reflect"
 	"slices"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/schema"
 )
 
 func TestParseMX(t *testing.T) {
@@ -43,7 +43,7 @@ func TestParseMX(t *testing.T) {
 				t.Errorf("parseMX() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !tt.wantErr && !reflect.DeepEqual(got, tt.expected) {
+			if !tt.wantErr && (got.host != tt.expected.host || got.pref != tt.expected.pref) {
 				t.Errorf("parseMX() = %+v, want %+v", got, tt.expected)
 			}
 		})
@@ -54,46 +54,68 @@ func TestBuildMXHostResult(t *testing.T) {
 	tests := []struct {
 		name      string
 		host      string
+		target    string
 		wantValue string
 		wantType  string
-		wantOK    bool
+		wantNil   bool
 		wantOOS   bool
 	}{
 		{
-			name:      "valid host gets normalized",
+			name:      "in scope subdomain host",
 			host:      "MAIL.EXAMPLE.COM",
-			wantOK:    true,
+			target:    "example.com",
 			wantType:  constants.TypeSubdomain,
 			wantValue: "mail.example.com",
-			wantOOS:   false,
 		},
 		{
-			name:   "invalid host is skipped",
-			host:   "bad host",
-			wantOK: false,
+			name:    "invalid host is skipped",
+			host:    "bad host",
+			target:  "example.net",
+			wantNil: true,
+		},
+		{
+			name:    "self referential host is skipped",
+			host:    "example.edu",
+			target:  "example.edu",
+			wantNil: true,
+		},
+		{
+			name:      "out of scope host",
+			host:      "relay.example.edu",
+			target:    "example.com",
+			wantType:  constants.TypeSubdomain,
+			wantValue: "relay.example.edu",
+			wantOOS:   true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, ok := buildMXHostResult(tt.host, "host.mx.example.com")
-			if ok != tt.wantOK {
-				t.Fatalf("buildMXHostResult() ok = %v, want %v", ok, tt.wantOK)
-			}
-			if !tt.wantOK {
+			source := &schema.EntityRef{Type: constants.TypeMX, Value: "10 " + tt.host}
+			result := buildMXHostResult(source, tt.host, tt.target)
+			if tt.wantNil {
+				if result != nil {
+					t.Fatalf("expected nil result, got %+v", result)
+				}
 				return
 			}
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
 			if result.Type != tt.wantType {
-				t.Fatalf("buildMXHostResult() type = %q, want %q", result.Type, tt.wantType)
+				t.Fatalf("type = %q, want %q", result.Type, tt.wantType)
 			}
 			if !slices.Contains(result.Tags, constants.TagMX) {
-				t.Fatalf("buildMXHostResult() missing tag %q", constants.TagMX)
+				t.Fatalf("missing tag %q", constants.TagMX)
 			}
 			if result.Value != tt.wantValue {
-				t.Fatalf("buildMXHostResult() value = %q, want %q", result.Value, tt.wantValue)
+				t.Fatalf("value = %q, want %q", result.Value, tt.wantValue)
 			}
 			if result.OutOfScope != tt.wantOOS {
-				t.Fatalf("buildMXHostResult() out_of_scope = %v, want %v", result.OutOfScope, tt.wantOOS)
+				t.Fatalf("out_of_scope = %v, want %v", result.OutOfScope, tt.wantOOS)
+			}
+			if result.Source == nil || result.Source.Type != source.Type || result.Source.Value != source.Value {
+				t.Fatalf("expected source %+v, got %+v", source, result.Source)
 			}
 		})
 	}

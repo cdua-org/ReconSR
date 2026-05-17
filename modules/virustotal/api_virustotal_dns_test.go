@@ -140,7 +140,7 @@ func loadFixtureDNSRecord(t *testing.T, fileName, itemID, recordType string, pre
 	return findFixtureDNSRecord(t, records, recordType, predicate)
 }
 
-func TestParseDNSRecordMXAddsPropertyAndHostNode(t *testing.T) {
+func TestParseDNSRecordMXAddsPropertyAndSkipsSelfReferentialHost(t *testing.T) {
 	rec := loadFixtureDNSRecord(t, "subdomains_page1.json", fixtureMailSubdomain, "MX", func(record map[string]any) bool {
 		value, ok := record["value"].(string)
 		return ok && value == fixtureMailSubdomain
@@ -148,15 +148,16 @@ func TestParseDNSRecordMXAddsPropertyAndHostNode(t *testing.T) {
 	source := &schema.EntityRef{Type: constants.TypeSubdomain, Value: fixtureMailSubdomain}
 	results := parseDNSRecordFromFixture(t, fixtureMailSubdomain, source, rec)
 
-	requireResult(t, results, "mx property", func(result schema.ModuleResult) bool {
+	mxProp := requireResult(t, results, "mx property", func(result schema.ModuleResult) bool {
 		return result.Type == constants.TypeMX && result.Category == constants.CategoryProperty && result.Value == "5 "+fixtureMailSubdomain
 	})
+	assertFixtureResultSource(t, source, mxProp.Source)
 
-	mxHost := requireResult(t, results, "mx host node", func(result schema.ModuleResult) bool {
-		hasMXTag := slices.Contains(result.Tags, constants.TagMX)
-		return result.Type == constants.TypeSubdomain && result.Category == constants.CategoryNode && result.Value == fixtureMailSubdomain && hasMXTag
-	})
-	assertFixtureResultSource(t, source, mxHost.Source)
+	for _, res := range results {
+		if res.Type == constants.TypeSubdomain && res.Category == constants.CategoryNode && res.Value == fixtureMailSubdomain && slices.Contains(res.Tags, constants.TagMX) {
+			t.Fatal("expected self-referential MX host to NOT be emitted as a node")
+		}
+	}
 }
 
 func TestParseDNSRecordNSYieldsNode(t *testing.T) {
