@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -50,7 +51,8 @@ func executeDomainFixture(t *testing.T) domainFixtureRun {
 	subdomainsPage1 := loadVTFixture(t, "subdomains_page1.json")
 	subdomainsPage2 := loadVTFixture(t, "subdomains_page2.json")
 
-	withVTDelayConfig(t, 8)
+	resolver.VirustotalDelayMs = 20
+	defer func() { resolver.VirustotalDelayMs = 15000 }()
 
 	responses := map[string]string{
 		"/api/v3/domains/" + fixtureDomainTarget:                                                                    domainBody,

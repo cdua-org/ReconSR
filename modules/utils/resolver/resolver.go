@@ -100,6 +100,12 @@ var (
 	// DisableMailcryptoBruteForce prevents domains and subdomains from being routed to mailcrypto.
 	DisableMailcryptoBruteForce = true
 
+	// VirustotalDelayMs is the delay between VirusTotal API requests in milliseconds.
+	VirustotalDelayMs = 15000
+
+	// VirustotalMaxRetries defines maximum attempts for VirusTotal API requests.
+	VirustotalMaxRetries = 3
+
 	// VirustotalScanSubdomains enables processing of subdomains via the VirusTotal domain endpoint.
 	VirustotalScanSubdomains = false
 
@@ -283,6 +289,8 @@ func initOptionMaps() {
 		"MaxRetriesASNMeta":     &MaxRetriesASNMeta,
 		"MaxRecursionDepth":     &MaxRecursionDepth,
 		"AnubisLimit":           &AnubisLimit,
+		"VirustotalDelayMs":     &VirustotalDelayMs,
+		"VirustotalMaxRetries":  &VirustotalMaxRetries,
 		"VirustotalMaxPages":    &VirustotalMaxPages,
 		"ShodanMaxDomainPages":  &ShodanMaxDomainPages,
 		"DNSConcurrency":        &DNSConcurrency,

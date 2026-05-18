@@ -96,6 +96,12 @@ AnubisLimit=1000
 
 ### VirusTotal Options ###
 
+# Delay between API requests for VirusTotal, in milliseconds (default: 15000)
+VirustotalDelayMs=15000
+
+# Maximum retry attempts for VirusTotal API requests (default: 3)
+VirustotalMaxRetries=3
+
 # Enable routing of subdomains to the VirusTotal domain endpoint in addition to root domains (default: false)
 VirustotalScanSubdomains=false
 

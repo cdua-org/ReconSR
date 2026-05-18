@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -38,7 +39,8 @@ func executeIPFixture(t *testing.T) ipFixtureRun {
 	resolutionsPage1 := loadVTFixture(t, "resolutions_page1.json")
 	resolutionsPage2 := loadVTFixture(t, "resolutions_page2.json")
 
-	withVTDelayConfig(t, 8)
+	resolver.VirustotalDelayMs = 20
+	defer func() { resolver.VirustotalDelayMs = 15000 }()
 
 	responses := map[string]string{
 		"/api/v3/ip_addresses/" + fixtureIPTarget:                                                                      ipBody,

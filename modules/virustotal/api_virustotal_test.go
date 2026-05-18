@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -160,49 +158,17 @@ func setVTBaseURL(t *testing.T, url string) {
 	})
 }
 
-func withVTWorkingDir(t *testing.T) string {
-	t.Helper()
-
-	oldWD, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-
-	tempDir := t.TempDir()
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatalf("chdir temp dir: %v", err)
-	}
-
-	t.Cleanup(func() {
-		if chdirErr := os.Chdir(oldWD); chdirErr != nil {
-			t.Fatalf("restore working directory: %v", chdirErr)
-		}
-	})
-
-	return tempDir
-}
-
-func withVTDelayConfig(t *testing.T, delayMs int) {
-	t.Helper()
-
-	tempDir := withVTWorkingDir(t)
-	configDir := filepath.Join(tempDir, "configs")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
-		t.Fatalf("mkdir configs: %v", err)
-	}
-
-	config := "[virustotal]\n" + constants.FuncGetVTApiData + " delay=" + strconv.Itoa(delayMs)
-	if err := os.WriteFile(filepath.Join(configDir, "config.txt"), []byte(config), 0o600); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-}
-
 func execVT(t *testing.T, mod *module, target schema.Entity) schema.ModuleExecution {
 	t.Helper()
 
+	fn := constants.FuncGetVTApiDomain
+	if target.Type == constants.TypeIPv4 || target.Type == constants.TypeIPv6 {
+		fn = constants.FuncGetVTApiIP
+	}
+
 	output, err := mod.Exec(schema.ModuleInput{
 		Target:    target,
-		Functions: []string{constants.FuncGetVTApiData},
+		Functions: []string{fn},
 	})
 	if err != nil {
 		t.Fatalf("Exec returned error: %v", err)
@@ -303,15 +269,20 @@ func TestModuleCapabilities(t *testing.T) {
 		t.Fatalf("Capabilities error: %v", err)
 	}
 
-	fnCaps, ok := caps.CustomFunctions[constants.FuncGetVTApiData]
+	fnCaps, ok := caps.CustomFunctions[constants.FuncGetVTApiDomain]
 	if !ok {
-		t.Fatalf("expected %s in custom functions", constants.FuncGetVTApiData)
+		t.Fatalf("expected %s in custom functions", constants.FuncGetVTApiDomain)
 	}
-	if fnCaps.Limit != 1 {
-		t.Fatalf("expected limit 1, got %d", fnCaps.Limit)
+
+	ipCaps, ok := caps.CustomFunctions[constants.FuncGetVTApiIP]
+	if !ok {
+		t.Fatalf("expected %s in custom functions", constants.FuncGetVTApiIP)
 	}
-	if fnCaps.DelayMs != int(defaultVTDelay/time.Millisecond) {
-		t.Fatalf("expected delay %d, got %d", int(defaultVTDelay/time.Millisecond), fnCaps.DelayMs)
+	if caps.ModuleConfig == nil || caps.ModuleConfig.Limit != 1 {
+		t.Fatalf("expected ModuleConfig limit 1, got %+v", caps.ModuleConfig)
+	}
+	if len(fnCaps.InputTypes) == 0 || len(ipCaps.InputTypes) == 0 {
+		t.Fatalf("expected input types on functions")
 	}
 }
 
@@ -327,30 +298,16 @@ func TestNewUsesAPIConfigEnvOverride(t *testing.T) {
 	}
 }
 
-func TestGetDynamicDelayDefault(t *testing.T) {
-	withVTWorkingDir(t)
-
-	mod := &module{}
-	if got := mod.getDynamicDelay(); got != defaultVTDelay {
-		t.Fatalf("expected default delay %s, got %s", defaultVTDelay, got)
-	}
-}
-
-func TestGetDynamicDelayFromConfig(t *testing.T) {
-	withVTDelayConfig(t, 1234)
-
-	mod := &module{}
-	if got := mod.getDynamicDelay(); got != 1234*time.Millisecond {
-		t.Fatalf("expected config delay %s, got %s", 1234*time.Millisecond, got)
-	}
-}
-
 func TestDoVTRequestClassifiesRateLimit(t *testing.T) {
 	statuses := map[string]int{
 		"/api/v3/domains/" + fixtureDomainTarget: http.StatusTooManyRequests,
 	}
 	_, server := newVTMockServer(t, nil, statuses)
 	defer server.Close()
+
+	originalDelay := resolver.VirustotalDelayMs
+	resolver.VirustotalDelayMs = 0
+	defer func() { resolver.VirustotalDelayMs = originalDelay }()
 
 	mod := &module{apiKey: fixtureFixtureAPIKey}
 	_, _, err := mod.doVTRequest(context.Background(), server.URL+"/api/v3/domains/"+fixtureDomainTarget)
@@ -454,7 +411,8 @@ func TestProcessPaginatedLimits(t *testing.T) {
 	subdomainsPage1 := loadVTFixture(t, "subdomains_page1.json")
 	subdomainsPage2 := loadVTFixture(t, "subdomains_page2.json")
 
-	withVTDelayConfig(t, 0)
+	resolver.VirustotalDelayMs = 0
+	defer func() { resolver.VirustotalDelayMs = 15000 }()
 
 	responses := map[string]string{
 		"/api/v3/domains/" + fixtureDomainTarget:                                                                    domainBody,

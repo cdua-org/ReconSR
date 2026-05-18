@@ -373,6 +373,7 @@ func (m *module) extractSubdomain(item map[string]any, parent string, disableCer
 		Category:   constants.CategoryNode,
 		Value:      validatedSubdomain.Value,
 		Context:    "VirusTotal Subdomain Enumeration",
+		Tags:       []string{constants.TagPDNS},
 		OutOfScope: isOOS,
 		Source: &schema.EntityRef{
 			Type:  constants.TypeDomain,
