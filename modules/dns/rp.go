@@ -32,11 +32,12 @@ func processRPMailbox(mailbox, target string) []schema.ModuleResult {
 
 	res, vErr := validator.Validate(constants.TypeEmail, mailbox)
 	if vErr != nil {
+		log.Printf("%s skip_invalid_mailbox target=%q entity=%q err=%v", constants.FuncGetRP, target, mailbox, vErr)
 		return results
 	}
 
 	isOOS := orgdomain.IsEmailOutOfScope(res.Value, target)
-	log.Printf("get_rp target=%q entity=%q oos=%v", target, res.Value, isOOS)
+	log.Printf("%s result_mailbox target=%q entity=%q oos=%v", constants.FuncGetRP, target, res.Value, isOOS)
 
 	results = append(results, schema.ModuleResult{
 		Type:       res.Type,
@@ -59,6 +60,7 @@ func processRPTXTDomain(txtDomain, target string) []schema.ModuleResult {
 
 	res, vErr := validator.Validate(constants.TypeDomain, txtDomain)
 	if vErr != nil {
+		log.Printf("%s skip_invalid_txt_domain target=%q entity=%q err=%v", constants.FuncGetRP, target, txtDomain, vErr)
 		return results
 	}
 
@@ -67,7 +69,7 @@ func processRPTXTDomain(txtDomain, target string) []schema.ModuleResult {
 	}
 
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
-	log.Printf("get_rp target=%q entity=%q oos=%v", target, res.Value, isOOS)
+	log.Printf("%s result_txt_domain target=%q entity=%q oos=%v", constants.FuncGetRP, target, res.Value, isOOS)
 
 	results = append(results, schema.ModuleResult{
 		Type:       res.Type,
@@ -114,14 +116,14 @@ func processRPRecord(record, target string) []schema.ModuleResult {
 func getRPData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetRP)
 
-	log.Printf("get_rp query started for %q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetRP, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 17, nil)
 	if err != nil {
-		log.Printf("get_rp error for %q: %v", target, err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetRP, target, err)
 		modutil.SetError(&exec, "rp lookup failed: %v", err)
 		return exec
 	}
@@ -132,7 +134,7 @@ func getRPData(ctx context.Context, target string) schema.ModuleExecution {
 		exec.Results = append(exec.Results, processRPRecord(rec, target)...)
 	}
 
-	log.Printf("get_rp completed for %q with %d results", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetRP, target, len(exec.Results))
 
 	return exec
 }

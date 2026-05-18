@@ -89,14 +89,14 @@ func buildNAPTRRegexpResults(source *schema.EntityRef, regexpStr, regexpTarget s
 func getNAPTRData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetNAPTR)
 
-	log.Printf("get_naptr starting query for target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetNAPTR, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 35, nil)
 	if err != nil {
-		log.Printf("get_naptr error for target=%q: %v", target, err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetNAPTR, target, err)
 		modutil.SetError(&exec, "naptr lookup failed: %v", err)
 		return exec
 	}
@@ -142,11 +142,11 @@ func getNAPTRData(ctx context.Context, target string) schema.ModuleExecution {
 			continue
 		}
 
-		log.Printf("get_naptr target=%q entity=%q oos=%v", target, targetResult.Value, targetResult.OutOfScope)
+		log.Printf("%s result_target target=%q entity=%q oos=%v", constants.FuncGetNAPTR, target, targetResult.Value, targetResult.OutOfScope)
 		exec.Results = append(exec.Results, *targetResult)
 	}
 
-	log.Printf("get_naptr completed for target=%q results=%d", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetNAPTR, target, len(exec.Results))
 
 	return exec
 }

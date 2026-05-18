@@ -119,7 +119,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 
 func handlePreflightDNS(ctx context.Context, domain string, target schema.Entity) schema.ModuleExecution {
 	execution := modutil.NewExecution(constants.FuncPreflightDNS)
-	dbg.Printf("preflight_dns target=%q domain=%q", target.Value, domain)
+	dbg.Printf("%s target=%q domain=%q", constants.FuncPreflightDNS, target.Value, domain)
 	err := preflightcheck.PreFlightCheck(ctx, domain)
 	if err != nil {
 		if errors.Is(err, preflightcheck.ErrZoneBroken) {

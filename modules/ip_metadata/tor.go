@@ -37,18 +37,18 @@ func performAQuery(target, query, queryType string) ([]string, error) {
 		}()
 
 		if err == nil {
-			dbg.Printf("%s attempt=%d target=%q records=%d", queryType, attempt, target, len(ips))
+			dbg.Printf("%s success target=%q stage=lookup_host attempt=%d query=%q records=%d", queryType, target, attempt, query, len(ips))
 			return ips, nil
 		}
 
 		var dnsErr *net.DNSError
 		if errors.As(err, &dnsErr) && (dnsErr.IsNotFound || strings.Contains(err.Error(), "no such host") || strings.Contains(err.Error(), "server misbehaving")) {
-			dbg.Printf("%s attempt=%d target=%q nxdomain", queryType, attempt, target)
+			dbg.Printf("%s target=%q stage=lookup_host attempt=%d query=%q nxdomain", queryType, target, attempt, query)
 			return nil, nil
 		}
 
 		lastErr = err
-		dbg.Printf("%s attempt=%d target=%q err=%v", queryType, attempt, target, err)
+		dbg.Printf("%s error target=%q stage=lookup_host attempt=%d query=%q err=%v", queryType, target, attempt, query, err)
 		if attempt < resolver.MaxRetriesIPMeta {
 			httputil.SleepContext(context.Background(), resolver.RetryBaseDelay)
 		}
@@ -59,10 +59,11 @@ func performAQuery(target, query, queryType string) ([]string, error) {
 func getTorData(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetTOR)
 
-	dbg.Printf("getTorData target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncGetTOR, target)
 
 	rev, _, err := resolver.ReverseIP(target)
 	if err != nil {
+		dbg.Printf("%s error target=%q stage=validate_input err=%v", constants.FuncGetTOR, target, err)
 		errMsg := errInvalidIPFormat + target
 		execution.Error = &errMsg
 		return execution
@@ -97,6 +98,7 @@ func getTorData(target string) (execution schema.ModuleExecution) {
 	}
 
 	if !isTor && lastErr != nil {
+		dbg.Printf("%s error target=%q stage=lookup_tor err=%v", constants.FuncGetTOR, target, lastErr)
 		errMsg := fmt.Errorf("tor lookup failed after retries: %w", lastErr).Error()
 		execution.Error = &errMsg
 		return execution
@@ -110,6 +112,9 @@ func getTorData(target string) (execution schema.ModuleExecution) {
 			Context:  detectedContext,
 		})
 		execution.RawData = dnsblPositive
+		dbg.Printf("%s success target=%q context=%q", constants.FuncGetTOR, target, detectedContext)
+	} else {
+		dbg.Printf("%s target=%q listed=false", constants.FuncGetTOR, target)
 	}
 
 	return execution

@@ -26,6 +26,9 @@ profile.cov
 go.work
 go.work.sum
 
+# log
+*.log
+
 # env file
 .env
 

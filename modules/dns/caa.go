@@ -14,21 +14,21 @@ import (
 func getCAAData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetCAA)
 
-	log.Printf("get_caa target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetCAA, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 257, nil)
 	if err != nil {
-		log.Printf("get_caa error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetCAA, target, err)
 		modutil.SetError(&exec, "caa lookup failed: %v", err)
 		return exec
 	}
 
 	modutil.SetRawFromBytes(&exec, raw)
 
-	log.Printf("get_caa target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetCAA, target, len(records))
 
 	for _, rec := range records {
 		exec.Results = append(exec.Results, processCAARecord(rec, target)...)
@@ -76,7 +76,7 @@ func buildCAAAuthorityResult(tag, val, target string, source *schema.EntityRef) 
 
 	res, err := validator.Validate(constants.TypeDomain, domain)
 	if err != nil {
-		log.Printf("get_caa skipping invalid authority tag=%q entity=%q err=%v", tag, domain, err)
+		log.Printf("%s skip_invalid_authority tag=%q entity=%q err=%v", constants.FuncGetCAA, tag, domain, err)
 		return schema.ModuleResult{}, false
 	}
 
@@ -103,7 +103,7 @@ func buildCAAIodefEmailResult(val string, source *schema.EntityRef) (schema.Modu
 
 	res, err := validator.Validate(constants.TypeEmail, email)
 	if err != nil {
-		log.Printf("get_caa skipping invalid iodef email entity=%q err=%v", email, err)
+		log.Printf("%s skip_invalid_iodef_email entity=%q err=%v", constants.FuncGetCAA, email, err)
 		return schema.ModuleResult{}, false
 	}
 

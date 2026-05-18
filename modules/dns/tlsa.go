@@ -45,7 +45,7 @@ func parseTLSA(raw string) string {
 
 func getTLSAData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetTLSA)
-	log.Printf("get_tlsa target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetTLSA, target)
 
 	bruteCtx, cancel := context.WithTimeout(ctx, resolver.DNSBruteTimeout)
 	defer cancel()
@@ -119,6 +119,6 @@ func getTLSAData(ctx context.Context, target string) schema.ModuleExecution {
 		exec.RawData = rawDataBuilder.String()
 	}
 
-	log.Printf("get_tlsa target=%q results=%d", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetTLSA, target, len(exec.Results))
 	return exec
 }

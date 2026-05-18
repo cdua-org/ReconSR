@@ -72,21 +72,21 @@ func parseLOC(raw string) string {
 func getLOCData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetLOC)
 
-	log.Printf("get_loc target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetLOC, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 29, nil)
 	if err != nil {
-		log.Printf("get_loc error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetLOC, target, err)
 		modutil.SetError(&exec, "loc lookup failed: %v", err)
 		return exec
 	}
 
 	modutil.SetRawFromBytes(&exec, raw)
 
-	log.Printf("get_loc target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetLOC, target, len(records))
 
 	for _, rec := range records {
 		exec.Results = append(exec.Results, schema.ModuleResult{

@@ -116,7 +116,7 @@ func (m *module) waitRateLimit(ctx context.Context) bool {
 
 	sleepDuration := allowedTime.Sub(now)
 	if sleepDuration > 0 {
-		dbg.Printf("waitRateLimit duration=%s", sleepDuration)
+		dbg.Printf("vt_rate_limit_wait duration=%s", sleepDuration)
 		return httputil.SleepContext(ctx, sleepDuration)
 	}
 	return true
@@ -131,7 +131,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		if m.keyInvalid.Load() {
 			execution = modutil.NewExecution(f)
 			msg := "API key invalid (previous 401/403 error)"
-			dbg.Printf("Exec target=%q fn=%q blocked=true", data.Target.Value, f)
+			dbg.Printf("%s error target=%q state=blocked reason=invalid_api_key", f, data.Target.Value)
 			execution.Results = append(execution.Results, schema.ModuleResult{
 				Type:     constants.TypeInfo,
 				Category: constants.CategoryProperty,
@@ -164,18 +164,18 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 
 func (m *module) processDomain(ctx context.Context, target string, exec *schema.ModuleExecution) {
 	url := fmt.Sprintf("%s/domains/%s", baseURL, target)
-	dbg.Printf("processDomain target=%q phase=root_metadata url=%q", target, url)
+	dbg.Printf("%s phase=root_metadata target=%q url=%q", constants.FuncGetVTApiDomain, target, url)
 
 	data, raw, err := m.doVTRequest(ctx, url)
 	if raw != "" {
 		exec.RawData += raw
 	}
 	if err != nil {
-		dbg.Printf("processDomain target=%q phase=root_metadata action=%d err=%v", target, requestAction(err), err)
+		dbg.Printf("%s error target=%q phase=root_metadata action=%d err=%v", constants.FuncGetVTApiDomain, target, requestAction(err), err)
 		modutil.SetError(exec, "domain metadata failed: %v", err)
 		return
 	}
-	dbg.Printf("processDomain target=%q phase=root_metadata raw_bytes=%d", target, len(raw))
+	dbg.Printf("%s root_metadata_loaded target=%q raw_bytes=%d", constants.FuncGetVTApiDomain, target, len(raw))
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
 		if attr, ok := dataMap["attributes"].(map[string]any); ok {
@@ -205,22 +205,24 @@ func (m *module) processDomain(ctx context.Context, target string, exec *schema.
 			Context:  "Expired Certificates",
 		})
 	}
+
+	dbg.Printf("%s success target=%q results=%d expired_cert_subdomains=%d", constants.FuncGetVTApiDomain, target, len(exec.Results), len(expiredDomains))
 }
 
 func (m *module) processIP(ctx context.Context, target string, exec *schema.ModuleExecution) {
 	url := fmt.Sprintf("%s/ip_addresses/%s", baseURL, target)
-	dbg.Printf("processIP target=%q phase=metadata url=%q", target, url)
+	dbg.Printf("%s phase=ip_metadata target=%q url=%q", constants.FuncGetVTApiIP, target, url)
 
 	data, raw, err := m.doVTRequest(ctx, url)
 	if raw != "" {
 		exec.RawData += raw
 	}
 	if err != nil {
-		dbg.Printf("processIP target=%q phase=metadata action=%d err=%v", target, requestAction(err), err)
+		dbg.Printf("%s error target=%q phase=ip_metadata action=%d err=%v", constants.FuncGetVTApiIP, target, requestAction(err), err)
 		modutil.SetError(exec, "IP metadata failed: %v", err)
 		return
 	}
-	dbg.Printf("processIP target=%q phase=metadata raw_bytes=%d", target, len(raw))
+	dbg.Printf("%s ip_metadata_loaded target=%q raw_bytes=%d", constants.FuncGetVTApiIP, target, len(raw))
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
 		if attr, ok := dataMap["attributes"].(map[string]any); ok {
@@ -232,6 +234,8 @@ func (m *module) processIP(ctx context.Context, target string, exec *schema.Modu
 	m.processPaginated(ctx, resURL, exec, func(item map[string]any) {
 		m.extractIPResolution(item, target, exec)
 	})
+
+	dbg.Printf("%s success target=%q results=%d", constants.FuncGetVTApiIP, target, len(exec.Results))
 }
 
 func (m *module) processPaginated(ctx context.Context, firstURL string, exec *schema.ModuleExecution, handler func(map[string]any)) {
@@ -241,28 +245,28 @@ func (m *module) processPaginated(ctx context.Context, firstURL string, exec *sc
 
 	for currentURL != "" {
 		if maxPages > 0 && page > maxPages {
-			dbg.Printf("processPaginated page=%d limit_reached max_pages=%d", page, maxPages)
+			dbg.Printf("vt_pagination_limit_reached page=%d max_pages=%d", page, maxPages)
 			break
 		}
 
-		dbg.Printf("processPaginated page=%d url=%q", page, currentURL)
+		dbg.Printf("vt_pagination_request page=%d url=%q", page, currentURL)
 
 		data, raw, err := m.doVTRequest(ctx, currentURL)
 		if raw != "" {
 			exec.RawData += "\n---\n" + raw
-			dbg.Printf("processPaginated page=%d raw_saved=true bytes=%d", page, len(raw))
+			dbg.Printf("vt_pagination_raw_saved page=%d bytes=%d", page, len(raw))
 		} else {
-			dbg.Printf("processPaginated page=%d raw_saved=false", page)
+			dbg.Printf("vt_pagination_raw_empty page=%d", page)
 		}
 		if err != nil {
-			dbg.Printf("processPaginated page=%d action=%d err=%v", page, requestAction(err), err)
+			dbg.Printf("vt_pagination error page=%d action=%d err=%v", page, requestAction(err), err)
 			modutil.SetError(exec, "pagination failed: %v", err)
 			return
 		}
 
 		items, ok := data["data"].([]any)
 		if ok {
-			dbg.Printf("processPaginated page=%d items=%d", page, len(items))
+			dbg.Printf("vt_pagination_items page=%d count=%d", page, len(items))
 			for _, item := range items {
 				if itemMap, itemOK := item.(map[string]any); itemOK {
 					handler(itemMap)
@@ -272,12 +276,12 @@ func (m *module) processPaginated(ctx context.Context, firstURL string, exec *sc
 
 		links, ok := data["links"].(map[string]any)
 		if !ok {
-			dbg.Printf("processPaginated page=%d next=absent", page)
+			dbg.Printf("vt_pagination_next_absent page=%d", page)
 			break
 		}
 		next, ok := links["next"].(string)
 		if !ok || next == "" {
-			dbg.Printf("processPaginated page=%d next=empty", page)
+			dbg.Printf("vt_pagination_next_empty page=%d", page)
 			break
 		}
 
@@ -295,7 +299,7 @@ func (m *module) doVTRequest(ctx context.Context, url string) (data map[string]a
 
 		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 		if reqErr != nil {
-			dbg.Printf("doVTRequest attempt=%d build_error=%v", attempt, reqErr)
+			dbg.Printf("vt_request error attempt=%d stage=create_request err=%v", attempt, reqErr)
 			return nil, "", &vtRequestError{err: fmt.Errorf("new request: %w", reqErr), action: httputil.Abort}
 		}
 
@@ -307,12 +311,12 @@ func (m *module) doVTRequest(ctx context.Context, url string) (data map[string]a
 			client := &http.Client{Timeout: resolver.HTTPTimeout}
 			resp, doErr := client.Do(req)
 			if doErr != nil {
-				dbg.Printf("doVTRequest attempt=%d request_error=%v", attempt, doErr)
+				dbg.Printf("vt_request error attempt=%d stage=do_request err=%v", attempt, doErr)
 				return &vtRequestError{err: fmt.Errorf("do request: %w", doErr), action: httputil.Retry}
 			}
 			defer func() {
 				if closeErr := resp.Body.Close(); closeErr != nil {
-					dbg.Printf("doVTRequest attempt=%d close_error=%v", attempt, closeErr)
+					dbg.Printf("vt_request response_body_close_failed attempt=%d err=%v", attempt, closeErr)
 				}
 			}()
 
@@ -322,7 +326,7 @@ func (m *module) doVTRequest(ctx context.Context, url string) (data map[string]a
 		}()
 
 		if err == nil {
-			dbg.Printf("doVTRequest attempt=%d success bytes=%d", attempt, len(body))
+			dbg.Printf("vt_request success attempt=%d stage=request bytes=%d", attempt, len(body))
 			return data, body, nil
 		}
 
@@ -343,7 +347,7 @@ func (m *module) doVTRequest(ctx context.Context, url string) (data map[string]a
 		delay := httputil.RetryDelay(reqErrWrap.action, attempt, baseDelay)
 
 		if delay > 0 {
-			dbg.Printf("doVTRequest url=%q attempt=%d action=%d sleep=%s", url, attempt, reqErrWrap.action, delay)
+			dbg.Printf("vt_request_retry_wait url=%q attempt=%d action=%d sleep=%s", url, attempt, reqErrWrap.action, delay)
 			if !httputil.SleepContext(ctx, delay) {
 				return nil, body, &vtRequestError{err: errors.New("context cancelled during retry wait"), action: httputil.Abort}
 			}
@@ -354,28 +358,29 @@ func (m *module) doVTRequest(ctx context.Context, url string) (data map[string]a
 }
 
 func (m *module) processResponse(resp *http.Response, attempt int) (data map[string]any, body string, err error) {
-	dbg.Printf("doVTRequest attempt=%d status=%d", attempt, resp.StatusCode)
+	dbg.Printf("vt_response_status attempt=%d status=%d", attempt, resp.StatusCode)
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		m.keyInvalid.Store(true)
-		dbg.Printf("doVTRequest invalid_api_key=true status=%d", resp.StatusCode)
+		dbg.Printf("vt_request error attempt=%d stage=auth status=%d invalid_api_key=true", attempt, resp.StatusCode)
 		return nil, "", &vtRequestError{err: fmt.Errorf("HTTP %d: API key invalid", resp.StatusCode), action: httputil.Abort}
 	}
 
 	bodyBytes, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
-		dbg.Printf("doVTRequest attempt=%d read_error=%v", attempt, readErr)
+		dbg.Printf("vt_request error attempt=%d stage=read_body err=%v", attempt, readErr)
 		return nil, "", &vtRequestError{err: fmt.Errorf("read response body: %w", readErr), action: httputil.Retry}
 	}
 	body = string(bodyBytes)
 
 	if resp.StatusCode != http.StatusOK {
 		action := httputil.ClassifyStatus(resp.StatusCode)
+		dbg.Printf("vt_request error attempt=%d stage=response_status status=%d action=%d", attempt, resp.StatusCode, action)
 		return nil, body, &vtRequestError{err: fmt.Errorf("HTTP %d", resp.StatusCode), action: action}
 	}
 
 	if unmarshalErr := json.Unmarshal(bodyBytes, &data); unmarshalErr != nil {
-		dbg.Printf("doVTRequest attempt=%d unmarshal_error=%v", attempt, unmarshalErr)
+		dbg.Printf("vt_request error attempt=%d stage=unmarshal err=%v", attempt, unmarshalErr)
 		return nil, body, &vtRequestError{err: fmt.Errorf("unmarshal response: %w", unmarshalErr), action: httputil.Abort}
 	}
 

@@ -88,14 +88,14 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 func (m *module) getHosts(target string) schema.ModuleExecution {
 	execution := modutil.NewExecution(constants.FuncGetHosts)
 
-	dbg.Printf("getHosts target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncGetHosts, target)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	body, isQuotaLimit := fetchWithRetry(ctx, target, m.apiKey)
 
-	dbg.Printf("getHosts target=%q results=%d quota=%v", target, len(execution.Results), isQuotaLimit)
+	dbg.Printf("%s request_complete target=%q body_present=%t quota=%v", constants.FuncGetHosts, target, body != "", isQuotaLimit)
 
 	if isQuotaLimit {
 		execution.Results = append(execution.Results, schema.ModuleResult{
@@ -111,6 +111,7 @@ func (m *module) getHosts(target string) schema.ModuleExecution {
 	if body != "" {
 		execution.RawData = body
 		execution.Results = parseHostSearch(body, target)
+		dbg.Printf("%s success target=%q results=%d", constants.FuncGetHosts, target, len(execution.Results))
 	}
 
 	return execution
@@ -118,7 +119,7 @@ func (m *module) getHosts(target string) schema.ModuleExecution {
 
 func fetchWithRetry(ctx context.Context, target, apiKey string) (body string, isQuotaLimit bool) {
 	for attempt := 1; attempt <= resolver.MaxRetriesHT; attempt++ {
-		dbg.Printf("fetchWithRetry attempt=%d/%d target=%q", attempt, resolver.MaxRetriesHT, target)
+		dbg.Printf("%s attempt=%d/%d target=%q", constants.FuncGetHosts, attempt, resolver.MaxRetriesHT, target)
 
 		body, isQuota, errMsg, action := doRequest(ctx, target, apiKey)
 		if body != "" {
@@ -134,7 +135,7 @@ func fetchWithRetry(ctx context.Context, target, apiKey string) (body string, is
 		}
 
 		if action == httputil.Abort {
-			dbg.Printf("fetchWithRetry target=%q abort (permanent %s)", target, *errMsg)
+			dbg.Printf("%s error target=%q stage=retry_abort reason=%s", constants.FuncGetHosts, target, *errMsg)
 			break
 		}
 
@@ -156,11 +157,11 @@ func doRequest(ctx context.Context, target, apiKey string) (body string, isQuota
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
 		errStr := "create request: " + err.Error()
-		dbg.Printf("doRequest target=%q error=%v", target, err)
+		dbg.Printf("%s error target=%q stage=create_request err=%v", constants.FuncGetHosts, target, err)
 		return "", false, &errStr, httputil.Abort
 	}
 
-	dbg.Printf("doRequest target=%q url=%q", target, u)
+	dbg.Printf("%s request_prepared target=%q has_api_key=%t", constants.FuncGetHosts, target, apiKey != "")
 
 	req.Header.Set("User-Agent", resolver.GetRandomUserAgent())
 
@@ -168,38 +169,39 @@ func doRequest(ctx context.Context, target, apiKey string) (body string, isQuota
 	resp, err := client.Do(req)
 	if err != nil {
 		errStr := "do request: " + err.Error()
-		dbg.Printf("doRequest target=%q error=%v", target, err)
+		dbg.Printf("%s error target=%q stage=do_request err=%v", constants.FuncGetHosts, target, err)
 		return "", false, &errStr, httputil.Retry
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
-			dbg.Printf("body close error: %v", closeErr)
+			dbg.Printf("%s body_close_failed target=%q err=%v", constants.FuncGetHosts, target, closeErr)
 		}
 	}()
 
-	dbg.Printf("doRequest target=%q status=%d", target, resp.StatusCode)
+	dbg.Printf("%s response_status target=%q status=%d", constants.FuncGetHosts, target, resp.StatusCode)
 
 	if resp.StatusCode != http.StatusOK {
 		action = httputil.ClassifyStatus(resp.StatusCode)
 		errStr := "status " + strconv.Itoa(resp.StatusCode)
-		dbg.Printf("doRequest target=%q status=%d action=%v", target, resp.StatusCode, action)
+		dbg.Printf("%s error target=%q stage=response_status status=%d action=%v", constants.FuncGetHosts, target, resp.StatusCode, action)
 		return "", false, &errStr, action
 	}
 
 	if isQuotaExceeded(resp.Header) {
-		dbg.Printf("doRequest target=%q quota_exceeded", target)
+		dbg.Printf("%s error target=%q stage=quota_exceeded", constants.FuncGetHosts, target)
 		return "", true, nil, 0
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		errStr := "read body: " + err.Error()
-		dbg.Printf("doRequest target=%q error=%v", target, err)
+		dbg.Printf("%s error target=%q stage=read_body err=%v", constants.FuncGetHosts, target, err)
 		return "", false, &errStr, httputil.Retry
 	}
 
 	if !isValidCSVFormat(string(bodyBytes)) {
 		errStr := "invalid response format: " + string(bodyBytes)
+		dbg.Printf("%s error target=%q stage=validate_response err=%q", constants.FuncGetHosts, target, errStr)
 		return "", false, &errStr, httputil.Abort
 	}
 

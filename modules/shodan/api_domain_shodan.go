@@ -55,7 +55,7 @@ func (m *shodanModule) getShodanAPIDomain(target schema.Entity) schema.ModuleExe
 			exec.RawData += "\n---\n" + string(rawBody)
 		}
 
-		dbg.Printf("get_shodan_api_domain target=%q page=%d status=%d", target.Value, page, status)
+		dbg.Printf("%s target=%q page=%d status=%d", constants.FuncGetShodanAPIDomain, target.Value, page, status)
 
 		switch status {
 		case http.StatusOK:
@@ -113,7 +113,7 @@ func (m *shodanModule) doDomainPageRequest(target string, page int, exec *schema
 	parsedURL.RawQuery = q.Encode()
 	u = parsedURL.String()
 
-	dbg.Printf("doDomainPageRequest target=%q page=%d url=%q", target, page, u)
+	dbg.Printf("%s request target=%q page=%d url=%q", constants.FuncGetShodanAPIDomain, target, page, u)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
@@ -130,7 +130,7 @@ func (m *shodanModule) doDomainPageRequest(target string, page int, exec *schema
 	}
 	defer func() {
 		if cerr := resp.Body.Close(); cerr != nil {
-			dbg.Printf("getShodanAPIDomain body_close_err=%v", cerr)
+			dbg.Printf("%s body_close_failed err=%v", constants.FuncGetShodanAPIDomain, cerr)
 		}
 	}()
 

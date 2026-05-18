@@ -18,7 +18,7 @@ import (
 func getDMARCData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetDMARC)
 
-	log.Printf("get_dmarc starting query for target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetDMARC, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
@@ -35,7 +35,7 @@ func getDMARCData(ctx context.Context, target string) schema.ModuleExecution {
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, dmarcTarget, 16, plainFallback)
 	if err != nil {
-		log.Printf("get_dmarc error for target=%q: %v", target, err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetDMARC, target, err)
 		modutil.SetError(&exec, "dmarc lookup failed: %v", err)
 		return exec
 	}
@@ -61,7 +61,7 @@ func getDMARCData(ctx context.Context, target string) schema.ModuleExecution {
 		exec.Results = append(exec.Results, processDMARCEmails(target, parsed, source)...)
 	}
 
-	log.Printf("get_dmarc success for target=%q results=%d", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetDMARC, target, len(exec.Results))
 
 	return exec
 }
@@ -88,12 +88,12 @@ func processDMARCEmails(target string, parsed map[string]string, source *schema.
 		for i, email := range emails {
 			validatedEmail, err := validator.Validate(constants.TypeEmail, email)
 			if err != nil {
-				log.Printf("get_dmarc skipping invalid email target=%q entity=%q err=%v", target, email, err)
+				log.Printf("%s skip_invalid_email target=%q entity=%q err=%v", constants.FuncGetDMARC, target, email, err)
 				continue
 			}
 
 			isOOS := orgdomain.IsEmailOutOfScope(validatedEmail.Value, target)
-			log.Printf("get_dmarc target=%q email=%q normalized=%q type=%q oos=%v", target, email, validatedEmail.Value, validatedEmail.Type, isOOS)
+			log.Printf("%s result_email target=%q email=%q normalized=%q type=%q oos=%v", constants.FuncGetDMARC, target, email, validatedEmail.Value, validatedEmail.Type, isOOS)
 
 			contextMsg := "DMARC " + strings.ToUpper(key)
 			if len(emails) > 1 {

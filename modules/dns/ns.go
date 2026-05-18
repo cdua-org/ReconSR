@@ -17,7 +17,7 @@ import (
 func getNSData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetNS)
 
-	log.Printf("get_ns starting query for target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetNS, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
@@ -36,7 +36,7 @@ func getNSData(ctx context.Context, target string) schema.ModuleExecution {
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 2, plainFallback)
 	if err != nil {
-		log.Printf("get_ns error for target=%q: %v", target, err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetNS, target, err)
 		modutil.SetError(&exec, "ns lookup failed: %v", err)
 		return exec
 	}
@@ -48,7 +48,7 @@ func getNSData(ctx context.Context, target string) schema.ModuleExecution {
 		if !ok {
 			continue
 		}
-		log.Printf("get_ns target=%q entity=%q oos=%v", target, result.Value, result.OutOfScope)
+		log.Printf("%s result_ns target=%q entity=%q oos=%v", constants.FuncGetNS, target, result.Value, result.OutOfScope)
 		exec.Results = append(exec.Results, result)
 	}
 
@@ -56,7 +56,7 @@ func getNSData(ctx context.Context, target string) schema.ModuleExecution {
 		return exec
 	}
 
-	log.Printf("get_ns completed for target=%q with %d results", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetNS, target, len(exec.Results))
 
 	return exec
 }
@@ -69,7 +69,7 @@ func buildNSResult(rawNS, target string) (schema.ModuleResult, bool) {
 
 	res, err := validator.Validate(constants.TypeDomain, ns)
 	if err != nil {
-		log.Printf("get_ns skipping invalid ns target=%q entity=%q err=%v", target, rawNS, err)
+		log.Printf("%s skip_invalid_ns target=%q entity=%q err=%v", constants.FuncGetNS, target, rawNS, err)
 		return schema.ModuleResult{}, false
 	}
 

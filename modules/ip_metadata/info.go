@@ -14,12 +14,12 @@ import (
 
 func getIPInfo(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetIPInfo)
-	dbg.Printf("getIPInfo target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncGetIPInfo, target)
 
 	if target == "" {
 		errMsg := errInvalidIPFormat + target
 		execution.Error = &errMsg
-		dbg.Printf("getIPInfo target=%q invalid_format", target)
+		dbg.Printf("%s error target=%q stage=validate_input reason=invalid_format", constants.FuncGetIPInfo, target)
 		return execution
 	}
 
@@ -34,7 +34,7 @@ func getIPInfo(target string) (execution schema.ModuleExecution) {
 	if err := ripestatQueryFunc(ctx, target, "whois", &resp, resolver.MaxRetriesIPMeta); err != nil {
 		errMsg := fmt.Errorf("ip info lookup failed after retries: %w", err).Error()
 		execution.Error = &errMsg
-		dbg.Printf("getIPInfo target=%q lookup_error=%v", target, err)
+		dbg.Printf("%s error target=%q stage=lookup err=%v", constants.FuncGetIPInfo, target, err)
 		return execution
 	}
 
@@ -76,7 +76,11 @@ func getIPInfo(target string) (execution schema.ModuleExecution) {
 		})
 	}
 
-	dbg.Printf("getIPInfo target=%q found_netname=%q", target, netname)
+	if len(execution.Results) > 0 {
+		dbg.Printf("%s success target=%q result_count=%d netname=%q", constants.FuncGetIPInfo, target, len(execution.Results), netname)
+	} else {
+		dbg.Printf("%s target=%q result_count=0", constants.FuncGetIPInfo, target)
+	}
 
 	return execution
 }

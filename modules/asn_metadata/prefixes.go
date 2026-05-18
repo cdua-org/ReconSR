@@ -13,13 +13,13 @@ import (
 func getASNPrefixes(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetASNPrefixes)
 
-	dbg.Printf("getASNPrefixes target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncGetASNPrefixes, target)
 
 	originASN := target
 	if originASN == "" {
 		errMsg := errInvalidASNFormat
 		execution.Error = &errMsg
-		dbg.Printf("getASNPrefixes target=%q invalid_format", target)
+		dbg.Printf("%s error target=%q stage=validate_input err=invalid_asn_format", constants.FuncGetASNPrefixes, target)
 		return execution
 	}
 
@@ -34,7 +34,7 @@ func getASNPrefixes(target string) (execution schema.ModuleExecution) {
 	if err := ripestat.Query(ctx, originASN, constants.RIPEstatEndpointAnnouncedPrefixes, &resp, resolver.MaxRetriesASNMeta); err != nil {
 		errMsg := "asn prefixes lookup failed: " + err.Error()
 		execution.Error = &errMsg
-		dbg.Printf("getASNPrefixes target=%q lookup_error=%v", target, err)
+		dbg.Printf("%s error target=%q stage=query_lookup err=%v", constants.FuncGetASNPrefixes, target, err)
 		return execution
 	}
 
@@ -57,7 +57,7 @@ func getASNPrefixes(target string) (execution schema.ModuleExecution) {
 		}
 	}
 
-	dbg.Printf("getASNPrefixes target=%q found_prefixes=%d", target, len(resp.Data.Prefixes))
+	dbg.Printf("%s success target=%q found_prefixes=%d", constants.FuncGetASNPrefixes, target, len(resp.Data.Prefixes))
 
 	return execution
 }

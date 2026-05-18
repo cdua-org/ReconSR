@@ -14,13 +14,13 @@ import (
 func getASNAbuseContacts(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetASNAbuseContacts)
 
-	dbg.Printf("getASNAbuseContacts target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncGetASNAbuseContacts, target)
 
 	originASN := target
 	if originASN == "" {
 		errMsg := errInvalidASNFormat
 		execution.Error = &errMsg
-		dbg.Printf("getASNAbuseContacts target=%q invalid_format", target)
+		dbg.Printf("%s error target=%q stage=validate_input err=invalid_asn_format", constants.FuncGetASNAbuseContacts, target)
 		return execution
 	}
 
@@ -35,7 +35,7 @@ func getASNAbuseContacts(target string) (execution schema.ModuleExecution) {
 	if err := ripestat.Query(ctx, originASN, constants.RIPEstatEndpointAbuseContactFinder, &resp, resolver.MaxRetriesASNMeta); err != nil {
 		errMsg := "asn abuse lookup failed: " + err.Error()
 		execution.Error = &errMsg
-		dbg.Printf("getASNAbuseContacts target=%q lookup_error=%v", target, err)
+		dbg.Printf("%s error target=%q stage=query_lookup err=%v", constants.FuncGetASNAbuseContacts, target, err)
 		return execution
 	}
 
@@ -51,7 +51,7 @@ func getASNAbuseContacts(target string) (execution schema.ModuleExecution) {
 		}
 	}
 
-	dbg.Printf("getASNAbuseContacts target=%q found_contacts=%d", target, len(resp.Data.AbuseContacts))
+	dbg.Printf("%s success target=%q found_contacts=%d", constants.FuncGetASNAbuseContacts, target, len(resp.Data.AbuseContacts))
 
 	return execution
 }

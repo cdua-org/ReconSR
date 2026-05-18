@@ -67,7 +67,7 @@ func (m *shodanModule) getShodanAPIIP(target schema.Entity) schema.ModuleExecuti
 	}
 	defer func() {
 		if cerr := resp.Body.Close(); cerr != nil {
-			dbg.Printf("getShodanAPIIP body_close_err=%v", cerr)
+			dbg.Printf("%s body_close_failed err=%v", constants.FuncGetShodanAPIIP, cerr)
 		}
 	}()
 
@@ -78,7 +78,7 @@ func (m *shodanModule) getShodanAPIIP(target schema.Entity) schema.ModuleExecuti
 	}
 	modutil.SetRawFromBytes(&exec, rawBody)
 
-	dbg.Printf("get_shodan_api_ip target=%q status=%d", target.Value, resp.StatusCode)
+	dbg.Printf("%s target=%q status=%d", constants.FuncGetShodanAPIIP, target.Value, resp.StatusCode)
 
 	switch resp.StatusCode {
 	case http.StatusOK:

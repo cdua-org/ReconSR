@@ -42,7 +42,7 @@ func (m *module) parseDNSRecord(rec map[string]any, target string, src *schema.E
 	case "SRV":
 		m.appendVTSRVResults(exec, target, src, rec, recordValue)
 	default:
-		dbg.Printf("parseDNSRecord target=%q type=%q fallback=true value=%q", target, recordType, recordValue)
+		dbg.Printf("%s dns_record_fallback target=%q type=%q value=%q", constants.FuncGetVTApiDomain, target, recordType, recordValue)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     strings.ToLower(recordType),
 			Category: constants.CategoryProperty,
@@ -55,7 +55,7 @@ func (m *module) parseDNSRecord(rec map[string]any, target string, src *schema.E
 func (m *module) appendVTIPRecord(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string) {
 	validated, err := validator.Validate(constants.TypeIP, value)
 	if err != nil {
-		dbg.Printf("appendVTIPRecord target=%q value=%q err=%v", target, value, err)
+		dbg.Printf("%s skip_invalid_ip target=%q value=%q err=%v", constants.FuncGetVTApiDomain, target, value, err)
 		return
 	}
 
@@ -70,7 +70,7 @@ func (m *module) appendVTIPRecord(exec *schema.ModuleExecution, target string, s
 func (m *module) appendVTCNAMEResult(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string) {
 	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
-		dbg.Printf("appendVTCNAMEResult target=%q value=%q err=%v", target, value, err)
+		dbg.Printf("%s skip_invalid_cname target=%q value=%q err=%v", constants.FuncGetVTApiDomain, target, value, err)
 		return
 	}
 
@@ -108,7 +108,7 @@ func (m *module) appendVTMXResults(exec *schema.ModuleExecution, target string, 
 
 	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
-		dbg.Printf("appendVTMXResults target=%q value=%q err=%v", target, value, err)
+		dbg.Printf("%s skip_invalid_mx_host target=%q value=%q err=%v", constants.FuncGetVTApiDomain, target, value, err)
 		return
 	}
 
@@ -129,7 +129,7 @@ func (m *module) appendVTMXResults(exec *schema.ModuleExecution, target string, 
 func (m *module) appendVTNSResult(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string) {
 	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
-		dbg.Printf("appendVTNSResult target=%q value=%q err=%v", target, value, err)
+		dbg.Printf("%s skip_invalid_ns target=%q value=%q err=%v", constants.FuncGetVTApiDomain, target, value, err)
 		return
 	}
 
@@ -310,7 +310,7 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string,
 		}
 		validated, err := validator.Validate(constants.TypeDomain, authority)
 		if err != nil {
-			dbg.Printf("appendVTCAAResults authority=%q tag=%q err=%v", authority, tag, err)
+			dbg.Printf("%s skip_invalid_caa_authority authority=%q tag=%q err=%v", constants.FuncGetVTApiDomain, authority, tag, err)
 			return
 		}
 
@@ -334,7 +334,7 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string,
 		}
 		validated, err := validator.Validate(constants.TypeEmail, email)
 		if err != nil {
-			dbg.Printf("appendVTCAAResults email=%q tag=%q err=%v", email, tag, err)
+			dbg.Printf("%s skip_invalid_caa_email email=%q tag=%q err=%v", constants.FuncGetVTApiDomain, email, tag, err)
 			return
 		}
 
@@ -368,13 +368,13 @@ func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string,
 
 	host, err := dnsutils.ParseSRVHost(srvValue)
 	if err != nil {
-		dbg.Printf("appendVTSRVResults target=%q err=%v", target, err)
+		dbg.Printf("%s skip_invalid_srv target=%q value=%q err=%v", constants.FuncGetVTApiDomain, target, srvValue, err)
 		return
 	}
 
 	validated, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
-		dbg.Printf("appendVTSRVResults target=%q host=%q err=%v", target, host, err)
+		dbg.Printf("%s skip_invalid_srv_host target=%q host=%q err=%v", constants.FuncGetVTApiDomain, target, host, err)
 		return
 	}
 

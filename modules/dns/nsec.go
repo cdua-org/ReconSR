@@ -24,13 +24,13 @@ type nsecQuery struct {
 
 func getNSECData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetNSEC)
-	log.Printf("get_nsec target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetNSEC, target)
 
 	bruteCtx, cancel := context.WithTimeout(ctx, resolver.DNSBruteTimeout)
 	defer cancel()
 
 	if strings.HasPrefix(strings.ToLower(target), "nx-") {
-		log.Printf("get_nsec target=%q skipped (nx- prefix)", target)
+		log.Printf("%s skip_prefixed_target target=%q prefix=%q", constants.FuncGetNSEC, target, "nx-")
 		return exec
 	}
 
@@ -72,14 +72,14 @@ func getNSECData(ctx context.Context, target string) schema.ModuleExecution {
 		exec.RawData = rawDataBuilder.String()
 	}
 
-	log.Printf("get_nsec target=%q results=%d", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetNSEC, target, len(exec.Results))
 	return exec
 }
 
 func executeNSECQuery(ctx context.Context, q nsecQuery, target, nxTarget string) (results []schema.ModuleResult, raw []byte) {
 	resp, raw, err := resolver.QueryDoHDns(ctx, q.queryTarget, q.qtype)
 	if err != nil {
-		log.Printf("get_nsec query=%q qtype=%d error: %v", q.queryTarget, q.qtype, err)
+		log.Printf("%s error target=%q query=%q qtype=%d stage=query_doh err=%v", constants.FuncGetNSEC, target, q.queryTarget, q.qtype, err)
 		return nil, nil
 	}
 	if resp == nil {
@@ -156,7 +156,7 @@ func parseNSECRecord(rec resolver.DoHDnsRecord, target, nxTarget, contextDesc st
 	if r := extractNSECDomain(rec.Name, target, nxTarget, "NSEC Current Subdomain"); r != nil {
 		results = append(results, *r)
 		nsecSource = &schema.EntityRef{Type: r.Type, Value: r.Value}
-		log.Printf("get_nsec target=%q current=%q oos=%v", target, r.Value, r.OutOfScope)
+		log.Printf("%s result_current target=%q entity=%q oos=%v", constants.FuncGetNSEC, target, r.Value, r.OutOfScope)
 	}
 
 	nsecRes := schema.ModuleResult{
@@ -172,7 +172,7 @@ func parseNSECRecord(rec resolver.DoHDnsRecord, target, nxTarget, contextDesc st
 	if nextDomain := dnsutils.ParseNSEC(rec.Data); nextDomain != "" {
 		if r := extractNSECDomain(nextDomain, target, nxTarget, "NSEC Leaked Subdomain"); r != nil {
 			r.Source = nsecPropertyRef
-			log.Printf("get_nsec target=%q leaked=%q oos=%v", target, r.Value, r.OutOfScope)
+			log.Printf("%s result_leaked target=%q entity=%q oos=%v", constants.FuncGetNSEC, target, r.Value, r.OutOfScope)
 			results = append(results, *r)
 		}
 	}

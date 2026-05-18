@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/url"
 	"strings"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 type crtshRecord struct {
@@ -31,6 +33,7 @@ func (f *crtshFetcher) Fetch(ctx context.Context, target string) []certificateId
 
 	var records []crtshRecord
 	if err := json.Unmarshal(body, &records); err != nil {
+		dbg.Printf("%s error source=%q target=%q stage=unmarshal err=%v", constants.FuncGetDomains, f.Name(), target, err)
 		return nil
 	}
 

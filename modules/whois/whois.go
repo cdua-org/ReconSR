@@ -74,7 +74,7 @@ func (m *module) getWhoisData(target string) schema.ModuleExecution {
 		Results:  make([]schema.ModuleResult, 0, 35),
 	}
 
-	dbg.Printf("getWhoisData target=%q", target)
+	dbg.Printf("%s start target=%q", constants.FuncGetWhois, target)
 
 	ctx := context.Background()
 
@@ -117,19 +117,20 @@ func (m *module) getWhoisData(target string) schema.ModuleExecution {
 				errStr = rErr.Error() + "; "
 			}
 			errMsg := errStr + "whois fallback failed: " + wErr.Error()
+			dbg.Printf("%s error target=%q stage=query err=%q", constants.FuncGetWhois, target, errMsg)
 			execution.Error = &errMsg
 			execution.RawData = rawData
 			return execution
 		}
 	}
 
-	dbg.Printf("method=%q usedDNS=%q rawLen=%d", methodUsed, resolver.GetLastUsedPlain(), len(rawData))
+	dbg.Printf("%s success target=%q method=%q used_dns=%q raw_len=%d", constants.FuncGetWhois, target, methodUsed, resolver.GetLastUsedPlain(), len(rawData))
 	if rawData != "" {
 		sample := rawData
 		if len(sample) > 300 {
 			sample = sample[:300] + "..."
 		}
-		dbg.Printf("rawSample: %s", sample)
+		dbg.Printf("%s raw_sample=%q", constants.FuncGetWhois, sample)
 	}
 
 	execution.RawData = rawData
@@ -298,12 +299,12 @@ func (m *module) result(typ, category, value, ctx string, oos bool, anchor *sche
 func buildWhoisServerResult(host, target string) (schema.ModuleResult, bool) {
 	res, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
-		dbg.Printf("buildWhoisServerResult skipping invalid whois server target=%q entity=%q err=%v", target, host, err)
+		dbg.Printf("%s skip_invalid_whois_server target=%q entity=%q err=%v", constants.FuncGetWhois, target, host, err)
 		return schema.ModuleResult{}, false
 	}
 
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
-	dbg.Printf("buildWhoisServerResult target=%q entity=%q oos=%v", target, res.Value, isOOS)
+	dbg.Printf("%s whois_server target=%q entity=%q out_of_scope=%v", constants.FuncGetWhois, target, res.Value, isOOS)
 
 	return schema.ModuleResult{
 		Type:       res.Type,
@@ -419,7 +420,7 @@ func attemptRDAP(ctx context.Context, url string) (data map[string]any, retriabl
 
 	decodeErr := json.NewDecoder(resp.Body).Decode(&data)
 	if cerr := resp.Body.Close(); cerr != nil {
-		dbg.Printf("warning: failed to close rdap body: %v", cerr)
+		dbg.Printf("%s rdap_body_close_failed err=%v", constants.FuncGetWhois, cerr)
 	}
 
 	if !bodyOk {
@@ -487,7 +488,7 @@ func dialWHOIS(ctx context.Context, server, query string) (string, error) {
 			}
 			defer func() {
 				if cerr := conn.Close(); cerr != nil {
-					dbg.Printf("warning: failed to close whois connection: %v", cerr)
+					dbg.Printf("%s whois_connection_close_failed err=%v", constants.FuncGetWhois, cerr)
 				}
 			}()
 

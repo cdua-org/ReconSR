@@ -55,21 +55,21 @@ func parseDNSKEY(raw string) string {
 func getDNSKEYData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetDNSKEY)
 
-	log.Printf("get_dnskey target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetDNSKEY, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 48, nil)
 	if err != nil {
-		log.Printf("get_dnskey error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetDNSKEY, target, err)
 		modutil.SetError(&exec, "dnskey lookup failed: %v", err)
 		return exec
 	}
 
 	modutil.SetRawFromBytes(&exec, raw)
 
-	log.Printf("get_dnskey target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetDNSKEY, target, len(records))
 
 	for _, rec := range records {
 		parsed := parseDNSKEY(rec)

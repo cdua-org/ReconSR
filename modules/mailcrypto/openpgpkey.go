@@ -36,9 +36,9 @@ func getOPENPGPKEYData(localParts []string, domain string) schema.ModuleExecutio
 	execution := modutil.NewExecution(constants.FuncGetOpenpgpkey)
 
 	if len(localParts) == 1 {
-		dbg.Printf("get_openpgpkey email=%q", localParts[0]+"@"+domain)
+		dbg.Printf("%s email=%q", constants.FuncGetOpenpgpkey, localParts[0]+"@"+domain)
 	} else {
-		dbg.Printf("get_openpgpkey domain=%q localParts=%d", domain, len(localParts))
+		dbg.Printf("%s domain=%q local_parts=%d", constants.FuncGetOpenpgpkey, domain, len(localParts))
 	}
 
 	var rawData []string
@@ -48,11 +48,11 @@ func getOPENPGPKEYData(localParts []string, domain string) schema.ModuleExecutio
 	for _, user := range localParts {
 		reqCtx, cancel := context.WithTimeout(context.Background(), resolver.DNSBruteTimeout)
 		queryDomain := GenerateMailHashDomain(user, domain, hashPrefixOpenPGPKey)
-		dbg.Printf("get_openpgpkey user=%q query=%q", user, queryDomain)
+		dbg.Printf("%s user=%q query=%q", constants.FuncGetOpenpgpkey, user, queryDomain)
 		records, raw, err := resolveRecord(reqCtx, queryDomain, 61, nil)
 		cancel()
 		if err != nil {
-			dbg.Printf("get_openpgpkey user=%q domain=%q error=%v", user, domain, err)
+			dbg.Printf("%s error user=%q domain=%q query=%q err=%v", constants.FuncGetOpenpgpkey, user, domain, queryDomain, err)
 			lastErr = err
 			failedAliases = append(failedAliases, user)
 			continue
@@ -81,6 +81,6 @@ func getOPENPGPKEYData(localParts []string, domain string) schema.ModuleExecutio
 		execution.RawData = strings.Join(rawData, "\n")
 	}
 
-	dbg.Printf("get_openpgpkey domain=%q results=%d", domain, len(execution.Results))
+	dbg.Printf("%s domain=%q results=%d", constants.FuncGetOpenpgpkey, domain, len(execution.Results))
 	return execution
 }

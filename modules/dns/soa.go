@@ -17,14 +17,14 @@ import (
 func getSOAData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetSOA)
 
-	log.Printf("get_soa query target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetSOA, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 6, nil)
 	if err != nil {
-		log.Printf("get_soa error target=%q err=%v", target, err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetSOA, target, err)
 		modutil.SetError(&exec, "soa lookup failed: %v", err)
 		return exec
 	}
@@ -60,7 +60,7 @@ func getSOAData(ctx context.Context, target string) schema.ModuleExecution {
 		exec.Results = append(exec.Results, *result)
 	}
 
-	log.Printf("get_soa success target=%q results=%d", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetSOA, target, len(exec.Results))
 
 	return exec
 }
@@ -69,7 +69,7 @@ func buildSOAPrimaryNSResult(rawNS, target string, source *schema.EntityRef) *sc
 	primaryNS := strings.TrimSuffix(rawNS, ".")
 	res, err := validator.Validate(constants.TypeDomain, primaryNS)
 	if err != nil {
-		log.Printf("get_soa skipping invalid primary ns target=%q entity=%q err=%v", target, primaryNS, err)
+		log.Printf("%s skip_invalid_primary_ns target=%q entity=%q err=%v", constants.FuncGetSOA, target, primaryNS, err)
 		return nil
 	}
 
@@ -78,7 +78,7 @@ func buildSOAPrimaryNSResult(rawNS, target string, source *schema.EntityRef) *sc
 	}
 
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
-	log.Printf("get_soa target=%q entity=%q oos=%v", target, res.Value, isOOS)
+	log.Printf("%s result_primary_ns target=%q entity=%q oos=%v", constants.FuncGetSOA, target, res.Value, isOOS)
 
 	return &schema.ModuleResult{
 		Type:       res.Type,
@@ -95,12 +95,12 @@ func buildSOAResponsibleEmailResult(rawMbox, target string, source *schema.Entit
 	responsibleEmail := dnsutils.FormatSOAMbox(rawMbox)
 	res, err := validator.Validate(constants.TypeEmail, responsibleEmail)
 	if err != nil {
-		log.Printf("get_soa skipping invalid responsible email target=%q email=%q err=%v", target, responsibleEmail, err)
+		log.Printf("%s skip_invalid_responsible_email target=%q email=%q err=%v", constants.FuncGetSOA, target, responsibleEmail, err)
 		return nil
 	}
 
 	isOOS := orgdomain.IsEmailOutOfScope(res.Value, target)
-	log.Printf("get_soa target=%q email=%q oos=%v", target, res.Value, isOOS)
+	log.Printf("%s result_responsible_email target=%q email=%q oos=%v", constants.FuncGetSOA, target, res.Value, isOOS)
 
 	return &schema.ModuleResult{
 		Type:       res.Type,

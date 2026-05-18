@@ -32,18 +32,18 @@ func performTXTQuery(target, query, queryType string) ([]string, error) {
 		}()
 
 		if err == nil {
-			dbg.Printf("get_asn %s attempt=%d target=%q records=%d", queryType, attempt, target, len(names))
+			dbg.Printf("%s success target=%q stage=lookup_txt query_type=%s attempt=%d query=%q records=%d", constants.FuncGetASN, target, queryType, attempt, query, len(names))
 			return names, nil
 		}
 
 		var dnsErr *net.DNSError
 		if errors.As(err, &dnsErr) && (dnsErr.IsNotFound || strings.Contains(err.Error(), "no such host") || strings.Contains(err.Error(), "server misbehaving")) {
-			dbg.Printf("get_asn %s attempt=%d target=%q nxdomain", queryType, attempt, target)
+			dbg.Printf("%s target=%q stage=lookup_txt query_type=%s attempt=%d query=%q nxdomain", constants.FuncGetASN, target, queryType, attempt, query)
 			return nil, nil
 		}
 
 		lastErr = err
-		dbg.Printf("get_asn %s attempt=%d target=%q err=%v", queryType, attempt, target, err)
+		dbg.Printf("%s error target=%q stage=lookup_txt query_type=%s attempt=%d query=%q err=%v", constants.FuncGetASN, target, queryType, attempt, query, err)
 		if attempt < resolver.MaxRetriesIPMeta {
 			httputil.SleepContext(context.Background(), resolver.RetryBaseDelay)
 		}
@@ -84,7 +84,7 @@ func getASNInfo(asn string) string {
 func getASNData(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetASN)
 
-	dbg.Printf("getASNData target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncGetASN, target)
 
 	var rawBuffer strings.Builder
 	defer func() {
@@ -95,6 +95,7 @@ func getASNData(target string) (execution schema.ModuleExecution) {
 
 	rev, isIPv4, err := resolver.ReverseIP(target)
 	if err != nil {
+		dbg.Printf("%s error target=%q stage=validate_input err=%v", constants.FuncGetASN, target, err)
 		errMsg := errInvalidIPFormat + target
 		execution.Error = &errMsg
 		return execution
@@ -108,6 +109,7 @@ func getASNData(target string) (execution schema.ModuleExecution) {
 	originNames, originErr := txtQueryFunc(target, rev+"."+originZone, "origin")
 
 	if originErr != nil {
+		dbg.Printf("%s error target=%q stage=lookup_origin err=%v", constants.FuncGetASN, target, originErr)
 		errMsg := fmt.Errorf("asn lookup failed after retries: %w", originErr).Error()
 		execution.Error = &errMsg
 		return execution
@@ -147,6 +149,12 @@ func getASNData(target string) (execution schema.ModuleExecution) {
 				})
 			}
 		}
+	}
+
+	if len(execution.Results) > 0 {
+		dbg.Printf("%s success target=%q result_count=%d", constants.FuncGetASN, target, len(execution.Results))
+	} else {
+		dbg.Printf("%s target=%q result_count=0", constants.FuncGetASN, target)
 	}
 
 	return execution

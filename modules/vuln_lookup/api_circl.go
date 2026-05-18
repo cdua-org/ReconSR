@@ -50,7 +50,7 @@ func fetchAndParseCVE(ctx context.Context, exec *schema.ModuleExecution, cve str
 func parseCVEResponse(exec *schema.ModuleExecution, raw []byte) {
 	var resp CIRCLCVEResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		dlog.Printf("failed to parse cve response: %v", err)
+		dlog.Printf("%s error stage=parse_cve_response err=%v", constants.FuncGetCirclVuln, err)
 		return
 	}
 
@@ -207,7 +207,7 @@ func extractVulnLookupMeta(exec *schema.ModuleExecution, meta *VulnLookupMeta, s
 
 	var nvd NVDWrapper
 	if err := json.Unmarshal([]byte(meta.NVD), &nvd); err != nil {
-		dlog.Printf("failed to parse nvd meta: %v", err)
+		dlog.Printf("%s error stage=parse_nvd_meta err=%v", constants.FuncGetCirclVuln, err)
 		return
 	}
 
@@ -324,7 +324,7 @@ func fetchCircl(ctx context.Context, apiURL string) ([]byte, error) {
 
 	client := &http.Client{Timeout: resolver.HTTPTimeout}
 
-	dlog.Printf("fetching circl url: %s", apiURL)
+	dlog.Printf("%s stage=request_start url=%q", constants.FuncGetCirclVuln, apiURL)
 
 	var body []byte
 	var lastErr error
@@ -337,7 +337,7 @@ func fetchCircl(ctx context.Context, apiURL string) ([]byte, error) {
 
 		body, err = io.ReadAll(resp.Body)
 		if cerr := resp.Body.Close(); cerr != nil {
-			dlog.Printf("failed to close body: %v", cerr)
+			dlog.Printf("%s body_close_failed url=%q err=%v", constants.FuncGetCirclVuln, apiURL, cerr)
 		}
 		if err != nil {
 			lastErr = fmt.Errorf("read body: %w", err)
@@ -351,13 +351,13 @@ func fetchCircl(ctx context.Context, apiURL string) ([]byte, error) {
 		action := httputil.ClassifyStatus(resp.StatusCode)
 		if action == httputil.Abort {
 			if resp.StatusCode == http.StatusNotFound {
-				dlog.Printf("circl url %s returned 404", apiURL)
+				dlog.Printf("%s not_found url=%q status=%d", constants.FuncGetCirclVuln, apiURL, resp.StatusCode)
 				return nil, nil
 			}
 			return body, fmt.Errorf("http %d", resp.StatusCode)
 		}
 		if action == httputil.RateLimit {
-			dlog.Printf("circl rate limited on %s, attempt %d", apiURL, attempt)
+			dlog.Printf("%s rate_limited url=%q attempt=%d", constants.FuncGetCirclVuln, apiURL, attempt)
 			if !httputil.SleepContext(ctx, httputil.RetryDelay(action, attempt, resolver.RetryBaseDelay)) {
 				return body, fmt.Errorf("context canceled: %w", ctx.Err())
 			}
@@ -365,7 +365,7 @@ func fetchCircl(ctx context.Context, apiURL string) ([]byte, error) {
 			continue
 		}
 		if action == httputil.Retry {
-			dlog.Printf("circl retryable error %d on %s, attempt %d", resp.StatusCode, apiURL, attempt)
+			dlog.Printf("%s retry_status=%d url=%q attempt=%d", constants.FuncGetCirclVuln, resp.StatusCode, apiURL, attempt)
 			if !httputil.SleepContext(ctx, httputil.RetryDelay(action, attempt, resolver.RetryBaseDelay)) {
 				return body, fmt.Errorf("context canceled: %w", ctx.Err())
 			}

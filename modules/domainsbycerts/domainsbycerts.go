@@ -80,6 +80,7 @@ func getDomains(target string) schema.ModuleExecution {
 	allIdentities := collectAllIdentities(ctx, target)
 
 	if len(allIdentities.identities) == 0 {
+		dbg.Printf("%s error target=%q stage=collect_identities reason=no_identities", constants.FuncGetDomains, target)
 		errMsg := "all cert discovery methods exhausted for " + target
 		execution.Error = &errMsg
 		return execution
@@ -97,6 +98,8 @@ func getDomains(target string) schema.ModuleExecution {
 	sort.Slice(execution.Results, func(i, j int) bool {
 		return execution.Results[i].Value < execution.Results[j].Value
 	})
+
+	dbg.Printf("%s success target=%q identities=%d results=%d", constants.FuncGetDomains, target, len(allIdentities.identities), len(execution.Results))
 
 	return execution
 }
@@ -142,13 +145,13 @@ func collectAllIdentities(ctx context.Context, target string) collectedIdentitie
 	if !disableCertspotter {
 		fetchers = append(fetchers, newCertspotterFetcher())
 	} else {
-		dbg.Printf("Certspotter disabled via config")
+		dbg.Printf("%s certspotter_disabled=true target=%q", constants.FuncGetDomains, target)
 	}
 
 	if !disableCrtshPG {
 		fetchers = append(fetchers, newCrtshPgFetcher())
 	} else {
-		dbg.Printf("Crtsh PG disabled via config")
+		dbg.Printf("%s crtsh_pg_disabled=true target=%q", constants.FuncGetDomains, target)
 	}
 
 	fetchers = append(fetchers, newCrtshFetcher())
@@ -156,7 +159,7 @@ func collectAllIdentities(ctx context.Context, target string) collectedIdentitie
 	for _, f := range fetchers {
 		entries := f.Fetch(ctx, target)
 
-		dbg.Printf("fetcher=%q target=%q entries=%d", f.Name(), target, len(entries))
+		dbg.Printf("%s fetcher=%q target=%q entries=%d", constants.FuncGetDomains, f.Name(), target, len(entries))
 
 		if len(entries) > 0 {
 			for _, entry := range entries {
@@ -174,7 +177,7 @@ func collectAllIdentities(ctx context.Context, target string) collectedIdentitie
 		}
 	}
 
-	dbg.Printf("totalIdentities=%d", len(result.identities))
+	dbg.Printf("%s identities_total=%d target=%q", constants.FuncGetDomains, len(result.identities), target)
 
 	if combined, err := json.Marshal(rawPayloads); err == nil {
 		result.rawData = string(combined)
@@ -212,7 +215,7 @@ func classifyIdentities(identities []certificateIdentitySource, target string) c
 		if !matchesTargetIdentity(identity.value, target) {
 			skippedCount++
 			if skippedCount <= 10 {
-				dbg.Printf("rejected identity=%q (not related to %q)", identity.value, target)
+				dbg.Printf("%s skip_unrelated_identity=%q target=%q", constants.FuncGetDomains, identity.value, target)
 			}
 			continue
 		}
@@ -221,7 +224,7 @@ func classifyIdentities(identities []certificateIdentitySource, target string) c
 		if !ok {
 			skippedCount++
 			if skippedCount <= 10 {
-				dbg.Printf("rejected identity=%q (validation failed)", identity.value)
+				dbg.Printf("%s skip_invalid_identity=%q", constants.FuncGetDomains, identity.value)
 			}
 			continue
 		}
@@ -252,8 +255,8 @@ func classifyIdentities(identities []certificateIdentitySource, target string) c
 		}
 	}
 
-	dbg.Printf("filter: targetHits=%d skipped=%d validSubdomains=%d uniqueSubdomains=%d validEmails=%d uniqueEmails=%d",
-		targetCount, skippedCount, subdomainCount, len(result.subdomains), emailCount, len(result.emails))
+	dbg.Printf("%s classify target_hits=%d skipped=%d valid_subdomains=%d unique_subdomains=%d valid_emails=%d unique_emails=%d",
+		constants.FuncGetDomains, targetCount, skippedCount, subdomainCount, len(result.subdomains), emailCount, len(result.emails))
 
 	return result
 }
@@ -284,7 +287,7 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 		})
 	}
 
-	dbg.Printf("output: results=%d expiredDomains=%d emails=%d", len(results), len(expiredDomains), len(classified.emails))
+	dbg.Printf("%s format_results=%d expired_subdomains=%d emails=%d", constants.FuncGetDomains, len(results), len(expiredDomains), len(classified.emails))
 
 	return results
 }

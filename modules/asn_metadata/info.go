@@ -13,13 +13,13 @@ import (
 func getASNInfo(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetASNInfo)
 
-	dbg.Printf("getASNInfo target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncGetASNInfo, target)
 
 	originASN := target
 	if originASN == "" {
 		errMsg := errInvalidASNFormat
 		execution.Error = &errMsg
-		dbg.Printf("getASNInfo target=%q invalid_format", target)
+		dbg.Printf("%s error target=%q stage=validate_input err=invalid_asn_format", constants.FuncGetASNInfo, target)
 		return execution
 	}
 
@@ -34,7 +34,7 @@ func getASNInfo(target string) (execution schema.ModuleExecution) {
 	if err := ripestat.Query(ctx, originASN, constants.RIPEstatEndpointASOverview, &resp, resolver.MaxRetriesASNMeta); err != nil {
 		errMsg := "asn info lookup failed: " + err.Error()
 		execution.Error = &errMsg
-		dbg.Printf("getASNInfo target=%q lookup_error=%v", target, err)
+		dbg.Printf("%s error target=%q stage=query_lookup err=%v", constants.FuncGetASNInfo, target, err)
 		return execution
 	}
 
@@ -48,7 +48,7 @@ func getASNInfo(target string) (execution schema.ModuleExecution) {
 		})
 	}
 
-	dbg.Printf("getASNInfo target=%q found_holder=%q", target, resp.Data.Holder)
+	dbg.Printf("%s success target=%q found_holder=%q", constants.FuncGetASNInfo, target, resp.Data.Holder)
 
 	return execution
 }

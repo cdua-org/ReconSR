@@ -44,21 +44,21 @@ func parseCERT(raw string) string {
 func getCERTData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetCERT)
 
-	log.Printf("get_cert target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetCERT, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 37, nil)
 	if err != nil {
-		log.Printf("get_cert error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetCERT, target, err)
 		modutil.SetError(&exec, "cert lookup failed: %v", err)
 		return exec
 	}
 
 	modutil.SetRawFromBytes(&exec, raw)
 
-	log.Printf("get_cert target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetCERT, target, len(records))
 
 	for _, rec := range records {
 		parsed := parseCERT(rec)

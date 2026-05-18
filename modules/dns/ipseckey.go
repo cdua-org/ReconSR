@@ -108,6 +108,7 @@ func buildIPSECKEYResults(parsed *dnsutils.IPSECKEYRecord, target string, source
 
 	gatewayResult.Context = "IPSECKEY Gateway (" + gwTypeName + ")"
 	gatewayResult.Source = source
+	log.Printf("%s result_gateway target=%q entity=%q type=%q oos=%v", constants.FuncGetIPSECKEY, target, gatewayResult.Value, gatewayResult.Type, gatewayResult.OutOfScope)
 	results = append(results, gatewayResult)
 
 	return results
@@ -115,14 +116,14 @@ func buildIPSECKEYResults(parsed *dnsutils.IPSECKEYRecord, target string, source
 
 func getIPSECKEYData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetIPSECKEY)
-	log.Printf("get_ipseckey target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetIPSECKEY, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 45, nil)
 	if err != nil {
-		log.Printf("get_ipseckey error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetIPSECKEY, target, err)
 		modutil.SetError(&exec, "ipseckey lookup failed: %v", err)
 		return exec
 	}
@@ -148,6 +149,6 @@ func getIPSECKEYData(ctx context.Context, target string) schema.ModuleExecution 
 		exec.Results = append(exec.Results, buildIPSECKEYResults(parsed, target, source)...)
 	}
 
-	log.Printf("get_ipseckey target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetIPSECKEY, target, len(records))
 	return exec
 }

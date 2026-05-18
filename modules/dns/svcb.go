@@ -14,7 +14,7 @@ import (
 
 func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetSVCB)
-	log.Printf("get_svcb target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetSVCB, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
@@ -37,7 +37,7 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 		go func(code int, name string) {
 			recs, raw, err := resolver.ResolveRecord(queryCtx, target, code, nil)
 			if err != nil {
-				log.Printf("get_svcb %s error: %v", name, err)
+				log.Printf("%s error target=%q rrtype=%s stage=resolve_record err=%v", constants.FuncGetSVCB, target, name, err)
 				ch <- queryResult{qtype: name}
 				return
 			}
@@ -132,6 +132,6 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 		exec.RawData = strings.Join(rawParts, "\n")
 	}
 
-	log.Printf("get_svcb target=%q results=%d", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetSVCB, target, len(exec.Results))
 	return exec
 }

@@ -28,16 +28,16 @@ func getDomainKeyData(ctx context.Context, target string) schema.ModuleExecution
 		return txts, nil
 	}
 
-	log.Printf("get_domainkey target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetDomainKey, target)
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, domainkeyTarget, 16, plainFallback)
 	if err != nil {
-		log.Printf("get_domainkey error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetDomainKey, target, err)
 		modutil.SetError(&exec, "domainkey lookup failed: %v", err)
 		return exec
 	}
 
-	log.Printf("get_domainkey target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetDomainKey, target, len(records))
 
 	modutil.SetRawFallback(&exec, raw, records, ", ")
 

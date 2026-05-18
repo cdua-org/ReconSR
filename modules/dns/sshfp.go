@@ -50,14 +50,14 @@ func parseSSHFP(raw string) string {
 
 func getSSHFPData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetSSHFP)
-	log.Printf("get_sshfp target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetSSHFP, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 44, nil)
 	if err != nil {
-		log.Printf("get_sshfp error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetSSHFP, target, err)
 		modutil.SetError(&exec, "sshfp lookup failed: %v", err)
 		return exec
 	}
@@ -74,6 +74,6 @@ func getSSHFPData(ctx context.Context, target string) schema.ModuleExecution {
 		})
 	}
 
-	log.Printf("get_sshfp target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetSSHFP, target, len(records))
 	return exec
 }

@@ -25,7 +25,7 @@ type mxRecord struct {
 func getMXData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetMX)
 
-	log.Printf("get_mx starting query for target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetMX, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
@@ -44,7 +44,7 @@ func getMXData(ctx context.Context, target string) schema.ModuleExecution {
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 15, plainFallback)
 	if err != nil {
-		log.Printf("get_mx error for target=%q: %v", target, err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetMX, target, err)
 		modutil.SetError(&exec, "mx lookup failed: %v", err)
 		return exec
 	}
@@ -82,7 +82,7 @@ func getMXData(ctx context.Context, target string) schema.ModuleExecution {
 		}
 	}
 
-	log.Printf("get_mx completed for target=%q results=%d", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetMX, target, len(exec.Results))
 
 	return exec
 }
@@ -90,17 +90,17 @@ func getMXData(ctx context.Context, target string) schema.ModuleExecution {
 func buildMXHostResult(source *schema.EntityRef, host, target string) *schema.ModuleResult {
 	res, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
-		log.Printf("get_mx skipping invalid mx host target=%q entity=%q err=%v", target, host, err)
+		log.Printf("%s skip_invalid_mx_host target=%q entity=%q err=%v", constants.FuncGetMX, target, host, err)
 		return nil
 	}
 
 	if res.Value == target {
-		log.Printf("get_mx skipping self-referential mx host target=%q", target)
+		log.Printf("%s skip_self_referential_mx_host target=%q", constants.FuncGetMX, target)
 		return nil
 	}
 
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
-	log.Printf("get_mx target=%q entity=%q oos=%v", target, res.Value, isOOS)
+	log.Printf("%s result_host target=%q entity=%q oos=%v", constants.FuncGetMX, target, res.Value, isOOS)
 
 	return &schema.ModuleResult{
 		Type:       res.Type,

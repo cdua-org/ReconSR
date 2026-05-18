@@ -61,7 +61,7 @@ type srvResult struct {
 
 func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetSRV)
-	log.Printf("get_srv target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetSRV, target)
 
 	bruteCtx, cancel := context.WithTimeout(ctx, resolver.DNSBruteTimeout)
 	defer cancel()
@@ -134,14 +134,14 @@ func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
 		exec.RawData = rawDataBuilder.String()
 	}
 
-	log.Printf("get_srv target=%q results=%d", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetSRV, target, len(exec.Results))
 	return exec
 }
 
 func buildSRVHostResult(host, target string, source *schema.EntityRef) (schema.ModuleResult, bool) {
 	res, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
-		log.Printf("get_srv skipping invalid srv host target=%q entity=%q err=%v", target, host, err)
+		log.Printf("%s skip_invalid_srv_host target=%q entity=%q err=%v", constants.FuncGetSRV, target, host, err)
 		return schema.ModuleResult{}, false
 	}
 
@@ -150,7 +150,7 @@ func buildSRVHostResult(host, target string, source *schema.EntityRef) (schema.M
 	}
 
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
-	log.Printf("get_srv target=%q entity=%q oos=%v", target, res.Value, isOOS)
+	log.Printf("%s result_host target=%q entity=%q oos=%v", constants.FuncGetSRV, target, res.Value, isOOS)
 
 	return schema.ModuleResult{
 		Type:       res.Type,

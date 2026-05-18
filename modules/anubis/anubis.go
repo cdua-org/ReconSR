@@ -79,6 +79,7 @@ func fetchAnubisData(ctx context.Context, target string) ([]byte, error) {
 	for attempt := 1; attempt <= resolver.MaxRetriesHT; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 		if err != nil {
+			dbg.Printf("%s error target=%q stage=create_request attempt=%d err=%v", constants.FuncGetDomains, target, attempt, err)
 			return nil, fmt.Errorf("create request: %w", err)
 		}
 
@@ -89,7 +90,7 @@ func fetchAnubisData(ctx context.Context, target string) ([]byte, error) {
 		resp, err := client.Do(req)
 		if err != nil {
 			lastErr = err
-			dbg.Printf("attempt=%d error=%v", attempt, err)
+			dbg.Printf("%s error target=%q stage=do_request attempt=%d err=%v", constants.FuncGetDomains, target, attempt, err)
 			if !httputil.SleepContext(ctx, resolver.RetryBaseDelay) {
 				return nil, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
 			}
@@ -98,12 +99,12 @@ func fetchAnubisData(ctx context.Context, target string) ([]byte, error) {
 
 		body, err := io.ReadAll(resp.Body)
 		if cerr := resp.Body.Close(); cerr != nil {
-			dbg.Printf("body close error: %v", cerr)
+			dbg.Printf("%s body_close_failed target=%q err=%v", constants.FuncGetDomains, target, cerr)
 		}
 
 		if err != nil {
 			lastErr = err
-			dbg.Printf("attempt=%d read body error=%v", attempt, err)
+			dbg.Printf("%s error target=%q stage=read_body attempt=%d err=%v", constants.FuncGetDomains, target, attempt, err)
 			if !httputil.SleepContext(ctx, resolver.RetryBaseDelay) {
 				return nil, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
 			}
@@ -116,12 +117,13 @@ func fetchAnubisData(ctx context.Context, target string) ([]byte, error) {
 
 		action := httputil.ClassifyStatus(resp.StatusCode)
 		if action == httputil.Abort {
+			dbg.Printf("%s error target=%q stage=response_status attempt=%d status=%d action=%d", constants.FuncGetDomains, target, attempt, resp.StatusCode, action)
 			return body, fmt.Errorf("hard failure status %d", resp.StatusCode)
 		}
 
 		lastErr = fmt.Errorf("retryable status %d", resp.StatusCode)
 		delay := httputil.RetryDelay(action, attempt-1, resolver.RetryBaseDelay)
-		dbg.Printf("attempt=%d status=%d action=%d delay=%v", attempt, resp.StatusCode, action, delay)
+		dbg.Printf("%s error target=%q stage=response_status attempt=%d status=%d action=%d delay=%v", constants.FuncGetDomains, target, attempt, resp.StatusCode, action, delay)
 
 		if !httputil.SleepContext(ctx, delay) {
 			return body, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
@@ -148,6 +150,7 @@ func getDomains(target string) schema.ModuleExecution {
 
 	var subdomains []string
 	if err := json.Unmarshal(rawData, &subdomains); err != nil {
+		dbg.Printf("%s error target=%q stage=unmarshal err=%v", constants.FuncGetDomains, target, err)
 		modutil.SetError(&exec, "failed to unmarshal anubis JSON: %v", err)
 		return exec
 	}
@@ -162,7 +165,7 @@ func getDomains(target string) schema.ModuleExecution {
 
 	for _, rawDomain := range subdomains {
 		if processedCount >= limit {
-			dbg.Printf("reached anubis limit of %d", limit)
+			dbg.Printf("%s reached_limit=%d target=%q", constants.FuncGetDomains, limit, target)
 			break
 		}
 
@@ -186,7 +189,7 @@ func getDomains(target string) schema.ModuleExecution {
 		}
 
 		if _, err := validator.Validate(constants.TypeDomain, cleanDomain); err != nil {
-			dbg.Printf("skipped invalid domain %q: %v", domain, err)
+			dbg.Printf("%s skip_invalid_domain=%q err=%v", constants.FuncGetDomains, domain, err)
 			continue
 		}
 
@@ -213,7 +216,7 @@ func getDomains(target string) schema.ModuleExecution {
 		exec.Results = append(exec.Results, result)
 	}
 
-	dbg.Printf("target=%q raw_count=%d processed_count=%d", target, len(subdomains), processedCount)
+	dbg.Printf("%s success target=%q raw_count=%d processed_count=%d", constants.FuncGetDomains, target, len(subdomains), processedCount)
 
 	return exec
 }

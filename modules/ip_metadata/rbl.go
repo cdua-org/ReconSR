@@ -35,7 +35,7 @@ func checkRBLZone(target, query string, rawBuffer *strings.Builder) (isHit, isBl
 func getRBLData(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetRBL)
 
-	dbg.Printf("getRBLData target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncGetRBL, target)
 
 	var rawBuffer strings.Builder
 	defer func() {
@@ -46,6 +46,7 @@ func getRBLData(target string) (execution schema.ModuleExecution) {
 
 	rev, _, err := resolver.ReverseIP(target)
 	if err != nil {
+		dbg.Printf("%s error target=%q stage=validate_input err=%v", constants.FuncGetRBL, target, err)
 		errMsg := errInvalidIPFormat + target
 		execution.Error = &errMsg
 		return execution
@@ -86,6 +87,7 @@ func getRBLData(target string) (execution schema.ModuleExecution) {
 	}
 
 	if !isListed && lastErr != nil {
+		dbg.Printf("%s error target=%q stage=lookup_rbl err=%v", constants.FuncGetRBL, target, lastErr)
 		errMsg := fmt.Errorf("rbl lookup failed after retries: %w", lastErr).Error()
 		execution.Error = &errMsg
 		return execution
@@ -98,6 +100,9 @@ func getRBLData(target string) (execution schema.ModuleExecution) {
 			Value:    constants.TagSpamBotnet,
 			Context:  detectedContext,
 		})
+		dbg.Printf("%s success target=%q context=%q", constants.FuncGetRBL, target, detectedContext)
+	} else {
+		dbg.Printf("%s target=%q listed=false", constants.FuncGetRBL, target)
 	}
 
 	return execution

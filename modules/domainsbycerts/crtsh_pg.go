@@ -10,6 +10,7 @@ import (
 	// Register standard library PostgreSQL driver.
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
@@ -40,12 +41,12 @@ func (f *crtshPgFetcher) Fetch(ctx context.Context, target string) []certificate
 	dsn := "postgres://guest@crt.sh:5432/certwatch?default_query_exec_mode=simple_protocol&sslmode=disable"
 	db, err := f.openDB(dsn)
 	if err != nil {
-		dbg.Printf("pg connection creation failed: %v", err)
+		dbg.Printf("%s error source=%q target=%q stage=open_db err=%v", constants.FuncGetDomains, f.Name(), target, err)
 		return nil
 	}
 	defer func() {
 		if cerr := db.Close(); cerr != nil {
-			dbg.Printf("pg close error: %v", cerr)
+			dbg.Printf("%s db_close_failed source=%q target=%q err=%v", constants.FuncGetDomains, f.Name(), target, cerr)
 		}
 	}()
 
@@ -62,12 +63,12 @@ func (f *crtshPgFetcher) Fetch(ctx context.Context, target string) []certificate
 	`
 	rows, err := db.QueryContext(qCtx, query, target)
 	if err != nil {
-		dbg.Printf("pg query failed: %v", err)
+		dbg.Printf("%s error source=%q target=%q stage=query err=%v", constants.FuncGetDomains, f.Name(), target, err)
 		return nil
 	}
 	defer func() {
 		if cerr := rows.Close(); cerr != nil {
-			dbg.Printf("pg rows close error: %v", cerr)
+			dbg.Printf("%s rows_close_failed source=%q target=%q err=%v", constants.FuncGetDomains, f.Name(), target, cerr)
 		}
 	}()
 
@@ -83,7 +84,7 @@ func (f *crtshPgFetcher) Fetch(ctx context.Context, target string) []certificate
 		var notAfter sql.NullTime
 
 		if err := rows.Scan(&nameValue, &notAfter); err != nil {
-			dbg.Printf("pg row scan failed: %v", err)
+			dbg.Printf("%s skip_row_scan_failed source=%q target=%q err=%v", constants.FuncGetDomains, f.Name(), target, err)
 			continue
 		}
 
@@ -110,7 +111,7 @@ func (f *crtshPgFetcher) Fetch(ctx context.Context, target string) []certificate
 	}
 
 	if err := rows.Err(); err != nil {
-		dbg.Printf("pg rows iteration failed: %v", err)
+		dbg.Printf("%s error source=%q target=%q stage=iterate_rows err=%v", constants.FuncGetDomains, f.Name(), target, err)
 	}
 
 	if len(rawRecords) > 0 {
@@ -119,7 +120,7 @@ func (f *crtshPgFetcher) Fetch(ctx context.Context, target string) []certificate
 				entries[i].rawData = rawBytes
 			}
 		} else {
-			dbg.Printf("pg json marshal failed: %v", err)
+			dbg.Printf("%s raw_marshal_failed source=%q target=%q err=%v", constants.FuncGetDomains, f.Name(), target, err)
 		}
 	}
 

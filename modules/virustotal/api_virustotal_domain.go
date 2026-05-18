@@ -42,15 +42,15 @@ func (m *module) extractDomainMetadata(attr map[string]any, target string, exec 
 	appendDomainCertificateSummary(exec, attr, target)
 
 	if _, ok := attr["whois"]; ok {
-		dbg.Printf("extractDomainMetadata target=%q ignored_field=whois", target)
+		dbg.Printf("%s ignored_field=whois target=%q", constants.FuncGetVTApiDomain, target)
 	}
 	if _, ok := attr["rdap"]; ok {
-		dbg.Printf("extractDomainMetadata target=%q ignored_field=rdap", target)
+		dbg.Printf("%s ignored_field=rdap target=%q", constants.FuncGetVTApiDomain, target)
 	}
 	for key := range attr {
 		keyLower := strings.ToLower(key)
 		if strings.Contains(keyLower, "registrar") || strings.Contains(keyLower, "registrant") {
-			dbg.Printf("extractDomainMetadata target=%q ignored_field=%q", target, key)
+			dbg.Printf("%s ignored_field=%q target=%q", constants.FuncGetVTApiDomain, key, target)
 		}
 	}
 }
@@ -352,7 +352,7 @@ func (m *module) extractSubdomain(item map[string]any, parent string, disableCer
 
 	validatedSubdomain, err := validator.Validate(constants.TypeDomain, sub)
 	if err != nil {
-		dbg.Printf("extractSubdomain parent=%q value=%q err=%v", parent, sub, err)
+		dbg.Printf("%s skip_invalid_subdomain parent=%q value=%q err=%v", constants.FuncGetVTApiDomain, parent, sub, err)
 		return ""
 	}
 
@@ -428,14 +428,14 @@ func (m *module) appendSubdomainDeepResults(attr map[string]any, scopeTarget str
 func (m *module) logIgnoredSubdomainFields(attr map[string]any, subdomain string) {
 	for _, field := range []string{"whois", "rdap"} {
 		if _, ok := attr[field]; ok {
-			dbg.Printf("extractSubdomain subdomain=%q ignored_field=%q", subdomain, field)
+			dbg.Printf("%s ignored_field=%q subdomain=%q", constants.FuncGetVTApiDomain, field, subdomain)
 		}
 	}
 
 	for key := range attr {
 		keyLower := strings.ToLower(key)
 		if strings.Contains(keyLower, "registrar") || strings.Contains(keyLower, "registrant") {
-			dbg.Printf("extractSubdomain subdomain=%q ignored_field=%q", subdomain, key)
+			dbg.Printf("%s ignored_field=%q subdomain=%q", constants.FuncGetVTApiDomain, key, subdomain)
 		}
 	}
 }

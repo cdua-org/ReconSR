@@ -84,9 +84,9 @@ func getSMIMEAData(localParts []string, domain string) schema.ModuleExecution {
 	execution := modutil.NewExecution(constants.FuncGetSmimea)
 
 	if len(localParts) == 1 {
-		dbg.Printf("get_smimea email=%q", localParts[0]+"@"+domain)
+		dbg.Printf("%s email=%q", constants.FuncGetSmimea, localParts[0]+"@"+domain)
 	} else {
-		dbg.Printf("get_smimea domain=%q localParts=%d", domain, len(localParts))
+		dbg.Printf("%s domain=%q local_parts=%d", constants.FuncGetSmimea, domain, len(localParts))
 	}
 
 	var rawData []string
@@ -96,11 +96,11 @@ func getSMIMEAData(localParts []string, domain string) schema.ModuleExecution {
 	for _, user := range localParts {
 		reqCtx, cancel := context.WithTimeout(context.Background(), resolver.DNSBruteTimeout)
 		queryDomain := GenerateMailHashDomain(user, domain, hashPrefixSMIMEA)
-		dbg.Printf("get_smimea user=%q query=%q", user, queryDomain)
+		dbg.Printf("%s user=%q query=%q", constants.FuncGetSmimea, user, queryDomain)
 		records, raw, err := resolveRecord(reqCtx, queryDomain, 53, nil)
 		cancel()
 		if err != nil {
-			dbg.Printf("get_smimea user=%q domain=%q error=%v", user, domain, err)
+			dbg.Printf("%s error user=%q domain=%q query=%q err=%v", constants.FuncGetSmimea, user, domain, queryDomain, err)
 			lastErr = err
 			failedAliases = append(failedAliases, user)
 			continue
@@ -144,6 +144,6 @@ func getSMIMEAData(localParts []string, domain string) schema.ModuleExecution {
 		execution.RawData = strings.Join(rawData, "\n")
 	}
 
-	dbg.Printf("get_smimea domain=%q results=%d", domain, len(execution.Results))
+	dbg.Printf("%s domain=%q results=%d", constants.FuncGetSmimea, domain, len(execution.Results))
 	return execution
 }

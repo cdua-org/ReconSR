@@ -23,7 +23,7 @@ var commonSelectors = []string{
 
 func getDKIMData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetDKIM)
-	log.Printf("get_dkim target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetDKIM, target)
 
 	bruteCtx, cancel := context.WithTimeout(ctx, resolver.DNSBruteTimeout)
 	defer cancel()
@@ -78,7 +78,7 @@ func getDKIMData(ctx context.Context, target string) schema.ModuleExecution {
 			for _, rec := range records {
 				rec = strings.Trim(strings.TrimSpace(rec), "\"")
 				if strings.HasPrefix(rec, "v=DKIM1") {
-					log.Printf("get_dkim target=%q selector=%q found=true", target, sel)
+					log.Printf("%s success target=%q selector=%q found=true", constants.FuncGetDKIM, target, sel)
 					results <- dkimResult{selector: sel, record: rec}
 				}
 			}
@@ -115,6 +115,6 @@ func getDKIMData(ctx context.Context, target string) schema.ModuleExecution {
 		exec.RawData = rawDataBuilder.String()
 	}
 
-	log.Printf("get_dkim target=%q results=%d", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetDKIM, target, len(exec.Results))
 	return exec
 }

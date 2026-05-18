@@ -118,7 +118,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 }
 
 func processCheck(exec *schema.ModuleExecution, target, apiKey string) {
-	dbg.Printf("processCheck target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncCheckAbuseIPDB, target)
 
 	maxAge := resolver.AbuseIPDBmaxAgeInDays
 	if maxAge < 1 {
@@ -129,7 +129,7 @@ func processCheck(exec *schema.ModuleExecution, target, apiKey string) {
 
 	u, err := url.Parse(defaultAPIURL)
 	if err != nil {
-		dbg.Printf("processCheck error target=%q invalid_url=%v", target, err)
+		dbg.Printf("%s error target=%q stage=url_parse err=%v", constants.FuncCheckAbuseIPDB, target, err)
 		modutil.SetError(exec, "invalid default API URL: %v", err)
 		return
 	}
@@ -150,7 +150,7 @@ func processCheck(exec *schema.ModuleExecution, target, apiKey string) {
 		body, statusCode, headers, err := doRequest(ctx, u.String(), apiKey)
 		if err != nil {
 			lastErr = err
-			dbg.Printf("processCheck error target=%q attempt=%d err=%v", target, attempt, lastErr)
+			dbg.Printf("%s error target=%q stage=request attempt=%d err=%v", constants.FuncCheckAbuseIPDB, target, attempt, lastErr)
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 				break
 			}
@@ -160,29 +160,32 @@ func processCheck(exec *schema.ModuleExecution, target, apiKey string) {
 
 		rawData = body
 		action := httputil.ClassifyStatus(statusCode)
-		dbg.Printf("processCheck target=%q attempt=%d status=%d action=%d", target, attempt, statusCode, action)
+		dbg.Printf("%s target=%q attempt=%d status=%d action=%d", constants.FuncCheckAbuseIPDB, target, attempt, statusCode, action)
 
 		if action == httputil.RateLimit {
 			if isDailyQuotaExceeded(headers) {
 				lastErr = fmt.Errorf("daily API quota exceeded (HTTP 429), Retry-After: %s", headers.Get("Retry-After"))
+				dbg.Printf("%s error target=%q stage=rate_limit attempt=%d retry_after=%q quota=daily_exhausted", constants.FuncCheckAbuseIPDB, target, attempt, headers.Get("Retry-After"))
 				break
 			}
 
 			lastErr = errors.New("rate limited (HTTP 429)")
+			dbg.Printf("%s error target=%q stage=rate_limit attempt=%d", constants.FuncCheckAbuseIPDB, target, attempt)
 			httputil.SleepContext(ctx, httputil.RetryDelay(httputil.RateLimit, attempt, resolver.RetryBaseDelay))
 			continue
 		}
 
 		if statusCode != http.StatusOK {
 			lastErr = fmt.Errorf("unexpected status %d", statusCode)
+			dbg.Printf("%s error target=%q stage=response_status attempt=%d status=%d", constants.FuncCheckAbuseIPDB, target, attempt, statusCode)
 			break
 		}
 
 		if err := json.Unmarshal(body, &parsed); err != nil {
 			lastErr = fmt.Errorf("parse json: %w", err)
-			dbg.Printf("processCheck error target=%q attempt=%d parse=%v", target, attempt, lastErr)
+			dbg.Printf("%s error target=%q stage=unmarshal attempt=%d err=%v", constants.FuncCheckAbuseIPDB, target, attempt, lastErr)
 		} else {
-			dbg.Printf("processCheck success target=%q attempt=%d", target, attempt)
+			dbg.Printf("%s success target=%q attempt=%d reports=%d score=%d", constants.FuncCheckAbuseIPDB, target, attempt, parsed.Data.TotalReports, parsed.Data.AbuseConfidenceScore)
 			lastErr = nil
 		}
 		break

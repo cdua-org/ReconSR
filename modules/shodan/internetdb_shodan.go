@@ -66,7 +66,7 @@ func getInternetDB(target schema.Entity) schema.ModuleExecution {
 	}
 
 	parseInternetDBResponse(&exec, rawBody, target.Value)
-	dbg.Printf(constants.FuncGetIDBShodan+" target=%q records=%d", target.Value, len(exec.Results))
+	dbg.Printf("%s success target=%q records=%d", constants.FuncGetIDBShodan, target.Value, len(exec.Results))
 	return exec
 }
 
@@ -76,7 +76,7 @@ func fetchInternetDB(ctx context.Context, url, target string) (rawBody []byte, s
 	for attempt := 1; attempt <= resolver.MaxRetriesIPMeta; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 		if err != nil {
-			dbg.Printf("get_internetdb attempt=%d target=%q err=%v", attempt, target, err)
+			dbg.Printf("%s error target=%q stage=create_request attempt=%d err=%v", constants.FuncGetIDBShodan, target, attempt, err)
 			return nil, 0, fmt.Errorf("create request: %w", err)
 		}
 		req.Header.Set("Accept", "application/json")
@@ -86,7 +86,7 @@ func fetchInternetDB(ctx context.Context, url, target string) (rawBody []byte, s
 		resp, err := client.Do(req)
 		if err != nil {
 			lastErr = err
-			dbg.Printf("get_internetdb attempt=%d target=%q err=%v", attempt, target, err)
+			dbg.Printf("%s error target=%q stage=do_request attempt=%d err=%v", constants.FuncGetIDBShodan, target, attempt, err)
 			if attempt < resolver.MaxRetriesIPMeta {
 				httputil.SleepContext(ctx, resolver.RetryBaseDelay)
 			}
@@ -96,12 +96,12 @@ func fetchInternetDB(ctx context.Context, url, target string) (rawBody []byte, s
 		statusCode = resp.StatusCode
 		body, err := io.ReadAll(resp.Body)
 		if cerr := resp.Body.Close(); cerr != nil {
-			dbg.Printf("get_internetdb attempt=%d target=%q body_close_err=%v", attempt, target, cerr)
+			dbg.Printf("%s body_close_failed target=%q attempt=%d err=%v", constants.FuncGetIDBShodan, target, attempt, cerr)
 		}
 
 		if err != nil {
 			lastErr = err
-			dbg.Printf("get_internetdb attempt=%d target=%q read_body_err=%v", attempt, target, err)
+			dbg.Printf("%s error target=%q stage=read_body attempt=%d err=%v", constants.FuncGetIDBShodan, target, attempt, err)
 			if attempt < resolver.MaxRetriesIPMeta {
 				httputil.SleepContext(ctx, resolver.RetryBaseDelay)
 			}
@@ -111,12 +111,12 @@ func fetchInternetDB(ctx context.Context, url, target string) (rawBody []byte, s
 		rawBody = body
 
 		if statusCode == http.StatusOK || statusCode == http.StatusNotFound {
-			dbg.Printf("get_internetdb attempt=%d target=%q status=%d", attempt, target, statusCode)
+			dbg.Printf("%s target=%q attempt=%d status=%d", constants.FuncGetIDBShodan, target, attempt, statusCode)
 			break
 		}
 
 		action := httputil.ClassifyStatus(statusCode)
-		dbg.Printf("get_internetdb attempt=%d target=%q status=%d action=%d", attempt, target, statusCode, action)
+		dbg.Printf("%s target=%q attempt=%d status=%d action=%d", constants.FuncGetIDBShodan, target, attempt, statusCode, action)
 		if action == httputil.Abort {
 			lastErr = fmt.Errorf("http status %d: %s", statusCode, string(body))
 			break
@@ -137,7 +137,7 @@ func fetchInternetDB(ctx context.Context, url, target string) (rawBody []byte, s
 func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, target string) {
 	var parsed internetdbResponse
 	if err := json.Unmarshal(rawBody, &parsed); err != nil {
-		dbg.Printf(constants.FuncGetIDBShodan+" target=%q unmarshal_err=%v", target, err)
+		dbg.Printf("%s error target=%q stage=unmarshal err=%v", constants.FuncGetIDBShodan, target, err)
 		modutil.SetError(exec, "unmarshal json: %v", err)
 		return
 	}

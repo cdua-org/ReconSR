@@ -29,16 +29,16 @@ func getTXTData(ctx context.Context, target string) schema.ModuleExecution {
 		return txts, nil
 	}
 
-	log.Printf("get_txt target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetTXT, target)
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 16, plainFallback)
 	if err != nil {
-		log.Printf("get_txt error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetTXT, target, err)
 		modutil.SetError(&exec, "txt lookup failed: %v", err)
 		return exec
 	}
 
-	log.Printf("get_txt target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetTXT, target, len(records))
 
 	modutil.SetRawFallback(&exec, raw, records, "\n")
 

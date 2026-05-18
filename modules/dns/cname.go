@@ -18,7 +18,7 @@ import (
 func getCNAMEData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetCNAME)
 
-	log.Printf("get_cname starting query for target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetCNAME, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
@@ -55,7 +55,7 @@ func getCNAMEData(ctx context.Context, target string) schema.ModuleExecution {
 	wg.Wait()
 
 	if cnameErr != nil {
-		log.Printf("get_cname error for target=%q: %v", target, cnameErr)
+		log.Printf("%s error target=%q stage=lookup_root_cname err=%v", constants.FuncGetCNAME, target, cnameErr)
 		modutil.SetError(&exec, "cname lookup failed: %v", cnameErr)
 		return exec
 	}
@@ -67,7 +67,7 @@ func getCNAMEData(ctx context.Context, target string) schema.ModuleExecution {
 	if cname != "" && !strings.EqualFold(cname, strings.TrimSuffix(target, ".")) {
 		result, ok := buildCNAMEResult(cname, target, "CNAME Record")
 		if ok {
-			log.Printf("get_cname target=%q entity=%q type=%q oos=%v", target, result.Value, result.Type, result.OutOfScope)
+			log.Printf("%s result_entity target=%q entity=%q type=%q oos=%v", constants.FuncGetCNAME, target, result.Value, result.Type, result.OutOfScope)
 			exec.Results = append(exec.Results, result)
 		}
 	}
@@ -75,12 +75,12 @@ func getCNAMEData(ctx context.Context, target string) schema.ModuleExecution {
 	if wwwCnameErr == nil && wwwCname != "" && !strings.EqualFold(wwwCname, strings.TrimSuffix(wwwTarget, ".")) {
 		result, ok := buildCNAMEResult(wwwCname, wwwTarget, "CNAME Record (www)")
 		if ok {
-			log.Printf("get_cname target=%q entity=%q type=%q oos=%v", wwwTarget, result.Value, result.Type, result.OutOfScope)
+			log.Printf("%s result_entity target=%q entity=%q type=%q oos=%v", constants.FuncGetCNAME, wwwTarget, result.Value, result.Type, result.OutOfScope)
 			exec.Results = append(exec.Results, result)
 		}
 	}
 
-	log.Printf("get_cname completed for target=%q results=%d", target, len(exec.Results))
+	log.Printf("%s success target=%q results=%d", constants.FuncGetCNAME, target, len(exec.Results))
 
 	return exec
 }
@@ -88,7 +88,7 @@ func getCNAMEData(ctx context.Context, target string) schema.ModuleExecution {
 func buildCNAMEResult(cname, target, relationContext string) (schema.ModuleResult, bool) {
 	res, err := validator.Validate(constants.TypeDomain, cname)
 	if err != nil {
-		log.Printf("get_cname skipping invalid cname target=%q entity=%q err=%v", target, cname, err)
+		log.Printf("%s skip_invalid_cname target=%q entity=%q err=%v", constants.FuncGetCNAME, target, cname, err)
 		return schema.ModuleResult{}, false
 	}
 

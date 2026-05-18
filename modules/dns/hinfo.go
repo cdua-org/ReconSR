@@ -17,16 +17,16 @@ func getHINFOData(ctx context.Context, target string) schema.ModuleExecution {
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
-	log.Printf("get_hinfo target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetHINFO, target)
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 13, nil)
 	if err != nil {
 		modutil.SetError(&exec, "hinfo lookup failed: %v", err)
-		log.Printf("get_hinfo error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetHINFO, target, err)
 		return exec
 	}
 
-	log.Printf("get_hinfo target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetHINFO, target, len(records))
 
 	modutil.SetRawFromBytes(&exec, raw)
 

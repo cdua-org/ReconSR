@@ -38,21 +38,21 @@ func parseDS(raw string) string {
 func getDSData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetDS)
 
-	log.Printf("get_ds target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetDS, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 43, nil)
 	if err != nil {
-		log.Printf("get_ds error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetDS, target, err)
 		modutil.SetError(&exec, "ds lookup failed: %v", err)
 		return exec
 	}
 
 	modutil.SetRawFromBytes(&exec, raw)
 
-	log.Printf("get_ds target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetDS, target, len(records))
 
 	for _, rec := range records {
 		parsed := parseDS(rec)

@@ -44,23 +44,23 @@ func performPTRQuery(target string) ([]string, error) {
 		}()
 
 		if err == nil {
-			dbg.Printf("get_ptr attempt=%d target=%q records=%d", attempt, target, len(names))
+			dbg.Printf("%s success target=%q stage=lookup_ptr attempt=%d records=%d", constants.FuncGetPTR, target, attempt, len(names))
 			return names, nil
 		}
 
 		var dnsErr *net.DNSError
 		if errors.As(err, &dnsErr) && (dnsErr.IsNotFound || strings.Contains(err.Error(), "no such host")) {
-			dbg.Printf("get_ptr attempt=%d target=%q nxdomain", attempt, target)
+			dbg.Printf("%s target=%q stage=lookup_ptr attempt=%d nxdomain", constants.FuncGetPTR, target, attempt)
 			return nil, nil
 		}
 
 		if strings.Contains(err.Error(), "unrecognized address") {
-			dbg.Printf("get_ptr target=%q invalid_ip", target)
+			dbg.Printf("%s error target=%q stage=validate_input err=%v", constants.FuncGetPTR, target, err)
 			return nil, err
 		}
 
 		lastErr = err
-		dbg.Printf("get_ptr attempt=%d target=%q err=%v", attempt, target, err)
+		dbg.Printf("%s error target=%q stage=lookup_ptr attempt=%d err=%v", constants.FuncGetPTR, target, attempt, err)
 		if attempt < resolver.MaxRetriesIPMeta {
 			httputil.SleepContext(context.Background(), resolver.RetryBaseDelay)
 		}
@@ -72,7 +72,7 @@ func performPTRQuery(target string) ([]string, error) {
 func getPTRData(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetPTR)
 
-	dbg.Printf("getPTRData target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncGetPTR, target)
 
 	var rawBuffer strings.Builder
 	defer func() {
@@ -89,6 +89,7 @@ func getPTRData(target string) (execution schema.ModuleExecution) {
 			execution.Error = &errMsg
 			return execution
 		}
+		dbg.Printf("%s error target=%q stage=lookup_ptr err=%v", constants.FuncGetPTR, target, err)
 		errMsg := fmt.Errorf("ptr lookup failed after retries: %w", err).Error()
 		execution.Error = &errMsg
 		return execution
@@ -100,6 +101,12 @@ func getPTRData(target string) (execution schema.ModuleExecution) {
 
 	for _, name := range names {
 		appendPTRResult(&execution, name)
+	}
+
+	if len(execution.Results) > 0 {
+		dbg.Printf("%s success target=%q result_count=%d", constants.FuncGetPTR, target, len(execution.Results))
+	} else {
+		dbg.Printf("%s target=%q result_count=0", constants.FuncGetPTR, target)
 	}
 
 	return execution

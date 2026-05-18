@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+
+	"cdua-org/ReconSR/modules/utils/constants"
 )
 
 type certspotterResponse struct {
@@ -31,6 +33,7 @@ func (f *certspotterFetcher) Fetch(ctx context.Context, target string) []certifi
 
 	var records []certspotterResponse
 	if err := json.Unmarshal(body, &records); err != nil {
+		dbg.Printf("%s error source=%q target=%q stage=unmarshal err=%v", constants.FuncGetDomains, f.Name(), target, err)
 		return nil
 	}
 

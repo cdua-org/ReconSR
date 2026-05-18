@@ -23,13 +23,13 @@ const (
 func getASNPeers(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetASNPeers)
 
-	dbg.Printf("getASNPeers target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncGetASNPeers, target)
 
 	originASN := target
 	if originASN == "" {
 		errMsg := errInvalidASNFormat
 		execution.Error = &errMsg
-		dbg.Printf("getASNPeers target=%q invalid_format", target)
+		dbg.Printf("%s error target=%q stage=validate_input err=invalid_asn_format", constants.FuncGetASNPeers, target)
 		return execution
 	}
 
@@ -43,11 +43,11 @@ func getASNPeers(target string) (execution schema.ModuleExecution) {
 
 	chain, err := buildTransitChain(ctx, originASN, &rawBuffer)
 	if err != nil {
-		dbg.Printf("getASNPeers target=%q build_chain_error=%v", target, err)
+		dbg.Printf("%s error target=%q stage=build_transit_chain err=%v", constants.FuncGetASNPeers, target, err)
 		chain = append(chain, chainTooManyPeers)
 	}
 
-	dbg.Printf("getASNPeers target=%q chain_length=%d", target, len(chain))
+	dbg.Printf("%s success target=%q chain_length=%d", constants.FuncGetASNPeers, target, len(chain))
 
 	if len(chain) == 0 {
 		return execution
@@ -103,21 +103,21 @@ func extractLargestUpstreamASN(neighbours []ripestat.Neighbour, originASN string
 
 func traverseUpstream(ctx context.Context, asn string, depth int, visited map[string]bool, chain *[]string, rawOut *strings.Builder) error {
 	if depth >= resolver.MaxRecursionDepth {
-		dbg.Printf("traverseUpstream asn=%q depth=%d max_depth_reached", asn, depth)
+		dbg.Printf("%s asn=%q depth=%d max_depth_reached", constants.FuncGetASNPeers, asn, depth)
 		return nil
 	}
 
 	if visited[asn] {
-		dbg.Printf("traverseUpstream asn=%q depth=%d already_visited", asn, depth)
+		dbg.Printf("%s asn=%q depth=%d already_visited", constants.FuncGetASNPeers, asn, depth)
 		return nil
 	}
 	visited[asn] = true
 
-	dbg.Printf("traverseUpstream asn=%q depth=%d querying_ripestat", asn, depth)
+	dbg.Printf("%s asn=%q depth=%d querying_ripestat", constants.FuncGetASNPeers, asn, depth)
 
 	var resp ripestat.APIResponse
 	if err := ripestat.Query(ctx, asn, constants.RIPEstatEndpointASNNeighbours, &resp, resolver.MaxRetriesASNMeta); err != nil {
-		dbg.Printf("traverseUpstream asn=%q depth=%d ripestat_error=%v", asn, depth, err)
+		dbg.Printf("%s error asn=%q depth=%d stage=query_ripestat err=%v", constants.FuncGetASNPeers, asn, depth, err)
 		return fmt.Errorf("ripestat query: %w", err)
 	}
 
@@ -128,7 +128,7 @@ func traverseUpstream(ctx context.Context, asn string, depth int, visited map[st
 
 	upstream := extractLargestUpstreamASN(resp.Data.Neighbours, asn)
 
-	dbg.Printf("traverseUpstream asn=%q depth=%d largest_upstream=%q", asn, depth, upstream)
+	dbg.Printf("%s asn=%q depth=%d largest_upstream=%q", constants.FuncGetASNPeers, asn, depth, upstream)
 
 	if upstream != "" {
 		*chain = append(*chain, upstream)

@@ -51,14 +51,14 @@ func parseHIP(raw string) string {
 
 func getHIPData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetHIP)
-	log.Printf("get_hip target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetHIP, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 55, nil)
 	if err != nil {
-		log.Printf("get_hip error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetHIP, target, err)
 		modutil.SetError(&exec, "hip lookup failed: %v", err)
 		return exec
 	}
@@ -69,7 +69,7 @@ func getHIPData(ctx context.Context, target string) schema.ModuleExecution {
 		exec.Results = append(exec.Results, buildHIPResults(parseHIP(rec), target)...)
 	}
 
-	log.Printf("get_hip target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetHIP, target, len(records))
 	return exec
 }
 
@@ -117,7 +117,7 @@ func buildHIPRendezvousResult(rawRV, target string, hipSource *schema.EntityRef)
 
 	res, err := validator.Validate(constants.TypeDomain, rv)
 	if err != nil {
-		log.Printf("get_hip skipping invalid rendezvous target=%q rv=%q err=%v", target, rv, err)
+		log.Printf("%s skip_invalid_rendezvous target=%q rv=%q err=%v", constants.FuncGetHIP, target, rv, err)
 		return nil
 	}
 
@@ -126,7 +126,7 @@ func buildHIPRendezvousResult(rawRV, target string, hipSource *schema.EntityRef)
 	}
 
 	isOOS := orgdomain.IsOutOfScope(res.Value, target)
-	log.Printf("get_hip target=%q rv=%q oos=%v", target, res.Value, isOOS)
+	log.Printf("%s result_rendezvous target=%q entity=%q oos=%v", constants.FuncGetHIP, target, res.Value, isOOS)
 
 	return &schema.ModuleResult{
 		Type:       res.Type,

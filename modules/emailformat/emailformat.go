@@ -75,25 +75,29 @@ func getEmails(target schema.Entity) schema.ModuleExecution {
 	modutil.SetRawFromBytes(&exec, rawBody)
 
 	if statusCode == 0 && lastErr != nil {
+		dbg.Printf("%s error target=%q stage=request err=%v", constants.FuncGetEmails, target.Value, lastErr)
 		modutil.SetError(&exec, "request failed: %v", lastErr)
 		return exec
 	}
 
 	if statusCode == http.StatusNotFound {
+		dbg.Printf("%s not_found target=%q status=%d", constants.FuncGetEmails, target.Value, statusCode)
 		return exec
 	}
 
 	if statusCode != http.StatusOK {
 		if lastErr != nil {
+			dbg.Printf("%s error target=%q stage=response status=%d err=%v", constants.FuncGetEmails, target.Value, statusCode, lastErr)
 			modutil.SetError(&exec, "request failed: %v", lastErr)
 		} else {
+			dbg.Printf("%s error target=%q stage=response status=%d", constants.FuncGetEmails, target.Value, statusCode)
 			modutil.SetError(&exec, "request failed with status: %d", fmt.Errorf("%d", statusCode))
 		}
 		return exec
 	}
 
 	parseEmails(&exec, rawBody, target.Value)
-	dbg.Printf("get_emails target=%q records=%d", target.Value, len(exec.Results))
+	dbg.Printf("%s success target=%q records=%d", constants.FuncGetEmails, target.Value, len(exec.Results))
 	return exec
 }
 
@@ -103,7 +107,7 @@ func fetchHTML(ctx context.Context, reqURL, target string) (rawBody []byte, stat
 	for attempt := 1; attempt <= resolver.MaxRetriesHT; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 		if err != nil {
-			dbg.Printf("get_emails attempt=%d target=%q err=create_request_failed details=%v", attempt, target, err)
+			dbg.Printf("%s error target=%q stage=create_request attempt=%d err=%v", constants.FuncGetEmails, target, attempt, err)
 			return nil, 0, fmt.Errorf("create request: %w", err)
 		}
 
@@ -115,7 +119,7 @@ func fetchHTML(ctx context.Context, reqURL, target string) (rawBody []byte, stat
 		resp, err := client.Do(req)
 		if err != nil {
 			lastErr = err
-			dbg.Printf("get_emails attempt=%d target=%q err=do_request_failed details=%v", attempt, target, err)
+			dbg.Printf("%s request_retry target=%q stage=do_request attempt=%d err=%v", constants.FuncGetEmails, target, attempt, err)
 			if attempt < resolver.MaxRetriesHT {
 				httputil.SleepContext(ctx, resolver.RetryBaseDelay)
 			}
@@ -125,12 +129,12 @@ func fetchHTML(ctx context.Context, reqURL, target string) (rawBody []byte, stat
 		statusCode = resp.StatusCode
 		body, err := io.ReadAll(resp.Body)
 		if cerr := resp.Body.Close(); cerr != nil {
-			dbg.Printf("get_emails attempt=%d target=%q err=body_close_failed details=%v", attempt, target, cerr)
+			dbg.Printf("%s body_close_failed target=%q attempt=%d err=%v", constants.FuncGetEmails, target, attempt, cerr)
 		}
 
 		if err != nil {
 			lastErr = err
-			dbg.Printf("get_emails attempt=%d target=%q err=read_body_failed details=%v", attempt, target, err)
+			dbg.Printf("%s request_retry target=%q stage=read_body attempt=%d err=%v", constants.FuncGetEmails, target, attempt, err)
 			if attempt < resolver.MaxRetriesHT {
 				httputil.SleepContext(ctx, resolver.RetryBaseDelay)
 			}
@@ -140,16 +144,17 @@ func fetchHTML(ctx context.Context, reqURL, target string) (rawBody []byte, stat
 		rawBody = body
 
 		if statusCode == http.StatusOK || statusCode == http.StatusNotFound {
-			dbg.Printf("get_emails attempt=%d target=%q success=true status=%d", attempt, target, statusCode)
+			dbg.Printf("%s response_received target=%q attempt=%d status=%d", constants.FuncGetEmails, target, attempt, statusCode)
 			break
 		}
 
 		action := httputil.ClassifyStatus(statusCode)
-		dbg.Printf("get_emails attempt=%d target=%q status=%d action=%d", attempt, target, statusCode, action)
 		if action == httputil.Abort {
+			dbg.Printf("%s error target=%q stage=response_status attempt=%d status=%d action=%d", constants.FuncGetEmails, target, attempt, statusCode, action)
 			lastErr = fmt.Errorf("http status %d: %s", statusCode, string(body))
 			break
 		}
+		dbg.Printf("%s retry_status target=%q attempt=%d status=%d action=%d", constants.FuncGetEmails, target, attempt, statusCode, action)
 
 		lastErr = fmt.Errorf("http status %d", statusCode)
 		if attempt < resolver.MaxRetriesHT {

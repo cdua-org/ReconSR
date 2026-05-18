@@ -13,21 +13,21 @@ import (
 func getURIData(ctx context.Context, target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetURI)
 
-	log.Printf("get_uri target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetURI, target)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
 	records, raw, err := resolver.ResolveRecord(queryCtx, target, 256, nil)
 	if err != nil {
-		log.Printf("get_uri error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetURI, target, err)
 		modutil.SetError(&exec, "uri lookup failed: %v", err)
 		return exec
 	}
 
 	modutil.SetRawFromBytes(&exec, raw)
 
-	log.Printf("get_uri target=%q records=%d", target, len(records))
+	log.Printf("%s success target=%q records=%d", constants.FuncGetURI, target, len(records))
 
 	for _, rec := range records {
 		parsed := dnsutils.ParseURI(rec)

@@ -14,12 +14,12 @@ import (
 func getIPAbuseContacts(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetIPAbuseContacts)
 
-	dbg.Printf("getIPAbuseContacts target=%q", target)
+	dbg.Printf("%s target=%q", constants.FuncGetIPAbuseContacts, target)
 
 	if target == "" {
 		errMsg := errInvalidIPFormat + target
 		execution.Error = &errMsg
-		dbg.Printf("getIPAbuseContacts target=%q invalid_format", target)
+		dbg.Printf("%s error target=%q stage=validate_input reason=invalid_format", constants.FuncGetIPAbuseContacts, target)
 		return execution
 	}
 
@@ -34,7 +34,7 @@ func getIPAbuseContacts(target string) (execution schema.ModuleExecution) {
 	if err := ripestatQueryFunc(ctx, target, "abuse-contact-finder", &resp, resolver.MaxRetriesIPMeta); err != nil {
 		errMsg := fmt.Errorf("ip abuse lookup failed after retries: %w", err).Error()
 		execution.Error = &errMsg
-		dbg.Printf("getIPAbuseContacts target=%q lookup_error=%v", target, err)
+		dbg.Printf("%s error target=%q stage=lookup err=%v", constants.FuncGetIPAbuseContacts, target, err)
 		return execution
 	}
 
@@ -50,7 +50,11 @@ func getIPAbuseContacts(target string) (execution schema.ModuleExecution) {
 		}
 	}
 
-	dbg.Printf("getIPAbuseContacts target=%q found_contacts=%d", target, len(resp.Data.AbuseContacts))
+	if len(resp.Data.AbuseContacts) > 0 {
+		dbg.Printf("%s success target=%q found_contacts=%d", constants.FuncGetIPAbuseContacts, target, len(resp.Data.AbuseContacts))
+	} else {
+		dbg.Printf("%s target=%q found_contacts=0", constants.FuncGetIPAbuseContacts, target)
+	}
 
 	return execution
 }

@@ -15,16 +15,16 @@ func getIPData(ctx context.Context, target string) schema.ModuleExecution {
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
 
-	log.Printf("get_ip target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncGetIP, target)
 
 	ips, raw, err := resolver.ResolveIP(queryCtx, target)
 	if err != nil {
-		log.Printf("get_ip error: %v", err)
+		log.Printf("%s error target=%q stage=resolve_ip err=%v", constants.FuncGetIP, target, err)
 		modutil.SetError(&exec, "dns lookup failed: %v", err)
 		return exec
 	}
 
-	log.Printf("get_ip target=%q ips=%d", target, len(ips))
+	log.Printf("%s success target=%q ips=%d", constants.FuncGetIP, target, len(ips))
 
 	for _, ipStr := range ips {
 		exec.Results = append(exec.Results, schema.ModuleResult{

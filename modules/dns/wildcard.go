@@ -19,23 +19,24 @@ func checkWildcard(ctx context.Context, target string) schema.ModuleExecution {
 
 	bytes := make([]byte, 6)
 	if _, err := rand.Read(bytes); err != nil {
+		log.Printf("%s error target=%q stage=generate_random_label err=%v", constants.FuncCheckWildcard, target, err)
 		modutil.SetError(&exec, "failed to generate random bytes: %v", err)
 		return exec
 	}
 
 	testDomain := "recon-" + hex.EncodeToString(bytes) + "." + target
 
-	log.Printf("check_wildcard target=%q", target)
+	log.Printf("%s query_start target=%q", constants.FuncCheckWildcard, target)
 
 	ips, raw, err := resolver.ResolveIP(queryCtx, testDomain)
 
 	if err != nil {
-		log.Printf("check_wildcard error: %v", err)
+		log.Printf("%s error target=%q test_domain=%q stage=resolve_ip err=%v", constants.FuncCheckWildcard, target, testDomain, err)
 		modutil.SetError(&exec, "dns lookup failed: %v", err)
 		return exec
 	}
 
-	log.Printf("check_wildcard target=%q ips=%d", target, len(ips))
+	log.Printf("%s success target=%q ips=%d", constants.FuncCheckWildcard, target, len(ips))
 
 	for _, ipStr := range ips {
 		exec.Results = append(exec.Results, schema.ModuleResult{
