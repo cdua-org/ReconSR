@@ -129,7 +129,7 @@ func processCheck(exec *schema.ModuleExecution, target, apiKey string) {
 
 	u, err := url.Parse(defaultAPIURL)
 	if err != nil {
-		dbg.Printf("processCheck target=%q err_invalid_url=%v", target, err)
+		dbg.Printf("processCheck error target=%q invalid_url=%v", target, err)
 		modutil.SetError(exec, "invalid default API URL: %v", err)
 		return
 	}
@@ -150,7 +150,7 @@ func processCheck(exec *schema.ModuleExecution, target, apiKey string) {
 		body, statusCode, headers, err := doRequest(ctx, u.String(), apiKey)
 		if err != nil {
 			lastErr = err
-			dbg.Printf("processCheck target=%q attempt=%d err=%v", target, attempt, lastErr)
+			dbg.Printf("processCheck error target=%q attempt=%d err=%v", target, attempt, lastErr)
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 				break
 			}
@@ -180,9 +180,9 @@ func processCheck(exec *schema.ModuleExecution, target, apiKey string) {
 
 		if err := json.Unmarshal(body, &parsed); err != nil {
 			lastErr = fmt.Errorf("parse json: %w", err)
-			dbg.Printf("processCheck target=%q attempt=%d err_parse=%v", target, attempt, lastErr)
+			dbg.Printf("processCheck error target=%q attempt=%d parse=%v", target, attempt, lastErr)
 		} else {
-			dbg.Printf("processCheck target=%q attempt=%d success=true", target, attempt)
+			dbg.Printf("processCheck success target=%q attempt=%d", target, attempt)
 			lastErr = nil
 		}
 		break

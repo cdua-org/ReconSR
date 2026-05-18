@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -91,6 +92,15 @@ func runModuleTest(t *testing.T, target, fixture string, statusCode int, customH
 func hasResult(results []schema.ModuleResult, rType, val string) bool {
 	for _, r := range results {
 		if r.Type == rType && r.Value == val {
+			return true
+		}
+	}
+	return false
+}
+
+func hasResultWithTag(results []schema.ModuleResult, rType, val, tag string) bool {
+	for _, r := range results {
+		if r.Type == rType && r.Value == val && slices.Contains(r.Tags, tag) {
 			return true
 		}
 	}
@@ -237,5 +247,27 @@ func TestAbuseIPDB_SuspiciousAndTags(t *testing.T) {
 	}
 	if !hasResult(exec.Results, constants.TypeTag, constants.TagDDoS) {
 		t.Errorf("Missing ddos tag")
+	}
+}
+
+func TestAbuseIPDB_DomainReverseIPTag(t *testing.T) {
+	setupTestEnv(t)
+	exec := runModuleTest(t, "192.0.2.1", "ip.json", http.StatusOK, nil)
+
+	if exec.Error != nil {
+		t.Fatalf("Expected no error, got: %s", *exec.Error)
+	}
+
+	domains := []string{"example.com", "node1.example.com", "mail.example.org"}
+	for _, d := range domains {
+		if !hasResultWithTag(exec.Results, constants.TypeDomain, d, constants.TagReverseIP) {
+			t.Errorf("Domain %q missing %s tag", d, constants.TagReverseIP)
+		}
+	}
+
+	for _, r := range exec.Results {
+		if r.Type == constants.TypeDomain && r.OutOfScope {
+			t.Errorf("Domain %q must not be OutOfScope", r.Value)
+		}
 	}
 }
