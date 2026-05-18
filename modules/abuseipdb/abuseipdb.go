@@ -308,9 +308,9 @@ func populateMoreResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) 
 
 	if d.Domain != "" {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:       constants.TypeDomain,
-			Value:      d.Domain,
-			OutOfScope: true,
+			Type:  constants.TypeDomain,
+			Value: d.Domain,
+			Tags:  []string{constants.TagReverseIP},
 		})
 	}
 
@@ -325,9 +325,9 @@ func populateMoreResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) 
 	for _, host := range d.Hostnames {
 		if host != "" {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:       constants.TypeDomain,
-				Value:      host,
-				OutOfScope: true,
+				Type:  constants.TypeDomain,
+				Value: host,
+				Tags:  []string{constants.TagReverseIP},
 			})
 		}
 	}
