@@ -40,12 +40,17 @@ func (m *emailformatModule) Name() string {
 }
 
 func (m *emailformatModule) Capabilities() (schema.ModuleCapabilities, error) {
+	inputTypes := []string{constants.TypeDomain}
+	if resolver.EmailformatLookupSubdomains {
+		inputTypes = append(inputTypes, constants.TypeSubdomain)
+	}
+
 	return schema.ModuleCapabilities{
 		CustomFunctions: map[string]schema.FunctionCapabilities{
 			constants.FuncGetEmails: {
 				Limit:      1,
 				DelayMs:    3000,
-				InputTypes: []string{constants.TypeDomain, constants.TypeSubdomain},
+				InputTypes: inputTypes,
 			},
 		},
 	}, nil
@@ -93,6 +98,18 @@ func getEmails(target schema.Entity) schema.ModuleExecution {
 			dbg.Printf("%s error target=%q stage=response status=%d", constants.FuncGetEmails, target.Value, statusCode)
 			modutil.SetError(&exec, "request failed with status: %d", fmt.Errorf("%d", statusCode))
 		}
+		return exec
+	}
+
+	if len(rawBody) == 0 {
+		dbg.Printf("%s error target=%q stage=response status=%d err=empty response body from server", constants.FuncGetEmails, target.Value, statusCode)
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeInfo,
+			Category: constants.CategoryProperty,
+			Value:    "Service unavailable: empty response body",
+			Context:  "email-format.com",
+			Applied:  true,
+		})
 		return exec
 	}
 

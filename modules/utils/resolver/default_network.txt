@@ -88,6 +88,12 @@ MaxRetriesIPMeta=3
 DisableMailcryptoBruteForce=true
 
 
+### Emailformat Options ###
+
+# Enable routing of subdomains to the email-format.com lookup page in addition to root domains (default: false)
+EmailformatLookupSubdomains=false
+
+
 ### Anubis Options ###
 
 # Maximum number of subdomains to process from jldc.me/Anubis (default: 1000)

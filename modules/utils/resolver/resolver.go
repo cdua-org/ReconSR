@@ -100,6 +100,9 @@ var (
 	// DisableMailcryptoBruteForce prevents domains and subdomains from being routed to mailcrypto.
 	DisableMailcryptoBruteForce = true
 
+	// EmailformatLookupSubdomains enables routing subdomains to the email-format.com lookup endpoint.
+	EmailformatLookupSubdomains = false
+
 	// VirustotalDelayMs is the delay between VirusTotal API requests in milliseconds.
 	VirustotalDelayMs = 15000
 
@@ -269,6 +272,7 @@ func initOptionMaps() {
 	}
 	boolOptions = map[string]*bool{
 		"DisableMailcryptoBruteForce": &DisableMailcryptoBruteForce,
+		"EmailformatLookupSubdomains": &EmailformatLookupSubdomains,
 		"VirustotalScanSubdomains":    &VirustotalScanSubdomains,
 		"ShodanDomainHistory":         &ShodanDomainHistory,
 		"ShodanScanSubdomains":        &ShodanScanSubdomains,

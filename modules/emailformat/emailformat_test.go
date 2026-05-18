@@ -49,6 +49,12 @@ func TestEmailFormatModule_Name(t *testing.T) {
 }
 
 func TestEmailFormatModule_Capabilities(t *testing.T) {
+	original := resolver.EmailformatLookupSubdomains
+	resolver.EmailformatLookupSubdomains = false
+	defer func() {
+		resolver.EmailformatLookupSubdomains = original
+	}()
+
 	m := New()
 	caps, err := m.Capabilities()
 	if err != nil {
@@ -69,6 +75,32 @@ func TestEmailFormatModule_Capabilities(t *testing.T) {
 	}
 	if fnCaps.DelayMs != 3000 {
 		t.Errorf("expected delay 3000, got %d", fnCaps.DelayMs)
+	}
+	if len(fnCaps.InputTypes) != 1 || fnCaps.InputTypes[0] != constants.TypeDomain {
+		t.Errorf("unexpected input types: %v", fnCaps.InputTypes)
+	}
+}
+
+func TestEmailFormatModule_CapabilitiesWithLookupSubdomains(t *testing.T) {
+	original := resolver.EmailformatLookupSubdomains
+	resolver.EmailformatLookupSubdomains = true
+	defer func() {
+		resolver.EmailformatLookupSubdomains = original
+	}()
+
+	m := New()
+	caps, err := m.Capabilities()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	fnCaps, ok := caps.CustomFunctions[constants.FuncGetEmails]
+	if !ok {
+		t.Fatalf("expected %q capability", constants.FuncGetEmails)
+	}
+
+	if len(fnCaps.InputTypes) != 2 || fnCaps.InputTypes[0] != constants.TypeDomain || fnCaps.InputTypes[1] != constants.TypeSubdomain {
+		t.Errorf("unexpected input types with EmailformatLookupSubdomains=true: %v", fnCaps.InputTypes)
 	}
 }
 
@@ -242,5 +274,46 @@ func TestGetEmails_AbortStatus(t *testing.T) {
 	}
 	if !strings.Contains(*exec.Error, "http status 403") {
 		t.Errorf("expected error to contain 'http status 403', got %q", *exec.Error)
+	}
+}
+
+func TestGetEmails_EmptyBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Empty body
+	}))
+	defer srv.Close()
+	defer withMockHost(t, srv.URL)()
+
+	m := New()
+	input := schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "emptybody.example.com"},
+		Functions: []string{constants.FuncGetEmails},
+	}
+
+	output, err := m.Exec(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(output.Executions) != 1 {
+		t.Fatalf("expected 1 execution, got %d", len(output.Executions))
+	}
+
+	exec := output.Executions[0]
+	if exec.Error != nil {
+		t.Fatalf("unexpected execution error: %s", *exec.Error)
+	}
+
+	if len(exec.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(exec.Results))
+	}
+
+	res := exec.Results[0]
+	if res.Type != constants.TypeInfo {
+		t.Errorf("expected TypeInfo, got %s", res.Type)
+	}
+	if !strings.Contains(res.Value, "empty response body") {
+		t.Errorf("expected value to contain 'empty response body', got %q", res.Value)
 	}
 }

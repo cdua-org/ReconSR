@@ -2,6 +2,25 @@ package resolver
 
 import "testing"
 
+func TestParseOptionEmailformatLookupSubdomains(t *testing.T) {
+	original := EmailformatLookupSubdomains
+	defer func() {
+		EmailformatLookupSubdomains = original
+	}()
+
+	initOptionMaps()
+	EmailformatLookupSubdomains = false
+	parseOption("EmailformatLookupSubdomains=true")
+	if !EmailformatLookupSubdomains {
+		t.Fatal("expected EmailformatLookupSubdomains to become true")
+	}
+
+	parseOption("EmailformatLookupSubdomains=false")
+	if EmailformatLookupSubdomains {
+		t.Fatal("expected EmailformatLookupSubdomains to become false")
+	}
+}
+
 func TestReverseIP(t *testing.T) {
 	tests := []struct {
 		ip       string
