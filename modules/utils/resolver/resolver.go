@@ -100,9 +100,6 @@ var (
 	// DisableMailcryptoBruteForce prevents domains and subdomains from being routed to mailcrypto.
 	DisableMailcryptoBruteForce = true
 
-	// EmailformatLookupSubdomains enables routing subdomains to the email-format.com lookup endpoint.
-	EmailformatLookupSubdomains = false
-
 	// VirustotalDelayMs is the delay between VirusTotal API requests in milliseconds.
 	VirustotalDelayMs = 15000
 
@@ -135,6 +132,21 @@ var (
 
 	// AbuseIPDBmaxAgeInDays defines how far back in time we go to fetch reports (default 30, max 365).
 	AbuseIPDBmaxAgeInDays = 30
+
+	// HunterioLimit specifies the max number of email addresses to return per page (max 100).
+	HunterioLimit = 10
+	// HunterioType limits results to 'personal' or 'generic'.
+	HunterioType = ""
+	// HunterioSeniority limits results by seniority (e.g., 'executive', 'senior').
+	HunterioSeniority = ""
+	// HunterioDepartment limits results by department.
+	HunterioDepartment = ""
+	// HunterioScanOrg enables processing of organization entities via the company endpoint.
+	HunterioScanOrg = false
+	// HunterioMaxPages defines the maximum pages to fetch.
+	HunterioMaxPages = 1
+	// HunterioMaxRetries defines maximum attempts for Hunter.io API.
+	HunterioMaxRetries = 3
 
 	// Options acts as a generic configuration dictionary.
 	Options = make(map[string]string)
@@ -272,7 +284,6 @@ func initOptionMaps() {
 	}
 	boolOptions = map[string]*bool{
 		"DisableMailcryptoBruteForce": &DisableMailcryptoBruteForce,
-		"EmailformatLookupSubdomains": &EmailformatLookupSubdomains,
 		"VirustotalScanSubdomains":    &VirustotalScanSubdomains,
 		"ShodanDomainHistory":         &ShodanDomainHistory,
 		"ShodanScanSubdomains":        &ShodanScanSubdomains,
@@ -283,6 +294,7 @@ func initOptionMaps() {
 		"CirclWithComments":           &CirclWithComments,
 		"CirclWithBundles":            &CirclWithBundles,
 		"CirclWithSightings":          &CirclWithSightings,
+		"HunterioScanOrg":             &HunterioScanOrg,
 	}
 	intOptions = map[string]*int{
 		"MaxRetriesCert":        &MaxRetriesCert,
@@ -300,9 +312,15 @@ func initOptionMaps() {
 		"DNSConcurrency":        &DNSConcurrency,
 		"MaxRetriesCircl":       &MaxRetriesCircl,
 		"AbuseIPDBmaxAgeInDays": &AbuseIPDBmaxAgeInDays,
+		"HunterioLimit":         &HunterioLimit,
+		"HunterioMaxPages":      &HunterioMaxPages,
+		"HunterioMaxRetries":    &HunterioMaxRetries,
 	}
 	stringOptions = map[string]*string{
-		"ShodanDomainType": &ShodanDomainType,
+		"ShodanDomainType":   &ShodanDomainType,
+		"HunterioType":       &HunterioType,
+		"HunterioSeniority":  &HunterioSeniority,
+		"HunterioDepartment": &HunterioDepartment,
 	}
 }
 

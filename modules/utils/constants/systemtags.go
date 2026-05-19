@@ -22,4 +22,7 @@ const (
 	TagSPF         = "spf"
 	TagCTLog       = "ct_log"
 	TagHistorical  = "historical"
+	TagLinked      = "linked"
+	TagSocial      = "social"
+	TagScrape      = "scrape"
 )

@@ -1,0 +1,24 @@
+{
+  "data": {
+    "domain": "public-freemail.example.com",
+    "disposable": false,
+    "webmail": true,
+    "accept_all": false,
+    "pattern": null,
+    "organization": "Public Freemail Provider",
+    "linked_domains": [],
+    "emails": []
+  },
+  "meta": {
+    "results": 0,
+    "limit": 10,
+    "offset": 0,
+    "params": {
+      "domain": "public-freemail.example.com",
+      "company": null,
+      "type": null,
+      "seniority": null,
+      "department": null
+    }
+  }
+}

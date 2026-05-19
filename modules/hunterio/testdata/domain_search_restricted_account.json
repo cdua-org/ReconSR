@@ -1,0 +1,9 @@
+{
+  "errors": [
+    {
+      "id": "restricted_account",
+      "code": 429,
+      "details": "Your account was restricted. Please log in to Hunter for more information."
+    }
+  ]
+}

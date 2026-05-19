@@ -88,12 +88,6 @@ MaxRetriesIPMeta=3
 DisableMailcryptoBruteForce=true
 
 
-### Emailformat Options ###
-
-# Enable routing of subdomains to the email-format.com lookup page in addition to root domains (default: false)
-EmailformatLookupSubdomains=false
-
-
 ### Anubis Options ###
 
 # Maximum number of subdomains to process from jldc.me/Anubis (default: 1000)
@@ -161,6 +155,30 @@ CirclWithSightings=false
 
 # Maximum retry attempts for CIRCL API requests (default: 3)
 MaxRetriesCircl=3
+
+
+### Hunter.io Options ###
+
+# Specifies the max number of email addresses to return per page. Max is 100. (default: 10)
+HunterioLimit=10
+
+# Get only personal or generic email addresses. Possible values: personal, generic. (default: empty, returns all)
+HunterioType=
+
+# Get only email addresses for people with the selected seniority level. Possible values: junior, senior, executive. Several seniority levels can be selected (delimited by a comma). (default: empty)
+HunterioSeniority=
+
+# Get only email addresses for people working in the selected department(s). Possible values: executive, it, finance, management, sales, legal, support, hr, marketing, communication, education, design, health, operations. Several departments can be selected (comma-delimited). (default: empty)
+HunterioDepartment=
+
+# Enable processing of organization entities via the company endpoint (default: false)
+HunterioScanOrg=false
+
+# Maximum number of pages to fetch for Hunter.io domain lookups (default: 1)
+HunterioMaxPages=1
+
+# Maximum retry attempts for Hunter.io API requests (default: 3)
+HunterioMaxRetries=3
 
 
 [DoH]

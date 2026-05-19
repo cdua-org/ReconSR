@@ -1,0 +1,89 @@
+{
+  "data": {
+    "domain": "global-corp.example.com",
+    "disposable": false,
+    "webmail": false,
+    "accept_all": true,
+    "pattern": "{f}.{last}",
+    "organization": "Global Corp Worldwide",
+    "linked_domains": [],
+    "emails": [
+      {
+        "value": "r.martinez@global-corp.example.com",
+        "type": "personal",
+        "confidence": 94,
+        "sources": [],
+        "first_name": "Robert",
+        "last_name": "Martinez",
+        "position": "IT Support Specialist",
+        "position_raw": "IT Support",
+        "seniority": "junior",
+        "department": "it",
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": { "date": "2026-01-11", "status": "valid" }
+      },
+      {
+        "value": "l.garcia@global-corp.example.com",
+        "type": "personal",
+        "confidence": 89,
+        "sources": [],
+        "first_name": "Laura",
+        "last_name": "Garcia",
+        "position": "Content Creator",
+        "position_raw": "Content Marketing",
+        "seniority": "junior",
+        "department": "marketing",
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": { "date": "2026-01-12", "status": "accept_all" }
+      },
+      {
+        "value": "k.robinson@global-corp.example.com",
+        "type": "personal",
+        "confidence": 97,
+        "sources": [],
+        "first_name": "Kevin",
+        "last_name": "Robinson",
+        "position": "Financial Analyst",
+        "position_raw": "Analyst",
+        "seniority": "senior",
+        "department": "finance",
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": { "date": "2026-01-13", "status": "valid" }
+      },
+      {
+        "value": "helpdesk@global-corp.example.com",
+        "type": "generic",
+        "confidence": 99,
+        "sources": [],
+        "first_name": null,
+        "last_name": null,
+        "position": null,
+        "position_raw": null,
+        "seniority": null,
+        "department": "support",
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": { "date": "2026-01-14", "status": "valid" }
+      }
+    ]
+  },
+  "meta": {
+    "results": 14,
+    "limit": 10,
+    "offset": 10,
+    "params": {
+      "domain": "global-corp.example.com",
+      "company": null,
+      "type": null,
+      "seniority": null,
+      "department": null
+    }
+  }
+}

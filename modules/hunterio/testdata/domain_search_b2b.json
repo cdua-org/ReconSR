@@ -1,0 +1,108 @@
+{
+  "data": {
+    "domain": "enterprise-b2b.example.net",
+    "disposable": false,
+    "webmail": false,
+    "accept_all": true,
+    "pattern": "{first}.{last}",
+    "organization": "Enterprise B2B Corporation",
+    "linked_domains": [
+      "api.enterprise-b2b.example.net",
+      "cdn.enterprise-b2b.example.net"
+    ],
+    "emails": [
+      {
+        "value": "alice.director@enterprise-b2b.example.net",
+        "type": "personal",
+        "confidence": 98,
+        "sources": [
+          {
+            "domain": "news.example.com",
+            "uri": "https://news.example.com/enterprise-b2b-leadership",
+            "extracted_on": "2022-01-15",
+            "last_seen_on": "2026-02-20",
+            "still_on_page": true
+          }
+        ],
+        "first_name": "Alice",
+        "last_name": "Director",
+        "position": "Chief Technology Officer",
+        "position_raw": "CTO",
+        "seniority": "executive",
+        "department": "it",
+        "linkedin": "https://www.linkedin.com/in/alicedirector-example",
+        "twitter": "alice_tech_example",
+        "phone_number": "+1 800 555 0199",
+        "verification": {
+          "date": "2026-04-10",
+          "status": "valid"
+        }
+      },
+      {
+        "value": "support-team@enterprise-b2b.example.net",
+        "type": "generic",
+        "confidence": 90,
+        "sources": [
+          {
+            "domain": "enterprise-b2b.example.net",
+            "uri": "https://enterprise-b2b.example.net/helpdesk",
+            "extracted_on": "2019-06-01",
+            "last_seen_on": "2026-05-18",
+            "still_on_page": true
+          },
+          {
+            "domain": "github.com",
+            "uri": "https://github.com/enterprise-b2b-example/open-docs",
+            "extracted_on": "2021-08-10",
+            "last_seen_on": "2023-12-01",
+            "still_on_page": false
+          }
+        ],
+        "first_name": null,
+        "last_name": null,
+        "position": null,
+        "position_raw": null,
+        "seniority": null,
+        "department": "support",
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": {
+          "date": "2026-05-15",
+          "status": "accept_all"
+        }
+      },
+      {
+        "value": "bob.intern@enterprise-b2b.example.net",
+        "type": "personal",
+        "confidence": 35,
+        "sources": [],
+        "first_name": "Bob",
+        "last_name": "Intern",
+        "position": "Marketing Intern",
+        "position_raw": "Intern",
+        "seniority": "junior",
+        "department": "marketing",
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": {
+          "date": "2024-01-20",
+          "status": "unknown"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "results": 3,
+    "limit": 10,
+    "offset": 0,
+    "params": {
+      "domain": "enterprise-b2b.example.net",
+      "company": "Enterprise B2B",
+      "type": "personal,generic",
+      "seniority": "executive,junior",
+      "department": "it,support,marketing"
+    }
+  }
+}

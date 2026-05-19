@@ -1,0 +1,44 @@
+{
+  "data": {
+    "domain": "strict-corp.example.com",
+    "disposable": false,
+    "webmail": false,
+    "accept_all": false,
+    "pattern": "{first}",
+    "organization": "Strict Corporation",
+    "linked_domains": [],
+    "emails": [
+      {
+        "value": "alice@strict-corp.example.com",
+        "type": "personal",
+        "confidence": 99,
+        "sources": [],
+        "first_name": "Alice",
+        "last_name": "Smith",
+        "position": "CEO",
+        "position_raw": "Chief Executive Officer",
+        "seniority": "executive",
+        "department": "executive",
+        "linkedin": "https://www.linkedin.com/in/alicesmith-example",
+        "twitter": "alicesmith_ex",
+        "phone_number": "+1 555 0100",
+        "verification": {
+          "date": "2026-05-10",
+          "status": "valid"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "results": 1,
+    "limit": 10,
+    "offset": 0,
+    "params": {
+      "domain": "strict-corp.example.com",
+      "company": null,
+      "type": null,
+      "seniority": null,
+      "department": null
+    }
+  }
+}
