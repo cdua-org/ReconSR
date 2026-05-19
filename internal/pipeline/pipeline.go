@@ -55,7 +55,22 @@ func Run(ctx context.Context) {
 		defer wg.Done()
 		defer close(dispatchChan)
 		for packet := range repoChan {
+			expectedTokens := 0
+			for _, group := range packet.Groups {
+				expectedTokens += len(group.Results)
+			}
+
 			repoData, err := repository.Store(ctx, packet)
+
+			actualTokens := 0
+			if err == nil && repoData != nil {
+				actualTokens = len(repoData.Batch)
+			}
+
+			if expectedTokens > actualTokens {
+				repoWritersWg.Add(-(expectedTokens - actualTokens))
+			}
+
 			if err != nil {
 				log.Printf("Data storage error: %v", err)
 				continue
