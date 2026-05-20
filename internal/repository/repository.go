@@ -19,11 +19,11 @@ import (
 )
 
 const (
-	AnchorEntityType  = "domain"
-	StorageBaseDir    = "storage/base"
+	AnchorEntityType   = "domain"
+	StorageBaseDir     = "storage/base"
 	StorageProjectsDir = "storage/projects"
-	MasterDBName      = "master.db"
-	sqliteMaxParams   = 999
+	MasterDBName       = "master.db"
+	sqliteMaxParams    = 999
 )
 
 type routeRegistry struct {
@@ -429,6 +429,7 @@ type storeBatch struct {
 	propertyRefs  map[string][]batchEntityID
 	propertyIDs   []batchEntityID
 	results       []batchResult
+	localIDMap    map[string]batchEntityID
 }
 
 type entityAgg struct {
@@ -514,6 +515,7 @@ func newStoreBatch(hints batchBuildHints) storeBatch {
 		propertyRefs:  make(map[string][]batchEntityID, hints.propertyCap),
 		propertyIDs:   make([]batchEntityID, 0, hints.propertyCap),
 		results:       make([]batchResult, 0, hints.resultCap),
+		localIDMap:    make(map[string]batchEntityID),
 	}
 }
 
@@ -549,11 +551,14 @@ func appendUniqueTags(dst []string, src []string) []string {
 	return dst
 }
 
-func (b *storeBatch) addNode(entityType, value, category string) batchEntityID {
+func (b *storeBatch) addNode(entityType, value, category string, localID string) batchEntityID {
 	key := nodeKey{entityType: entityType, value: value}
 	if id, ok := b.nodeIndex[key]; ok {
 		if category != "" {
 			b.item(id).entity.category = category
+		}
+		if localID != "" {
+			b.localIDMap[localID] = id
 		}
 		return id
 	}
@@ -567,6 +572,9 @@ func (b *storeBatch) addNode(entityType, value, category string) batchEntityID {
 	})
 	b.nodeIndex[key] = id
 	b.nodeIDs = append(b.nodeIDs, id)
+	if localID != "" {
+		b.localIDMap[localID] = id
+	}
 	return id
 }
 
@@ -578,6 +586,9 @@ func (b *storeBatch) addProperty(sourceID, parentID batchEntityID, result schema
 		item.tags = appendUniqueTags(item.tags, result.Tags)
 		if item.anchor == "" && result.Anchor != "" {
 			item.anchor = result.Anchor
+		}
+		if result.LocalID != "" {
+			b.localIDMap[result.LocalID] = id
 		}
 		return id
 	}
@@ -593,10 +604,20 @@ func (b *storeBatch) addProperty(sourceID, parentID batchEntityID, result schema
 	b.propertyIndex[key] = id
 	b.propertyRefs[entityKey(result.Type, result.Value)] = append(b.propertyRefs[entityKey(result.Type, result.Value)], id)
 	b.propertyIDs = append(b.propertyIDs, id)
+	if result.LocalID != "" {
+		b.localIDMap[result.LocalID] = id
+	}
 	return id
 }
 
 func (b *storeBatch) resolveSource(rootKey string, source schema.EntityRef) (batchEntityID, bool, error) {
+	if source.LocalID != "" {
+		if id, ok := b.localIDMap[source.LocalID]; ok {
+			return id, true, nil
+		}
+		return 0, false, nil
+	}
+
 	key := entityKey(source.Type, source.Value)
 	if key == rootKey {
 		return b.rootID, true, nil
@@ -622,7 +643,7 @@ func buildStoreBatch(data *schema.ProcessorToRepoData, source entityFields) (sto
 	if source.category == "property" {
 		batch.rootID = batch.appendEntity(batchEntity{entity: source})
 	} else {
-		batch.rootID = batch.addNode(source.entityType, source.value, source.category)
+		batch.rootID = batch.addNode(source.entityType, source.value, source.category, "")
 	}
 
 	rootKey := entityKey(source.entityType, source.value)
@@ -645,12 +666,12 @@ func buildStoreBatch(data *schema.ProcessorToRepoData, source entityFields) (sto
 				category := normalizeCategory(result.Category)
 				var targetID batchEntityID
 				if category == "node" {
-					targetID = batch.addNode(result.Type, result.Value, category)
+					targetID = batch.addNode(result.Type, result.Value, category, result.LocalID)
 				} else {
 					targetID = batch.addProperty(sourceID, sourceID, result)
 				}
 				if result.Anchor != "" {
-					batch.addNode(AnchorEntityType, result.Anchor, "node")
+					batch.addNode(AnchorEntityType, result.Anchor, "node", "")
 				}
 				batch.results = append(batch.results, batchResult{sourceID: sourceID, targetID: targetID, result: result})
 			}

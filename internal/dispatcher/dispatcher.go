@@ -527,8 +527,8 @@ func Dispatch(data *schema.RepoToDispatcherData, out chan<- *schema.ProcessorToR
 								})
 
 								processorData := &schema.ProcessorInputData{
-									ProjectID:  data.ProjectID,
-									ModuleName: entry.mod.Name(),
+									ProjectID:      data.ProjectID,
+									ModuleName:     entry.mod.Name(),
 									SourceEntityID: item.SourceEntityID,
 									SourceEntity: schema.Entity{
 										Type:  item.Entity.Type,
@@ -565,8 +565,8 @@ func Dispatch(data *schema.RepoToDispatcherData, out chan<- *schema.ProcessorToR
 							}
 
 							processorData := &schema.ProcessorInputData{
-								ProjectID:  data.ProjectID,
-								ModuleName: entry.mod.Name(),
+								ProjectID:      data.ProjectID,
+								ModuleName:     entry.mod.Name(),
 								SourceEntityID: item.SourceEntityID,
 								SourceEntity: schema.Entity{
 									Type:  item.Entity.Type,

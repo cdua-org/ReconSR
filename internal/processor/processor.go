@@ -13,16 +13,27 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 	var functionsWithoutResults []string
 	var errors []schema.ProcessorToRepoError
 
+	type procEntityKey struct {
+		Type  string
+		Value string
+	}
+
+	type resAggKey struct {
+		Type    string
+		Value   string
+		LocalID string
+	}
+
 	returnedSet := make(map[string]bool)
 	functionHasFindings := make(map[string]bool)
 	functionHasErrors := make(map[string]bool)
 	functionRawData := make(map[string]string)
 
-	aggregatedGroups := make(map[schema.EntityRef]map[string]*schema.ProcessorToRepoValidResult)
+	aggregatedGroups := make(map[schema.EntityRef]map[resAggKey]*schema.ProcessorToRepoValidResult)
 
-	refs := make(map[string]*schema.EntityRef)
+	refs := make(map[procEntityKey]*schema.EntityRef)
 	getRef := func(t, v string) *schema.EntityRef {
-		k := t + ":" + v
+		k := procEntityKey{Type: t, Value: v}
 		if r, ok := refs[k]; ok {
 			return r
 		}
@@ -66,9 +77,9 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 		}
 	}
 
-	sourceKey := data.SourceEntity.Type + ":" + data.SourceEntity.Value
+	sourceKey := procEntityKey{Type: data.SourceEntity.Type, Value: data.SourceEntity.Value}
 	getRef(data.SourceEntity.Type, data.SourceEntity.Value)
-	adj := make(map[string][]string)
+	adj := make(map[procEntityKey][]procEntityKey)
 
 	for i := range data.Executions {
 		exec := &data.Executions[i]
@@ -80,22 +91,24 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 		}
 		for j := range exec.Results {
 			res := &exec.Results[j]
+			var srcType, srcValue string
 			if res.Source == nil {
-				res.Source = getRef(data.SourceEntity.Type, data.SourceEntity.Value)
+				srcType, srcValue = data.SourceEntity.Type, data.SourceEntity.Value
 			} else {
-				res.Source = getRef(res.Source.Type, res.Source.Value)
+				srcType, srcValue = res.Source.Type, res.Source.Value
 			}
-			targetRef := getRef(res.Type, res.Value)
+			getRef(srcType, srcValue)
+			getRef(res.Type, res.Value)
 
-			srcKey := res.Source.Type + ":" + res.Source.Value
-			targetKey := targetRef.Type + ":" + targetRef.Value
+			srcKey := procEntityKey{Type: srcType, Value: srcValue}
+			targetKey := procEntityKey{Type: res.Type, Value: res.Value}
 			adj[srcKey] = append(adj[srcKey], targetKey)
 		}
 	}
 
-	reachable := make(map[string]bool)
+	reachable := make(map[procEntityKey]bool)
 	reachable[sourceKey] = true
-	queue := []string{sourceKey}
+	queue := []procEntityKey{sourceKey}
 	for len(queue) > 0 {
 		curr := queue[0]
 		queue = queue[1:]
@@ -166,9 +179,22 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 				continue
 			}
 
-			origTargetKey := res.Type + ":" + res.Value
+			origTargetKey := procEntityKey{Type: res.Type, Value: res.Value}
 			targetRef := refs[origTargetKey]
-			srcRefVal := *res.Source
+
+			var srcType, srcValue, srcLocalID string
+			if res.Source == nil {
+				srcType, srcValue = data.SourceEntity.Type, data.SourceEntity.Value
+			} else {
+				srcType, srcValue = res.Source.Type, res.Source.Value
+				srcLocalID = res.Source.LocalID
+			}
+
+			origSrcKey := procEntityKey{Type: srcType, Value: srcValue}
+			srcCacheRef := refs[origSrcKey]
+
+			srcRefVal := *srcCacheRef
+			srcRefVal.LocalID = srcLocalID
 
 			// Skip self-discovery unless new tags are provided to enrich the immediate source entity
 			if targetRef.Value == srcRefVal.Value && targetRef.Type == srcRefVal.Type && len(validTags) == 0 {
@@ -201,9 +227,9 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 				}
 			}
 
-			resKey := targetRef.Type + ":" + targetRef.Value
+			resKey := resAggKey{Type: targetRef.Type, Value: targetRef.Value, LocalID: res.LocalID}
 			if aggregatedGroups[srcRefVal] == nil {
-				aggregatedGroups[srcRefVal] = make(map[string]*schema.ProcessorToRepoValidResult)
+				aggregatedGroups[srcRefVal] = make(map[resAggKey]*schema.ProcessorToRepoValidResult)
 			}
 
 			if existing, found := aggregatedGroups[srcRefVal][resKey]; found {
@@ -230,15 +256,16 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 				targetAnchor := targetRef.Anchor
 
 				aggregatedGroups[srcRefVal][resKey] = &schema.ProcessorToRepoValidResult{
-					Function:    exec.Function,
-					Type:        targetRef.Type,
-					Value:       targetRef.Value,
-					Context:     res.Context,
-					Category:    cat,
-					Applied:     applied,
-					OutOfScope:  res.OutOfScope || scopemanager.IsOutOfScope(targetRef.Type, targetRef.Value),
-					Tags:        validTags,
-					Anchor:      targetAnchor,
+					Function:   exec.Function,
+					Type:       targetRef.Type,
+					Value:      targetRef.Value,
+					Context:    res.Context,
+					Category:   cat,
+					Applied:    applied,
+					OutOfScope: res.OutOfScope || scopemanager.IsOutOfScope(targetRef.Type, targetRef.Value),
+					Tags:       validTags,
+					Anchor:     targetAnchor,
+					LocalID:    res.LocalID,
 				}
 			}
 			functionHasFindings[exec.Function] = true
@@ -288,12 +315,11 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 			Errors:                  errors,
 		}
 
-		out <- repoData
 		if totalResults > 0 {
-			writersWg.Add(totalResults - 1)
-		} else {
-			writersWg.Done()
+			writersWg.Add(totalResults)
 		}
+		out <- repoData
+		writersWg.Done()
 	} else {
 		writersWg.Done()
 	}

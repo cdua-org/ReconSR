@@ -17,9 +17,10 @@ type Entity struct {
 
 // EntityRef represents a reference to an entity.
 type EntityRef struct {
-	Type      string `json:"Type"`
-	Value     string `json:"Value"`
-	Anchor string `json:"Anchor,omitempty"`
+	Type    string `json:"Type"`
+	Value   string `json:"Value"`
+	Anchor  string `json:"Anchor,omitempty"`
+	LocalID string `json:"LocalID,omitempty"`
 }
 
 type ModuleFunction struct {
@@ -54,6 +55,7 @@ type ModuleResult struct {
 	Value      string     `json:"Value"`
 	Context    string     `json:"Context,omitempty"`
 	Source     *EntityRef `json:"Source,omitempty"`
+	LocalID    string     `json:"LocalID,omitempty"`
 	Applied    bool       `json:"Applied,omitempty"`
 	OutOfScope bool       `json:"OutOfScope,omitempty"`
 	Tags       []string   `json:"Tags,omitempty"`
@@ -86,6 +88,7 @@ type ProcessorInputResult struct {
 	Value      string     `json:"Value"`
 	Context    string     `json:"Context"`
 	Source     *EntityRef `json:"Source,omitempty"`
+	LocalID    string     `json:"LocalID,omitempty"`
 	Applied    bool       `json:"Applied,omitempty"`
 	OutOfScope bool       `json:"OutOfScope,omitempty"`
 	Tags       []string   `json:"Tags,omitempty"`
@@ -125,15 +128,16 @@ type PipelineInjection struct {
 }
 
 type ProcessorToRepoValidResult struct {
-	Function    string   `json:"Function"`
-	Type        string   `json:"Type"`
-	Category    string   `json:"Category,omitempty"`
-	Value       string   `json:"Value"`
-	Context     string   `json:"Context"`
-	Applied     bool     `json:"Applied,omitempty"`
-	OutOfScope  bool     `json:"OutOfScope,omitempty"`
-	Tags        []string `json:"Tags,omitempty"`
-	Anchor      string   `json:"Anchor,omitempty"`
+	Function   string   `json:"Function"`
+	Type       string   `json:"Type"`
+	Category   string   `json:"Category,omitempty"`
+	Value      string   `json:"Value"`
+	Context    string   `json:"Context"`
+	Applied    bool     `json:"Applied,omitempty"`
+	OutOfScope bool     `json:"OutOfScope,omitempty"`
+	Tags       []string `json:"Tags,omitempty"`
+	Anchor     string   `json:"Anchor,omitempty"`
+	LocalID    string   `json:"LocalID,omitempty"`
 }
 
 type ProcessorToRepoError struct {
