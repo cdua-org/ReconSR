@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/apiconfig"
@@ -25,6 +26,7 @@ type module struct {
 	keyInvalid    bool
 	quotaExceeded bool
 	queryCredits  int
+	demoFired     atomic.Bool
 }
 
 func (m *module) waitRateLimit() {

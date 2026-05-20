@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"cdua-org/ReconSR/modules/utils/apiconfig"
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -51,7 +52,8 @@ var defaultAPIURL = "https://api.abuseipdb.com/api/v2/check"
 var dbg = debuglog.New("abuseipdb")
 
 type module struct {
-	apiKey string
+	apiKey    string
+	demoFired atomic.Bool
 }
 
 // New creates a new abuseipdb module instance.
@@ -106,7 +108,11 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		exec := modutil.NewExecution(f)
 
 		if f == constants.FuncCheckAbuseIPDB {
-			processCheck(&exec, data.Target.Value, m.apiKey)
+			if m.apiKey == "demo-api-key" {
+				m.processCheckDemo(&exec, data.Target.Value)
+			} else {
+				processCheck(&exec, data.Target.Value, m.apiKey)
+			}
 		} else {
 			modutil.SetError(&exec, "unsupported function: %v", errors.New(f))
 		}

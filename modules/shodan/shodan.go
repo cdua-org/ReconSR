@@ -10,17 +10,20 @@ import (
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
+	"sync/atomic"
 )
 
 const moduleName = "shodan"
 
 type shodanModule struct {
-	lastReqTime   time.Time
-	apiKey        string
-	queryCredits  int
-	preflightOnce sync.Once
-	mu            sync.Mutex
-	keyInvalid    bool
+	lastReqTime     time.Time
+	apiKey          string
+	queryCredits    int
+	preflightOnce   sync.Once
+	mu              sync.Mutex
+	keyInvalid      bool
+	demoDomainFired atomic.Bool
+	demoIPFired     atomic.Bool
 }
 
 // New returns a new instance of the Shodan module.

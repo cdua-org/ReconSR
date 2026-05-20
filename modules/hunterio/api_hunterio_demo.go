@@ -13,6 +13,11 @@ import (
 // getDomainSearchDemo is a demo function that loads a local JSON fixture
 // instead of querying the Hunter.io API when the "demo-api-key" is used.
 func (m *module) getDomainSearchDemo(exec *schema.ModuleExecution, targetType, targetValue string) schema.ModuleExecution {
+	if !m.demoFired.CompareAndSwap(false, true) {
+		dlog.Printf("%s skipped stage=demo_already_fired target=%q", constants.FuncGetHunterioDomainSearch, targetValue)
+		return *exec
+	}
+
 	dlog.Printf("%s start stage=demo_mode", constants.FuncGetHunterioDomainSearch)
 
 	exec.Results = append(exec.Results, schema.ModuleResult{

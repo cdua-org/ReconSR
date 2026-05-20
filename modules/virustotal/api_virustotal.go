@@ -33,10 +33,12 @@ var baseURL = "https://www.virustotal.com/api/v3"
 var dbg = debuglog.New("vt")
 
 type module struct {
-	lastReqTime time.Time
-	apiKey      string
-	mu          sync.Mutex
-	keyInvalid  atomic.Bool
+	lastReqTime     time.Time
+	apiKey          string
+	mu              sync.Mutex
+	keyInvalid      atomic.Bool
+	demoDomainFired atomic.Bool
+	demoIPFired     atomic.Bool
 }
 
 type vtRequestError struct {
@@ -163,6 +165,11 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 }
 
 func (m *module) processDomain(ctx context.Context, target string, exec *schema.ModuleExecution) {
+	if m.apiKey == "demo-api-key" {
+		m.processDomainDemo(ctx, target, exec)
+		return
+	}
+
 	url := fmt.Sprintf("%s/domains/%s", baseURL, target)
 	dbg.Printf("%s phase=root_metadata target=%q url=%q", constants.FuncGetVTApiDomain, target, url)
 
@@ -210,6 +217,11 @@ func (m *module) processDomain(ctx context.Context, target string, exec *schema.
 }
 
 func (m *module) processIP(ctx context.Context, target string, exec *schema.ModuleExecution) {
+	if m.apiKey == "demo-api-key" {
+		m.processIPDemo(ctx, target, exec)
+		return
+	}
+
 	url := fmt.Sprintf("%s/ip_addresses/%s", baseURL, target)
 	dbg.Printf("%s phase=ip_metadata target=%q url=%q", constants.FuncGetVTApiIP, target, url)
 
