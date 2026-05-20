@@ -18,6 +18,11 @@ import (
 
 func (m *shodanModule) getShodanAPIDomain(target schema.Entity) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetShodanAPIDomain)
+
+	if m.apiKey == "demo-api-key" {
+		return m.getShodanAPIDomainDemo(&exec, target)
+	}
+
 	m.preflightOnce.Do(func() { m.handlePreflightAPI() })
 
 	page := 1

@@ -15,6 +15,11 @@ import (
 
 func (m *shodanModule) getShodanAPIIP(target schema.Entity) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetShodanAPIIP)
+
+	if m.apiKey == "demo-api-key" {
+		return m.getShodanAPIIPDemo(&exec, target)
+	}
+
 	m.preflightOnce.Do(func() { m.handlePreflightAPI() })
 
 	m.mu.Lock()
