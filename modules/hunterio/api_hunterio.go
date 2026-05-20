@@ -148,6 +148,11 @@ func (m *module) handlePreflightAPI(ctx context.Context) {
 
 func (m *module) getDomainSearch(ctx context.Context, targetType, targetValue string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetHunterioDomainSearch)
+
+	if m.apiKey == "demo-api-key" {
+		return m.getDomainSearchDemo(&exec, targetType, targetValue)
+	}
+
 	m.preflightOnce.Do(func() { m.handlePreflightAPI(ctx) })
 
 	m.mu.Lock()
@@ -176,6 +181,7 @@ func (m *module) getDomainSearch(ctx context.Context, targetType, targetValue st
 	var rawResponses []byte
 	var allEmails []schema.ModuleResult
 	var linkedDomains []string
+	var domainForScope string
 
 	for page := range maxPages {
 		if page > 0 {
@@ -202,12 +208,16 @@ func (m *module) getDomainSearch(ctx context.Context, targetType, targetValue st
 			break
 		}
 
-		allEmails = append(allEmails, extractEmails(&parsedResp, targetValue)...)
-
 		if page == 0 {
+			domainForScope = targetValue
+			if targetType == constants.TypeOrganization && parsedResp.Data.Domain != "" {
+				domainForScope = parsedResp.Data.Domain
+			}
 			appendDomainProperties(&exec, &parsedResp)
 			linkedDomains = append(linkedDomains, parsedResp.Data.LinkedDomains...)
 		}
+
+		allEmails = append(allEmails, extractEmails(&parsedResp, domainForScope)...)
 
 		dlog.Printf("%s success target=%q page=%d results=%d", constants.FuncGetHunterioDomainSearch, targetValue, page+1, parsedResp.Meta.Results)
 
@@ -220,10 +230,11 @@ func (m *module) getDomainSearch(ctx context.Context, targetType, targetValue st
 	exec.Results = append(exec.Results, allEmails...)
 	for _, ld := range linkedDomains {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:    constants.TypeDomain,
-			Value:   ld,
-			Tags:    []string{constants.TagLinked},
-			Applied: true,
+			Type:       constants.TypeDomain,
+			Value:      ld,
+			Tags:       []string{constants.TagLinked},
+			OutOfScope: orgdomain.IsOutOfScope(ld, domainForScope),
+			Applied:    true,
 		})
 	}
 
