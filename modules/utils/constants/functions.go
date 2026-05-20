@@ -52,4 +52,7 @@ const (
 	FuncGetCirclVuln            = "get_circl_vuln"
 	FuncCheckAbuseIPDB          = "check_abuseipdb"
 	FuncGetHunterioDomainSearch = "get_hunterio_domain_search"
+	FuncGetGeoIP                = "get_geo_ip"
+	FuncGetIPASN                = "get_ip_asn"
+	FuncGetProxyCheck           = "get_proxy_check"
 )
