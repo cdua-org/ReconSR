@@ -21,7 +21,7 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 	type resAggKey struct {
 		Type    string
 		Value   string
-		LocalID string
+		LocalID int
 	}
 
 	returnedSet := make(map[string]bool)
@@ -182,7 +182,8 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 			origTargetKey := procEntityKey{Type: res.Type, Value: res.Value}
 			targetRef := refs[origTargetKey]
 
-			var srcType, srcValue, srcLocalID string
+			var srcType, srcValue string
+			var srcLocalID int
 			if res.Source == nil {
 				srcType, srcValue = data.SourceEntity.Type, data.SourceEntity.Value
 			} else {

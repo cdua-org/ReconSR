@@ -429,7 +429,7 @@ type storeBatch struct {
 	propertyRefs  map[string][]batchEntityID
 	propertyIDs   []batchEntityID
 	results       []batchResult
-	localIDMap    map[string]batchEntityID
+	localIDMap    map[int]batchEntityID
 }
 
 type entityAgg struct {
@@ -515,7 +515,7 @@ func newStoreBatch(hints batchBuildHints) storeBatch {
 		propertyRefs:  make(map[string][]batchEntityID, hints.propertyCap),
 		propertyIDs:   make([]batchEntityID, 0, hints.propertyCap),
 		results:       make([]batchResult, 0, hints.resultCap),
-		localIDMap:    make(map[string]batchEntityID),
+		localIDMap:    make(map[int]batchEntityID),
 	}
 }
 
@@ -551,13 +551,13 @@ func appendUniqueTags(dst []string, src []string) []string {
 	return dst
 }
 
-func (b *storeBatch) addNode(entityType, value, category string, localID string) batchEntityID {
+func (b *storeBatch) addNode(entityType, value, category string, localID int) batchEntityID {
 	key := nodeKey{entityType: entityType, value: value}
 	if id, ok := b.nodeIndex[key]; ok {
 		if category != "" {
 			b.item(id).entity.category = category
 		}
-		if localID != "" {
+		if localID != 0 {
 			b.localIDMap[localID] = id
 		}
 		return id
@@ -572,7 +572,7 @@ func (b *storeBatch) addNode(entityType, value, category string, localID string)
 	})
 	b.nodeIndex[key] = id
 	b.nodeIDs = append(b.nodeIDs, id)
-	if localID != "" {
+	if localID != 0 {
 		b.localIDMap[localID] = id
 	}
 	return id
@@ -587,7 +587,7 @@ func (b *storeBatch) addProperty(sourceID, parentID batchEntityID, result schema
 		if item.anchor == "" && result.Anchor != "" {
 			item.anchor = result.Anchor
 		}
-		if result.LocalID != "" {
+		if result.LocalID != 0 {
 			b.localIDMap[result.LocalID] = id
 		}
 		return id
@@ -604,14 +604,14 @@ func (b *storeBatch) addProperty(sourceID, parentID batchEntityID, result schema
 	b.propertyIndex[key] = id
 	b.propertyRefs[entityKey(result.Type, result.Value)] = append(b.propertyRefs[entityKey(result.Type, result.Value)], id)
 	b.propertyIDs = append(b.propertyIDs, id)
-	if result.LocalID != "" {
+	if result.LocalID != 0 {
 		b.localIDMap[result.LocalID] = id
 	}
 	return id
 }
 
 func (b *storeBatch) resolveSource(rootKey string, source schema.EntityRef) (batchEntityID, bool, error) {
-	if source.LocalID != "" {
+	if source.LocalID != 0 {
 		if id, ok := b.localIDMap[source.LocalID]; ok {
 			return id, true, nil
 		}
@@ -643,7 +643,7 @@ func buildStoreBatch(data *schema.ProcessorToRepoData, source entityFields) (sto
 	if source.category == "property" {
 		batch.rootID = batch.appendEntity(batchEntity{entity: source})
 	} else {
-		batch.rootID = batch.addNode(source.entityType, source.value, source.category, "")
+		batch.rootID = batch.addNode(source.entityType, source.value, source.category, 0)
 	}
 
 	rootKey := entityKey(source.entityType, source.value)
@@ -671,7 +671,7 @@ func buildStoreBatch(data *schema.ProcessorToRepoData, source entityFields) (sto
 					targetID = batch.addProperty(sourceID, sourceID, result)
 				}
 				if result.Anchor != "" {
-					batch.addNode(AnchorEntityType, result.Anchor, "node", "")
+					batch.addNode(AnchorEntityType, result.Anchor, "node", 0)
 				}
 				batch.results = append(batch.results, batchResult{sourceID: sourceID, targetID: targetID, result: result})
 			}
