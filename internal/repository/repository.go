@@ -1338,7 +1338,20 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 
 	batchModel, err := buildStoreBatch(data, source.entity)
 	if err != nil {
-		return nil, err
+		var funcName string
+		for fn := range data.FunctionRawData {
+			funcName = fn
+			break
+		}
+
+		data.Groups = nil
+		data.Errors = append(data.Errors, schema.ProcessorToRepoError{
+			Function:  funcName,
+			ErrorType: "invalid_batch(core)",
+			ErrorText: err.Error(),
+		})
+
+		batchModel, _ = buildStoreBatch(data, source.entity)
 	}
 
 	states := make([]entityState, len(batchModel.entities)+1)
