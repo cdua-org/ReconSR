@@ -7,6 +7,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -54,11 +55,13 @@ func parseSubjectAltName(exec *schema.ModuleExecution, value string) []schema.En
 		}
 		seen[cacheKey] = struct{}{}
 
+		localID := modutil.BuildLocalID(nil, resultType, resultValue)
 		result := schema.ModuleResult{
 			Type:     resultType,
 			Category: constants.CategoryNode,
 			Value:    resultValue,
 			Tags:     []string{constants.TagSan},
+			LocalID:  localID,
 		}
 		if wildcardContext != "" {
 			result.Tags = append(result.Tags, constants.TagWildcard)
@@ -66,7 +69,7 @@ func parseSubjectAltName(exec *schema.ModuleExecution, value string) []schema.En
 		}
 
 		exec.Results = append(exec.Results, result)
-		sources = append(sources, schema.EntityRef{Type: resultType, Value: resultValue})
+		sources = append(sources, schema.EntityRef{Type: resultType, Value: resultValue, LocalID: localID})
 	}
 
 	return sources
@@ -117,12 +120,14 @@ func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, valu
 		return
 	}
 
+	localID := modutil.BuildLocalID(source, resultType, value)
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
 		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  context,
 		Source:   source,
+		LocalID:  localID,
 	})
 }
 
@@ -142,12 +147,14 @@ func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value str
 		return
 	}
 
+	localID := modutil.BuildLocalID(source, resultType, value)
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
 		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  context,
 		Source:   source,
+		LocalID:  localID,
 	})
 }
 

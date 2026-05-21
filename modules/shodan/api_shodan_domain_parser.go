@@ -86,6 +86,7 @@ func appendShodanSubdomain(exec *schema.ModuleExecution, fqdn, entityType, targe
 		return nil
 	}
 
+	localID := modutil.BuildLocalID(nil, entityType, fqdn)
 	result := schema.ModuleResult{
 		Type:       entityType,
 		Category:   constants.CategoryNode,
@@ -93,6 +94,7 @@ func appendShodanSubdomain(exec *schema.ModuleExecution, fqdn, entityType, targe
 		Context:    "Shodan DNS",
 		Tags:       []string{constants.TagPDNS},
 		OutOfScope: orgdomain.IsOutOfScope(fqdn, target),
+		LocalID:    localID,
 	}
 	if resolver.ShodanDomainHistory {
 		result.Tags = append(result.Tags, constants.TagHistorical)
@@ -104,7 +106,7 @@ func appendShodanSubdomain(exec *schema.ModuleExecution, fqdn, entityType, targe
 
 	exec.Results = append(exec.Results, result)
 
-	return &schema.EntityRef{Type: entityType, Value: fqdn}
+	return &schema.EntityRef{Type: entityType, Value: fqdn, LocalID: localID}
 }
 
 func processShodanDNSRecord(exec *schema.ModuleExecution, record shodanDomainRecord, value, target string, source *schema.EntityRef) *schema.EntityRef {
@@ -144,15 +146,17 @@ func appendShodanIPResult(exec *schema.ModuleExecution, value string, source *sc
 		return nil
 	}
 
+	localID := modutil.BuildLocalID(source, validated.Type, validated.Value)
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     validated.Type,
 		Category: constants.CategoryNode,
 		Value:    validated.Value,
 		Context:  "A/AAAA Record",
 		Source:   source,
+		LocalID:  localID,
 	})
 
-	return &schema.EntityRef{Type: validated.Type, Value: validated.Value}
+	return &schema.EntityRef{Type: validated.Type, Value: validated.Value, LocalID: localID}
 }
 
 func appendShodanCNAMEResult(exec *schema.ModuleExecution, value, target string, source *schema.EntityRef) *schema.EntityRef {
@@ -166,6 +170,7 @@ func appendShodanCNAMEResult(exec *schema.ModuleExecution, value, target string,
 	}
 
 	isOOS := orgdomain.IsOutOfScope(validated.Value, target)
+	localID := modutil.BuildLocalID(source, validated.Type, validated.Value)
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:       validated.Type,
@@ -175,9 +180,10 @@ func appendShodanCNAMEResult(exec *schema.ModuleExecution, value, target string,
 		Context:    "CNAME Record",
 		OutOfScope: isOOS,
 		Source:     source,
+		LocalID:    localID,
 	})
 
-	return &schema.EntityRef{Type: validated.Type, Value: validated.Value}
+	return &schema.EntityRef{Type: validated.Type, Value: validated.Value, LocalID: localID}
 }
 
 func appendShodanMXResult(exec *schema.ModuleExecution, record shodanDomainRecord, value, target string, source *schema.EntityRef) *schema.EntityRef {
@@ -186,14 +192,17 @@ func appendShodanMXResult(exec *schema.ModuleExecution, record shodanDomainRecor
 		mxValue = strconv.FormatUint(uint64(record.Options.Priority), 10) + " " + value
 	}
 
+	localID := modutil.BuildLocalID(source, constants.TypeMX, mxValue)
+
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeMX,
 		Category: constants.CategoryProperty,
 		Value:    mxValue,
 		Source:   source,
+		LocalID:  localID,
 	})
 
-	mxRef := &schema.EntityRef{Type: constants.TypeMX, Value: mxValue}
+	mxRef := &schema.EntityRef{Type: constants.TypeMX, Value: mxValue, LocalID: localID}
 
 	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
@@ -204,6 +213,7 @@ func appendShodanMXResult(exec *schema.ModuleExecution, record shodanDomainRecor
 		return mxRef
 	}
 
+	nodeLocalID := modutil.BuildLocalID(mxRef, validated.Type, validated.Value)
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:       validated.Type,
 		Category:   constants.CategoryNode,
@@ -211,6 +221,7 @@ func appendShodanMXResult(exec *schema.ModuleExecution, record shodanDomainRecor
 		Tags:       []string{constants.TagMX},
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     mxRef,
+		LocalID:    nodeLocalID,
 	})
 
 	return mxRef
@@ -226,6 +237,7 @@ func appendShodanNSResult(exec *schema.ModuleExecution, value, target string, so
 		return nil
 	}
 
+	localID := modutil.BuildLocalID(source, validated.Type, validated.Value)
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:       validated.Type,
 		Category:   constants.CategoryNode,
@@ -233,9 +245,10 @@ func appendShodanNSResult(exec *schema.ModuleExecution, value, target string, so
 		Tags:       []string{constants.TagNS},
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     source,
+		LocalID:    localID,
 	})
 
-	return &schema.EntityRef{Type: validated.Type, Value: validated.Value}
+	return &schema.EntityRef{Type: validated.Type, Value: validated.Value, LocalID: localID}
 }
 
 func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainRecord, value, target string, source *schema.EntityRef) *schema.EntityRef {
@@ -255,7 +268,8 @@ func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainReco
 		contextStr = record.Subdomain
 	}
 
-	ref := &schema.EntityRef{Type: resultType, Value: value}
+	localID := modutil.BuildLocalID(source, resultType, value)
+	ref := &schema.EntityRef{Type: resultType, Value: value, LocalID: localID}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
@@ -263,6 +277,7 @@ func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainReco
 		Value:    value,
 		Context:  contextStr,
 		Source:   source,
+		LocalID:  localID,
 	})
 
 	if resultType == constants.TypeDMARC {
@@ -286,6 +301,7 @@ func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainReco
 					contextMsg = fmt.Sprintf("DMARC %s #%d", strings.ToUpper(key), i+1)
 				}
 
+				nodeLocalID := modutil.BuildLocalID(ref, validatedEmail.Type, validatedEmail.Value)
 				exec.Results = append(exec.Results, schema.ModuleResult{
 					Type:       validatedEmail.Type,
 					Category:   constants.CategoryNode,
@@ -293,6 +309,7 @@ func appendShodanTXTResult(exec *schema.ModuleExecution, record shodanDomainReco
 					Context:    contextMsg,
 					OutOfScope: isOOS,
 					Source:     ref,
+					LocalID:    nodeLocalID,
 				})
 			}
 		}
@@ -316,6 +333,7 @@ func buildShodanSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity
 		if err != nil {
 			return schema.ModuleResult{}, false
 		}
+		localID := modutil.BuildLocalID(source, validated.Type, validated.Value)
 		return schema.ModuleResult{
 			Type:     validated.Type,
 			Category: constants.CategoryNode,
@@ -323,6 +341,7 @@ func buildShodanSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity
 			Tags:     []string{constants.TagSPF},
 			Context:  "SPF " + ent.Mechanism,
 			Source:   source,
+			LocalID:  localID,
 		}, true
 	case dnsutils.SPFEntityDomain:
 		validated, err := validator.Validate(constants.TypeDomain, ent.Value)
@@ -332,6 +351,7 @@ func buildShodanSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity
 		if validated.Value == target {
 			return schema.ModuleResult{}, false
 		}
+		localID := modutil.BuildLocalID(source, validated.Type, validated.Value)
 		return schema.ModuleResult{
 			Type:       validated.Type,
 			Category:   constants.CategoryNode,
@@ -340,6 +360,7 @@ func buildShodanSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity
 			Context:    "SPF " + ent.Mechanism,
 			OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 			Source:     source,
+			LocalID:    localID,
 		}, true
 	default:
 		return schema.ModuleResult{}, false
@@ -348,27 +369,34 @@ func buildShodanSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity
 
 func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRecord, primaryNS, target string, source *schema.EntityRef) *schema.EntityRef {
 	soaRaw := buildShodanSOARaw(primaryNS, record.Options)
+	localID := modutil.BuildLocalID(source, constants.TypeSOA, soaRaw)
+
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeSOA,
 		Category: constants.CategoryProperty,
 		Value:    soaRaw,
 		Source:   source,
+		LocalID:  localID,
 	})
 
-	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: soaRaw}
+	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: soaRaw, LocalID: localID}
 
 	if record.Options != nil && record.Options.Serial != 0 {
+		serialVal := strconv.FormatUint(record.Options.Serial, 10)
+		serialLocalID := modutil.BuildLocalID(soaRef, constants.TypeSOA, serialVal)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeSOA,
 			Category: constants.CategoryProperty,
-			Value:    strconv.FormatUint(record.Options.Serial, 10),
+			Value:    serialVal,
 			Context:  "Serial",
 			Source:   soaRef,
+			LocalID:  serialLocalID,
 		})
 	}
 
 	validatedNS, err := validator.Validate(constants.TypeDomain, primaryNS)
 	if err == nil && validatedNS.Value != target {
+		nsLocalID := modutil.BuildLocalID(soaRef, validatedNS.Type, validatedNS.Value)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:       validatedNS.Type,
 			Category:   constants.CategoryNode,
@@ -377,6 +405,7 @@ func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRec
 			Context:    "Primary NS",
 			OutOfScope: orgdomain.IsOutOfScope(validatedNS.Value, target),
 			Source:     soaRef,
+			LocalID:    nsLocalID,
 		})
 	}
 
@@ -384,6 +413,7 @@ func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRec
 		email := dnsutils.FormatSOAMbox(record.Options.Hostmaster)
 		validatedEmail, emailErr := validator.Validate(constants.TypeEmail, email)
 		if emailErr == nil {
+			emailLocalID := modutil.BuildLocalID(soaRef, validatedEmail.Type, validatedEmail.Value)
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validatedEmail.Type,
 				Category:   constants.CategoryNode,
@@ -391,6 +421,7 @@ func appendShodanSOAResults(exec *schema.ModuleExecution, record shodanDomainRec
 				Context:    "Responsible Email",
 				OutOfScope: orgdomain.IsEmailOutOfScope(validatedEmail.Value, target),
 				Source:     soaRef,
+				LocalID:    emailLocalID,
 			})
 		}
 	}
@@ -418,15 +449,17 @@ func buildShodanSOARaw(primaryNS string, opts *shodanDomainRecordOptions) string
 
 func appendShodanGenericDNSResult(exec *schema.ModuleExecution, recordType, value string, source *schema.EntityRef) *schema.EntityRef {
 	resultType := strings.ToLower(recordType)
+	localID := modutil.BuildLocalID(source, resultType, value)
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
 		Category: constants.CategoryProperty,
 		Value:    value,
 		Source:   source,
+		LocalID:  localID,
 	})
 
-	return &schema.EntityRef{Type: resultType, Value: value}
+	return &schema.EntityRef{Type: resultType, Value: value, LocalID: localID}
 }
 
 func appendShodanLastSeen(exec *schema.ModuleExecution, lastSeen string, source *schema.EntityRef, fqdn string) {
@@ -435,12 +468,15 @@ func appendShodanLastSeen(exec *schema.ModuleExecution, lastSeen string, source 
 		return
 	}
 
+	localID := modutil.BuildLocalID(source, constants.TypeLastSeen, lastSeen)
+
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeLastSeen,
 		Category: constants.CategoryProperty,
 		Value:    lastSeen,
 		Context:  fqdn,
 		Source:   source,
+		LocalID:  localID,
 	})
 }
 
@@ -448,6 +484,7 @@ func appendShodanSRVResult(exec *schema.ModuleExecution, value, target string, s
 	ref := appendShodanGenericDNSResult(exec, "SRV", value, source)
 	if host, err := dnsutils.ParseSRVHost(value); err == nil {
 		if validated, err := validator.Validate(constants.TypeDomain, host); err == nil && validated.Value != target {
+			localID := modutil.BuildLocalID(ref, validated.Type, validated.Value)
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validated.Type,
 				Category:   constants.CategoryNode,
@@ -455,6 +492,7 @@ func appendShodanSRVResult(exec *schema.ModuleExecution, value, target string, s
 				Tags:       []string{constants.TagSRV},
 				OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 				Source:     ref,
+				LocalID:    localID,
 			})
 		}
 	}
@@ -474,6 +512,7 @@ func appendShodanCAAResult(exec *schema.ModuleExecution, value, target string, s
 		domain := dnsutils.ExtractCAAAuthority(parsedVal)
 		if domain != "" {
 			if validated, err := validator.Validate(constants.TypeDomain, domain); err == nil && validated.Value != target {
+				localID := modutil.BuildLocalID(ref, validated.Type, validated.Value)
 				exec.Results = append(exec.Results, schema.ModuleResult{
 					Type:       validated.Type,
 					Category:   constants.CategoryNode,
@@ -482,6 +521,7 @@ func appendShodanCAAResult(exec *schema.ModuleExecution, value, target string, s
 					Context:    "Authorized CA (" + tag + ")",
 					OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 					Source:     ref,
+					LocalID:    localID,
 				})
 			}
 		}
@@ -489,6 +529,7 @@ func appendShodanCAAResult(exec *schema.ModuleExecution, value, target string, s
 		email := dnsutils.ExtractCAAIodefEmail(parsedVal)
 		if email != "" {
 			if validated, err := validator.Validate(constants.TypeEmail, email); err == nil {
+				localID := modutil.BuildLocalID(ref, validated.Type, validated.Value)
 				exec.Results = append(exec.Results, schema.ModuleResult{
 					Type:       validated.Type,
 					Category:   constants.CategoryNode,
@@ -496,6 +537,7 @@ func appendShodanCAAResult(exec *schema.ModuleExecution, value, target string, s
 					Context:    "CAA Violation Report",
 					OutOfScope: orgdomain.IsEmailOutOfScope(validated.Value, target),
 					Source:     ref,
+					LocalID:    localID,
 				})
 			}
 		}
@@ -513,12 +555,14 @@ func appendShodanURIResult(exec *schema.ModuleExecution, value, _ string, source
 	ref := appendShodanGenericDNSResult(exec, "URI", parsed.Formatted, source)
 
 	if parsed.Target != "" {
+		localID := modutil.BuildLocalID(ref, constants.TypeURL, parsed.Target)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeURL,
 			Category: constants.CategoryProperty,
 			Value:    parsed.Target,
 			Context:  "URI Endpoint",
 			Source:   ref,
+			LocalID:  localID,
 		})
 	}
 
@@ -535,32 +579,38 @@ func appendShodanNAPTRResult(exec *schema.ModuleExecution, value, target string,
 
 	targetSource := ref
 	if parsed.Service != "" {
+		serviceLocalID := modutil.BuildLocalID(ref, constants.TypeNAPTR, parsed.Service)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeNAPTR,
 			Category: constants.CategoryProperty,
 			Value:    parsed.Service,
 			Context:  "NAPTR Service",
 			Source:   ref,
+			LocalID:  serviceLocalID,
 		})
-		targetSource = &schema.EntityRef{Type: constants.TypeNAPTR, Value: parsed.Service}
+		targetSource = &schema.EntityRef{Type: constants.TypeNAPTR, Value: parsed.Service, LocalID: serviceLocalID}
 	}
 
 	if parsed.Regexp != "" {
 		regexpSource := targetSource
+		regexpLocalID := modutil.BuildLocalID(regexpSource, constants.TypeNAPTR, parsed.Regexp)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeNAPTR,
 			Category: constants.CategoryProperty,
 			Value:    parsed.Regexp,
 			Context:  "NAPTR Regexp",
 			Source:   regexpSource,
+			LocalID:  regexpLocalID,
 		})
 		if parsed.RegexpTarget != "" {
+			urlLocalID := modutil.BuildLocalID(&schema.EntityRef{LocalID: regexpLocalID}, constants.TypeURL, parsed.RegexpTarget)
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeURL,
 				Category: constants.CategoryProperty,
 				Value:    parsed.RegexpTarget,
 				Context:  "NAPTR Regexp Target",
-				Source:   &schema.EntityRef{Type: constants.TypeNAPTR, Value: parsed.Regexp},
+				Source:   &schema.EntityRef{Type: constants.TypeNAPTR, Value: parsed.Regexp, LocalID: regexpLocalID},
+				LocalID:  urlLocalID,
 			})
 		}
 	}
@@ -583,6 +633,7 @@ func appendShodanNAPTRResult(exec *schema.ModuleExecution, value, target string,
 				contextStr = "NAPTR Target (" + parsed.Replacement + ")"
 			}
 
+			localID := modutil.BuildLocalID(targetSource, validatedType, validatedValue)
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validatedType,
 				Category:   constants.CategoryNode,
@@ -591,6 +642,7 @@ func appendShodanNAPTRResult(exec *schema.ModuleExecution, value, target string,
 				Context:    contextStr,
 				OutOfScope: orgdomain.IsOutOfScope(validatedValue, target),
 				Source:     targetSource,
+				LocalID:    localID,
 			})
 		}
 	}
@@ -606,6 +658,7 @@ func appendShodanRPResult(exec *schema.ModuleExecution, value, target string, so
 			mbox = mbox[:idx] + "@" + mbox[idx+1:]
 		}
 		if validated, err := validator.Validate(constants.TypeEmail, mbox); err == nil {
+			localID := modutil.BuildLocalID(ref, validated.Type, validated.Value)
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validated.Type,
 				Category:   constants.CategoryNode,
@@ -613,11 +666,13 @@ func appendShodanRPResult(exec *schema.ModuleExecution, value, target string, so
 				Context:    "RP Administrator Email",
 				OutOfScope: orgdomain.IsEmailOutOfScope(validated.Value, target),
 				Source:     ref,
+				LocalID:    localID,
 			})
 		}
 
 		txtDomain := strings.TrimSuffix(parts[1], ".")
 		if validated, err := validator.Validate(constants.TypeDomain, txtDomain); err == nil && validated.Value != target {
+			localID := modutil.BuildLocalID(ref, validated.Type, validated.Value)
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:       validated.Type,
 				Category:   constants.CategoryNode,
@@ -626,6 +681,7 @@ func appendShodanRPResult(exec *schema.ModuleExecution, value, target string, so
 				Context:    "RP TXT Reference Domain",
 				OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 				Source:     ref,
+				LocalID:    localID,
 			})
 		}
 	}
@@ -639,6 +695,7 @@ func appendShodanHIPResult(exec *schema.ModuleExecution, value, target string, s
 		for _, rv := range parts[3:] {
 			rvNode := strings.TrimSuffix(rv, ".")
 			if validated, err := validator.Validate(constants.TypeDomain, rvNode); err == nil && validated.Value != target {
+				localID := modutil.BuildLocalID(ref, validated.Type, validated.Value)
 				exec.Results = append(exec.Results, schema.ModuleResult{
 					Type:       validated.Type,
 					Category:   constants.CategoryNode,
@@ -647,6 +704,7 @@ func appendShodanHIPResult(exec *schema.ModuleExecution, value, target string, s
 					Context:    "HIP Rendezvous Server",
 					OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 					Source:     ref,
+					LocalID:    localID,
 				})
 			}
 		}

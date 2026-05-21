@@ -62,6 +62,7 @@ func allowedDNSResultTags() []string {
 		constants.TagReverseIP,
 		constants.TagPDNS,
 		constants.TagHistorical,
+		constants.TagCVE,
 	}
 }
 

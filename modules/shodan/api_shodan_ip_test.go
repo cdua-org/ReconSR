@@ -32,28 +32,28 @@ func TestParseShodanAPIIP(t *testing.T) {
 func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult, targetIP, service string) {
 	t.Helper()
 
+	portResult := requireModuleResult(t, results, constants.TypePort, "443/tcp")
+	if portResult.Source != nil {
+		t.Fatalf("expected port to be anchored directly to IP, got %+v", portResult.Source)
+	}
+
 	serviceResult := requireModuleResult(t, results, constants.TypeService, service)
 	if serviceResult.Category != constants.CategoryProperty {
 		t.Fatalf("expected service to be a property, got %q", serviceResult.Category)
 	}
-	if serviceResult.Source != nil {
-		t.Fatalf("expected service to be anchored directly to IP, got %+v", serviceResult.Source)
+	if serviceResult.Source == nil || serviceResult.Source.Type != constants.TypePort || serviceResult.Source.Value != "443/tcp" {
+		t.Fatalf("expected service to be chained to port, got %+v", serviceResult.Source)
 	}
 
 	assertShodanIPResultSource(t, results, constants.TypeWebServer, "FakeHTTP", constants.TypeService, service)
-
-	portResult := requireModuleResult(t, results, constants.TypePort, "443/tcp")
-	if portResult.Source == nil || portResult.Source.Type != constants.TypeService || portResult.Source.Value != service {
-		t.Fatalf("expected port to be chained to service, got %+v", portResult.Source)
-	}
 
 	assertShodanIPPortSource(t, results, constants.TypeHash, "2222222")
 	assertShodanIPPortSource(t, results, constants.TypeBannerTimestamp, "2026-05-02T16:15:08.228066")
 	assertShodanIPPortSource(t, results, constants.TypeCertFingerprint, "sha1:00112233445566778899aabbccddeeff00112233")
 	assertShodanIPPortSource(t, results, constants.TypeCertFingerprint, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	assertShodanIPPortSource(t, results, constants.TypeJARM, "29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d29d")
-	assertShodanIPPortSource(t, results, constants.TypeCPE, "cpe:/a:fake:product:9.9")
-	assertShodanIPPortSource(t, results, constants.TypeCPE23, "cpe:2.3:a:fake:product:9.9")
+	assertShodanIPResultSource(t, results, constants.TypeCPE, "cpe:/a:fake:product:9.9", constants.TypeService, service)
+	assertShodanIPResultSource(t, results, constants.TypeCPE23, "cpe:2.3:a:fake:product:9.9", constants.TypeService, service)
 
 	assertShodanIPCVEChain(t, results, targetIP, service)
 }
@@ -72,8 +72,8 @@ func assertCVEWithSummary(t *testing.T, results []schema.ModuleResult, service, 
 	t.Helper()
 
 	cve := requireModuleResult(t, results, constants.TypeCVE, "CVE-1111-1001")
-	if cve.Category != constants.CategoryNode {
-		t.Fatalf("expected cve to be a node, got %q", cve.Category)
+	if cve.Category != constants.CategoryProperty {
+		t.Fatalf("expected cve to be a property, got %q", cve.Category)
 	}
 	if cve.Source == nil || cve.Source.Type != constants.TypeService || cve.Source.Value != service {
 		t.Fatalf("expected cve to be chained to service, got %+v", cve.Source)
@@ -201,21 +201,21 @@ func TestParseShodanAPIIPSkipsDuplicateWebServerValue(t *testing.T) {
 		t.Fatalf("unexpected parser error: %v", *exec.Error)
 	}
 
+	portResult := requireModuleResult(t, exec.Results, constants.TypePort, "443/tcp https")
+	if portResult.Source != nil {
+		t.Fatalf("expected port to be anchored to IP, got %+v", portResult.Source)
+	}
 	serviceResult := requireModuleResult(t, exec.Results, constants.TypeService, "nginx")
-	if serviceResult.Source != nil {
-		t.Fatalf("expected service to be anchored to IP, got %+v", serviceResult.Source)
+	if serviceResult.Source == nil || serviceResult.Source.Type != constants.TypePort || serviceResult.Source.Value != "443/tcp https" {
+		t.Fatalf("expected service to be chained to port, got %+v", serviceResult.Source)
 	}
 	if _, ok := findModuleResult(exec.Results, constants.TypeWebServer, "nginx"); ok {
 		t.Fatalf("expected duplicate web_server value to be skipped, got %+v", exec.Results)
 	}
-	portResult := requireModuleResult(t, exec.Results, constants.TypePort, "443/tcp https")
-	if portResult.Source == nil || portResult.Source.Type != constants.TypeService || portResult.Source.Value != "nginx" {
-		t.Fatalf("expected port to be chained to service nginx, got %+v", portResult.Source)
-	}
 
 	assertShodanIPResultSource(t, exec.Results, constants.TypeHash, "3333333", constants.TypePort, "443/tcp https")
-	assertShodanIPResultSource(t, exec.Results, constants.TypeCPE, "cpe:/a:f5:nginx", constants.TypePort, "443/tcp https")
-	assertShodanIPResultSource(t, exec.Results, constants.TypeCPE23, "cpe:2.3:a:f5:nginx", constants.TypePort, "443/tcp https")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeCPE, "cpe:/a:f5:nginx", constants.TypeService, "nginx")
+	assertShodanIPResultSource(t, exec.Results, constants.TypeCPE23, "cpe:2.3:a:f5:nginx", constants.TypeService, "nginx")
 }
 
 func TestAppendReverseIPHostnameResultKeepsInvalidPTRProperty(t *testing.T) {

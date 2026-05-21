@@ -24,6 +24,24 @@ func parseShodanAPIIP(exec *schema.ModuleExecution, rawBody []byte, target strin
 	extractIPLastUpdate(exec, payload.LastUpdate, target)
 	extractIPHostnames(exec, payload.Hostnames)
 	extractIPBanners(exec, payload.Data, target)
+
+	hasCVE := false
+	for _, banner := range payload.Data {
+		if banner.Artifacts != nil && len(banner.Artifacts.Vulns) > 0 {
+			hasCVE = true
+			break
+		}
+	}
+	if hasCVE {
+		if val, err := validator.Validate(constants.TypeIP, target); err == nil {
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     val.Type,
+				Category: constants.CategoryNode,
+				Value:    val.Value,
+				Tags:     []string{constants.TagCVE},
+			})
+		}
+	}
 }
 
 func extractIPDomains(exec *schema.ModuleExecution, domains []string) {

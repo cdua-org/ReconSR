@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/httputil"
@@ -162,9 +163,19 @@ func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, targe
 	for _, v := range parsed.Vulns {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeCVE,
-			Category: constants.CategoryNode,
+			Category: constants.CategoryProperty,
 			Value:    v,
 		})
+	}
+	if len(parsed.Vulns) > 0 {
+		if val, err := validator.Validate(constants.TypeIP, target); err == nil {
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     val.Type,
+				Category: constants.CategoryNode,
+				Value:    val.Value,
+				Tags:     []string{constants.TagCVE},
+			})
+		}
 	}
 	for _, c := range parsed.Cpes {
 		exec.Results = append(exec.Results, schema.ModuleResult{

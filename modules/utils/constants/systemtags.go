@@ -25,4 +25,5 @@ const (
 	TagLinked      = "linked"
 	TagSocial      = "social"
 	TagScrape      = "scrape"
+	TagCVE         = "cve"
 )

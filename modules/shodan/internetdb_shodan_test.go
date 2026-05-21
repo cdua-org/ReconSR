@@ -225,7 +225,7 @@ func TestGetInternetDB_Success(t *testing.T) {
 		t.Fatalf("unexpected execution error: %s", *exec.Error)
 	}
 
-	expectedResultsCount := 1 + 3 + 1 + 1 + 1
+	expectedResultsCount := 1 + 3 + 1 + 1 + 1 + 1
 	if len(exec.Results) != expectedResultsCount {
 		t.Errorf("expected %d results, got %d", expectedResultsCount, len(exec.Results))
 	}
@@ -252,6 +252,9 @@ func TestGetInternetDB_Success(t *testing.T) {
 	}
 	if typesCount[constants.TypeCPE] != 1 {
 		t.Errorf("expected 1 cpe result, got %d", typesCount[constants.TypeCPE])
+	}
+	if typesCount[constants.TypeIPv4] != 1 {
+		t.Errorf("expected 1 ipv4 result, got %d", typesCount[constants.TypeIPv4])
 	}
 }
 

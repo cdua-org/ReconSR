@@ -6,37 +6,38 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
 func extractIPBanners(exec *schema.ModuleExecution, banners []shodanIPBanner, target string) {
 	for i := range banners {
 		banner := &banners[i]
-		serviceSrc := extractBannerServiceAndWeb(exec, banner, target)
-		portSrc := extractBannerPort(exec, banner, serviceSrc, target)
+		portSrc := extractBannerPort(exec, banner, nil, target)
+		serviceSrc := extractBannerServiceAndWeb(exec, banner, portSrc, target)
 
-		cveSrc := serviceSrc
-		if cveSrc == nil {
-			cveSrc = portSrc
+		softwareSrc := serviceSrc
+		if softwareSrc == nil {
+			softwareSrc = portSrc
 		}
 
 		extractBannerSSL(exec, banner, portSrc, target)
-		extractBannerCPEs(exec, banner, portSrc, target)
-		extractBannerVulns(exec, banner, cveSrc, target)
+		extractBannerCPEs(exec, banner, softwareSrc, target)
+		extractBannerVulns(exec, banner, softwareSrc, target)
 		extractBannerGeo(exec, banner, target)
 		extractBannerHash(exec, banner, portSrc, target)
 		extractBannerTimestamp(exec, banner, portSrc, target)
-		extractBannerHeartbleed(exec, banner, portSrc, target)
+		extractBannerHeartbleed(exec, banner, softwareSrc, target)
 	}
 }
 
-func extractBannerServiceAndWeb(exec *schema.ModuleExecution, banner *shodanIPBanner, target string) *schema.EntityRef {
+func extractBannerServiceAndWeb(exec *schema.ModuleExecution, banner *shodanIPBanner, parentSrc *schema.EntityRef, target string) *schema.EntityRef {
 	serviceValue := extractBannerServiceValue(banner)
 	webServerValue := extractBannerWebServerValue(banner)
 
 	var src *schema.EntityRef
 	if serviceValue != "" {
-		src = appendBannerSourceResult(exec, constants.TypeService, serviceValue, nil, "Service for "+target)
+		src = appendBannerSourceResult(exec, constants.TypeService, serviceValue, parentSrc, "Service for "+target)
 	}
 
 	if webServerValue != "" {
@@ -45,7 +46,7 @@ func extractBannerServiceAndWeb(exec *schema.ModuleExecution, banner *shodanIPBa
 				appendBannerSourceResult(exec, constants.TypeWebServer, webServerValue, src, "Web Server for "+target)
 			}
 		} else {
-			src = appendBannerSourceResult(exec, constants.TypeWebServer, webServerValue, nil, "Web Server for "+target)
+			src = appendBannerSourceResult(exec, constants.TypeWebServer, webServerValue, parentSrc, "Web Server for "+target)
 		}
 	}
 	return src
@@ -64,15 +65,17 @@ func extractBannerPort(exec *schema.ModuleExecution, banner *shodanIPBanner, par
 		portValue += " " + banner.ModuleLabel
 	}
 
+	localID := modutil.BuildLocalID(parentSrc, constants.TypePort, portValue)
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypePort,
 		Category: constants.CategoryProperty,
 		Value:    portValue,
 		Context:  "Port for " + target,
 		Source:   parentSrc,
+		LocalID:  localID,
 	})
 
-	return &schema.EntityRef{Type: constants.TypePort, Value: portValue}
+	return &schema.EntityRef{Type: constants.TypePort, Value: portValue, LocalID: localID}
 }
 
 func extractBannerServiceValue(banner *shodanIPBanner) string {
@@ -96,15 +99,17 @@ func appendBannerSourceResult(exec *schema.ModuleExecution, resultType, value st
 		return nil
 	}
 
+	localID := modutil.BuildLocalID(src, resultType, value)
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
 		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  context,
 		Source:   src,
+		LocalID:  localID,
 	})
 
-	return &schema.EntityRef{Type: resultType, Value: value}
+	return &schema.EntityRef{Type: resultType, Value: value, LocalID: localID}
 }
 
 func extractBannerCPEs(exec *schema.ModuleExecution, banner *shodanIPBanner, src *schema.EntityRef, target string) {
@@ -122,12 +127,14 @@ func appendBannerStringResults(exec *schema.ModuleExecution, resultType string, 
 			continue
 		}
 
+		localID := modutil.BuildLocalID(src, resultType, value)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     resultType,
 			Category: constants.CategoryProperty,
 			Value:    value,
 			Context:  context,
 			Source:   src,
+			LocalID:  localID,
 		})
 	}
 }
@@ -144,31 +151,37 @@ func extractBannerVulns(exec *schema.ModuleExecution, banner *shodanIPBanner, sr
 			continue
 		}
 
+		cveLocalID := modutil.BuildLocalID(src, constants.TypeCVE, cveID)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeCVE,
-			Category: constants.CategoryNode,
+			Category: constants.CategoryProperty,
 			Value:    cveID,
 			Context:  vulnContext,
 			Source:   src,
+			LocalID:  cveLocalID,
 		})
 
-		cveRef := &schema.EntityRef{Type: constants.TypeCVE, Value: cveID}
+		cveRef := &schema.EntityRef{Type: constants.TypeCVE, Value: cveID, LocalID: cveLocalID}
 
+		verifiedLocalID := modutil.BuildLocalID(cveRef, constants.TypeVerified, strconv.FormatBool(vuln.Verified))
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeVerified,
 			Category: constants.CategoryProperty,
 			Value:    strconv.FormatBool(vuln.Verified),
 			Context:  vulnContext,
 			Source:   cveRef,
+			LocalID:  verifiedLocalID,
 		})
 
 		if vuln.Summary != "" {
+			summaryLocalID := modutil.BuildLocalID(cveRef, constants.TypeSummary, vuln.Summary)
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeSummary,
 				Category: constants.CategoryProperty,
 				Value:    vuln.Summary,
 				Context:  vulnContext,
 				Source:   cveRef,
+				LocalID:  summaryLocalID,
 			})
 		}
 
@@ -182,32 +195,40 @@ func appendVulnScoring(exec *schema.ModuleExecution, vuln shodanVuln, vulnContex
 		if vuln.CvssVersion != 0 {
 			cvssValue += " (v" + strconv.FormatFloat(vuln.CvssVersion, 'f', 1, 64) + ")"
 		}
+		cvssLocalID := modutil.BuildLocalID(cveRef, constants.TypeCVSS, cvssValue)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeCVSS,
 			Category: constants.CategoryProperty,
 			Value:    cvssValue,
 			Context:  vulnContext,
 			Source:   cveRef,
+			LocalID:  cvssLocalID,
 		})
 	}
 
 	if vuln.EPSS != 0 {
+		epssVal := formatPercent(vuln.EPSS)
+		epssLocalID := modutil.BuildLocalID(cveRef, constants.TypeEPSS, epssVal)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeEPSS,
 			Category: constants.CategoryProperty,
-			Value:    formatPercent(vuln.EPSS),
+			Value:    epssVal,
 			Context:  vulnContext,
 			Source:   cveRef,
+			LocalID:  epssLocalID,
 		})
 	}
 
 	if vuln.RankingEPSS != 0 {
+		rankVal := formatPercent(vuln.RankingEPSS)
+		rankLocalID := modutil.BuildLocalID(cveRef, constants.TypeRankEPSS, rankVal)
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeRankEPSS,
 			Category: constants.CategoryProperty,
-			Value:    formatPercent(vuln.RankingEPSS),
+			Value:    rankVal,
 			Context:  vulnContext,
 			Source:   cveRef,
+			LocalID:  rankLocalID,
 		})
 	}
 }
@@ -282,12 +303,15 @@ func extractBannerHash(exec *schema.ModuleExecution, banner *shodanIPBanner, src
 		return
 	}
 
+	hashStr := strconv.FormatInt(banner.Hash, 10)
+	localID := modutil.BuildLocalID(src, constants.TypeHash, hashStr)
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeHash,
 		Category: constants.CategoryProperty,
-		Value:    strconv.FormatInt(banner.Hash, 10),
+		Value:    hashStr,
 		Context:  "Hash for " + target,
 		Source:   src,
+		LocalID:  localID,
 	})
 }
 
@@ -296,12 +320,14 @@ func extractBannerTimestamp(exec *schema.ModuleExecution, banner *shodanIPBanner
 		return
 	}
 
+	localID := modutil.BuildLocalID(src, constants.TypeBannerTimestamp, banner.Timestamp)
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeBannerTimestamp,
 		Category: constants.CategoryProperty,
 		Value:    banner.Timestamp,
 		Context:  "Banner Timestamp for " + target,
 		Source:   src,
+		LocalID:  localID,
 	})
 }
 
@@ -310,11 +336,13 @@ func extractBannerHeartbleed(exec *schema.ModuleExecution, banner *shodanIPBanne
 		return
 	}
 
+	localID := modutil.BuildLocalID(src, constants.TypeHeartbleed, banner.Heartbleed)
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeHeartbleed,
 		Category: constants.CategoryProperty,
 		Value:    banner.Heartbleed,
 		Context:  "Heartbleed for " + target,
 		Source:   src,
+		LocalID:  localID,
 	})
 }
