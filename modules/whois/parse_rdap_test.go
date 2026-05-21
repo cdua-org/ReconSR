@@ -35,8 +35,8 @@ func TestParseRDAP(t *testing.T) {
 				"vcardArray": [
 					"vcard",
 					[
-						["fn", {}, "text", "John Doe"],
-						["org", {}, "text", "Doe Inc"],
+						["fn", {}, "text", "Richard Roe"],
+						["org", {}, "text", "Roe LLC"],
 						["email", {}, "text", "john@doe.com"],
 						["tel", {}, "text", "+1.5551234567"],
 						["adr", {}, "text", "123 Main St"]
@@ -63,8 +63,8 @@ func TestParseRDAP(t *testing.T) {
 		},
 		RegistrarURL: "http://www.example.com",
 		Registrant: Contact{
-			Name:         []string{"John Doe"},
-			Organization: []string{"Doe Inc"},
+			Name:         []string{"Richard Roe"},
+			Organization: []string{"Roe LLC"},
 			Email:        []string{"john@doe.com"},
 			Phone:        []string{"+1.5551234567"},
 			Address:      []string{"123 Main St"},

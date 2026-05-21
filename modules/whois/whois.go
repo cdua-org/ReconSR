@@ -171,7 +171,7 @@ func (m *module) appendSlice(results *[]schema.ModuleResult, arr []string, typ, 
 		if v != "" {
 			category := constants.CategoryProperty
 			resolvedType := typ
-			if typ == "person" || typ == constants.TypeOrganization || typ == constants.TypeEmail {
+			if typ == constants.TypePerson || typ == constants.TypeOrganization || typ == constants.TypeEmail {
 				category = constants.CategoryNode
 			}
 			if typ == constants.TypeEmail {
@@ -231,10 +231,10 @@ func (m *module) appendContact(results *[]schema.ModuleResult, c *Contact, roleN
 	if roleType != "" {
 		roleValue := roleName + " Contact of " + target
 		*results = append(*results, m.result(roleType, constants.CategoryNode, roleValue, roleName+" Contact ("+sourceCtx+")", isOOS, anchor))
-		currentAnchor = &schema.EntityRef{Type: roleType, Value: roleValue}
+		currentAnchor = &schema.EntityRef{Type: roleType, Value: roleValue, LocalID: modutil.BuildLocalID(anchor, roleType, roleValue)}
 	}
 
-	m.appendSlice(results, c.Name, "person", roleName+" Name", isOOS, currentAnchor, sourceCtx)
+	m.appendSlice(results, c.Name, constants.TypePerson, roleName+" Name", isOOS, currentAnchor, sourceCtx)
 	m.appendSlice(results, c.Organization, constants.TypeOrganization, roleName+" Organization", isOOS, currentAnchor, sourceCtx)
 	m.appendSlice(results, c.Email, constants.TypeEmail, roleName+" Email", isOOS, currentAnchor, sourceCtx)
 	m.appendAddress(results, c.Address, "address", roleName, isOOS, currentAnchor, sourceCtx)
@@ -250,14 +250,16 @@ func (m *module) appendContact(results *[]schema.ModuleResult, c *Contact, roleN
 func (m *module) getRegistrantAnchor(metadata *Metadata, target, sourceCtx string) (*schema.EntityRef, []schema.ModuleResult) {
 	if hasContactData(&metadata.Registrant) || hasContactData(&metadata.Admin) || hasContactData(&metadata.Tech) || hasContactData(&metadata.Billing) {
 		regValue := "Registrant of " + target
+		localID := modutil.BuildLocalID(nil, constants.TypeWhoisRegistrant, regValue)
 		res := []schema.ModuleResult{{
 			Type:     constants.TypeWhoisRegistrant,
 			Category: constants.CategoryNode,
 			Value:    regValue,
 			Context:  "Domain Registrant (" + sourceCtx + ")",
 			Applied:  true,
+			LocalID:  localID,
 		}}
-		return &schema.EntityRef{Type: constants.TypeWhoisRegistrant, Value: regValue}, res
+		return &schema.EntityRef{Type: constants.TypeWhoisRegistrant, Value: regValue, LocalID: localID}, res
 	}
 	return nil, nil
 }
@@ -265,14 +267,16 @@ func (m *module) getRegistrantAnchor(metadata *Metadata, target, sourceCtx strin
 func (m *module) getRegistrarAnchor(metadata *Metadata, target, sourceCtx string) (*schema.EntityRef, []schema.ModuleResult) {
 	if hasContactData(&metadata.Registrar) || hasContactData(&metadata.Abuse) || metadata.RegistrarURL != "" || metadata.WhoisServer != "" || metadata.IANAID != "" {
 		regValue := "Registrar of " + target
+		localID := modutil.BuildLocalID(nil, constants.TypeWhoisRegistrar, regValue)
 		res := []schema.ModuleResult{{
 			Type:     constants.TypeWhoisRegistrar,
 			Category: constants.CategoryNode,
 			Value:    regValue,
 			Context:  "Domain Registrar (" + sourceCtx + ")",
 			Applied:  true,
+			LocalID:  localID,
 		}}
-		return &schema.EntityRef{Type: constants.TypeWhoisRegistrar, Value: regValue}, res
+		return &schema.EntityRef{Type: constants.TypeWhoisRegistrar, Value: regValue, LocalID: localID}, res
 	}
 	return nil, nil
 }
@@ -289,6 +293,7 @@ func (m *module) result(typ, category, value, ctx string, oos bool, anchor *sche
 		Context:    ctx,
 		Applied:    true,
 		OutOfScope: oos,
+		LocalID:    modutil.BuildLocalID(anchor, typ, value),
 	}
 	if anchor != nil {
 		res.Source = anchor
@@ -326,6 +331,7 @@ func (m *module) buildMetadataResults(metadata *Metadata, target, sourceCtx stri
 			result.Context = "Whois Server (" + sourceCtx + ")"
 			result.Applied = true
 			result.Source = registrarAnchor
+			result.LocalID = modutil.BuildLocalID(registrarAnchor, result.Type, result.Value)
 			results = append(results, result)
 		}
 	}

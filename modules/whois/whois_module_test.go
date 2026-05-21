@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -46,5 +47,42 @@ func TestBuildMetadataResults_WhoisServerUsesDomainTag(t *testing.T) {
 	}
 	if *got.Source != *anchor {
 		t.Fatalf("Source = %+v, want %+v", *got.Source, *anchor)
+	}
+
+	expectedLocalID := modutil.BuildLocalID(anchor, got.Type, got.Value)
+	if got.LocalID != expectedLocalID {
+		t.Fatalf("LocalID = %q, want %q", got.LocalID, expectedLocalID)
+	}
+}
+
+func TestBuildResults_LocalIDChaining(t *testing.T) {
+	m := &module{}
+	targetDomain := "example.com"
+	metadata := &Metadata{
+		Registrant: Contact{
+			Name:         []string{"Alice Bob"},
+			Organization: []string{"Bob Corp"},
+		},
+	}
+
+	results := m.buildResults(metadata, targetDomain, "WHOIS")
+
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+
+	anchorID := modutil.BuildLocalID(nil, constants.TypeWhoisRegistrant, "Registrant of "+targetDomain)
+	if results[0].LocalID != anchorID {
+		t.Errorf("anchor LocalID = %q, want %q", results[0].LocalID, anchorID)
+	}
+
+	personID := modutil.BuildLocalID(&schema.EntityRef{LocalID: anchorID}, constants.TypePerson, "Alice Bob")
+	if results[1].LocalID != personID {
+		t.Errorf("person LocalID = %q, want %q", results[1].LocalID, personID)
+	}
+
+	orgID := modutil.BuildLocalID(&schema.EntityRef{LocalID: anchorID}, constants.TypeOrganization, "Bob Corp")
+	if results[2].LocalID != orgID {
+		t.Errorf("org LocalID = %q, want %q", results[2].LocalID, orgID)
 	}
 }
