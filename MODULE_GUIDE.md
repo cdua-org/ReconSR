@@ -273,10 +273,11 @@ execError := schema.ModuleExecution{
 | **`Value`** | **Mandatory** | The extracted value (e.g., `"192.0.2.1"`). While standard extraction is necessary, syntactic errors within the entity itself must not be auto-corrected or cleaned. Malformed data must be preserved exactly as found to allow analysts to identify real-world configuration errors. If a function identifies a malformed entity but can infer the intended correct value, it may return both: the malformed entity as the primary finding, and the corrected entity linked to the malformed one via the `Source` field (Refer to Section 5.3). |
 | **`Category`**| **Optional** | Controls visual representation on the graph UI. `"node"` (default) renders as a standalone, connectable entity. `"property"` renders as an attribute within the parent node's modal window (e.g., a DMARC record or ASN). Note: This does not affect data processing; further modules can process both nodes and properties equally. |
 | **`Context`** | **Optional** | A human-readable description of the semantic relationship between the source and the discovered entity (e.g., specifying if an extracted email is a "rua reporting address" or an "admin contact"). This field must not be used for technical debugging details. If the relationship is already obvious from the entity's `Type`, this field must be omitted to prevent redundant UI labels (e.g., writing "DMARC Record" for a `dmarc` type). |
+| **`LocalID`** | **Optional** | An identifier used to uniquely mark an entity within the `exec.Results` slice. This allows the core system to accurately distinguish between multiple entities that might share the exact same `Type` and `Value`, ensuring precise parent-child mapping. Refer to Section 5.4. |
 | **`Tags`** | **Optional** | An array of tags to assign to the entity. **Format Constraint:** Tags must consist only of the characters `a-z0-9_.-`. Providing a malformed tag will cause the core system to reject the result and generate a function error.<br><br>**Technical Tags (Prefixed with `.`):** Tags starting with a dot (e.g., `.dns_resolved`) are strictly for internal system use, such as inter-function routing and establishing execution order (Refer to Section 4.3). These technical tags are completely invisible to the user. Multiple tags can be assigned simultaneously, but they must be restricted to those explicitly expected by other functions.<br><br>**Display Tags (No Prefix):** Tags that do not start with a dot are treated as user-facing "subtypes". They are displayed to the user in the UI as supplementary information alongside the primary entity type. |
 | **`Applied`** | **Optional** | (Defaults to `false`). If `true`, instructs the core not to execute the current function on this specific result again. This prevents redundant reprocessing of results (e.g., when a function decomposes a long subdomain like `a.b.c.com` into `b.c.com` and `c.com`, setting `Applied` ensures the function is not re-run on those extracted parts). |
 | **`OutOfScope`**| **Optional** | (Defaults to `false`). If `true`, instructs the core to record the result in the database (for visual graphing) but to exclude it from being routed to modules to discover new relationships. Useful for filtering out "noise" infrastructure (e.g., registrar domains, CDN IPs). |
-| **`Source`** | **Optional** | A pointer to `schema.EntityRef{Type, Value}`. Specifies the immediate parent of the discovered entity. This is used when a function discovers a sequential chain of relationships (e.g., Target -> Property -> Node) rather than a flat "star" topology radiating directly from the input target. If the finding connects directly to the input target, this field must be omitted. Detailed chaining patterns are covered in Section 5.3. |
+| **`Source`** | **Optional** | A pointer to `schema.EntityRef{Type, Value, LocalID}`. Specifies the immediate parent of the discovered entity. This is used when a function discovers a sequential chain of relationships (e.g., Target -> Property -> Node) rather than a flat "star" topology radiating directly from the input target. If the finding connects directly to the input target, this field must be omitted. Detailed chaining patterns are covered in Sections 5.3 and 5.4. |
 
 **Examples: Discovered Entities**
 ```go
@@ -310,7 +311,7 @@ By default, the core links every item in `Results` directly to the initial `Targ
 
 When a module discovers data that forms sequential chains (e.g., `Target` -> `Intermediate Node` -> `Final Node`), the immediate parent of the discovered entity must be explicitly specified using the `Source` field (`*schema.EntityRef{Type, Value}`). 
 
-The core validates all graph connections. An entity can be specified as a `Source` only if it is also declared as a discovered result elsewhere within the exact same `exec.Results` slice. When defining a `Source`, only its `Type` and `Value` must be specified. These two fields must match the `Type` and `Value` of that exact same entity where it was declared as a discovered result. All other fields (e.g., context, tags, category, out_of_scope) are assigned exclusively when declaring an entity as a result, never when referencing it as a source. Every discovered entity within the `exec.Results` slice must trace back to the module's input target through a continuous chain of declared relationships. Any break in this chain creates an isolated graph "island", and all entities of such an "island" are marked by the core as `invalid`.
+The core validates all graph connections. An entity can be specified as a `Source` only if it is also declared as a discovered result elsewhere within the exact same `exec.Results` slice. When defining a `Source`, its `Type`, `Value`, and optionally `LocalID` must be specified. These fields must exactly match the corresponding fields of that exact same entity where it was declared as a discovered result. All other fields (e.g., context, tags, category, out_of_scope) are assigned exclusively when declaring an entity as a result, never when referencing it as a source. Every discovered entity within the `exec.Results` slice must trace back to the module's input target through a continuous chain of declared relationships. Any break in this chain creates an isolated graph "island", and all entities of such an "island" are marked by the core as `invalid`.
 
 #### Pattern 1: Node-to-Node Decomposition
 To represent a chain of derived entities (e.g., breaking a subdomain into parent domains), each intermediate entity must be explicitly assigned as the `Source` for the next entity in the chain.
@@ -388,6 +389,54 @@ exec.Results = append(exec.Results, schema.ModuleResult{
 
 ---
 
+### 5.4 Using Identifiers (`LocalID`) in Chains
+
+When a module returns complex chains of entities, situations may arise where multiple entities of the `property` category in the same `exec.Results` slice possess identical `Type` and `Value` parameters (e.g., discovering two identical `http` services running on different `port` properties). If a child entity is linked using only `Type` and `Value` in this scenario, the core system cannot unambiguously determine which of the identical parent properties is the true source.
+
+To prevent this ambiguity, the `LocalID` field is utilized to uniquely identify specific entities, enabling exact parent-child binding.
+
+**Implementation Rules:**
+1. **Dynamic Generation:** The `LocalID` must guarantee uniqueness within the current `exec.Results` slice. This value must be dynamically generated during the parsing loop using an incrementing integer starting from `1`. The value `0` is reserved by the system to indicate an unassigned identifier and must not be used. Random numbers must not be used, as they can cause key collisions.
+2. **Usage Context:** The usage of `LocalID` is highly recommended whenever returning multi-level chains of properties. However, if the module's logic inherently guarantees unique entities of the `property` category per execution without the possibility of duplication, `LocalID` may be omitted.
+3. **Graph Resolution:** `LocalID` is assigned to entities of both `property` and `node` categories, but when persisted to the database, entities of category `node` are strictly deduplicated based solely on their `Type` and `Value`, ignoring the transient `LocalID`. However, the core system guarantees that all child entities referencing distinct `LocalID`s will be correctly attached to the resulting unified node in the graph.
+
+**Pattern 4: Using LocalID**
+```go
+// 1. Initialize a sequential counter for the current execution
+seq := 1
+
+for _, item := range externalData {
+    // 2. Assign a sequential ID to the first entity in the chain
+    id1 := seq
+    seq++
+    
+    exec.Results = append(exec.Results, schema.ModuleResult{
+        Type:     "port",
+        Category: "property",
+        Value:    item.PortNumber, 
+        LocalID:  id1,
+    })
+    
+    // 3. Assign an ID to the next entity and link it to the previous one
+    id2 := seq
+    seq++
+
+    exec.Results = append(exec.Results, schema.ModuleResult{
+        Type:     "service",
+        Category: "property",
+        Value:    item.ServiceName, 
+        LocalID:  id2, // Assigned for potential deeper chaining
+        Source: &schema.EntityRef{
+            Type:    "port", 
+            Value:   item.PortNumber, 
+            LocalID: id1, // Links back to the exact parent entity
+        },
+    })
+}
+```
+
+---
+
 ## 6. Implementation Rules
 
 1. **Strict Execution Contract:** Modules must return exactly one `ModuleExecution` object for every function requested in `data.Functions`, even if the result is empty or an error occurred. Returning data for unrequested functions will result in a contract violation error.
@@ -396,6 +445,7 @@ exec.Results = append(exec.Results, schema.ModuleResult{
 4. **Concise Errors (`Error`):** The `Error` field must contain a short, summarized technical error message (e.g., `err.Error()` or "HTTP 500: Server Error"). Large HTML/JSON response bodies must not be included here; they belong in the `RawData` field.
 5. **Graph Integrity:** When a module returns a chain of discovered entities within an `exec.Results` slice, every entity in that specific slice must trace back to the module's input target through a continuous chain of `Source` declarations. Entities forming disconnected islands within the slice will be marked as `invalid` by the core.
 6. **Tag Discipline (`Tags`):** Tags are invisible to the researcher and serve purely as internal routing triggers. Tags must not be assigned arbitrarily. A tag must only be assigned if another function in the system explicitly requires it for execution. Conversely, a function must only require a tag if it is known that another function assigns it.
+7. **LocalID Uniqueness:** When utilizing `LocalID` to distinguish entities in complex chains, the ID must be dynamically generated per object using an incrementing integer to ensure absolute uniqueness within the `exec.Results` slice. The value `0` must not be used. Using predictable sequences that result in duplicate IDs, or using random numbers, will cause the core system to reject the execution batch.
 
 ---
 
