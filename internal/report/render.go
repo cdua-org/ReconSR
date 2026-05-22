@@ -339,6 +339,44 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 
 	visited := make(map[string]bool)
 	printNode(initialTargetID, graph.InitialTarget, initialTargetType, initialOutOfScope, initialLimitReached, "", "", "", true, adj, visited, nodeProperties, graph)
+
+	inDegree := make(map[string]int)
+	for _, edges := range adj {
+		for _, edge := range edges {
+			inDegree[edge.TargetID]++
+		}
+	}
+
+	for {
+		var candidates []string
+		for id, n := range graph.Nodes {
+			if !visited[id] && n.Category != "property" {
+				candidates = append(candidates, id)
+			}
+		}
+		if len(candidates) == 0 {
+			break
+		}
+
+		sort.Slice(candidates, func(i, j int) bool {
+			degI := inDegree[candidates[i]]
+			degJ := inDegree[candidates[j]]
+			if degI != degJ {
+				return degI < degJ
+			}
+			return graph.Nodes[candidates[i]].Value < graph.Nodes[candidates[j]].Value
+		})
+
+		rootID := candidates[0]
+		n := graph.Nodes[rootID]
+		d := n.DepthRelaxed
+		if graph.StrictDepth {
+			d = n.DepthStrict
+		}
+
+		fmt.Println()
+		printNode(rootID, n.Value, n.Type, n.OutOfScope, d > graph.MaxDepth, "", "", "", true, adj, visited, nodeProperties, graph)
+	}
 }
 
 func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, isLimitReached bool, prefix string, marker string, connInfo string, isLast bool, adj map[string][]schema.EdgeData, visited map[string]bool, nodeProperties map[string][]propertyInfo, graph *schema.ProjectGraph) {
@@ -440,6 +478,12 @@ func printProperties(nodeID string, basePrefix string, hasChildren bool, propInd
 		if prop.Type == "invalid" {
 			typeColor = colorRed
 		}
+
+		if visited[prop.ID] {
+			fmt.Printf("%s%s%s• [%s%s%s] [%s%s%s]%s%s %s(seen)%s\n", basePrefix, startChar, propIndent, typeColor, strings.ToUpper(prop.Type), colorReset, valColor, prop.Value, colorReset, contextStr, suffix, colorCyan, colorReset)
+			continue
+		}
+		visited[prop.ID] = true
 
 		fmt.Printf("%s%s%s• [%s%s%s] [%s%s%s]%s%s\n", basePrefix, startChar, propIndent, typeColor, strings.ToUpper(prop.Type), colorReset, valColor, prop.Value, colorReset, contextStr, suffix)
 
