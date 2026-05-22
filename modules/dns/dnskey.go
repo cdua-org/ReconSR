@@ -52,7 +52,7 @@ func parseDNSKEY(raw string) string {
 	return fmt.Sprintf("%d %d %s %s", flags, protocol, algName, pubKey)
 }
 
-func getDNSKEYData(ctx context.Context, target string) schema.ModuleExecution {
+func getDNSKEYData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetDNSKEY)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetDNSKEY, target)
@@ -93,6 +93,7 @@ func getDNSKEYData(ctx context.Context, target string) schema.ModuleExecution {
 					Category: constants.CategoryProperty,
 					Value:    parts[3],
 					Context:  "DNSKEY KSK, Alg: " + algName,
+					LocalID:  gen.NextID(),
 				})
 			case "256":
 				exec.Results = append(exec.Results, schema.ModuleResult{
@@ -100,6 +101,7 @@ func getDNSKEYData(ctx context.Context, target string) schema.ModuleExecution {
 					Category: constants.CategoryProperty,
 					Value:    parts[3],
 					Context:  "DNSKEY ZSK, Alg: " + algName,
+					LocalID:  gen.NextID(),
 				})
 			}
 		}

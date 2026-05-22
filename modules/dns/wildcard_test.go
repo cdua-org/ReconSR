@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestCheckWildcard(t *testing.T) {
-	res := checkWildcard(context.Background(), "example.com")
+	res := checkWildcard(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if res.Error != nil {
 		t.Logf("Network resolution error: %v", *res.Error)

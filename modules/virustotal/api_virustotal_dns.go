@@ -7,11 +7,12 @@ import (
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/schema"
 )
 
-func (m *module) parseDNSRecord(rec map[string]any, target string, src *schema.EntityRef, exec *schema.ModuleExecution) {
+func (m *module) parseDNSRecord(rec map[string]any, target string, src *schema.EntityRef, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	recordType, typeOK := rec["type"].(string)
 	recordValue, valueOK := rec["value"].(string)
 	if !typeOK || !valueOK {
@@ -26,21 +27,21 @@ func (m *module) parseDNSRecord(rec map[string]any, target string, src *schema.E
 
 	switch recordType {
 	case "A", "AAAA":
-		m.appendVTIPRecord(exec, target, src, recordValue)
+		m.appendVTIPRecord(exec, target, src, recordValue, gen)
 	case "CNAME":
-		m.appendVTCNAMEResult(exec, target, src, recordValue)
+		m.appendVTCNAMEResult(exec, target, src, recordValue, gen)
 	case "MX":
-		m.appendVTMXResults(exec, target, src, rec, recordValue)
+		m.appendVTMXResults(exec, target, src, rec, recordValue, gen)
 	case "NS":
-		m.appendVTNSResult(exec, target, src, recordValue)
+		m.appendVTNSResult(exec, target, src, recordValue, gen)
 	case "SOA":
-		m.appendVTSOAResults(exec, target, src, rec)
+		m.appendVTSOAResults(exec, target, src, rec, gen)
 	case "TXT":
-		m.appendVTTXTResult(exec, target, src, recordValue)
+		m.appendVTTXTResult(exec, target, src, recordValue, gen)
 	case "CAA":
-		m.appendVTCAAResults(exec, target, src, rec)
+		m.appendVTCAAResults(exec, target, src, rec, gen)
 	case "SRV":
-		m.appendVTSRVResults(exec, target, src, rec, recordValue)
+		m.appendVTSRVResults(exec, target, src, rec, recordValue, gen)
 	default:
 		dbg.Printf("%s dns_record_fallback target=%q type=%q value=%q", constants.FuncGetVTApiDomain, target, recordType, recordValue)
 		exec.Results = append(exec.Results, schema.ModuleResult{
@@ -48,11 +49,12 @@ func (m *module) parseDNSRecord(rec map[string]any, target string, src *schema.E
 			Category: constants.CategoryProperty,
 			Value:    recordValue,
 			Source:   src,
+			LocalID:  gen.NextID(),
 		})
 	}
 }
 
-func (m *module) appendVTIPRecord(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string) {
+func (m *module) appendVTIPRecord(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string, gen *modutil.LocalIDGenerator) {
 	validated, err := validator.Validate(constants.TypeIP, value)
 	if err != nil {
 		dbg.Printf("%s skip_invalid_ip target=%q value=%q err=%v", constants.FuncGetVTApiDomain, target, value, err)
@@ -64,10 +66,11 @@ func (m *module) appendVTIPRecord(exec *schema.ModuleExecution, target string, s
 		Category: constants.CategoryNode,
 		Value:    validated.Value,
 		Source:   src,
+		LocalID:  gen.NextID(),
 	})
 }
 
-func (m *module) appendVTCNAMEResult(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string) {
+func (m *module) appendVTCNAMEResult(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string, gen *modutil.LocalIDGenerator) {
 	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
 		dbg.Printf("%s skip_invalid_cname target=%q value=%q err=%v", constants.FuncGetVTApiDomain, target, value, err)
@@ -88,23 +91,26 @@ func (m *module) appendVTCNAMEResult(exec *schema.ModuleExecution, target string
 		Context:    "CNAME Record",
 		OutOfScope: isOOS,
 		Source:     src,
+		LocalID:    gen.NextID(),
 	})
 }
 
-func (m *module) appendVTMXResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any, value string) {
+func (m *module) appendVTMXResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any, value string, gen *modutil.LocalIDGenerator) {
 	mxValue := value
 	if priority, ok := formatVTInt(rec["priority"]); ok {
 		mxValue = priority + " " + value
 	}
 
+	mxLocalID := gen.NextID()
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeMX,
 		Category: constants.CategoryProperty,
 		Value:    mxValue,
 		Source:   src,
+		LocalID:  mxLocalID,
 	})
 
-	mxRef := &schema.EntityRef{Type: constants.TypeMX, Value: mxValue}
+	mxRef := &schema.EntityRef{Type: constants.TypeMX, Value: mxValue, LocalID: mxLocalID}
 
 	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
@@ -123,10 +129,11 @@ func (m *module) appendVTMXResults(exec *schema.ModuleExecution, target string, 
 		Tags:       []string{constants.TagMX},
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     mxRef,
+		LocalID:    gen.NextID(),
 	})
 }
 
-func (m *module) appendVTNSResult(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string) {
+func (m *module) appendVTNSResult(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string, gen *modutil.LocalIDGenerator) {
 	validated, err := validator.Validate(constants.TypeDomain, value)
 	if err != nil {
 		dbg.Printf("%s skip_invalid_ns target=%q value=%q err=%v", constants.FuncGetVTApiDomain, target, value, err)
@@ -144,10 +151,11 @@ func (m *module) appendVTNSResult(exec *schema.ModuleExecution, target string, s
 		Tags:       []string{constants.TagNS},
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     src,
+		LocalID:    gen.NextID(),
 	})
 }
 
-func (m *module) appendVTSOAResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any) {
+func (m *module) appendVTSOAResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any, gen *modutil.LocalIDGenerator) {
 	parts := make([]string, 0, 7)
 	var rawNS, rawRname string
 
@@ -169,17 +177,19 @@ func (m *module) appendVTSOAResults(exec *schema.ModuleExecution, target string,
 	}
 
 	soaRaw := strings.Join(parts, " ")
-	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: soaRaw}
+	soaLocalID := gen.NextID()
+	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: soaRaw, LocalID: soaLocalID}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeSOA,
 		Category: constants.CategoryProperty,
 		Value:    soaRaw,
 		Source:   src,
+		LocalID:  soaLocalID,
 	})
 
 	if rawNS != "" {
-		m.appendVTNSResult(exec, target, soaRef, rawNS)
+		m.appendVTNSResult(exec, target, soaRef, rawNS, gen)
 	}
 
 	if rawRname != "" {
@@ -195,6 +205,7 @@ func (m *module) appendVTSOAResults(exec *schema.ModuleExecution, target string,
 				Context:    "Responsible Email",
 				OutOfScope: orgdomain.IsEmailOutOfScope(validated.Value, target),
 				Source:     soaRef,
+				LocalID:    gen.NextID(),
 			})
 		}
 	}
@@ -208,23 +219,25 @@ func ensureFQDN(s string) string {
 	return s
 }
 
-func (m *module) appendVTTXTResult(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string) {
+func (m *module) appendVTTXTResult(exec *schema.ModuleExecution, target string, src *schema.EntityRef, value string, gen *modutil.LocalIDGenerator) {
 	resultType := constants.TypeTXT
 	if strings.HasPrefix(strings.ToLower(value), "v=spf1") {
 		resultType = constants.TypeSPF
 	}
 
+	txtLocalID := gen.NextID()
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
 		Category: constants.CategoryProperty,
 		Value:    value,
 		Source:   src,
+		LocalID:  txtLocalID,
 	})
 
 	if resultType == constants.TypeSPF {
-		spfRef := &schema.EntityRef{Type: constants.TypeSPF, Value: value}
+		spfRef := &schema.EntityRef{Type: constants.TypeSPF, Value: value, LocalID: txtLocalID}
 		for _, ent := range dnsutils.ParseSPF(value) {
-			spfResult, ok := buildVTSPFEntityResult(spfRef, ent, target)
+			spfResult, ok := buildVTSPFEntityResult(spfRef, ent, target, gen)
 			if ok {
 				exec.Results = append(exec.Results, spfResult)
 			}
@@ -232,7 +245,7 @@ func (m *module) appendVTTXTResult(exec *schema.ModuleExecution, target string, 
 	}
 }
 
-func buildVTSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity, target string) (schema.ModuleResult, bool) {
+func buildVTSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity, target string, gen *modutil.LocalIDGenerator) (schema.ModuleResult, bool) {
 	switch ent.Kind {
 	case dnsutils.SPFEntityIP4, dnsutils.SPFEntityIP6:
 		validated, err := validator.Validate(constants.TypeIP, ent.Value)
@@ -246,6 +259,7 @@ func buildVTSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity, ta
 			Tags:     []string{constants.TagSPF},
 			Context:  "SPF " + ent.Mechanism,
 			Source:   source,
+			LocalID:  gen.NextID(),
 		}, true
 	case dnsutils.SPFEntityDomain:
 		validated, err := validator.Validate(constants.TypeDomain, ent.Value)
@@ -263,13 +277,14 @@ func buildVTSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity, ta
 			Context:    "SPF " + ent.Mechanism,
 			OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 			Source:     source,
+			LocalID:    gen.NextID(),
 		}, true
 	default:
 		return schema.ModuleResult{}, false
 	}
 }
 
-func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any) {
+func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any, gen *modutil.LocalIDGenerator) {
 	flagValue := "0"
 	if flag, ok := formatVTInt(rec["flag"]); ok {
 		flagValue = flag
@@ -293,13 +308,15 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string,
 		propertyValue = fmt.Sprintf("%s %s %q", flagValue, tag, value)
 	}
 
-	caaRef := &schema.EntityRef{Type: constants.TypeCAA, Value: propertyValue}
+	caaLocalID := gen.NextID()
+	caaRef := &schema.EntityRef{Type: constants.TypeCAA, Value: propertyValue, LocalID: caaLocalID}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeCAA,
 		Category: constants.CategoryProperty,
 		Value:    propertyValue,
 		Source:   src,
+		LocalID:  caaLocalID,
 	})
 
 	switch tag {
@@ -326,6 +343,7 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string,
 			Context:    "Authorized CA (" + tag + ")",
 			OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 			Source:     caaRef,
+			LocalID:    gen.NextID(),
 		})
 	case "iodef":
 		email := dnsutils.ExtractCAAIodefEmail(value)
@@ -345,11 +363,12 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string,
 			Context:    "CAA Violation Report",
 			OutOfScope: orgdomain.IsEmailOutOfScope(validated.Value, target),
 			Source:     caaRef,
+			LocalID:    gen.NextID(),
 		})
 	}
 }
 
-func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any, value string) {
+func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any, value string, gen *modutil.LocalIDGenerator) {
 	srvValue := value
 	if priority, ok := formatVTInt(rec["priority"]); ok {
 		if !strings.HasPrefix(value, priority+" ") {
@@ -357,13 +376,15 @@ func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string,
 		}
 	}
 
-	srvRef := &schema.EntityRef{Type: constants.TypeSRV, Value: srvValue}
+	srvLocalID := gen.NextID()
+	srvRef := &schema.EntityRef{Type: constants.TypeSRV, Value: srvValue, LocalID: srvLocalID}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeSRV,
 		Category: constants.CategoryProperty,
 		Value:    srvValue,
 		Source:   src,
+		LocalID:  srvLocalID,
 	})
 
 	host, err := dnsutils.ParseSRVHost(srvValue)
@@ -389,5 +410,6 @@ func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string,
 		Tags:       []string{constants.TagSRV},
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     srvRef,
+		LocalID:    gen.NextID(),
 	})
 }

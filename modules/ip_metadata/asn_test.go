@@ -110,3 +110,14 @@ func TestGetASNDataDebug(t *testing.T) {
 	getASNData("198.51.100.2")
 	getASNData("192.0.2.1")
 }
+
+func TestModule_LocalIDChaining_ASN(t *testing.T) {
+	mockASNLookup(t)
+
+	res := getASNData("198.51.100.2")
+	if res.Error != nil {
+		t.Fatalf("expected no error, got: %v", *res.Error)
+	}
+
+	requireUniqueLocalIDs(t, res.Results)
+}

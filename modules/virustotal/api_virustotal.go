@@ -134,11 +134,13 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 			execution = modutil.NewExecution(f)
 			msg := "API key invalid (previous 401/403 error)"
 			dbg.Printf("%s error target=%q state=blocked reason=invalid_api_key", f, data.Target.Value)
+			gen := modutil.NewLocalIDGenerator()
 			execution.Results = append(execution.Results, schema.ModuleResult{
 				Type:     constants.TypeInfo,
 				Category: constants.CategoryProperty,
 				Value:    msg,
 				Context:  apiServiceName,
+				LocalID:  gen.NextID(),
 			})
 			executions = append(executions, execution)
 			continue
@@ -147,13 +149,14 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		ctx := context.Background()
 		target := data.Target.Value
 
+		gen := modutil.NewLocalIDGenerator()
 		switch f {
 		case constants.FuncGetVTApiIP:
 			execution = modutil.NewExecution(constants.FuncGetVTApiIP)
-			m.processIP(ctx, target, &execution)
+			m.processIP(ctx, target, &execution, gen)
 		case constants.FuncGetVTApiDomain:
 			execution = modutil.NewExecution(constants.FuncGetVTApiDomain)
-			m.processDomain(ctx, target, &execution)
+			m.processDomain(ctx, target, &execution, gen)
 		default:
 			execution = modutil.NewExecution(f)
 			modutil.SetError(&execution, "unsupported function: %v", fmt.Errorf("%s", f))
@@ -164,9 +167,9 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	return schema.ModuleOutput{Executions: executions}, nil
 }
 
-func (m *module) processDomain(ctx context.Context, target string, exec *schema.ModuleExecution) {
+func (m *module) processDomain(ctx context.Context, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	if m.apiKey == "demo-api-key" {
-		m.processDomainDemo(ctx, target, exec)
+		m.processDomainDemo(ctx, target, exec, gen)
 		return
 	}
 
@@ -186,7 +189,7 @@ func (m *module) processDomain(ctx context.Context, target string, exec *schema.
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
 		if attr, ok := dataMap["attributes"].(map[string]any); ok {
-			m.extractDomainMetadata(attr, target, exec)
+			m.extractDomainMetadata(attr, target, exec, gen)
 		}
 	}
 
@@ -198,7 +201,7 @@ func (m *module) processDomain(ctx context.Context, target string, exec *schema.
 	var expiredDomains []string
 	subURL := fmt.Sprintf("%s/domains/%s/subdomains?limit=40", baseURL, target)
 	m.processPaginated(ctx, subURL, exec, func(item map[string]any) {
-		if expired := m.extractSubdomain(item, target, disableCertExpired, exec); expired != "" {
+		if expired := m.extractSubdomain(item, target, disableCertExpired, exec, gen); expired != "" {
 			expiredDomains = append(expiredDomains, expired)
 		}
 	})
@@ -210,15 +213,16 @@ func (m *module) processDomain(ctx context.Context, target string, exec *schema.
 			Category: constants.CategoryProperty,
 			Value:    strings.Join(expiredDomains, ", "),
 			Context:  "Expired Certificates",
+			LocalID:  gen.NextID(),
 		})
 	}
 
 	dbg.Printf("%s success target=%q results=%d expired_cert_subdomains=%d", constants.FuncGetVTApiDomain, target, len(exec.Results), len(expiredDomains))
 }
 
-func (m *module) processIP(ctx context.Context, target string, exec *schema.ModuleExecution) {
+func (m *module) processIP(ctx context.Context, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	if m.apiKey == "demo-api-key" {
-		m.processIPDemo(ctx, target, exec)
+		m.processIPDemo(ctx, target, exec, gen)
 		return
 	}
 
@@ -238,13 +242,13 @@ func (m *module) processIP(ctx context.Context, target string, exec *schema.Modu
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
 		if attr, ok := dataMap["attributes"].(map[string]any); ok {
-			m.extractIPMetadata(attr, target, exec)
+			m.extractIPMetadata(attr, target, exec, gen)
 		}
 	}
 
 	resURL := fmt.Sprintf("%s/ip_addresses/%s/resolutions?limit=40", baseURL, target)
 	m.processPaginated(ctx, resURL, exec, func(item map[string]any) {
-		m.extractIPResolution(item, target, exec)
+		m.extractIPResolution(item, target, exec, gen)
 	})
 
 	dbg.Printf("%s success target=%q results=%d", constants.FuncGetVTApiIP, target, len(exec.Results))

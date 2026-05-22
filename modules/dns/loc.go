@@ -69,7 +69,7 @@ func parseLOC(raw string) string {
 	return fmt.Sprintf("%s %s %.2fm %s %s %s", lat, lon, alt, size, horiz, vert)
 }
 
-func getLOCData(ctx context.Context, target string) schema.ModuleExecution {
+func getLOCData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetLOC)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetLOC, target)
@@ -94,6 +94,7 @@ func getLOCData(ctx context.Context, target string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    parseLOC(rec),
 			Context:  "Geographic Location",
+			LocalID:  gen.NextID(),
 		})
 	}
 

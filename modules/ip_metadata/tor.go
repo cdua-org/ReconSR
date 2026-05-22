@@ -58,6 +58,7 @@ func performAQuery(target, query, queryType string) ([]string, error) {
 
 func getTorData(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetTOR)
+	gen := modutil.NewLocalIDGenerator()
 
 	dbg.Printf("%s target=%q", constants.FuncGetTOR, target)
 
@@ -110,6 +111,7 @@ func getTorData(target string) (execution schema.ModuleExecution) {
 			Category: constants.CategoryProperty,
 			Value:    constants.TagTorExit,
 			Context:  detectedContext,
+			LocalID:  gen.NextID(),
 		})
 		execution.RawData = dnsblPositive
 		dbg.Printf("%s success target=%q context=%q", constants.FuncGetTOR, target, detectedContext)

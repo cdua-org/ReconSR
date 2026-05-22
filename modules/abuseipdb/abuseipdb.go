@@ -106,12 +106,13 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 
 	for _, f := range data.Functions {
 		exec := modutil.NewExecution(f)
+		gen := modutil.NewLocalIDGenerator()
 
 		if f == constants.FuncCheckAbuseIPDB {
 			if m.apiKey == "demo-api-key" {
-				m.processCheckDemo(&exec, data.Target.Value)
+				m.processCheckDemo(&exec, data.Target.Value, gen)
 			} else {
-				processCheck(&exec, data.Target.Value, m.apiKey)
+				processCheck(&exec, data.Target.Value, m.apiKey, gen)
 			}
 		} else {
 			modutil.SetError(&exec, "unsupported function: %v", errors.New(f))
@@ -123,7 +124,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	return schema.ModuleOutput{Executions: executions}, nil
 }
 
-func processCheck(exec *schema.ModuleExecution, target, apiKey string) {
+func processCheck(exec *schema.ModuleExecution, target, apiKey string, gen *modutil.LocalIDGenerator) {
 	dbg.Printf("%s target=%q", constants.FuncCheckAbuseIPDB, target)
 
 	maxAge := resolver.AbuseIPDBmaxAgeInDays
@@ -204,7 +205,7 @@ func processCheck(exec *schema.ModuleExecution, target, apiKey string) {
 		return
 	}
 
-	populateResults(exec, &parsed)
+	populateResults(exec, &parsed, gen)
 }
 
 func doRequest(ctx context.Context, urlStr, apiKey string) (body []byte, statusCode int, headers http.Header, err error) {
@@ -244,7 +245,7 @@ func isDailyQuotaExceeded(header http.Header) bool {
 	return false
 }
 
-func populateResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
+func populateResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse, gen *modutil.LocalIDGenerator) {
 	d := resp.Data
 
 	if d.AbuseConfidenceScore > 0 {
@@ -252,6 +253,7 @@ func populateResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
 			Type:     constants.TypeAbuseScore,
 			Category: constants.CategoryProperty,
 			Value:    strconv.Itoa(d.AbuseConfidenceScore),
+			LocalID:  gen.NextID(),
 		})
 
 		if d.AbuseConfidenceScore < 50 {
@@ -259,12 +261,14 @@ func populateResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
 				Type:     constants.TypeTag,
 				Category: constants.CategoryProperty,
 				Value:    constants.TagSuspicious,
+				LocalID:  gen.NextID(),
 			})
 		} else {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeTag,
 				Category: constants.CategoryProperty,
 				Value:    constants.TagMalicious,
+				LocalID:  gen.NextID(),
 			})
 		}
 	}
@@ -274,6 +278,7 @@ func populateResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
 			Type:     constants.TypeTag,
 			Category: constants.CategoryProperty,
 			Value:    constants.TagWhitelisted,
+			LocalID:  gen.NextID(),
 		})
 	}
 
@@ -282,6 +287,7 @@ func populateResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
 			Type:     constants.TypeTag,
 			Category: constants.CategoryProperty,
 			Value:    constants.TagPublicIP,
+			LocalID:  gen.NextID(),
 		})
 	}
 
@@ -290,6 +296,7 @@ func populateResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
 			Type:     constants.TypeTag,
 			Category: constants.CategoryProperty,
 			Value:    constants.TagTorExit,
+			LocalID:  gen.NextID(),
 		})
 	}
 
@@ -298,6 +305,7 @@ func populateResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
 			Type:     constants.TypeUsageType,
 			Category: constants.CategoryProperty,
 			Value:    d.UsageType,
+			LocalID:  gen.NextID(),
 		})
 	}
 
@@ -306,20 +314,22 @@ func populateResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
 			Type:     constants.TypeISP,
 			Category: constants.CategoryProperty,
 			Value:    d.ISP,
+			LocalID:  gen.NextID(),
 		})
 	}
 
-	populateMoreResults(exec, resp)
+	populateMoreResults(exec, resp, gen)
 }
 
-func populateMoreResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
+func populateMoreResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse, gen *modutil.LocalIDGenerator) {
 	d := resp.Data
 
 	if d.Domain != "" {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:  constants.TypeDomain,
-			Value: d.Domain,
-			Tags:  []string{constants.TagReverseIP},
+			Type:    constants.TypeDomain,
+			Value:   d.Domain,
+			Tags:    []string{constants.TagReverseIP},
+			LocalID: gen.NextID(),
 		})
 	}
 
@@ -328,23 +338,25 @@ func populateMoreResults(exec *schema.ModuleExecution, resp *abuseIPDBResponse) 
 			Type:     constants.TypeGeo,
 			Category: constants.CategoryProperty,
 			Value:    d.CountryCode,
+			LocalID:  gen.NextID(),
 		})
 	}
 
 	for _, host := range d.Hostnames {
 		if host != "" {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:  constants.TypeDomain,
-				Value: host,
-				Tags:  []string{constants.TagReverseIP},
+				Type:    constants.TypeDomain,
+				Value:   host,
+				Tags:    []string{constants.TagReverseIP},
+				LocalID: gen.NextID(),
 			})
 		}
 	}
 
-	parseReports(exec, resp)
+	parseReports(exec, resp, gen)
 }
 
-func parseReports(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
+func parseReports(exec *schema.ModuleExecution, resp *abuseIPDBResponse, gen *modutil.LocalIDGenerator) {
 	d := resp.Data
 	if d.TotalReports <= 0 {
 		return
@@ -354,6 +366,7 @@ func parseReports(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
 		Type:     constants.TypeTotalReports,
 		Category: constants.CategoryProperty,
 		Value:    strconv.Itoa(d.TotalReports),
+		LocalID:  gen.NextID(),
 	})
 
 	var hasSpam, hasDDoS, hasBruteforce, hasScanner bool
@@ -389,19 +402,20 @@ func parseReports(exec *schema.ModuleExecution, resp *abuseIPDBResponse) {
 			Type:     constants.TypeAbuseReport,
 			Category: constants.CategoryProperty,
 			Value:    fmt.Sprintf("[%s] %s: %s", rep.ReportedAt, catStr, safeComment),
+			LocalID:  gen.NextID(),
 		})
 	}
 
 	if hasSpam {
-		exec.Results = append(exec.Results, schema.ModuleResult{Type: constants.TypeTag, Category: constants.CategoryProperty, Value: constants.TagSpam})
+		exec.Results = append(exec.Results, schema.ModuleResult{Type: constants.TypeTag, Category: constants.CategoryProperty, Value: constants.TagSpam, LocalID: gen.NextID()})
 	}
 	if hasDDoS {
-		exec.Results = append(exec.Results, schema.ModuleResult{Type: constants.TypeTag, Category: constants.CategoryProperty, Value: constants.TagDDoS})
+		exec.Results = append(exec.Results, schema.ModuleResult{Type: constants.TypeTag, Category: constants.CategoryProperty, Value: constants.TagDDoS, LocalID: gen.NextID()})
 	}
 	if hasBruteforce {
-		exec.Results = append(exec.Results, schema.ModuleResult{Type: constants.TypeTag, Category: constants.CategoryProperty, Value: constants.TagBruteforce})
+		exec.Results = append(exec.Results, schema.ModuleResult{Type: constants.TypeTag, Category: constants.CategoryProperty, Value: constants.TagBruteforce, LocalID: gen.NextID()})
 	}
 	if hasScanner {
-		exec.Results = append(exec.Results, schema.ModuleResult{Type: constants.TypeTag, Category: constants.CategoryProperty, Value: constants.TagScanner})
+		exec.Results = append(exec.Results, schema.ModuleResult{Type: constants.TypeTag, Category: constants.CategoryProperty, Value: constants.TagScanner, LocalID: gen.NextID()})
 	}
 }

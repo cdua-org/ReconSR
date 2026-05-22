@@ -11,7 +11,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getCAAData(ctx context.Context, target string) schema.ModuleExecution {
+func getCAAData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetCAA)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetCAA, target)
@@ -31,13 +31,13 @@ func getCAAData(ctx context.Context, target string) schema.ModuleExecution {
 	log.Printf("%s success target=%q records=%d", constants.FuncGetCAA, target, len(records))
 
 	for _, rec := range records {
-		exec.Results = append(exec.Results, processCAARecord(rec, target)...)
+		exec.Results = append(exec.Results, processCAARecord(rec, target, gen)...)
 	}
 
 	return exec
 }
 
-func processCAARecord(data, target string) []schema.ModuleResult {
+func processCAARecord(data, target string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	normalized, tag, val, matched := dnsutils.ParseCAA(data)
 
 	results := make([]schema.ModuleResult, 0, 2)
@@ -45,6 +45,7 @@ func processCAARecord(data, target string) []schema.ModuleResult {
 		Type:     constants.TypeCAA,
 		Category: constants.CategoryProperty,
 		Value:    normalized,
+		LocalID:  gen.NextID(),
 	}
 	results = append(results, caaResult)
 
@@ -56,11 +57,11 @@ func processCAARecord(data, target string) []schema.ModuleResult {
 
 	switch tag {
 	case "issue", "issuewild", "issuemail":
-		if result, ok := buildCAAAuthorityResult(tag, val, target, source); ok {
+		if result, ok := buildCAAAuthorityResult(tag, val, target, source, gen); ok {
 			results = append(results, result)
 		}
 	case "iodef":
-		if result, ok := buildCAAIodefEmailResult(val, source); ok {
+		if result, ok := buildCAAIodefEmailResult(val, source, gen); ok {
 			results = append(results, result)
 		}
 	}
@@ -68,7 +69,7 @@ func processCAARecord(data, target string) []schema.ModuleResult {
 	return results
 }
 
-func buildCAAAuthorityResult(tag, val, target string, source *schema.EntityRef) (schema.ModuleResult, bool) {
+func buildCAAAuthorityResult(tag, val, target string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) (schema.ModuleResult, bool) {
 	domain := dnsutils.ExtractCAAAuthority(val)
 	if domain == "" {
 		return schema.ModuleResult{}, false
@@ -92,10 +93,11 @@ func buildCAAAuthorityResult(tag, val, target string, source *schema.EntityRef) 
 		Context:    "Authorized CA" + " (" + tag + ")",
 		OutOfScope: true,
 		Source:     source,
+		LocalID:    gen.NextID(),
 	}, true
 }
 
-func buildCAAIodefEmailResult(val string, source *schema.EntityRef) (schema.ModuleResult, bool) {
+func buildCAAIodefEmailResult(val string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) (schema.ModuleResult, bool) {
 	email := dnsutils.ExtractCAAIodefEmail(val)
 	if email == "" {
 		return schema.ModuleResult{}, false
@@ -114,5 +116,6 @@ func buildCAAIodefEmailResult(val string, source *schema.EntityRef) (schema.Modu
 		Context:    "CAA Violation Report",
 		OutOfScope: true,
 		Source:     source,
+		LocalID:    gen.NextID(),
 	}, true
 }

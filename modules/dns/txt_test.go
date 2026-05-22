@@ -6,11 +6,12 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestGetTXTDataEmpty(t *testing.T) {
-	execution := getTXTData(context.Background(), "nonexistent.domain.invalid")
+	execution := getTXTData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("txt lookup failed: %v", *execution.Error)
@@ -23,7 +24,7 @@ func TestGetTXTDataEmpty(t *testing.T) {
 }
 
 func TestGetTXTData(t *testing.T) {
-	res := getTXTData(context.Background(), "example.com")
+	res := getTXTData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if res.Error != nil {
 		t.Logf("Network resolution error: %v", *res.Error)
@@ -44,11 +45,29 @@ func TestTXTCapabilities(t *testing.T) {
 	}
 }
 
+func TestGetTXTData_LocalIDChaining(t *testing.T) {
+	exec := getTXTData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+
+	if exec.Error != nil {
+		t.Fatalf("Expected no error, got: %v", *exec.Error)
+	}
+	if len(exec.Results) < 2 {
+		t.Skip("Expected multiple results to verify chaining, skipping test")
+	}
+
+	for i, res := range exec.Results {
+		expectedID := i + 1
+		if res.LocalID != expectedID {
+			t.Errorf("Expected LocalID %d at index %d, got %d (Type: %s, Value: %s)", expectedID, i, res.LocalID, res.Type, res.Value)
+		}
+	}
+}
+
 func TestBuildSPFEntityResults(t *testing.T) {
 	spf := "v=spf1 ip4:198.51.100.10 ip6:2001:db8::1 include:spf.example.net a:web.example.org mx:relay.example.edu -all"
 	source := &schema.EntityRef{Type: constants.TypeSPF, Value: spf}
 
-	results := buildSPFEntityResults(source, spf, "example.com")
+	results := buildSPFEntityResults(source, spf, "example.com", modutil.NewLocalIDGenerator())
 
 	requireSPFResult(t, results, constants.TypeIPv4, "198.51.100.10", "SPF ip4", false)
 	requireSPFResult(t, results, constants.TypeIPv6, "2001:db8::1", "SPF ip6", false)
@@ -70,7 +89,7 @@ func TestBuildSPFEntityResultsSelfReferentialSkipped(t *testing.T) {
 	spf := "v=spf1 include:samehost.example.com redirect=samehost.example.com -all"
 	source := &schema.EntityRef{Type: constants.TypeSPF, Value: spf}
 
-	results := buildSPFEntityResults(source, spf, "samehost.example.com")
+	results := buildSPFEntityResults(source, spf, "samehost.example.com", modutil.NewLocalIDGenerator())
 
 	for _, res := range results {
 		if res.Value == "samehost.example.com" {
@@ -83,7 +102,7 @@ func TestBuildSPFEntityResultsEmptySPF(t *testing.T) {
 	spf := "v=spf1 -all"
 	source := &schema.EntityRef{Type: constants.TypeSPF, Value: spf}
 
-	results := buildSPFEntityResults(source, spf, "example.com")
+	results := buildSPFEntityResults(source, spf, "example.com", modutil.NewLocalIDGenerator())
 	if len(results) != 0 {
 		t.Fatalf("expected 0 results for empty SPF, got %d", len(results))
 	}

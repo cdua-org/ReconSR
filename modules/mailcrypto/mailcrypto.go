@@ -119,6 +119,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 
 func handlePreflightDNS(ctx context.Context, domain string, target schema.Entity) schema.ModuleExecution {
 	execution := modutil.NewExecution(constants.FuncPreflightDNS)
+	gen := modutil.NewLocalIDGenerator()
 	dbg.Printf("%s target=%q domain=%q", constants.FuncPreflightDNS, target.Value, domain)
 	err := preflightcheck.PreFlightCheck(ctx, domain)
 	if err != nil {
@@ -128,6 +129,7 @@ func handlePreflightDNS(ctx context.Context, domain string, target schema.Entity
 				Category: constants.CategoryProperty,
 				Value:    constants.StatusBrokenDNSZone,
 				Tags:     []string{constants.TagDNSBad},
+				LocalID:  gen.NextID(),
 			})
 		} else {
 			errMsg := err.Error()
@@ -135,9 +137,10 @@ func handlePreflightDNS(ctx context.Context, domain string, target schema.Entity
 		}
 	} else {
 		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:  target.Type,
-			Value: target.Value,
-			Tags:  []string{constants.TagDNSOK},
+			Type:    target.Type,
+			Value:   target.Value,
+			Tags:    []string{constants.TagDNSOK},
+			LocalID: gen.NextID(),
 		})
 	}
 	return execution

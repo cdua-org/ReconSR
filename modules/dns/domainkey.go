@@ -12,7 +12,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getDomainKeyData(ctx context.Context, target string) schema.ModuleExecution {
+func getDomainKeyData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetDomainKey)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
@@ -48,6 +48,7 @@ func getDomainKeyData(ctx context.Context, target string) schema.ModuleExecution
 			Category: constants.CategoryProperty,
 			Value:    rec,
 			Context:  "Old DomainKey Record: " + domainkeyTarget,
+			LocalID:  gen.NextID(),
 		})
 	}
 

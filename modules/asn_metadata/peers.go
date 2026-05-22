@@ -20,7 +20,7 @@ const (
 	neighbourPositionRight = "right"
 )
 
-func getASNPeers(target string) (execution schema.ModuleExecution) {
+func getASNPeers(target string, gen *modutil.LocalIDGenerator) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetASNPeers)
 
 	dbg.Printf("%s target=%q", constants.FuncGetASNPeers, target)
@@ -59,6 +59,7 @@ func getASNPeers(target string) (execution schema.ModuleExecution) {
 		Value:    originASN,
 		Context:  "Origin AS",
 		Applied:  true,
+		LocalID:  gen.NextID(),
 	})
 
 	chainLine := buildChainString(chain, originASN)
@@ -67,6 +68,7 @@ func getASNPeers(target string) (execution schema.ModuleExecution) {
 		Category: constants.CategoryProperty,
 		Value:    chainLine,
 		Context:  "ASN Peers",
+		LocalID:  gen.NextID(),
 	})
 
 	return execution

@@ -4,10 +4,11 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
-func appendShodanTagResults(exec *schema.ModuleExecution, tags []string) {
+func appendShodanTagResults(exec *schema.ModuleExecution, tags []string, gen *modutil.LocalIDGenerator) {
 	if len(tags) == 0 {
 		return
 	}
@@ -27,6 +28,7 @@ func appendShodanTagResults(exec *schema.ModuleExecution, tags []string) {
 			Type:     constants.TypeTag,
 			Category: constants.CategoryProperty,
 			Value:    tag,
+			LocalID:  gen.NextID(),
 		})
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestParseDNSKEY(t *testing.T) {
@@ -42,7 +43,7 @@ func TestParseDNSKEY(t *testing.T) {
 }
 
 func TestGetDNSKEYData(t *testing.T) {
-	res := getDNSKEYData(context.Background(), "example.com")
+	res := getDNSKEYData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	switch {
 	case res.Error != nil:

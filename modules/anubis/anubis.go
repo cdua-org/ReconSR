@@ -21,13 +21,13 @@ import (
 
 const (
 	moduleName    = "anubis"
-	baseURL       = "https://jldc.me/anubis/subdomains/"
 	acceptJSON    = "application/json"
 	anubisContext = "Anubis DB"
-	anubisLimit   = 1000
+	anubisLimit   = 10000
 )
 
 var dbg = debuglog.New(moduleName)
+var baseURL = "https://anubisdb.com/anubis/subdomains/"
 
 type module struct{}
 
@@ -45,7 +45,7 @@ func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 		CustomFunctions: map[string]schema.FunctionCapabilities{
 			constants.FuncGetDomains: {
 				Limit:      3,
-				DelayMs:    2000,
+				DelayMs:    600,
 				InputTypes: []string{constants.TypeDomain},
 			},
 		},
@@ -72,7 +72,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	return schema.ModuleOutput{Executions: execs}, nil
 }
 
-func fetchAnubisData(ctx context.Context, target string) ([]byte, error) {
+func fetchAnubisData(ctx context.Context, target string) (body []byte, statusCode int, err error) {
 	reqURL := baseURL + target
 	var lastErr error
 
@@ -80,7 +80,7 @@ func fetchAnubisData(ctx context.Context, target string) ([]byte, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 		if err != nil {
 			dbg.Printf("%s error target=%q stage=create_request attempt=%d err=%v", constants.FuncGetDomains, target, attempt, err)
-			return nil, fmt.Errorf("create request: %w", err)
+			return nil, 0, fmt.Errorf("create request: %w", err)
 		}
 
 		req.Header.Set("User-Agent", resolver.GetRandomUserAgent())
@@ -92,7 +92,7 @@ func fetchAnubisData(ctx context.Context, target string) ([]byte, error) {
 			lastErr = err
 			dbg.Printf("%s error target=%q stage=do_request attempt=%d err=%v", constants.FuncGetDomains, target, attempt, err)
 			if !httputil.SleepContext(ctx, resolver.RetryBaseDelay) {
-				return nil, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
+				return nil, 0, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
 			}
 			continue
 		}
@@ -106,19 +106,19 @@ func fetchAnubisData(ctx context.Context, target string) ([]byte, error) {
 			lastErr = err
 			dbg.Printf("%s error target=%q stage=read_body attempt=%d err=%v", constants.FuncGetDomains, target, attempt, err)
 			if !httputil.SleepContext(ctx, resolver.RetryBaseDelay) {
-				return nil, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
+				return nil, 0, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
 			}
 			continue
 		}
 
 		if resp.StatusCode == http.StatusOK {
-			return body, nil
+			return body, resp.StatusCode, nil
 		}
 
 		action := httputil.ClassifyStatus(resp.StatusCode)
 		if action == httputil.Abort {
 			dbg.Printf("%s error target=%q stage=response_status attempt=%d status=%d action=%d", constants.FuncGetDomains, target, attempt, resp.StatusCode, action)
-			return body, fmt.Errorf("hard failure status %d", resp.StatusCode)
+			return body, resp.StatusCode, fmt.Errorf("hard failure status %d", resp.StatusCode)
 		}
 
 		lastErr = fmt.Errorf("retryable status %d", resp.StatusCode)
@@ -126,21 +126,29 @@ func fetchAnubisData(ctx context.Context, target string) ([]byte, error) {
 		dbg.Printf("%s error target=%q stage=response_status attempt=%d status=%d action=%d delay=%v", constants.FuncGetDomains, target, attempt, resp.StatusCode, action, delay)
 
 		if !httputil.SleepContext(ctx, delay) {
-			return body, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
+			return body, resp.StatusCode, fmt.Errorf("context cancelled during retry: %w", ctx.Err())
 		}
 	}
 
-	return nil, fmt.Errorf("all API attempts failed: %w", lastErr)
+	return nil, 0, fmt.Errorf("all API attempts failed: %w", lastErr)
 }
 
 func getDomains(target string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetDomains)
 
+	gen := modutil.NewLocalIDGenerator()
+
 	ctx, cancel := context.WithTimeout(context.Background(), resolver.HTTPTimeout*2)
 	defer cancel()
 
-	rawData, err := fetchAnubisData(ctx, target)
+	rawData, statusCode, err := fetchAnubisData(ctx, target)
 	if err != nil {
+		if statusCode == http.StatusForbidden {
+			modutil.SetRawFromBytes(&exec, rawData)
+			exec.Results = append(exec.Results, handle403Result(gen))
+			return exec
+		}
+
 		modutil.SetError(&exec, "%v", err)
 		modutil.SetRawFromBytes(&exec, rawData)
 		return exec
@@ -169,27 +177,8 @@ func getDomains(target string) schema.ModuleExecution {
 			break
 		}
 
-		domain := strings.ToLower(strings.TrimSpace(rawDomain))
-		if domain == "" || domain == target {
-			continue
-		}
-
-		if orgdomain.IsOutOfScope(domain, target) {
-			continue
-		}
-
-		if strings.HasSuffix(domain, ".in-addr.arpa") || strings.HasSuffix(domain, ".ip6.arpa") {
-			continue
-		}
-
-		isWildcard := strings.HasPrefix(domain, "*.")
-		cleanDomain := domain
-		if isWildcard {
-			cleanDomain = strings.TrimPrefix(domain, "*.")
-		}
-
-		if _, err := validator.Validate(constants.TypeDomain, cleanDomain); err != nil {
-			dbg.Printf("%s skip_invalid_domain=%q err=%v", constants.FuncGetDomains, domain, err)
+		domain, cleanDomain, isWildcard, valid := processDomain(rawDomain, target)
+		if !valid {
 			continue
 		}
 
@@ -207,6 +196,7 @@ func getDomains(target string) schema.ModuleExecution {
 			Context:  anubisContext,
 			Applied:  true,
 			Tags:     []string{constants.TagPDNS},
+			LocalID:  gen.NextID(),
 		}
 		if isWildcard {
 			result.Tags = append(result.Tags, constants.TagWildcard)
@@ -219,4 +209,41 @@ func getDomains(target string) schema.ModuleExecution {
 	dbg.Printf("%s success target=%q raw_count=%d processed_count=%d", constants.FuncGetDomains, target, len(subdomains), processedCount)
 
 	return exec
+}
+
+func processDomain(rawDomain, target string) (domain, cleanDomain string, isWildcard, valid bool) {
+	domain = strings.ToLower(strings.TrimSpace(rawDomain))
+	if domain == "" || domain == target {
+		return "", "", false, false
+	}
+
+	if orgdomain.IsOutOfScope(domain, target) {
+		return "", "", false, false
+	}
+
+	if strings.HasSuffix(domain, ".in-addr.arpa") || strings.HasSuffix(domain, ".ip6.arpa") {
+		return "", "", false, false
+	}
+
+	isWildcard = strings.HasPrefix(domain, "*.")
+	cleanDomain = domain
+	if isWildcard {
+		cleanDomain = strings.TrimPrefix(domain, "*.")
+	}
+
+	if _, err := validator.Validate(constants.TypeDomain, cleanDomain); err != nil {
+		dbg.Printf("%s skip_invalid_domain=%q err=%v", constants.FuncGetDomains, domain, err)
+		return "", "", false, false
+	}
+
+	return domain, cleanDomain, isWildcard, true
+}
+
+func handle403Result(gen *modutil.LocalIDGenerator) schema.ModuleResult {
+	return schema.ModuleResult{
+		Type:     constants.TypeInfo,
+		Category: constants.CategoryProperty,
+		Value:    "Access denied (HTTP 403) from Anubis API. Service might be blocking your IP, consider using a VPN.",
+		LocalID:  gen.NextID(),
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
@@ -34,56 +35,68 @@ func TestModuleCapabilities(t *testing.T) {
 }
 
 func TestGetASNPeersClean(t *testing.T) {
-	res := getASNPeers("AS64512")
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNPeers("AS64512", gen)
 	if res.Error == nil {
 		t.Log("network error may occur, skipping test")
 	}
+	requireUniqueLocalIDs(t, []schema.ModuleExecution{res})
 }
 
 func TestGetASNPrefixesClean(t *testing.T) {
-	res := getASNPrefixes("AS64513")
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNPrefixes("AS64513", gen)
 	if res.Error == nil {
 		t.Log("network error may occur, skipping test")
 	}
+	requireUniqueLocalIDs(t, []schema.ModuleExecution{res})
 }
 
 func TestGetASNInfoClean(t *testing.T) {
-	res := getASNInfo("AS64514")
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNInfo("AS64514", gen)
 	if res.Error == nil {
 		t.Log("network error may occur, skipping test")
 	}
+	requireUniqueLocalIDs(t, []schema.ModuleExecution{res})
 }
 
 func TestGetASNAbuseContactsClean(t *testing.T) {
-	res := getASNAbuseContacts("AS64515")
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNAbuseContacts("AS64515", gen)
 	if res.Error == nil {
 		t.Log("network error may occur, skipping test")
 	}
+	requireUniqueLocalIDs(t, []schema.ModuleExecution{res})
 }
 
 func TestGetASNPeersInvalid(t *testing.T) {
-	res := getASNPeers("")
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNPeers("", gen)
 	if res.Error == nil {
 		t.Error("expected error for empty ASN")
 	}
 }
 
 func TestGetASNPrefixesInvalid(t *testing.T) {
-	res := getASNPrefixes("")
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNPrefixes("", gen)
 	if res.Error == nil {
 		t.Error("expected error for empty ASN")
 	}
 }
 
 func TestGetASNInfoInvalid(t *testing.T) {
-	res := getASNInfo("")
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNInfo("", gen)
 	if res.Error == nil {
 		t.Error("expected error for empty ASN")
 	}
 }
 
 func TestGetASNAbuseContactsInvalid(t *testing.T) {
-	res := getASNAbuseContacts("")
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNAbuseContacts("", gen)
 	if res.Error == nil {
 		t.Error("expected error for empty ASN")
 	}
@@ -94,10 +107,11 @@ func TestGetASNPeersDebug(t *testing.T) {
 	resolver.Options["Debug"] = "true"
 	defer func() { resolver.Options["Debug"] = "false" }()
 
-	getASNPeers("AS64516")
-	getASNPrefixes("AS64516")
-	getASNInfo("AS64516")
-	getASNAbuseContacts("AS64516")
+	gen := modutil.NewLocalIDGenerator()
+	getASNPeers("AS64516", gen)
+	getASNPrefixes("AS64516", gen)
+	getASNInfo("AS64516", gen)
+	getASNAbuseContacts("AS64516", gen)
 }
 
 func TestBuildChainString(t *testing.T) {
@@ -170,5 +184,54 @@ func TestModuleExec(t *testing.T) {
 
 	if !foundPeers || !foundPrefixes || !foundInfo || !foundAbuse || !foundInvalid {
 		t.Error("missing expected execution results")
+	}
+	requireUniqueLocalIDs(t, out.Executions)
+}
+
+func TestModule_LocalIDChaining(t *testing.T) {
+	mod := New()
+	input := schema.ModuleInput{
+		Target: schema.Entity{
+			Type:  constants.TypeASN,
+			Value: "AS64521",
+		},
+		Functions: []string{constants.FuncGetASNPrefixes},
+	}
+
+	out, err := mod.Exec(input)
+	if err != nil {
+		t.Fatalf("expected no error from Exec, got %v", err)
+	}
+
+	if len(out.Executions) != 1 {
+		t.Fatalf("expected 1 execution, got %d", len(out.Executions))
+	}
+
+	exec := out.Executions[0]
+
+	if len(exec.Results) > 1 {
+		for i, res := range exec.Results {
+			expectedID := i + 1
+			if res.LocalID != expectedID {
+				t.Errorf("Expected LocalID %d at index %d, got %d (Type: %s, Value: %s)", expectedID, i, res.LocalID, res.Type, res.Value)
+			}
+		}
+	}
+}
+
+func requireUniqueLocalIDs(t *testing.T, execs []schema.ModuleExecution) {
+	t.Helper()
+
+	for _, exec := range execs {
+		seen := make(map[int]bool)
+		for _, res := range exec.Results {
+			if res.LocalID <= 0 {
+				t.Errorf("expected positive LocalID, got %d for type %s value %s", res.LocalID, res.Type, res.Value)
+			}
+			if seen[res.LocalID] {
+				t.Errorf("duplicate LocalID %d found for type %s value %s", res.LocalID, res.Type, res.Value)
+			}
+			seen[res.LocalID] = true
+		}
 	}
 }

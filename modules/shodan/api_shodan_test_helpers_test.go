@@ -175,3 +175,18 @@ func loadShodanFixture(t *testing.T, filename string) []byte {
 	}
 	return data
 }
+
+func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	seen := make(map[int]bool)
+	for _, res := range results {
+		if res.LocalID <= 0 {
+			t.Errorf("expected positive LocalID, got %d for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		if seen[res.LocalID] {
+			t.Errorf("duplicate LocalID %d found for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		seen[res.LocalID] = true
+	}
+}

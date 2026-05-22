@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestGetSVCBDataEmpty(t *testing.T) {
-	execution := getSVCBData(context.Background(), "example.com")
+	execution := getSVCBData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("svcb lookup failed: %v", *execution.Error)
@@ -20,7 +21,7 @@ func TestGetSVCBDataEmpty(t *testing.T) {
 }
 
 func TestGetSVCBDataNX(t *testing.T) {
-	execution := getSVCBData(context.Background(), "nonexistent.domain.invalid")
+	execution := getSVCBData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 	t.Logf("Found %d results for nonexistent domain", len(execution.Results))
 }
 

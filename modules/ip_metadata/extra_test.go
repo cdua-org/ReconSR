@@ -109,3 +109,25 @@ func TestExtraTimeout(t *testing.T) {
 		t.Error("expected timeout error for abuse contacts")
 	}
 }
+
+func TestModule_LocalIDChaining_Info(t *testing.T) {
+	mockRIPEstatSuccess(t)
+
+	res := getIPInfo("198.51.100.2")
+	if res.Error != nil {
+		t.Fatalf("expected no error, got: %v", *res.Error)
+	}
+
+	requireUniqueLocalIDs(t, res.Results)
+}
+
+func TestModule_LocalIDChaining_Abuse(t *testing.T) {
+	mockRIPEstatSuccess(t)
+
+	res := getIPAbuseContacts("198.51.100.2")
+	if res.Error != nil {
+		t.Fatalf("expected no error, got: %v", *res.Error)
+	}
+
+	requireUniqueLocalIDs(t, res.Results)
+}

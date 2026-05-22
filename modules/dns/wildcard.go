@@ -11,7 +11,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func checkWildcard(ctx context.Context, target string) schema.ModuleExecution {
+func checkWildcard(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncCheckWildcard)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
@@ -44,6 +44,7 @@ func checkWildcard(ctx context.Context, target string) schema.ModuleExecution {
 			Category: constants.CategoryNode,
 			Value:    ipStr,
 			Context:  "Wildcard Record",
+			LocalID:  gen.NextID(),
 		})
 	}
 

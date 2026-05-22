@@ -14,7 +14,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func (m *module) processDomainDemo(_ context.Context, target string, exec *schema.ModuleExecution) {
+func (m *module) processDomainDemo(_ context.Context, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	if !m.demoDomainFired.CompareAndSwap(false, true) {
 		dbg.Printf("%s skipped stage=demo_already_fired target=%q", constants.FuncGetVTApiDomain, target)
 		return
@@ -26,6 +26,7 @@ func (m *module) processDomainDemo(_ context.Context, target string, exec *schem
 		Type:     constants.TypeInfo,
 		Category: constants.CategoryProperty,
 		Value:    "⚠️ DEMO MODE: Showing sample data for VirusTotal (API key not configured)",
+		LocalID:  gen.NextID(),
 	})
 
 	dataBytes, err := os.ReadFile("modules/virustotal/testdata/domain_page1.json")
@@ -43,7 +44,7 @@ func (m *module) processDomainDemo(_ context.Context, target string, exec *schem
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
 		if attr, ok := dataMap["attributes"].(map[string]any); ok {
-			m.extractDomainMetadata(attr, target, exec)
+			m.extractDomainMetadata(attr, target, exec, gen)
 		}
 	}
 
@@ -75,7 +76,7 @@ func (m *module) processDomainDemo(_ context.Context, target string, exec *schem
 			if !ok {
 				continue
 			}
-			if expired := m.extractSubdomain(itemMap, target, disableCertExpired, exec); expired != "" {
+			if expired := m.extractSubdomain(itemMap, target, disableCertExpired, exec, gen); expired != "" {
 				expiredDomains = append(expiredDomains, expired)
 			}
 		}
@@ -88,13 +89,14 @@ func (m *module) processDomainDemo(_ context.Context, target string, exec *schem
 			Category: constants.CategoryProperty,
 			Value:    strings.Join(expiredDomains, ", "),
 			Context:  "Expired Certificates",
+			LocalID:  gen.NextID(),
 		})
 	}
 
 	dbg.Printf("%s success stage=demo_parsed results=%d", constants.FuncGetVTApiDomain, len(exec.Results))
 }
 
-func (m *module) processIPDemo(_ context.Context, target string, exec *schema.ModuleExecution) {
+func (m *module) processIPDemo(_ context.Context, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	if !m.demoIPFired.CompareAndSwap(false, true) {
 		dbg.Printf("%s skipped stage=demo_already_fired target=%q", constants.FuncGetVTApiIP, target)
 		return
@@ -106,6 +108,7 @@ func (m *module) processIPDemo(_ context.Context, target string, exec *schema.Mo
 		Type:     constants.TypeInfo,
 		Category: constants.CategoryProperty,
 		Value:    "⚠️ DEMO MODE: Showing sample data for VirusTotal (API key not configured)",
+		LocalID:  gen.NextID(),
 	})
 
 	dataBytes, err := os.ReadFile("modules/virustotal/testdata/ip_page1.json")
@@ -123,7 +126,7 @@ func (m *module) processIPDemo(_ context.Context, target string, exec *schema.Mo
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
 		if attr, ok := dataMap["attributes"].(map[string]any); ok {
-			m.extractIPMetadata(attr, target, exec)
+			m.extractIPMetadata(attr, target, exec, gen)
 		}
 	}
 
@@ -151,7 +154,7 @@ func (m *module) processIPDemo(_ context.Context, target string, exec *schema.Mo
 			if !ok {
 				continue
 			}
-			m.extractIPResolution(itemMap, target, exec)
+			m.extractIPResolution(itemMap, target, exec, gen)
 		}
 	}
 

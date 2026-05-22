@@ -9,7 +9,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func (m *module) processCheckDemo(exec *schema.ModuleExecution, target string) {
+func (m *module) processCheckDemo(exec *schema.ModuleExecution, target string, gen *modutil.LocalIDGenerator) {
 	if !m.demoFired.CompareAndSwap(false, true) {
 		dbg.Printf("%s skipped stage=demo_already_fired target=%q", constants.FuncCheckAbuseIPDB, target)
 		return
@@ -21,6 +21,7 @@ func (m *module) processCheckDemo(exec *schema.ModuleExecution, target string) {
 		Type:     constants.TypeInfo,
 		Category: constants.CategoryProperty,
 		Value:    "⚠️ DEMO MODE: Showing sample data for AbuseIPDB (API key not configured)",
+		LocalID:  gen.NextID(),
 	})
 
 	data, err := os.ReadFile("modules/abuseipdb/testdata/ip.json")
@@ -36,7 +37,7 @@ func (m *module) processCheckDemo(exec *schema.ModuleExecution, target string) {
 		return
 	}
 
-	populateResults(exec, &parsed)
+	populateResults(exec, &parsed, gen)
 
 	dbg.Printf("%s success stage=demo_parsed score=%d reports=%d", constants.FuncCheckAbuseIPDB, parsed.Data.AbuseConfidenceScore, parsed.Data.TotalReports)
 }

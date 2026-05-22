@@ -15,7 +15,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getCNAMEData(ctx context.Context, target string) schema.ModuleExecution {
+func getCNAMEData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetCNAME)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetCNAME, target)
@@ -65,7 +65,7 @@ func getCNAMEData(ctx context.Context, target string) schema.ModuleExecution {
 	}
 
 	if cname != "" && !strings.EqualFold(cname, strings.TrimSuffix(target, ".")) {
-		result, ok := buildCNAMEResult(cname, target, "CNAME Record")
+		result, ok := buildCNAMEResult(cname, target, "CNAME Record", gen)
 		if ok {
 			log.Printf("%s result_entity target=%q entity=%q type=%q oos=%v", constants.FuncGetCNAME, target, result.Value, result.Type, result.OutOfScope)
 			exec.Results = append(exec.Results, result)
@@ -73,7 +73,7 @@ func getCNAMEData(ctx context.Context, target string) schema.ModuleExecution {
 	}
 
 	if wwwCnameErr == nil && wwwCname != "" && !strings.EqualFold(wwwCname, strings.TrimSuffix(wwwTarget, ".")) {
-		result, ok := buildCNAMEResult(wwwCname, wwwTarget, "CNAME Record (www)")
+		result, ok := buildCNAMEResult(wwwCname, wwwTarget, "CNAME Record (www)", gen)
 		if ok {
 			log.Printf("%s result_entity target=%q entity=%q type=%q oos=%v", constants.FuncGetCNAME, wwwTarget, result.Value, result.Type, result.OutOfScope)
 			exec.Results = append(exec.Results, result)
@@ -85,7 +85,7 @@ func getCNAMEData(ctx context.Context, target string) schema.ModuleExecution {
 	return exec
 }
 
-func buildCNAMEResult(cname, target, relationContext string) (schema.ModuleResult, bool) {
+func buildCNAMEResult(cname, target, relationContext string, gen *modutil.LocalIDGenerator) (schema.ModuleResult, bool) {
 	res, err := validator.Validate(constants.TypeDomain, cname)
 	if err != nil {
 		log.Printf("%s skip_invalid_cname target=%q entity=%q err=%v", constants.FuncGetCNAME, target, cname, err)
@@ -105,6 +105,7 @@ func buildCNAMEResult(cname, target, relationContext string) (schema.ModuleResul
 		Tags:       []string{constants.TagCNAME},
 		Context:    relationContext,
 		OutOfScope: isOOS,
+		LocalID:    gen.NextID(),
 	}, true
 }
 

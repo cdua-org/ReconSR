@@ -14,7 +14,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getSOAData(ctx context.Context, target string) schema.ModuleExecution {
+func getSOAData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetSOA)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetSOA, target)
@@ -48,15 +48,15 @@ func getSOAData(ctx context.Context, target string) schema.ModuleExecution {
 	soaRef := &schema.EntityRef{Type: constants.TypeSOA, Value: soaRaw}
 
 	exec.Results = append(exec.Results,
-		schema.ModuleResult{Type: constants.TypeSOA, Category: constants.CategoryProperty, Value: soaRaw},
-		schema.ModuleResult{Type: constants.TypeSOA, Category: constants.CategoryProperty, Value: strconv.FormatUint(uint64(soa.Serial), 10), Context: "Serial", Source: soaRef},
+		schema.ModuleResult{Type: constants.TypeSOA, Category: constants.CategoryProperty, Value: soaRaw, LocalID: gen.NextID()},
+		schema.ModuleResult{Type: constants.TypeSOA, Category: constants.CategoryProperty, Value: strconv.FormatUint(uint64(soa.Serial), 10), Context: "Serial", Source: soaRef, LocalID: gen.NextID()},
 	)
 
-	if result := buildSOAPrimaryNSResult(soa.NS, target, soaRef); result != nil {
+	if result := buildSOAPrimaryNSResult(soa.NS, target, soaRef, gen); result != nil {
 		exec.Results = append(exec.Results, *result)
 	}
 
-	if result := buildSOAResponsibleEmailResult(soa.Mbox, target, soaRef); result != nil {
+	if result := buildSOAResponsibleEmailResult(soa.Mbox, target, soaRef, gen); result != nil {
 		exec.Results = append(exec.Results, *result)
 	}
 
@@ -65,7 +65,7 @@ func getSOAData(ctx context.Context, target string) schema.ModuleExecution {
 	return exec
 }
 
-func buildSOAPrimaryNSResult(rawNS, target string, source *schema.EntityRef) *schema.ModuleResult {
+func buildSOAPrimaryNSResult(rawNS, target string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) *schema.ModuleResult {
 	primaryNS := strings.TrimSuffix(rawNS, ".")
 	res, err := validator.Validate(constants.TypeDomain, primaryNS)
 	if err != nil {
@@ -88,10 +88,11 @@ func buildSOAPrimaryNSResult(rawNS, target string, source *schema.EntityRef) *sc
 		Context:    "Primary NS",
 		OutOfScope: isOOS,
 		Source:     source,
+		LocalID:    gen.NextID(),
 	}
 }
 
-func buildSOAResponsibleEmailResult(rawMbox, target string, source *schema.EntityRef) *schema.ModuleResult {
+func buildSOAResponsibleEmailResult(rawMbox, target string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) *schema.ModuleResult {
 	responsibleEmail := dnsutils.FormatSOAMbox(rawMbox)
 	res, err := validator.Validate(constants.TypeEmail, responsibleEmail)
 	if err != nil {
@@ -109,5 +110,6 @@ func buildSOAResponsibleEmailResult(rawMbox, target string, source *schema.Entit
 		Context:    "Responsible Email",
 		OutOfScope: isOOS,
 		Source:     source,
+		LocalID:    gen.NextID(),
 	}
 }

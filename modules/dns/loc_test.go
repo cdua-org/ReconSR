@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestParseLOC(t *testing.T) {
@@ -25,7 +26,7 @@ func TestParseLOC(t *testing.T) {
 }
 
 func TestGetLOCDataEmpty(t *testing.T) {
-	execution := getLOCData(context.Background(), "example.com")
+	execution := getLOCData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("loc lookup failed: %v", *execution.Error)
@@ -38,7 +39,7 @@ func TestGetLOCDataEmpty(t *testing.T) {
 }
 
 func TestGetLOCDataNX(t *testing.T) {
-	execution := getLOCData(context.Background(), "nonexistent.domain.invalid")
+	execution := getLOCData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("loc lookup failed: %v", *execution.Error)

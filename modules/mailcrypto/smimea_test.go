@@ -1,6 +1,10 @@
 package mailcrypto
 
-import "testing"
+import (
+	"context"
+	"net"
+	"testing"
+)
 
 func TestParseSMIMEA(t *testing.T) {
 	const smimeaRecord = "3 0 1 010203"
@@ -49,4 +53,18 @@ func TestMapSMIMEAContext(t *testing.T) {
 			t.Errorf("mapSMIMEAContext() = %q, want %q", got, tt.expected)
 		}
 	}
+}
+
+func TestModule_LocalIDChaining_SMIMEA(t *testing.T) {
+	originalResolveRecord := resolveRecord
+	t.Cleanup(func() {
+		resolveRecord = originalResolveRecord
+	})
+
+	resolveRecord = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return []string{"\\# 6 030001010203"}, []byte("test_raw"), nil
+	}
+
+	execution := getSMIMEAData([]string{"testuser2"}, "smimea.example.net")
+	requireUniqueLocalIDs(t, execution.Results)
 }

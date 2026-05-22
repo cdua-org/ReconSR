@@ -126,6 +126,7 @@ func TestAbuseIPDB_Successful(t *testing.T) {
 	if len(exec.Results) == 0 {
 		t.Fatal("Expected results, got 0")
 	}
+	requireUniqueLocalIDs(t, exec.Results)
 
 	if !hasResult(exec.Results, constants.TypeAbuseScore, "100") {
 		t.Errorf("Missing abuse score 100")
@@ -163,6 +164,7 @@ func TestAbuseIPDB_Whitelisted(t *testing.T) {
 	if !foundWhitelisted {
 		t.Errorf("Expected whitelisted tag")
 	}
+	requireUniqueLocalIDs(t, exec.Results)
 }
 
 func TestAbuseIPDB_Tor(t *testing.T) {
@@ -184,6 +186,7 @@ func TestAbuseIPDB_Tor(t *testing.T) {
 	if !hasResult(exec.Results, constants.TypeTag, constants.TagScanner) {
 		t.Errorf("Expected scanner tag")
 	}
+	requireUniqueLocalIDs(t, exec.Results)
 }
 
 func TestAbuseIPDB_RateLimit_Retryable(t *testing.T) {
@@ -248,6 +251,7 @@ func TestAbuseIPDB_SuspiciousAndTags(t *testing.T) {
 	if !hasResult(exec.Results, constants.TypeTag, constants.TagDDoS) {
 		t.Errorf("Missing ddos tag")
 	}
+	requireUniqueLocalIDs(t, exec.Results)
 }
 
 func TestAbuseIPDB_DomainReverseIPTag(t *testing.T) {
@@ -269,5 +273,42 @@ func TestAbuseIPDB_DomainReverseIPTag(t *testing.T) {
 		if r.Type == constants.TypeDomain && r.OutOfScope {
 			t.Errorf("Domain %q must not be OutOfScope", r.Value)
 		}
+	}
+	requireUniqueLocalIDs(t, exec.Results)
+}
+
+func TestAbuseIPDB_LocalIDChaining(t *testing.T) {
+	setupTestEnv(t)
+	exec := runModuleTest(t, "192.0.2.100", "ip.json", http.StatusOK, nil)
+
+	if exec.Error != nil {
+		t.Fatalf("Expected no error, got: %s", *exec.Error)
+	}
+	if len(exec.Results) < 2 {
+		t.Fatalf("Expected multiple results to verify chaining, got %d", len(exec.Results))
+	}
+
+	for i, res := range exec.Results {
+		expectedID := i + 1
+		if res.LocalID != expectedID {
+			t.Errorf("Expected LocalID %d at index %d, got %d (Type: %s, Value: %s)", expectedID, i, res.LocalID, res.Type, res.Value)
+		}
+	}
+
+	requireUniqueLocalIDs(t, exec.Results)
+}
+
+func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	seen := make(map[int]bool)
+	for _, res := range results {
+		if res.LocalID <= 0 {
+			t.Errorf("expected positive LocalID, got %d for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		if seen[res.LocalID] {
+			t.Errorf("duplicate LocalID %d found for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		seen[res.LocalID] = true
 	}
 }

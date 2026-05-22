@@ -15,7 +15,8 @@ func TestBuildMetadataResults_WhoisServerUsesDomainTag(t *testing.T) {
 	whoisServer := "WHOIS.EXAMPLE.COM"
 	anchor := &schema.EntityRef{Type: constants.TypeWhoisRegistrar, Value: "Registrar of " + targetDomain}
 
-	results := m.buildMetadataResults(&Metadata{WhoisServer: whoisServer}, targetDomain, "WHOIS", anchor)
+	gen := modutil.NewLocalIDGenerator()
+	results := m.buildMetadataResults(&Metadata{WhoisServer: whoisServer}, targetDomain, "WHOIS", anchor, gen)
 	if len(results) != 1 {
 		t.Fatalf("buildMetadataResults() returned %d results, want 1", len(results))
 	}
@@ -49,9 +50,9 @@ func TestBuildMetadataResults_WhoisServerUsesDomainTag(t *testing.T) {
 		t.Fatalf("Source = %+v, want %+v", *got.Source, *anchor)
 	}
 
-	expectedLocalID := modutil.BuildLocalID(anchor, got.Type, got.Value)
+	expectedLocalID := 1
 	if got.LocalID != expectedLocalID {
-		t.Fatalf("LocalID = %q, want %q", got.LocalID, expectedLocalID)
+		t.Fatalf("LocalID = %d, want %d", got.LocalID, expectedLocalID)
 	}
 }
 
@@ -65,24 +66,25 @@ func TestBuildResults_LocalIDChaining(t *testing.T) {
 		},
 	}
 
-	results := m.buildResults(metadata, targetDomain, "WHOIS")
+	gen := modutil.NewLocalIDGenerator()
+	results := m.buildResults(metadata, targetDomain, "WHOIS", gen)
 
 	if len(results) != 3 {
 		t.Fatalf("expected 3 results, got %d", len(results))
 	}
 
-	anchorID := modutil.BuildLocalID(nil, constants.TypeWhoisRegistrant, "Registrant of "+targetDomain)
+	anchorID := 1
 	if results[0].LocalID != anchorID {
-		t.Errorf("anchor LocalID = %q, want %q", results[0].LocalID, anchorID)
+		t.Errorf("anchor LocalID = %d, want %d", results[0].LocalID, anchorID)
 	}
 
-	personID := modutil.BuildLocalID(&schema.EntityRef{LocalID: anchorID}, constants.TypePerson, "Alice Bob")
+	personID := 2
 	if results[1].LocalID != personID {
-		t.Errorf("person LocalID = %q, want %q", results[1].LocalID, personID)
+		t.Errorf("person LocalID = %d, want %d", results[1].LocalID, personID)
 	}
 
-	orgID := modutil.BuildLocalID(&schema.EntityRef{LocalID: anchorID}, constants.TypeOrganization, "Bob Corp")
+	orgID := 3
 	if results[2].LocalID != orgID {
-		t.Errorf("org LocalID = %q, want %q", results[2].LocalID, orgID)
+		t.Errorf("org LocalID = %d, want %d", results[2].LocalID, orgID)
 	}
 }

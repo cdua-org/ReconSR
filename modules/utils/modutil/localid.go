@@ -1,16 +1,22 @@
 package modutil
 
-import (
-	"fmt"
+import "sync/atomic"
 
-	"cdua-org/ReconSR/schema"
-)
+// LocalIDGenerator generates sequential integer LocalIDs to uniquely identify
+// entities within a single module execution (exec.Results slice).
+// It starts from 1 and increments by 1 for each new ID, as required by the core system.
+type LocalIDGenerator struct {
+	seq atomic.Int32
+}
 
-// BuildLocalID generates a hierarchical LocalID for conflict-free graph chaining.
-// It uses the "|" delimiter to separate the parent's LocalID from the current entity's type and value.
-func BuildLocalID(source *schema.EntityRef, entityType, value string) string {
-	if source != nil && source.LocalID != "" {
-		return fmt.Sprintf("%s|%s|%s", source.LocalID, entityType, value)
-	}
-	return fmt.Sprintf("%s|%s", entityType, value)
+// NewLocalIDGenerator creates a new LocalIDGenerator starting from sequence 1.
+func NewLocalIDGenerator() *LocalIDGenerator {
+	g := &LocalIDGenerator{}
+	g.seq.Store(1)
+	return g
+}
+
+// NextID returns the current sequential ID and increments the internal counter.
+func (g *LocalIDGenerator) NextID() int {
+	return int(g.seq.Add(1) - 1)
 }

@@ -43,7 +43,7 @@ func parseTLSA(raw string) string {
 	return fmt.Sprintf("%d %d %d %s", usage, selector, matchingType, hash)
 }
 
-func getTLSAData(ctx context.Context, target string) schema.ModuleExecution {
+func getTLSAData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetTLSA)
 	log.Printf("%s query_start target=%q", constants.FuncGetTLSA, target)
 
@@ -112,6 +112,7 @@ func getTLSAData(ctx context.Context, target string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    parsed,
 			Context:  "TLSA Certificate Association (" + res.prefix + ")",
+			LocalID:  gen.NextID(),
 		})
 	}
 

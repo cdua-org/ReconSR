@@ -184,3 +184,16 @@ func TestGetPTRDataTimeout(t *testing.T) {
 		t.Error("expected timeout error, got nil")
 	}
 }
+
+func TestModule_LocalIDChaining_PTR(t *testing.T) {
+	setPTRQueryMock(t, func(string) ([]string, error) {
+		return []string{"ptr4.example.com."}, nil
+	})
+
+	res := getPTRData("198.51.100.2")
+	if res.Error != nil {
+		t.Fatalf("expected no error, got: %v", *res.Error)
+	}
+
+	requireUniqueLocalIDs(t, res.Results)
+}

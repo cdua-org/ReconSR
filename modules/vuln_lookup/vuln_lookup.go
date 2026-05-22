@@ -40,7 +40,8 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	for _, f := range data.Functions {
 		switch f {
 		case constants.FuncGetCirclVuln:
-			executions = append(executions, getCirclVuln(ctx, data.Target.Type, data.Target.Value))
+			gen := modutil.NewLocalIDGenerator()
+			executions = append(executions, getCirclVuln(ctx, data.Target.Type, data.Target.Value, gen))
 		default:
 			exec := modutil.NewExecution(f)
 			modutil.SetError(&exec, "unsupported function: %v", fmt.Errorf("%s", f))

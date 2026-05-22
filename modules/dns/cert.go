@@ -41,7 +41,7 @@ func parseCERT(raw string) string {
 	return fmt.Sprintf("%d %d %d %s", cType, keyTag, alg, certBase64)
 }
 
-func getCERTData(ctx context.Context, target string) schema.ModuleExecution {
+func getCERTData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetCERT)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetCERT, target)
@@ -89,6 +89,7 @@ func getCERTData(ctx context.Context, target string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    parts[3],
 			Context:  "CERT Record, Type: " + cTypeName + ", KeyTag: " + keyTag + ", Alg: " + algName,
+			LocalID:  gen.NextID(),
 		})
 	}
 

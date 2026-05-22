@@ -8,11 +8,12 @@ import (
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestGetURIDataEmpty(t *testing.T) {
-	execution := getURIData(context.Background(), "example.com")
+	execution := getURIData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("uri lookup failed: %v", *execution.Error)
@@ -25,7 +26,7 @@ func TestGetURIDataEmpty(t *testing.T) {
 }
 
 func TestGetURIDataNX(t *testing.T) {
-	execution := getURIData(context.Background(), "nonexistent.domain.invalid")
+	execution := getURIData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("uri lookup failed: %v", *execution.Error)
@@ -53,7 +54,7 @@ func TestBuildURIResults(t *testing.T) {
 	}
 	source := &schema.EntityRef{Type: constants.TypeURI, Value: parsed.Formatted}
 
-	results := buildURIResults(parsed, source)
+	results := buildURIResults(parsed, source, modutil.NewLocalIDGenerator())
 
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))

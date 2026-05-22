@@ -10,7 +10,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getASNInfo(target string) (execution schema.ModuleExecution) {
+func getASNInfo(target string, gen *modutil.LocalIDGenerator) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetASNInfo)
 
 	dbg.Printf("%s target=%q", constants.FuncGetASNInfo, target)
@@ -45,6 +45,7 @@ func getASNInfo(target string) (execution schema.ModuleExecution) {
 			Value:      resp.Data.Holder,
 			Context:    "ASN Holder",
 			OutOfScope: true,
+			LocalID:    gen.NextID(),
 		})
 	}
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -47,7 +48,7 @@ func TestExecUnsupported(t *testing.T) {
 }
 
 func TestGetIPData(t *testing.T) {
-	res := getIPData(context.Background(), "example.com")
+	res := getIPData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	switch {
 	case res.Error != nil:

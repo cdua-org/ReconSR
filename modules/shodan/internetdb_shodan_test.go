@@ -256,6 +256,8 @@ func TestGetInternetDB_Success(t *testing.T) {
 	if typesCount[constants.TypeIPv4] != 1 {
 		t.Errorf("expected 1 ipv4 result, got %d", typesCount[constants.TypeIPv4])
 	}
+
+	requireUniqueLocalIDs(t, exec.Results)
 }
 
 func TestGetInternetDB_NotFound(t *testing.T) {

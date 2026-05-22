@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -65,7 +66,7 @@ func TestProcessCAARecord(t *testing.T) {
 			name:           "hex encoded issue",
 			record:         `\# 21 00 05 69 73 73 75 65 63 61 2e 65 78 61 6d 70 6c 65 2e 63 6f 6d`,
 			expectedTypes:  []string{constants.TypeCAA, constants.TypeSubdomain},
-			expectedValues: []string{issueRecord, authorityDomain},
+			expectedValues: []string{`0 issue "ca.example.com"`, authorityDomain},
 		},
 		{
 			name:           "invalid authority skipped",
@@ -95,7 +96,7 @@ func TestProcessCAARecord(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := processCAARecord(tt.record, "target.example.net")
+			results := processCAARecord(tt.record, "target.example.net", modutil.NewLocalIDGenerator())
 			if got := resultTypes(results); !slices.Equal(got, tt.expectedTypes) {
 				t.Fatalf("unexpected result types: got %v want %v", got, tt.expectedTypes)
 			}
@@ -115,7 +116,7 @@ func TestProcessCAARecord(t *testing.T) {
 }
 
 func TestGetCAAData(t *testing.T) {
-	res := getCAAData(context.Background(), "example.com")
+	res := getCAAData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	switch {
 	case res.Error != nil:

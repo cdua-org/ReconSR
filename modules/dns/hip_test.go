@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -49,7 +50,7 @@ func TestParseHIP(t *testing.T) {
 }
 
 func TestGetHIPDataEmpty(t *testing.T) {
-	execution := getHIPData(context.Background(), "example.com")
+	execution := getHIPData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("hip lookup failed: %v", *execution.Error)
@@ -60,7 +61,7 @@ func TestGetHIPDataEmpty(t *testing.T) {
 }
 
 func TestGetHIPDataNX(t *testing.T) {
-	execution := getHIPData(context.Background(), "nonexistent.domain.invalid")
+	execution := getHIPData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("hip lookup failed: %v", *execution.Error)
@@ -68,7 +69,7 @@ func TestGetHIPDataNX(t *testing.T) {
 }
 
 func TestBuildHIPResultsUsesSemanticServerType(t *testing.T) {
-	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.example.net.", "semantic.hip.example.com")
+	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.example.net.", "semantic.hip.example.com", modutil.NewLocalIDGenerator())
 	if len(results) != 2 {
 		t.Fatalf("buildHIPResults() returned %d results, want 2", len(results))
 	}
@@ -77,7 +78,7 @@ func TestBuildHIPResultsUsesSemanticServerType(t *testing.T) {
 }
 
 func TestParseHIPRecordBuildsSemanticServerResult(t *testing.T) {
-	results := buildHIPResults(parseHIP("2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.example.net."), "parse.hip.example.com")
+	results := buildHIPResults(parseHIP("2 200100107B1A74DF365639CC39F1D578 AwEAAb rv1.example.net."), "parse.hip.example.com", modutil.NewLocalIDGenerator())
 	if len(results) != 2 {
 		t.Fatalf("buildHIPResults(parseHIP()) returned %d results, want 2", len(results))
 	}
@@ -86,7 +87,7 @@ func TestParseHIPRecordBuildsSemanticServerResult(t *testing.T) {
 }
 
 func TestBuildHIPResultsEmptyRendezvousSkipsNode(t *testing.T) {
-	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb .", "empty.hip.example.com")
+	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb .", "empty.hip.example.com", modutil.NewLocalIDGenerator())
 	if len(results) != 1 {
 		t.Fatalf("buildHIPResults() returned %d results, want 1", len(results))
 	}
@@ -96,7 +97,7 @@ func TestBuildHIPResultsEmptyRendezvousSkipsNode(t *testing.T) {
 }
 
 func TestBuildHIPResultsInvalidRendezvousSkipsNode(t *testing.T) {
-	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb rv_1.example.net.", "invalid.hip.example.com")
+	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb rv_1.example.net.", "invalid.hip.example.com", modutil.NewLocalIDGenerator())
 	if len(results) != 1 {
 		t.Fatalf("buildHIPResults() returned %d results, want 1", len(results))
 	}
@@ -106,7 +107,7 @@ func TestBuildHIPResultsInvalidRendezvousSkipsNode(t *testing.T) {
 }
 
 func TestBuildHIPResultsSelfReferentialSkipsNode(t *testing.T) {
-	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb example.com.", "example.com")
+	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb example.com.", "example.com", modutil.NewLocalIDGenerator())
 	if len(results) != 1 {
 		t.Fatalf("buildHIPResults() returned %d results, want 1", len(results))
 	}
@@ -116,7 +117,7 @@ func TestBuildHIPResultsSelfReferentialSkipsNode(t *testing.T) {
 }
 
 func TestBuildHIPResultsNormalizesRendezvousServer(t *testing.T) {
-	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb RV1.EXAMPLE.NET.", "normalize.hip.example.com")
+	results := buildHIPResults("2 200100107B1A74DF365639CC39F1D578 AwEAAb RV1.EXAMPLE.NET.", "normalize.hip.example.com", modutil.NewLocalIDGenerator())
 	if len(results) != 2 {
 		t.Fatalf("buildHIPResults() returned %d results, want 2", len(results))
 	}

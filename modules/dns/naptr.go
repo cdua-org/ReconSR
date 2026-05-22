@@ -26,7 +26,7 @@ func normalizeNAPTRTarget(replacement string) (normalizedTarget, scopeTarget, re
 	return "", "", "", false
 }
 
-func buildNAPTRServiceResult(parsed, service string) schema.ModuleResult {
+func buildNAPTRServiceResult(parsed, service string, gen *modutil.LocalIDGenerator) schema.ModuleResult {
 	return schema.ModuleResult{
 		Type:     constants.TypeNAPTR,
 		Category: constants.CategoryProperty,
@@ -36,10 +36,11 @@ func buildNAPTRServiceResult(parsed, service string) schema.ModuleResult {
 			Type:  constants.TypeNAPTR,
 			Value: parsed,
 		},
+		LocalID: gen.NextID(),
 	}
 }
 
-func buildNAPTRTargetResult(source *schema.EntityRef, target, replacement string) *schema.ModuleResult {
+func buildNAPTRTargetResult(source *schema.EntityRef, target, replacement string, gen *modutil.LocalIDGenerator) *schema.ModuleResult {
 	normalizedTarget, scopeTarget, resultType, ok := normalizeNAPTRTarget(replacement)
 	if !ok || normalizedTarget == target {
 		return nil
@@ -58,10 +59,11 @@ func buildNAPTRTargetResult(source *schema.EntityRef, target, replacement string
 		Context:    contextStr,
 		OutOfScope: orgdomain.IsOutOfScope(scopeTarget, target),
 		Source:     source,
+		LocalID:    gen.NextID(),
 	}
 }
 
-func buildNAPTRRegexpResults(source *schema.EntityRef, regexpStr, regexpTarget string) []schema.ModuleResult {
+func buildNAPTRRegexpResults(source *schema.EntityRef, regexpStr, regexpTarget string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	if regexpStr == "" {
 		return nil
 	}
@@ -72,6 +74,7 @@ func buildNAPTRRegexpResults(source *schema.EntityRef, regexpStr, regexpTarget s
 			Value:    regexpStr,
 			Context:  "NAPTR Regexp",
 			Source:   source,
+			LocalID:  gen.NextID(),
 		},
 	}
 	if regexpTarget != "" {
@@ -81,12 +84,13 @@ func buildNAPTRRegexpResults(source *schema.EntityRef, regexpStr, regexpTarget s
 			Value:    regexpTarget,
 			Context:  "NAPTR Regexp Target",
 			Source:   &schema.EntityRef{Type: constants.TypeNAPTR, Value: regexpStr},
+			LocalID:  gen.NextID(),
 		})
 	}
 	return results
 }
 
-func getNAPTRData(ctx context.Context, target string) schema.ModuleExecution {
+func getNAPTRData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetNAPTR)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetNAPTR, target)
@@ -112,6 +116,7 @@ func getNAPTRData(ctx context.Context, target string) schema.ModuleExecution {
 					Category: constants.CategoryProperty,
 					Value:    rec,
 					Context:  "NAPTR Record",
+					LocalID:  gen.NextID(),
 				})
 			}
 			continue
@@ -122,22 +127,23 @@ func getNAPTRData(ctx context.Context, target string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    parsed.Formatted,
 			Context:  "NAPTR Record",
+			LocalID:  gen.NextID(),
 		}
 		exec.Results = append(exec.Results, rawResult)
 
 		targetSource := &schema.EntityRef{Type: rawResult.Type, Value: rawResult.Value}
 		if parsed.Service != "" {
-			serviceResult := buildNAPTRServiceResult(parsed.Formatted, parsed.Service)
+			serviceResult := buildNAPTRServiceResult(parsed.Formatted, parsed.Service, gen)
 			exec.Results = append(exec.Results, serviceResult)
 			targetSource = &schema.EntityRef{Type: serviceResult.Type, Value: serviceResult.Value}
 		}
 
 		if parsed.Regexp != "" {
-			regexpResults := buildNAPTRRegexpResults(targetSource, parsed.Regexp, parsed.RegexpTarget)
+			regexpResults := buildNAPTRRegexpResults(targetSource, parsed.Regexp, parsed.RegexpTarget, gen)
 			exec.Results = append(exec.Results, regexpResults...)
 		}
 
-		targetResult := buildNAPTRTargetResult(targetSource, target, parsed.Replacement)
+		targetResult := buildNAPTRTargetResult(targetSource, target, parsed.Replacement, gen)
 		if targetResult == nil {
 			continue
 		}

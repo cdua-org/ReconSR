@@ -30,6 +30,8 @@ func TestModuleExecIPFixtureContract(t *testing.T) {
 	t.Run("ignored whois and rdap", func(t *testing.T) {
 		assertIPIgnoredWhoisAndRDAP(t, run.exec.Results)
 	})
+
+	requireUniqueLocalIDs(t, run.exec.Results)
 }
 
 func executeIPFixture(t *testing.T) ipFixtureRun {

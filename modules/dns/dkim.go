@@ -21,7 +21,7 @@ var commonSelectors = []string{
 	"zimbra", "yandex", "mailgun", "mg", "mailjet", "em", "em1", "em2",
 }
 
-func getDKIMData(ctx context.Context, target string) schema.ModuleExecution {
+func getDKIMData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetDKIM)
 	log.Printf("%s query_start target=%q", constants.FuncGetDKIM, target)
 
@@ -108,6 +108,7 @@ func getDKIMData(ctx context.Context, target string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    res.record,
 			Context:  "DKIM Selector: " + res.selector,
+			LocalID:  gen.NextID(),
 		})
 	}
 

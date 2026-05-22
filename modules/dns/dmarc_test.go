@@ -7,11 +7,12 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestGetDMARCDataEmpty(t *testing.T) {
-	execution := getDMARCData(context.Background(), "nonexistent.domain.invalid")
+	execution := getDMARCData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("dmarc lookup failed: %v", *execution.Error)
@@ -24,7 +25,7 @@ func TestGetDMARCDataEmpty(t *testing.T) {
 }
 
 func TestGetDMARCData(t *testing.T) {
-	res := getDMARCData(context.Background(), "example.com")
+	res := getDMARCData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if res.Error != nil {
 		t.Logf("Network resolution error: %v", *res.Error)
@@ -96,7 +97,7 @@ func TestFilterDMARC(t *testing.T) {
 func TestProcessDMARCEmailsSkipsInvalidAndNormalizes(t *testing.T) {
 	source := &schema.EntityRef{Type: constants.TypeDMARC, Value: "v=DMARC1"}
 	parsed := map[string]string{"rua": "mailto:Admin@EXAMPLE.COM,mailto:bad@@example.com"}
-	results := processDMARCEmails("rua.dmarc.example.com", parsed, source)
+	results := processDMARCEmails("rua.dmarc.example.com", parsed, source, modutil.NewLocalIDGenerator())
 
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
@@ -126,7 +127,7 @@ func TestProcessDMARCEmailsSkipsInvalidAndNormalizes(t *testing.T) {
 func TestProcessDMARCEmailsUsesValidatedType(t *testing.T) {
 	source := &schema.EntityRef{Type: constants.TypeDMARC, Value: "v=DMARC1"}
 	parsed := map[string]string{"ruf": `mailto:"john"@example.com`}
-	results := processDMARCEmails("ruf.dmarc.example.com", parsed, source)
+	results := processDMARCEmails("ruf.dmarc.example.com", parsed, source, modutil.NewLocalIDGenerator())
 
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))

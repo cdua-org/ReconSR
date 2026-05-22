@@ -9,7 +9,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getIPData(ctx context.Context, target string) schema.ModuleExecution {
+func getIPData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetIP)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
@@ -32,6 +32,7 @@ func getIPData(ctx context.Context, target string) schema.ModuleExecution {
 			Category: constants.CategoryNode,
 			Value:    ipStr,
 			Context:  "A/AAAA Record",
+			LocalID:  gen.NextID(),
 		})
 	}
 

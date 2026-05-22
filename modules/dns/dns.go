@@ -21,7 +21,7 @@ const (
 	domainKeyLabel = "_domainkey"
 )
 
-type handlerFunc func(ctx context.Context, target string) schema.ModuleExecution
+type handlerFunc func(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution
 
 var handlers = map[string]handlerFunc{
 	constants.FuncGetIP:         getIPData,
@@ -104,11 +104,12 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 
 	for _, f := range data.Functions {
 		var execution schema.ModuleExecution
+		gen := modutil.NewLocalIDGenerator()
 
 		if f == constants.FuncPreflightDNS {
-			execution = handlePreflightDNS(ctx, data.Target)
+			execution = handlePreflightDNS(ctx, data.Target, gen)
 		} else if handler, ok := handlers[f]; ok {
-			execution = handler(ctx, data.Target.Value)
+			execution = handler(ctx, data.Target.Value, gen)
 		} else {
 			execution = modutil.NewExecution(f)
 			errMsg := "unsupported function: " + f
@@ -123,7 +124,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	}, nil
 }
 
-func handlePreflightDNS(ctx context.Context, target schema.Entity) schema.ModuleExecution {
+func handlePreflightDNS(ctx context.Context, target schema.Entity, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	execution := modutil.NewExecution(constants.FuncPreflightDNS)
 	err := preflightcheck.PreFlightCheck(ctx, target.Value)
 	if err != nil {
@@ -133,6 +134,7 @@ func handlePreflightDNS(ctx context.Context, target schema.Entity) schema.Module
 				Category: constants.CategoryProperty,
 				Value:    constants.StatusBrokenDNSZone,
 				Tags:     []string{constants.TagDNSBad},
+				LocalID:  gen.NextID(),
 			})
 		} else {
 			errMsg := err.Error()
@@ -140,9 +142,10 @@ func handlePreflightDNS(ctx context.Context, target schema.Entity) schema.Module
 		}
 	} else {
 		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:  target.Type,
-			Value: target.Value,
-			Tags:  []string{constants.TagDNSOK},
+			Type:    target.Type,
+			Value:   target.Value,
+			Tags:    []string{constants.TagDNSOK},
+			LocalID: gen.NextID(),
 		})
 	}
 	return execution

@@ -542,3 +542,45 @@ func TestGetDomainSearch_QuotaExceeded(t *testing.T) {
 		t.Errorf("expected category=%q, got %q", constants.CategoryProperty, r.Category)
 	}
 }
+
+func TestModule_LocalIDChaining(t *testing.T) {
+	server := setupMockServer(t, "domain_search_b2b.json", http.StatusOK)
+	defer server.Close()
+
+	overrideBaseURL(t, server.URL)
+
+	m := &module{apiKey: testAPIKey}
+	exec := m.getDomainSearch(context.Background(), constants.TypeDomain, "enterprise-b2b.example.net")
+
+	if exec.Error != nil {
+		t.Fatalf("expected no error, got: %s", *exec.Error)
+	}
+
+	if len(exec.Results) < 2 {
+		t.Skip("Expected multiple results to verify chaining, skipping test")
+	}
+
+	requireUniqueLocalIDs(t, exec.Results)
+}
+
+func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
+	seen := make(map[int]bool)
+	for _, res := range results {
+		if res.LocalID <= 0 {
+			t.Errorf("expected positive LocalID, got %d for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		if seen[res.LocalID] {
+			t.Errorf("duplicate LocalID %d found for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		seen[res.LocalID] = true
+
+		if res.Source != nil {
+			if res.Source.LocalID <= 0 {
+				t.Errorf("expected positive LocalID in source, got %d", res.Source.LocalID)
+			}
+			if res.Source.LocalID >= res.LocalID {
+				t.Errorf("expected source LocalID %d to be strictly less than result LocalID %d (Type: %s, Value: %s)", res.Source.LocalID, res.LocalID, res.Type, res.Value)
+			}
+		}
+	}
+}

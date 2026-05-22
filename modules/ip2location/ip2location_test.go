@@ -126,3 +126,67 @@ func TestModuleInitialization(t *testing.T) {
 		t.Errorf("expected %q function in capabilities", constants.FuncGetGeoIP)
 	}
 }
+
+func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
+	seen := make(map[int]bool)
+	for _, res := range results {
+		if res.LocalID <= 0 {
+			t.Errorf("expected positive LocalID, got %d for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		if seen[res.LocalID] {
+			t.Errorf("duplicate LocalID %d found for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		seen[res.LocalID] = true
+
+		if res.Source != nil {
+			if res.Source.LocalID <= 0 {
+				t.Errorf("expected positive LocalID in source, got %d", res.Source.LocalID)
+			}
+			if res.Source.LocalID >= res.LocalID {
+				t.Errorf("expected source LocalID %d to be strictly less than result LocalID %d (Type: %s, Value: %s)", res.Source.LocalID, res.LocalID, res.Type, res.Value)
+			}
+		}
+	}
+}
+
+func TestModule_LocalIDChaining_Geo(t *testing.T) {
+	geoQueryFunc = func(_, _ string) (*ip2location.IP2Locationrecord, error) {
+		return mockGeoRecord, nil
+	}
+	defer func() { geoQueryFunc = defaultGeoQuery }()
+
+	exec := getGeoIP("192.0.2.1", "dummy.bin")
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %v", *exec.Error)
+	}
+
+	requireUniqueLocalIDs(t, exec.Results)
+}
+
+func TestModule_LocalIDChaining_ASN(t *testing.T) {
+	asnQueryFunc = func(_, _ string) (*ip2location.IP2Locationrecord, error) {
+		return mockASNRecord, nil
+	}
+	defer func() { asnQueryFunc = defaultASNQuery }()
+
+	exec := getIPASN("192.0.2.1", "dummy.bin")
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %v", *exec.Error)
+	}
+
+	requireUniqueLocalIDs(t, exec.Results)
+}
+
+func TestModule_LocalIDChaining_Proxy(t *testing.T) {
+	proxyQueryFunc = func(_, _ string) (*ip2proxy.IP2ProxyRecord, error) {
+		return mockProxyRecord, nil
+	}
+	defer func() { proxyQueryFunc = defaultProxyQuery }()
+
+	exec := getProxyCheck("192.0.2.1", "dummy.bin")
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %v", *exec.Error)
+	}
+
+	requireUniqueLocalIDs(t, exec.Results)
+}

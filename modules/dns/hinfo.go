@@ -11,7 +11,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getHINFOData(ctx context.Context, target string) schema.ModuleExecution {
+func getHINFOData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetHINFO)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
@@ -41,17 +41,18 @@ func getHINFOData(ctx context.Context, target string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    parsed.Formatted,
 			Context:  "Hardware & OS Info (HINFO)",
+			LocalID:  gen.NextID(),
 		}
 		exec.Results = append(exec.Results, hinfoRes)
 
 		source := &schema.EntityRef{Type: hinfoRes.Type, Value: hinfoRes.Value}
-		exec.Results = append(exec.Results, buildHINFOResults(parsed, source)...)
+		exec.Results = append(exec.Results, buildHINFOResults(parsed, source, gen)...)
 	}
 
 	return exec
 }
 
-func buildHINFOResults(parsed *dnsutils.HINFORecord, source *schema.EntityRef) []schema.ModuleResult {
+func buildHINFOResults(parsed *dnsutils.HINFORecord, source *schema.EntityRef, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	var results []schema.ModuleResult
 	if parsed.CPU != "" && parsed.CPU != "ANY" && !strings.Contains(parsed.CPU, "cloudflare") {
 		results = append(results, schema.ModuleResult{
@@ -60,6 +61,7 @@ func buildHINFOResults(parsed *dnsutils.HINFORecord, source *schema.EntityRef) [
 			Value:    parsed.CPU,
 			Context:  "HINFO Extracted CPU",
 			Source:   source,
+			LocalID:  gen.NextID(),
 		})
 	}
 	if parsed.OS != "" && parsed.OS != "ANY" && !strings.Contains(parsed.OS, "cloudflare") {
@@ -69,6 +71,7 @@ func buildHINFOResults(parsed *dnsutils.HINFORecord, source *schema.EntityRef) [
 			Value:    parsed.OS,
 			Context:  "HINFO Extracted OS",
 			Source:   source,
+			LocalID:  gen.NextID(),
 		})
 	}
 	return results

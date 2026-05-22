@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -27,6 +28,7 @@ func TestParseShodanAPIIP(t *testing.T) {
 	assertShodanIPServiceChain(t, exec.Results, targetIP, service)
 	assertShodanIPCoreResults(t, exec.Results)
 	assertShodanIPResultTypeAbsent(t, exec.Results, constants.TypeHeartbleed)
+	requireUniqueLocalIDs(t, exec.Results)
 }
 
 func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult, targetIP, service string) {
@@ -220,8 +222,8 @@ func TestParseShodanAPIIPSkipsDuplicateWebServerValue(t *testing.T) {
 
 func TestAppendReverseIPHostnameResultKeepsInvalidPTRProperty(t *testing.T) {
 	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
-
-	appendReverseIPHostnameResult(&exec, "invalid ptr hostname", "Synthetic PTR")
+	gen := modutil.NewLocalIDGenerator()
+	appendReverseIPHostnameResult(&exec, "invalid ptr hostname", "Synthetic PTR", gen)
 
 	result := requireModuleResultWithContext(t, exec.Results, constants.TypePTR, "invalid ptr hostname", "Synthetic PTR")
 	if result.Category != constants.CategoryProperty {

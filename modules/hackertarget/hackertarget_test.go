@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -54,7 +55,7 @@ func TestExecUnsupportedFunction(t *testing.T) {
 }
 
 func TestGetHostsSuccess(t *testing.T) {
-	results := parseHostSearch("sub1.tenant.example.com,192.0.2.1\nsub2.tenant.example.com,198.51.100.2\n", "tenant.example.com")
+	results := parseHostSearch("sub1.tenant.example.com,192.0.2.1\nsub2.tenant.example.com,198.51.100.2\n", "tenant.example.com", modutil.NewLocalIDGenerator())
 
 	if len(results) != 4 {
 		t.Errorf("expected 4 results, got %d", len(results))
@@ -62,7 +63,7 @@ func TestGetHostsSuccess(t *testing.T) {
 }
 
 func TestGetHostsCSVFormat(t *testing.T) {
-	results := parseHostSearch("domain1.example.com,192.0.2.1\ndomain2.example.com,198.51.100.2\n", "example.com")
+	results := parseHostSearch("domain1.example.com,192.0.2.1\ndomain2.example.com,198.51.100.2\n", "example.com", modutil.NewLocalIDGenerator())
 
 	hasSubdomain := false
 	hasIP := false
@@ -145,7 +146,7 @@ func TestIsValidCSVFormat(t *testing.T) {
 }
 
 func TestParseHostSearch(t *testing.T) {
-	results := parseHostSearch("sub1.example.com,192.0.2.1\nsub2.example.com,198.51.100.2\n", "example.com")
+	results := parseHostSearch("sub1.example.com,192.0.2.1\nsub2.example.com,198.51.100.2\n", "example.com", modutil.NewLocalIDGenerator())
 
 	if len(results) != 4 {
 		t.Fatalf("expected 4 results, got %d", len(results))
@@ -229,5 +230,38 @@ func TestDoRequestQuotaExceeded(t *testing.T) {
 	_, isQuota, _, _ := doRequest(context.Background(), "example.com", "")
 	if !isQuota {
 		t.Error("expected doRequest to detect quota exceeded")
+	}
+}
+
+func TestModule_LocalIDChaining(t *testing.T) {
+	gen := modutil.NewLocalIDGenerator()
+	results := parseHostSearch("sub1.example.com,192.0.2.1\nsub2.example.com,198.51.100.2\n", "example.com", gen)
+
+	if len(results) < 2 {
+		t.Skip("Expected multiple results to verify chaining, skipping test")
+	}
+
+	requireUniqueLocalIDs(t, results)
+}
+
+func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
+	seen := make(map[int]bool)
+	for _, res := range results {
+		if res.LocalID <= 0 {
+			t.Errorf("expected positive LocalID, got %d for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		if seen[res.LocalID] {
+			t.Errorf("duplicate LocalID %d found for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		seen[res.LocalID] = true
+
+		if res.Source != nil {
+			if res.Source.LocalID <= 0 {
+				t.Errorf("expected positive LocalID in source, got %d", res.Source.LocalID)
+			}
+			if res.Source.LocalID >= res.LocalID {
+				t.Errorf("expected source LocalID %d to be strictly less than result LocalID %d (Type: %s, Value: %s)", res.Source.LocalID, res.LocalID, res.Type, res.Value)
+			}
+		}
 	}
 }

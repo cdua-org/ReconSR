@@ -11,7 +11,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getASNAbuseContacts(target string) (execution schema.ModuleExecution) {
+func getASNAbuseContacts(target string, gen *modutil.LocalIDGenerator) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetASNAbuseContacts)
 
 	dbg.Printf("%s target=%q", constants.FuncGetASNAbuseContacts, target)
@@ -47,6 +47,7 @@ func getASNAbuseContacts(target string) (execution schema.ModuleExecution) {
 				Value:      contact,
 				Context:    "Abuse Contact",
 				OutOfScope: true,
+				LocalID:    gen.NextID(),
 			})
 		}
 	}

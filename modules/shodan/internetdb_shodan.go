@@ -66,7 +66,8 @@ func getInternetDB(target schema.Entity) schema.ModuleExecution {
 		return exec
 	}
 
-	parseInternetDBResponse(&exec, rawBody, target.Value)
+	gen := modutil.NewLocalIDGenerator()
+	parseInternetDBResponse(&exec, rawBody, target.Value, gen)
 	dbg.Printf("%s success target=%q records=%d", constants.FuncGetIDBShodan, target.Value, len(exec.Results))
 	return exec
 }
@@ -135,7 +136,7 @@ func fetchInternetDB(ctx context.Context, url, target string) (rawBody []byte, s
 	return rawBody, statusCode, lastErr
 }
 
-func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, target string) {
+func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, target string, gen *modutil.LocalIDGenerator) {
 	var parsed internetdbResponse
 	if err := json.Unmarshal(rawBody, &parsed); err != nil {
 		dbg.Printf("%s error target=%q stage=unmarshal err=%v", constants.FuncGetIDBShodan, target, err)
@@ -144,13 +145,14 @@ func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, targe
 	}
 
 	for _, h := range parsed.Hostnames {
-		appendReverseIPHostnameResult(exec, h, "Shodan InternetDB PTR")
+		appendReverseIPHostnameResult(exec, h, "Shodan InternetDB PTR", gen)
 	}
 	for _, p := range parsed.Ports {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypePort,
 			Category: constants.CategoryProperty,
 			Value:    strconv.Itoa(p),
+			LocalID:  gen.NextID(),
 		})
 	}
 	for _, t := range parsed.Tags {
@@ -158,6 +160,7 @@ func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, targe
 			Type:     constants.TypeTag,
 			Category: constants.CategoryProperty,
 			Value:    t,
+			LocalID:  gen.NextID(),
 		})
 	}
 	for _, v := range parsed.Vulns {
@@ -165,6 +168,7 @@ func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, targe
 			Type:     constants.TypeCVE,
 			Category: constants.CategoryProperty,
 			Value:    v,
+			LocalID:  gen.NextID(),
 		})
 	}
 	if len(parsed.Vulns) > 0 {
@@ -174,6 +178,7 @@ func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, targe
 				Category: constants.CategoryNode,
 				Value:    val.Value,
 				Tags:     []string{constants.TagCVE},
+				LocalID:  gen.NextID(),
 			})
 		}
 	}
@@ -182,6 +187,7 @@ func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, targe
 			Type:     constants.TypeCPE,
 			Category: constants.CategoryProperty,
 			Value:    c,
+			LocalID:  gen.NextID(),
 		})
 	}
 }

@@ -22,7 +22,7 @@ type nsecQuery struct {
 	qtype       int
 }
 
-func getNSECData(ctx context.Context, target string) schema.ModuleExecution {
+func getNSECData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetNSEC)
 	log.Printf("%s query_start target=%q", constants.FuncGetNSEC, target)
 
@@ -50,7 +50,7 @@ func getNSECData(ctx context.Context, target string) schema.ModuleExecution {
 
 	for _, req := range queries {
 		wg.Go(func() {
-			results, raw := executeNSECQuery(bruteCtx, req, target, nxTarget)
+			results, raw := executeNSECQuery(bruteCtx, req, target, nxTarget, gen)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -76,7 +76,7 @@ func getNSECData(ctx context.Context, target string) schema.ModuleExecution {
 	return exec
 }
 
-func executeNSECQuery(ctx context.Context, q nsecQuery, target, nxTarget string) (results []schema.ModuleResult, raw []byte) {
+func executeNSECQuery(ctx context.Context, q nsecQuery, target, nxTarget string, gen *modutil.LocalIDGenerator) (results []schema.ModuleResult, raw []byte) {
 	resp, raw, err := resolver.QueryDoHDns(ctx, q.queryTarget, q.qtype)
 	if err != nil {
 		log.Printf("%s error target=%q query=%q qtype=%d stage=query_doh err=%v", constants.FuncGetNSEC, target, q.queryTarget, q.qtype, err)
@@ -86,28 +86,28 @@ func executeNSECQuery(ctx context.Context, q nsecQuery, target, nxTarget string)
 		return nil, nil
 	}
 
-	results = collectNSECRecords(resp.Answer, target, nxTarget, q.contextDesc)
+	results = collectNSECRecords(resp.Answer, target, nxTarget, q.contextDesc, gen)
 	if resp.Status == 3 || q.qtype == 1 {
-		results = append(results, collectNSECRecords(resp.Authority, target, nxTarget, q.contextDesc)...)
+		results = append(results, collectNSECRecords(resp.Authority, target, nxTarget, q.contextDesc, gen)...)
 	}
 
 	return results, raw
 }
 
-func collectNSECRecords(records []resolver.DoHDnsRecord, target, nxTarget, contextDesc string) []schema.ModuleResult {
+func collectNSECRecords(records []resolver.DoHDnsRecord, target, nxTarget, contextDesc string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	var results []schema.ModuleResult
 	for _, rec := range records {
 		switch rec.Type {
 		case 47:
-			results = append(results, parseNSECRecord(rec, target, nxTarget, contextDesc)...)
+			results = append(results, parseNSECRecord(rec, target, nxTarget, contextDesc, gen)...)
 		case 50:
-			results = append(results, parseNSEC3Record(rec, contextDesc)...)
+			results = append(results, parseNSEC3Record(rec, contextDesc, gen)...)
 		}
 	}
 	return results
 }
 
-func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.ModuleResult {
+func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	rec.Name = strings.TrimSuffix(rec.Name, ".")
 
 	nsecRes := schema.ModuleResult{
@@ -115,6 +115,7 @@ func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.Mo
 		Category: constants.CategoryProperty,
 		Value:    rec.Name + " NSEC3 " + rec.Data,
 		Context:  contextDesc,
+		LocalID:  gen.NextID(),
 	}
 	results := []schema.ModuleResult{nsecRes}
 	source := &schema.EntityRef{Type: nsecRes.Type, Value: nsecRes.Value}
@@ -126,6 +127,7 @@ func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.Mo
 			Value:    hashPart,
 			Context:  "NSEC3 Hash",
 			Source:   source,
+			LocalID:  gen.NextID(),
 		})
 	}
 
@@ -136,13 +138,14 @@ func parseNSEC3Record(rec resolver.DoHDnsRecord, contextDesc string) []schema.Mo
 			Value:    nextHash,
 			Context:  "NSEC3 Next Hash",
 			Source:   source,
+			LocalID:  gen.NextID(),
 		})
 	}
 
 	return results
 }
 
-func parseNSECRecord(rec resolver.DoHDnsRecord, target, nxTarget, contextDesc string) []schema.ModuleResult {
+func parseNSECRecord(rec resolver.DoHDnsRecord, target, nxTarget, contextDesc string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	rec.Name = strings.TrimSuffix(rec.Name, ".")
 	parts := strings.Fields(rec.Data)
 	if len(parts) > 0 {
@@ -153,7 +156,7 @@ func parseNSECRecord(rec resolver.DoHDnsRecord, target, nxTarget, contextDesc st
 	var results []schema.ModuleResult
 
 	var nsecSource *schema.EntityRef
-	if r := extractNSECDomain(rec.Name, target, nxTarget, "NSEC Current Subdomain"); r != nil {
+	if r := extractNSECDomain(rec.Name, target, nxTarget, "NSEC Current Subdomain", gen); r != nil {
 		results = append(results, *r)
 		nsecSource = &schema.EntityRef{Type: r.Type, Value: r.Value}
 		log.Printf("%s result_current target=%q entity=%q oos=%v", constants.FuncGetNSEC, target, r.Value, r.OutOfScope)
@@ -165,12 +168,13 @@ func parseNSECRecord(rec resolver.DoHDnsRecord, target, nxTarget, contextDesc st
 		Value:    rec.Name + " NSEC " + rec.Data,
 		Context:  contextDesc,
 		Source:   nsecSource,
+		LocalID:  gen.NextID(),
 	}
 	results = append(results, nsecRes)
 
 	nsecPropertyRef := &schema.EntityRef{Type: nsecRes.Type, Value: nsecRes.Value}
 	if nextDomain := dnsutils.ParseNSEC(rec.Data); nextDomain != "" {
-		if r := extractNSECDomain(nextDomain, target, nxTarget, "NSEC Leaked Subdomain"); r != nil {
+		if r := extractNSECDomain(nextDomain, target, nxTarget, "NSEC Leaked Subdomain", gen); r != nil {
 			r.Source = nsecPropertyRef
 			log.Printf("%s result_leaked target=%q entity=%q oos=%v", constants.FuncGetNSEC, target, r.Value, r.OutOfScope)
 			results = append(results, *r)
@@ -180,7 +184,7 @@ func parseNSECRecord(rec resolver.DoHDnsRecord, target, nxTarget, contextDesc st
 	return results
 }
 
-func extractNSECDomain(raw, target, nxTarget, contextDesc string) *schema.ModuleResult {
+func extractNSECDomain(raw, target, nxTarget, contextDesc string, gen *modutil.LocalIDGenerator) *schema.ModuleResult {
 	domain := strings.TrimSuffix(raw, ".")
 	if domain == "" {
 		return nil
@@ -217,6 +221,7 @@ func extractNSECDomain(raw, target, nxTarget, contextDesc string) *schema.Module
 		Context:    contextDesc,
 		OutOfScope: orgdomain.IsOutOfScope(cleanDomain, target),
 		Tags:       []string{constants.TagNSEC},
+		LocalID:    gen.NextID(),
 	}
 	if isWildcard {
 		result.Tags = append(result.Tags, constants.TagWildcard)

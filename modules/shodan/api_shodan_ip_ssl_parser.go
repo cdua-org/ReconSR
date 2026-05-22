@@ -21,7 +21,7 @@ var (
 	shodanDomainPatternRegex   = regexp.MustCompile(`(?i)(?:\*\.)?(?:[a-z0-9-]+\.)+[a-z]{2,63}`)
 )
 
-func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, source *schema.EntityRef, target string) {
+func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, source *schema.EntityRef, target string, gen *modutil.LocalIDGenerator) {
 	if banner.Details == nil || banner.Details.SSL == nil {
 		return
 	}
@@ -31,14 +31,14 @@ func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, sour
 			continue
 		}
 
-		sources := parseSubjectAltName(exec, extension.Data)
-		appendSubjectAltNameMetadata(exec, banner.Details.SSL, sources, target)
+		sources := parseSubjectAltName(exec, extension.Data, gen)
+		appendSubjectAltNameMetadata(exec, banner.Details.SSL, sources, target, gen)
 	}
 
-	appendBannerSSLProperties(exec, banner.Details.SSL, source, target)
+	appendBannerSSLProperties(exec, banner.Details.SSL, source, target, gen)
 }
 
-func parseSubjectAltName(exec *schema.ModuleExecution, value string) []schema.EntityRef {
+func parseSubjectAltName(exec *schema.ModuleExecution, value string, gen *modutil.LocalIDGenerator) []schema.EntityRef {
 	normalized := shodanEscapedSequenceRegex.ReplaceAllString(value, " ")
 	matches := shodanDomainPatternRegex.FindAllString(normalized, -1)
 	seen := make(map[string]struct{}, len(matches))
@@ -55,7 +55,7 @@ func parseSubjectAltName(exec *schema.ModuleExecution, value string) []schema.En
 		}
 		seen[cacheKey] = struct{}{}
 
-		localID := modutil.BuildLocalID(nil, resultType, resultValue)
+		localID := gen.NextID()
 		result := schema.ModuleResult{
 			Type:     resultType,
 			Category: constants.CategoryNode,
@@ -98,7 +98,7 @@ func classifySubjectAltName(match string) (resultType, resultValue, wildcardCont
 	return validated.Type, validated.Value, wildcardContext, true
 }
 
-func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBanner, sources []schema.EntityRef, target string) {
+func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBanner, sources []schema.EntityRef, target string, gen *modutil.LocalIDGenerator) {
 	if len(sources) == 0 {
 		return
 	}
@@ -109,18 +109,18 @@ func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBa
 
 	for i := range sources {
 		source := &sources[i]
-		appendSubjectAltNameProperty(exec, constants.TypeCertIssuer, issuerValue, source, "Cert Issuer for "+target)
-		appendSubjectAltNameProperty(exec, constants.TypeCertNotAfter, notAfterValue, source, "Cert Expiration for "+target)
-		appendSubjectAltNameProperty(exec, constants.TypeTLSVersions, tlsVersionsValue, source, "TLS Versions for "+target)
+		appendSubjectAltNameProperty(exec, constants.TypeCertIssuer, issuerValue, source, "Cert Issuer for "+target, gen)
+		appendSubjectAltNameProperty(exec, constants.TypeCertNotAfter, notAfterValue, source, "Cert Expiration for "+target, gen)
+		appendSubjectAltNameProperty(exec, constants.TypeTLSVersions, tlsVersionsValue, source, "TLS Versions for "+target, gen)
 	}
 }
 
-func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, value string, source *schema.EntityRef, context string) {
+func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, value string, source *schema.EntityRef, context string, gen *modutil.LocalIDGenerator) {
 	if value == "" {
 		return
 	}
 
-	localID := modutil.BuildLocalID(source, resultType, value)
+	localID := gen.NextID()
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
 		Category: constants.CategoryProperty,
@@ -131,23 +131,23 @@ func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, valu
 	})
 }
 
-func appendBannerSSLProperties(exec *schema.ModuleExecution, ssl *shodanSSLBanner, source *schema.EntityRef, target string) {
+func appendBannerSSLProperties(exec *schema.ModuleExecution, ssl *shodanSSLBanner, source *schema.EntityRef, target string, gen *modutil.LocalIDGenerator) {
 	if ssl == nil {
 		return
 	}
 
 	for _, fingerprint := range ssl.CertFingerprintValues {
-		appendBannerSSLProperty(exec, constants.TypeCertFingerprint, fingerprint, source, "Cert Fingerprint for "+target)
+		appendBannerSSLProperty(exec, constants.TypeCertFingerprint, fingerprint, source, "Cert Fingerprint for "+target, gen)
 	}
-	appendBannerSSLProperty(exec, constants.TypeJARM, ssl.JARMValue, source, "JARM for "+target)
+	appendBannerSSLProperty(exec, constants.TypeJARM, ssl.JARMValue, source, "JARM for "+target, gen)
 }
 
-func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value string, source *schema.EntityRef, context string) {
+func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value string, source *schema.EntityRef, context string, gen *modutil.LocalIDGenerator) {
 	if value == "" {
 		return
 	}
 
-	localID := modutil.BuildLocalID(source, resultType, value)
+	localID := gen.NextID()
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
 		Category: constants.CategoryProperty,

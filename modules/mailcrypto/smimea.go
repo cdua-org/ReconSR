@@ -82,6 +82,7 @@ func mapSMIMEAContext(usageStr, selectorStr, matchingTypeStr string) string {
 
 func getSMIMEAData(localParts []string, domain string) schema.ModuleExecution {
 	execution := modutil.NewExecution(constants.FuncGetSmimea)
+	gen := modutil.NewLocalIDGenerator()
 
 	if len(localParts) == 1 {
 		dbg.Printf("%s email=%q", constants.FuncGetSmimea, localParts[0]+"@"+domain)
@@ -123,6 +124,7 @@ func getSMIMEAData(localParts []string, domain string) schema.ModuleExecution {
 					Category: constants.CategoryProperty,
 					Value:    parts[3],
 					Context:  ctxStr,
+					LocalID:  gen.NextID(),
 				})
 			} else {
 				execution.Results = append(execution.Results, schema.ModuleResult{
@@ -130,6 +132,7 @@ func getSMIMEAData(localParts []string, domain string) schema.ModuleExecution {
 					Category: constants.CategoryProperty,
 					Value:    parsed,
 					Context:  fmt.Sprintf("%s (%s@%s)", ctxSMIMEA, user, domain),
+					LocalID:  gen.NextID(),
 				})
 			}
 		}

@@ -30,10 +30,12 @@ func getGeoIP(target, dbPath string) schema.ModuleExecution {
 		}
 	}()
 
+	gen := modutil.NewLocalIDGenerator()
+
 	var geoParts []string
 	parseGeoLocation(res, &geoParts, &rawBuffer)
-	parseGeoInfo(res, &execution, &rawBuffer)
-	parseGeoMobile(res, &execution, &rawBuffer)
+	parseGeoInfo(res, &execution, &rawBuffer, gen)
+	parseGeoMobile(res, &execution, &rawBuffer, gen)
 
 	if len(geoParts) > 0 {
 		execution.Results = append(execution.Results, schema.ModuleResult{
@@ -41,6 +43,7 @@ func getGeoIP(target, dbPath string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    strings.Join(geoParts, " | "),
 			Context:  "Geo Location",
+			LocalID:  gen.NextID(),
 		})
 	}
 
@@ -60,13 +63,14 @@ func getGeoIP(target, dbPath string) schema.ModuleExecution {
 	return execution
 }
 
-func parseGeoInfo(res *ip2location.IP2Locationrecord, exec *schema.ModuleExecution, rawBuffer *strings.Builder) {
+func parseGeoInfo(res *ip2location.IP2Locationrecord, exec *schema.ModuleExecution, rawBuffer *strings.Builder, gen *modutil.LocalIDGenerator) {
 	if !isUnavailable(res.Isp) {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeISP,
 			Category: constants.CategoryProperty,
 			Value:    res.Isp,
 			Context:  "ISP",
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(rawBuffer, "Isp", res.Isp)
 	}
@@ -77,6 +81,7 @@ func parseGeoInfo(res *ip2location.IP2Locationrecord, exec *schema.ModuleExecuti
 			Category: constants.CategoryNode,
 			Value:    res.Domain,
 			Tags:     []string{constants.TagReverseIP},
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(rawBuffer, "Domain", res.Domain)
 	}
@@ -87,20 +92,21 @@ func parseGeoInfo(res *ip2location.IP2Locationrecord, exec *schema.ModuleExecuti
 			Category: constants.CategoryProperty,
 			Value:    ParseUsageType(res.Usagetype),
 			Context:  "Usage Type",
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(rawBuffer, "Usagetype", res.Usagetype)
 	}
 
 	if !isUnavailable(res.Netspeed) {
-		appendInfo(exec, "Connection Speed", res.Netspeed)
+		appendInfo(exec, "Connection Speed", res.Netspeed, gen)
 		writeRaw(rawBuffer, "Netspeed", res.Netspeed)
 	}
 	if !isUnavailable(res.Addresstype) {
-		appendInfo(exec, "Address Type", res.Addresstype)
+		appendInfo(exec, "Address Type", res.Addresstype, gen)
 		writeRaw(rawBuffer, "Addresstype", res.Addresstype)
 	}
 	if !isUnavailable(res.Category) {
-		appendInfo(exec, "IAB Category", res.Category)
+		appendInfo(exec, "IAB Category", res.Category, gen)
 		writeRaw(rawBuffer, "Category", res.Category)
 	}
 }
@@ -146,7 +152,7 @@ func parseGeoLocation(res *ip2location.IP2Locationrecord, geoParts *[]string, ra
 	}
 }
 
-func parseGeoMobile(res *ip2location.IP2Locationrecord, exec *schema.ModuleExecution, rawBuffer *strings.Builder) {
+func parseGeoMobile(res *ip2location.IP2Locationrecord, exec *schema.ModuleExecution, rawBuffer *strings.Builder, gen *modutil.LocalIDGenerator) {
 	var mobileParts []string
 	if !isUnavailable(res.Mobilebrand) {
 		mobileParts = append(mobileParts, res.Mobilebrand)
@@ -169,7 +175,7 @@ func parseGeoMobile(res *ip2location.IP2Locationrecord, exec *schema.ModuleExecu
 		}
 	}
 	if len(mobileParts) > 0 {
-		appendInfo(exec, "Mobile Network", mobileParts[0])
+		appendInfo(exec, "Mobile Network", mobileParts[0], gen)
 	}
 }
 
@@ -182,11 +188,12 @@ func writeRaw(b *strings.Builder, key, val string) {
 	b.WriteString(val)
 }
 
-func appendInfo(exec *schema.ModuleExecution, contextStr, value string) {
+func appendInfo(exec *schema.ModuleExecution, contextStr, value string, gen *modutil.LocalIDGenerator) {
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeInfo,
 		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  contextStr,
+		LocalID:  gen.NextID(),
 	})
 }

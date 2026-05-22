@@ -6,16 +6,18 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
-func (m *module) extractIPMetadata(attr map[string]any, target string, exec *schema.ModuleExecution) {
+func (m *module) extractIPMetadata(attr map[string]any, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	tags := extractVTTags(attr)
 	for _, tag := range tags {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeTag,
 			Category: constants.CategoryProperty,
 			Value:    tag,
+			LocalID:  gen.NextID(),
 		})
 	}
 
@@ -24,15 +26,16 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 			Type:     constants.TypeASN,
 			Category: constants.CategoryNode,
 			Value:    asn,
+			LocalID:  gen.NextID(),
 		})
 	}
 
 	if network, ok := attr["network"].(string); ok {
-		appendVTProperty(exec, constants.TypeCIDR, network, "Network CIDR for "+target, nil)
+		appendVTProperty(exec, constants.TypeCIDR, network, "Network CIDR for "+target, nil, gen)
 	}
 
 	if asOwner, ok := attr["as_owner"].(string); ok {
-		appendVTProperty(exec, constants.TypeOrganization, asOwner, "AS Owner for "+target, nil)
+		appendVTProperty(exec, constants.TypeOrganization, asOwner, "AS Owner for "+target, nil, gen)
 	}
 
 	var geoParts []string
@@ -43,22 +46,22 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 		geoParts = append(geoParts, "Continent: "+continent)
 	}
 	if len(geoParts) > 0 {
-		appendVTProperty(exec, constants.TypeGeo, strings.Join(geoParts, " | "), "Geo Location for "+target, nil)
+		appendVTProperty(exec, constants.TypeGeo, strings.Join(geoParts, " | "), "Geo Location for "+target, nil, gen)
 	}
 
 	if jarm, ok := attr["jarm"].(string); ok {
-		appendVTProperty(exec, constants.TypeJARM, jarm, "JARM for "+target, nil)
+		appendVTProperty(exec, constants.TypeJARM, jarm, "JARM for "+target, nil, gen)
 	}
 
 	if lastUpdateRaw, ok := attr["last_modification_date"].(float64); ok {
 		formattedDate := time.Unix(int64(lastUpdateRaw), 0).UTC().Format(time.RFC3339)
-		appendVTProperty(exec, constants.TypeLastUpdate, formattedDate, "Last Update for "+target, nil)
+		appendVTProperty(exec, constants.TypeLastUpdate, formattedDate, "Last Update for "+target, nil, gen)
 	}
 
-	m.extractThreatScore(attr, nil, exec)
+	m.extractThreatScore(attr, nil, exec, gen)
 }
 
-func (m *module) extractIPResolution(item map[string]any, _ string, exec *schema.ModuleExecution) {
+func (m *module) extractIPResolution(item map[string]any, _ string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	attr, ok := item["attributes"].(map[string]any)
 	if !ok {
 		return
@@ -80,5 +83,6 @@ func (m *module) extractIPResolution(item map[string]any, _ string, exec *schema
 		Value:    validated.Value,
 		Context:  "VirusTotal Passive DNS",
 		Tags:     []string{constants.TagPDNS},
+		LocalID:  gen.NextID(),
 	})
 }

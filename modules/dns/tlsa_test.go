@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestParseTLSA(t *testing.T) {
@@ -38,7 +39,7 @@ func TestParseTLSA(t *testing.T) {
 }
 
 func TestGetTLSADataEmpty(t *testing.T) {
-	execution := getTLSAData(context.Background(), "example.com")
+	execution := getTLSAData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("tlsa lookup failed: %v", *execution.Error)
@@ -49,7 +50,7 @@ func TestGetTLSADataEmpty(t *testing.T) {
 }
 
 func TestGetTLSADataNX(t *testing.T) {
-	execution := getTLSAData(context.Background(), "nonexistent.domain.invalid")
+	execution := getTLSAData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("tlsa lookup failed: %v", *execution.Error)

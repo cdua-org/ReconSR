@@ -8,10 +8,11 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
-func appendVTProperty(exec *schema.ModuleExecution, resultType, value, resultContext string, source *schema.EntityRef) {
+func appendVTProperty(exec *schema.ModuleExecution, resultType, value, resultContext string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	trimmedValue := strings.TrimSpace(value)
 	if trimmedValue == "" {
 		return
@@ -23,6 +24,7 @@ func appendVTProperty(exec *schema.ModuleExecution, resultType, value, resultCon
 		Value:    trimmedValue,
 		Context:  strings.TrimSpace(resultContext),
 		Source:   source,
+		LocalID:  gen.NextID(),
 	})
 }
 
@@ -54,7 +56,7 @@ func extractVTTags(attr map[string]any) []string {
 	return tags
 }
 
-func (m *module) extractThreatScore(attr map[string]any, src *schema.EntityRef, exec *schema.ModuleExecution) {
+func (m *module) extractThreatScore(attr map[string]any, src *schema.EntityRef, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	stats, ok := attr["last_analysis_stats"].(map[string]any)
 	if !ok {
 		return
@@ -80,6 +82,7 @@ func (m *module) extractThreatScore(attr map[string]any, src *schema.EntityRef, 
 		Value:    fmt.Sprintf("Malicious: %d, Suspicious: %d", malicious, suspicious),
 		Context:  strings.Join(engines, ", "),
 		Source:   src,
+		LocalID:  gen.NextID(),
 	})
 }
 

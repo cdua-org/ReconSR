@@ -15,7 +15,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getTXTData(ctx context.Context, target string) schema.ModuleExecution {
+func getTXTData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetTXT)
 
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
@@ -62,10 +62,11 @@ func getTXTData(ctx context.Context, target string) schema.ModuleExecution {
 			Type:     constants.TypeSPF,
 			Category: constants.CategoryProperty,
 			Value:    spf,
+			LocalID:  gen.NextID(),
 		})
 
 		spfRef := &schema.EntityRef{Type: constants.TypeSPF, Value: spf}
-		exec.Results = append(exec.Results, buildSPFEntityResults(spfRef, spf, target)...)
+		exec.Results = append(exec.Results, buildSPFEntityResults(spfRef, spf, target, gen)...)
 	}
 
 	for _, txt := range generalRecords {
@@ -73,13 +74,14 @@ func getTXTData(ctx context.Context, target string) schema.ModuleExecution {
 			Type:     constants.TypeTXT,
 			Category: constants.CategoryProperty,
 			Value:    txt,
+			LocalID:  gen.NextID(),
 		})
 	}
 
 	return exec
 }
 
-func buildSPFEntityResults(source *schema.EntityRef, spf, target string) []schema.ModuleResult {
+func buildSPFEntityResults(source *schema.EntityRef, spf, target string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	entities := dnsutils.ParseSPF(spf)
 	if len(entities) == 0 {
 		return nil
@@ -87,7 +89,7 @@ func buildSPFEntityResults(source *schema.EntityRef, spf, target string) []schem
 
 	results := make([]schema.ModuleResult, 0, len(entities))
 	for _, ent := range entities {
-		result, ok := buildSPFEntityResult(source, ent, target)
+		result, ok := buildSPFEntityResult(source, ent, target, gen)
 		if ok {
 			results = append(results, result)
 		}
@@ -95,18 +97,18 @@ func buildSPFEntityResults(source *schema.EntityRef, spf, target string) []schem
 	return results
 }
 
-func buildSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity, target string) (schema.ModuleResult, bool) {
+func buildSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity, target string, gen *modutil.LocalIDGenerator) (schema.ModuleResult, bool) {
 	switch ent.Kind {
 	case dnsutils.SPFEntityIP4, dnsutils.SPFEntityIP6:
-		return buildSPFIPResult(source, ent)
+		return buildSPFIPResult(source, ent, gen)
 	case dnsutils.SPFEntityDomain:
-		return buildSPFDomainResult(source, ent, target)
+		return buildSPFDomainResult(source, ent, target, gen)
 	default:
 		return schema.ModuleResult{}, false
 	}
 }
 
-func buildSPFIPResult(source *schema.EntityRef, ent dnsutils.SPFEntity) (schema.ModuleResult, bool) {
+func buildSPFIPResult(source *schema.EntityRef, ent dnsutils.SPFEntity, gen *modutil.LocalIDGenerator) (schema.ModuleResult, bool) {
 	validated, err := validator.Validate(constants.TypeIP, ent.Value)
 	if err != nil {
 		return schema.ModuleResult{}, false
@@ -119,10 +121,11 @@ func buildSPFIPResult(source *schema.EntityRef, ent dnsutils.SPFEntity) (schema.
 		Tags:     []string{constants.TagSPF},
 		Context:  "SPF " + ent.Mechanism,
 		Source:   source,
+		LocalID:  gen.NextID(),
 	}, true
 }
 
-func buildSPFDomainResult(source *schema.EntityRef, ent dnsutils.SPFEntity, target string) (schema.ModuleResult, bool) {
+func buildSPFDomainResult(source *schema.EntityRef, ent dnsutils.SPFEntity, target string, gen *modutil.LocalIDGenerator) (schema.ModuleResult, bool) {
 	validated, err := validator.Validate(constants.TypeDomain, ent.Value)
 	if err != nil {
 		return schema.ModuleResult{}, false
@@ -140,5 +143,6 @@ func buildSPFDomainResult(source *schema.EntityRef, ent dnsutils.SPFEntity, targ
 		Context:    "SPF " + ent.Mechanism,
 		OutOfScope: orgdomain.IsOutOfScope(validated.Value, target),
 		Source:     source,
+		LocalID:    gen.NextID(),
 	}, true
 }

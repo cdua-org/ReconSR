@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -14,7 +15,8 @@ func parseDNSRecordFromFixture(t *testing.T, target string, source *schema.Entit
 
 	mod := &module{}
 	exec := schema.ModuleExecution{}
-	mod.parseDNSRecord(rec, target, source, &exec)
+	gen := modutil.NewLocalIDGenerator()
+	mod.parseDNSRecord(rec, target, source, &exec, gen)
 
 	return exec.Results
 }
@@ -256,7 +258,8 @@ func TestParseDNSRecordSelfReferentialSkipped(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.rec["type"] = tt.typ
 			tt.rec["value"] = tt.val
-			mod.parseDNSRecord(tt.rec, tt.target, nil, &exec)
+			gen := modutil.NewLocalIDGenerator()
+			mod.parseDNSRecord(tt.rec, tt.target, nil, &exec, gen)
 			for _, res := range exec.Results {
 				if res.Category == constants.CategoryNode && res.Value == tt.target {
 					t.Fatalf("expected self-referential %s host to NOT be emitted as a node", tt.name)

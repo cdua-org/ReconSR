@@ -1,0 +1,8 @@
+[
+  "www.example.com",
+  "mail.example.com",
+  "admin.example.com",
+  "test.example.com",
+  "invalid...example.com",
+  "*.example.com"
+]

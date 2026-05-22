@@ -97,6 +97,8 @@ func (m *module) getHosts(target string) schema.ModuleExecution {
 
 	dbg.Printf("%s request_complete target=%q body_present=%t quota=%v", constants.FuncGetHosts, target, body != "", isQuotaLimit)
 
+	gen := modutil.NewLocalIDGenerator()
+
 	if isQuotaLimit {
 		execution.Results = append(execution.Results, schema.ModuleResult{
 			Type:     constants.TypeAPIQuota,
@@ -104,13 +106,14 @@ func (m *module) getHosts(target string) schema.ModuleExecution {
 			Value:    quotaExhaustedValue,
 			Context:  apiServiceName,
 			Applied:  true,
+			LocalID:  gen.NextID(),
 		})
 		return execution
 	}
 
 	if body != "" {
 		execution.RawData = body
-		execution.Results = parseHostSearch(body, target)
+		execution.Results = parseHostSearch(body, target, gen)
 		dbg.Printf("%s success target=%q results=%d", constants.FuncGetHosts, target, len(execution.Results))
 	}
 
@@ -242,7 +245,7 @@ func isValidCSVFormat(body string) bool {
 	return true
 }
 
-func parseHostSearch(body, target string) []schema.ModuleResult {
+func parseHostSearch(body, target string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	var results []schema.ModuleResult
 
 	for line := range strings.SplitSeq(strings.TrimSpace(body), "\n") {
@@ -266,6 +269,7 @@ func parseHostSearch(body, target string) []schema.ModuleResult {
 
 			isOOS := orgdomain.IsOutOfScope(domainRes.Value, target)
 
+			domainID := gen.NextID()
 			results = append(results, schema.ModuleResult{
 				Type:       domainRes.Type,
 				Category:   constants.CategoryNode,
@@ -273,10 +277,12 @@ func parseHostSearch(body, target string) []schema.ModuleResult {
 				Context:    contextPDNSRecord,
 				OutOfScope: isOOS,
 				Tags:       []string{constants.TagPDNS},
+				LocalID:    domainID,
 			})
 			src = &schema.EntityRef{
-				Type:  domainRes.Type,
-				Value: domainRes.Value,
+				Type:    domainRes.Type,
+				Value:   domainRes.Value,
+				LocalID: domainID,
 			}
 		}
 
@@ -289,6 +295,7 @@ func parseHostSearch(body, target string) []schema.ModuleResult {
 					Value:    ipRes.Value,
 					Context:  contextResolvedIP,
 					Source:   src,
+					LocalID:  gen.NextID(),
 				})
 			}
 		}

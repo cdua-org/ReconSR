@@ -1,8 +1,11 @@
 package mailcrypto
 
 import (
+	"context"
 	"slices"
 	"testing"
+
+	"cdua-org/ReconSR/schema"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -62,4 +65,10 @@ func TestMailCryptoCapabilities(t *testing.T) {
 	if !slices.Contains(caps.InputTypes, constants.TypeEmail) {
 		t.Error("expected email in input types")
 	}
+}
+
+func TestModule_LocalIDChaining_Preflight(t *testing.T) {
+	in := schema.Entity{Type: constants.TypeDomain, Value: "example.com"}
+	res := handlePreflightDNS(context.Background(), "example.com", in)
+	requireUniqueLocalIDs(t, res.Results)
 }

@@ -23,7 +23,7 @@ func parseRPMailbox(mbox string) string {
 	return mbox[:idx] + "@" + mbox[idx+1:]
 }
 
-func processRPMailbox(mailbox, target string) []schema.ModuleResult {
+func processRPMailbox(mailbox, target string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	results := make([]schema.ModuleResult, 0, 1)
 
 	if mailbox == "." || mailbox == "" {
@@ -45,12 +45,13 @@ func processRPMailbox(mailbox, target string) []schema.ModuleResult {
 		Value:      res.Value,
 		Context:    "RP Administrator Email",
 		OutOfScope: isOOS,
+		LocalID:    gen.NextID(),
 	})
 
 	return results
 }
 
-func processRPTXTDomain(txtDomain, target string) []schema.ModuleResult {
+func processRPTXTDomain(txtDomain, target string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	results := make([]schema.ModuleResult, 0, 1)
 
 	txtDomain = strings.TrimSuffix(txtDomain, ".")
@@ -78,6 +79,7 @@ func processRPTXTDomain(txtDomain, target string) []schema.ModuleResult {
 		Tags:       []string{constants.TagRP},
 		Context:    "RP TXT Reference Domain",
 		OutOfScope: isOOS,
+		LocalID:    gen.NextID(),
 	})
 
 	return results
@@ -90,13 +92,14 @@ func attachRPSource(results []schema.ModuleResult, source *schema.EntityRef) []s
 	return results
 }
 
-func processRPRecord(record, target string) []schema.ModuleResult {
+func processRPRecord(record, target string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	results := make([]schema.ModuleResult, 0, 3)
 
 	rpResult := schema.ModuleResult{
 		Type:     constants.TypeRP,
 		Category: constants.CategoryProperty,
 		Value:    record,
+		LocalID:  gen.NextID(),
 	}
 	results = append(results, rpResult)
 
@@ -107,13 +110,13 @@ func processRPRecord(record, target string) []schema.ModuleResult {
 
 	rpSource := &schema.EntityRef{Type: rpResult.Type, Value: rpResult.Value}
 	mailbox := parseRPMailbox(parts[0])
-	results = append(results, attachRPSource(processRPMailbox(mailbox, target), rpSource)...)
-	results = append(results, attachRPSource(processRPTXTDomain(parts[1], target), rpSource)...)
+	results = append(results, attachRPSource(processRPMailbox(mailbox, target, gen), rpSource)...)
+	results = append(results, attachRPSource(processRPTXTDomain(parts[1], target, gen), rpSource)...)
 
 	return results
 }
 
-func getRPData(ctx context.Context, target string) schema.ModuleExecution {
+func getRPData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetRP)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetRP, target)
@@ -131,7 +134,7 @@ func getRPData(ctx context.Context, target string) schema.ModuleExecution {
 	modutil.SetRawFromBytes(&exec, raw)
 
 	for _, rec := range records {
-		exec.Results = append(exec.Results, processRPRecord(rec, target)...)
+		exec.Results = append(exec.Results, processRPRecord(rec, target, gen)...)
 	}
 
 	log.Printf("%s success target=%q results=%d", constants.FuncGetRP, target, len(exec.Results))

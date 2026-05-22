@@ -21,6 +21,8 @@ func getIPASN(target, dbPath string) schema.ModuleExecution {
 		return execution
 	}
 
+	gen := modutil.NewLocalIDGenerator()
+
 	var rawBuffer strings.Builder
 	defer func() {
 		if rawBuffer.Len() > 0 {
@@ -38,6 +40,7 @@ func getIPASN(target, dbPath string) schema.ModuleExecution {
 			Type:     constants.TypeASN,
 			Category: constants.CategoryNode,
 			Value:    val,
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "Asn", res.Asn)
 	}
@@ -48,6 +51,7 @@ func getIPASN(target, dbPath string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    res.As,
 			Context:  "AS Owner",
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "As", res.As)
 	}
@@ -58,6 +62,7 @@ func getIPASN(target, dbPath string) schema.ModuleExecution {
 			Category: constants.CategoryNode,
 			Value:    res.Asdomain,
 			Tags:     []string{constants.TagLinked},
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "Asdomain", res.Asdomain)
 	}
@@ -68,6 +73,7 @@ func getIPASN(target, dbPath string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    ParseUsageType(res.Asusagetype),
 			Context:  "AS Usage Type",
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "Asusagetype", res.Asusagetype)
 	}
@@ -78,6 +84,7 @@ func getIPASN(target, dbPath string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    res.Ascidr,
 			Context:  "AS CIDR",
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "Ascidr", res.Ascidr)
 	}

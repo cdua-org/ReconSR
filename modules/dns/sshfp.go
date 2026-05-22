@@ -48,7 +48,7 @@ func parseSSHFP(raw string) string {
 	return fmt.Sprintf("%s %s %s", algName, fpName, fp)
 }
 
-func getSSHFPData(ctx context.Context, target string) schema.ModuleExecution {
+func getSSHFPData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetSSHFP)
 	log.Printf("%s query_start target=%q", constants.FuncGetSSHFP, target)
 
@@ -71,6 +71,7 @@ func getSSHFPData(ctx context.Context, target string) schema.ModuleExecution {
 			Type:     constants.TypeSSHFP,
 			Category: constants.CategoryProperty,
 			Value:    parsed,
+			LocalID:  gen.NextID(),
 		})
 	}
 

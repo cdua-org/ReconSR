@@ -71,6 +71,7 @@ func performPTRQuery(target string) ([]string, error) {
 
 func getPTRData(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetPTR)
+	gen := modutil.NewLocalIDGenerator()
 
 	dbg.Printf("%s target=%q", constants.FuncGetPTR, target)
 
@@ -100,7 +101,7 @@ func getPTRData(target string) (execution schema.ModuleExecution) {
 	}
 
 	for _, name := range names {
-		appendPTRResult(&execution, name)
+		appendPTRResult(&execution, name, gen)
 	}
 
 	if len(execution.Results) > 0 {
@@ -112,7 +113,7 @@ func getPTRData(target string) (execution schema.ModuleExecution) {
 	return execution
 }
 
-func appendPTRResult(execution *schema.ModuleExecution, name string) {
+func appendPTRResult(execution *schema.ModuleExecution, name string, gen *modutil.LocalIDGenerator) {
 	name = strings.TrimSuffix(name, ".")
 	if name == "" {
 		return
@@ -125,6 +126,7 @@ func appendPTRResult(execution *schema.ModuleExecution, name string) {
 			Value:    validated.Value,
 			Context:  "PTR Record",
 			Tags:     []string{constants.TagReverseIP},
+			LocalID:  gen.NextID(),
 		})
 		return
 	}
@@ -133,5 +135,6 @@ func appendPTRResult(execution *schema.ModuleExecution, name string) {
 		Type:     constants.TypePTR,
 		Category: constants.CategoryProperty,
 		Value:    name,
+		LocalID:  gen.NextID(),
 	})
 }

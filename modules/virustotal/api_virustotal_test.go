@@ -437,3 +437,56 @@ func TestProcessPaginatedLimits(t *testing.T) {
 		t.Fatalf("expected 0 requests to page 2 due to VirustotalMaxPages=1 limit, got %d", len(requests))
 	}
 }
+
+func TestModule_LocalIDChaining(t *testing.T) {
+	domainBody := loadVTFixture(t, "domain_page1.json")
+	subdomainsPage1 := loadVTFixture(t, "subdomains_page1.json")
+	subdomainsPage2 := loadVTFixture(t, "subdomains_page2.json")
+
+	resolver.VirustotalDelayMs = 0
+	defer func() { resolver.VirustotalDelayMs = 15000 }()
+
+	responses := map[string]string{
+		"/api/v3/domains/" + fixtureDomainTarget:                                                                    domainBody,
+		"/api/v3/domains/" + fixtureDomainTarget + "/subdomains?limit=40":                                           subdomainsPage1,
+		"/api/v3/domains/" + fixtureDomainTarget + "/subdomains?limit=40&cursor=synthetic-subdomains-cursor-page-2": subdomainsPage2,
+	}
+
+	_, server := newVTMockServer(t, responses, nil)
+	defer server.Close()
+
+	setVTBaseURL(t, server.URL+"/api/v3")
+
+	mod := &module{apiKey: fixtureFixtureAPIKey}
+	exec := execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: fixtureDomainTarget})
+
+	if exec.Error != nil {
+		t.Fatalf("unexpected execution error: %q", *exec.Error)
+	}
+
+	if len(exec.Results) < 2 {
+		t.Fatalf("Expected multiple results to verify chaining, got %d", len(exec.Results))
+	}
+
+	for i, res := range exec.Results {
+		expectedID := i + 1
+		if res.LocalID != expectedID {
+			t.Errorf("Expected LocalID %d at index %d, got %d (Type: %s, Value: %s)", expectedID, i, res.LocalID, res.Type, res.Value)
+		}
+	}
+}
+
+func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	seen := make(map[int]bool)
+	for _, res := range results {
+		if res.LocalID <= 0 {
+			t.Errorf("expected positive LocalID, got %d for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		if seen[res.LocalID] {
+			t.Errorf("duplicate LocalID %d found for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		seen[res.LocalID] = true
+	}
+}

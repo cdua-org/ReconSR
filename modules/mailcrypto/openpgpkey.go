@@ -34,6 +34,7 @@ func parseOPENPGPKEY(raw string) string {
 
 func getOPENPGPKEYData(localParts []string, domain string) schema.ModuleExecution {
 	execution := modutil.NewExecution(constants.FuncGetOpenpgpkey)
+	gen := modutil.NewLocalIDGenerator()
 
 	if len(localParts) == 1 {
 		dbg.Printf("%s email=%q", constants.FuncGetOpenpgpkey, localParts[0]+"@"+domain)
@@ -68,6 +69,7 @@ func getOPENPGPKEYData(localParts []string, domain string) schema.ModuleExecutio
 				Category: constants.CategoryProperty,
 				Value:    parseOPENPGPKEY(rec),
 				Context:  fmt.Sprintf("%s (%s@%s)", ctxOpenPGPKey, user, domain),
+				LocalID:  gen.NextID(),
 			})
 		}
 	}

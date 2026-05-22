@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestParseCERT(t *testing.T) {
@@ -38,7 +39,7 @@ func TestParseCERT(t *testing.T) {
 }
 
 func TestGetCERTDataEmpty(t *testing.T) {
-	execution := getCERTData(context.Background(), "example.com")
+	execution := getCERTData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("cert lookup failed: %v", *execution.Error)
@@ -49,7 +50,7 @@ func TestGetCERTDataEmpty(t *testing.T) {
 }
 
 func TestGetCERTDataNX(t *testing.T) {
-	execution := getCERTData(context.Background(), "nonexistent.domain.invalid")
+	execution := getCERTData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("cert lookup failed: %v", *execution.Error)

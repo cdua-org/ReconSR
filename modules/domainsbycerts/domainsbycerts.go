@@ -91,9 +91,11 @@ func getDomains(target string) schema.ModuleExecution {
 		disableCertExpiredSubdomains = true
 	}
 
+	gen := modutil.NewLocalIDGenerator()
+
 	execution.RawData = allIdentities.rawData
 	classified := classifyIdentities(allIdentities.identities, target)
-	execution.Results = formatResults(classified, disableCertExpiredSubdomains)
+	execution.Results = formatResults(classified, disableCertExpiredSubdomains, gen)
 
 	sort.Slice(execution.Results, func(i, j int) bool {
 		return execution.Results[i].Value < execution.Results[j].Value
@@ -261,7 +263,7 @@ func classifyIdentities(identities []certificateIdentitySource, target string) c
 	return result
 }
 
-func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains bool) []schema.ModuleResult {
+func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains bool, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	now := time.Now()
 	results := make([]schema.ModuleResult, 0, len(classified.subdomains)*3+len(classified.emails)*3+2)
 	var expiredDomains []string
@@ -272,10 +274,11 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 			Category: constants.CategoryProperty,
 			Value:    classified.targetMaxExpiry.Format(time.RFC3339),
 			Context:  classified.targetSource,
+			LocalID:  gen.NextID(),
 		})
 	}
-	results = appendSubdomainResults(results, classified.subdomains, now, disableCertExpiredSubdomains, &expiredDomains)
-	results = appendEmailResults(results, classified.emails, now)
+	results = appendSubdomainResults(results, classified.subdomains, now, disableCertExpiredSubdomains, &expiredDomains, gen)
+	results = appendEmailResults(results, classified.emails, now, gen)
 
 	if len(expiredDomains) > 0 {
 		sort.Strings(expiredDomains)
@@ -284,6 +287,7 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 			Category: constants.CategoryProperty,
 			Value:    strings.Join(expiredDomains, ", "),
 			Context:  "Expired Certificates",
+			LocalID:  gen.NextID(),
 		})
 	}
 
@@ -292,7 +296,7 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 	return results
 }
 
-func appendSubdomainResults(results []schema.ModuleResult, subdomains map[string]classifiedIdentity, now time.Time, disableCertExpiredSubdomains bool, expiredDomains *[]string) []schema.ModuleResult {
+func appendSubdomainResults(results []schema.ModuleResult, subdomains map[string]classifiedIdentity, now time.Time, disableCertExpiredSubdomains bool, expiredDomains *[]string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	for subdomain, identity := range subdomains {
 		isExpired := !identity.notAfter.IsZero() && !identity.notAfter.After(now)
 
@@ -313,6 +317,7 @@ func appendSubdomainResults(results []schema.ModuleResult, subdomains map[string
 			Value:    resultValue,
 			Context:  identity.source,
 			Applied:  true,
+			LocalID:  gen.NextID(),
 		}
 		if trimmedWildcard, ok := strings.CutPrefix(subdomain, "*."); ok {
 			resultValue = trimmedWildcard
@@ -329,13 +334,16 @@ func appendSubdomainResults(results []schema.ModuleResult, subdomains map[string
 		}
 
 		dateVal := identity.notAfter.Format(time.RFC3339)
+		dateLocalID := gen.NextID()
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypeCertNotAfter,
 			Category: constants.CategoryProperty,
 			Value:    dateVal,
+			LocalID:  dateLocalID,
 			Source: &schema.EntityRef{
-				Type:  constants.TypeSubdomain,
-				Value: resultValue,
+				Type:    constants.TypeSubdomain,
+				Value:   resultValue,
+				LocalID: result.LocalID,
 			},
 		})
 
@@ -344,9 +352,11 @@ func appendSubdomainResults(results []schema.ModuleResult, subdomains map[string
 				Type:     constants.TypeStatus,
 				Category: constants.CategoryProperty,
 				Value:    constants.StatusExpired,
+				LocalID:  gen.NextID(),
 				Source: &schema.EntityRef{
-					Type:  constants.TypeCertNotAfter,
-					Value: dateVal,
+					Type:    constants.TypeCertNotAfter,
+					Value:   dateVal,
+					LocalID: dateLocalID,
 				},
 			})
 		}
@@ -354,7 +364,7 @@ func appendSubdomainResults(results []schema.ModuleResult, subdomains map[string
 	return results
 }
 
-func appendEmailResults(results []schema.ModuleResult, emails map[string]classifiedIdentity, now time.Time) []schema.ModuleResult {
+func appendEmailResults(results []schema.ModuleResult, emails map[string]classifiedIdentity, now time.Time, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	for email, identity := range emails {
 		isExpired := !identity.notAfter.IsZero() && !identity.notAfter.After(now)
 
@@ -363,6 +373,7 @@ func appendEmailResults(results []schema.ModuleResult, emails map[string]classif
 			tags = append(tags, constants.TagHistorical)
 		}
 
+		emailLocalID := gen.NextID()
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypeEmail,
 			Category: constants.CategoryNode,
@@ -370,6 +381,7 @@ func appendEmailResults(results []schema.ModuleResult, emails map[string]classif
 			Context:  identity.source,
 			Applied:  true,
 			Tags:     tags,
+			LocalID:  emailLocalID,
 		})
 
 		if identity.notAfter.IsZero() {
@@ -377,13 +389,16 @@ func appendEmailResults(results []schema.ModuleResult, emails map[string]classif
 		}
 
 		dateVal := identity.notAfter.Format(time.RFC3339)
+		dateLocalID := gen.NextID()
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypeDomainCertNotAfter,
 			Category: constants.CategoryProperty,
 			Value:    dateVal,
+			LocalID:  dateLocalID,
 			Source: &schema.EntityRef{
-				Type:  constants.TypeEmail,
-				Value: email,
+				Type:    constants.TypeEmail,
+				Value:   email,
+				LocalID: emailLocalID,
 			},
 		})
 
@@ -392,9 +407,11 @@ func appendEmailResults(results []schema.ModuleResult, emails map[string]classif
 				Type:     constants.TypeStatus,
 				Category: constants.CategoryProperty,
 				Value:    constants.StatusExpired,
+				LocalID:  gen.NextID(),
 				Source: &schema.EntityRef{
-					Type:  constants.TypeDomainCertNotAfter,
-					Value: dateVal,
+					Type:    constants.TypeDomainCertNotAfter,
+					Value:   dateVal,
+					LocalID: dateLocalID,
 				},
 			})
 		}

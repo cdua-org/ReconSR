@@ -42,6 +42,8 @@ func TestModuleExecDomainFixtureContract(t *testing.T) {
 	t.Run("subdomain certificate scope", func(t *testing.T) {
 		assertSubdomainCertificateScope(t, run.exec.Results)
 	})
+
+	requireUniqueLocalIDs(t, run.exec.Results)
 }
 
 func executeDomainFixture(t *testing.T) domainFixtureRun {

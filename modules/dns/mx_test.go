@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -92,7 +93,7 @@ func TestBuildMXHostResult(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			source := &schema.EntityRef{Type: constants.TypeMX, Value: "10 " + tt.host}
-			result := buildMXHostResult(source, tt.host, tt.target)
+			result := buildMXHostResult(source, tt.host, tt.target, modutil.NewLocalIDGenerator())
 			if tt.wantNil {
 				if result != nil {
 					t.Fatalf("expected nil result, got %+v", result)
@@ -122,7 +123,7 @@ func TestBuildMXHostResult(t *testing.T) {
 }
 
 func TestGetMXDataEmpty(t *testing.T) {
-	execution := getMXData(context.Background(), "nonexistent.domain.invalid")
+	execution := getMXData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("mx lookup failed: %v", *execution.Error)
@@ -135,7 +136,7 @@ func TestGetMXDataEmpty(t *testing.T) {
 }
 
 func TestGetMXData(t *testing.T) {
-	res := getMXData(context.Background(), "mx-lookup.example.com")
+	res := getMXData(context.Background(), "mx-lookup.example.com", modutil.NewLocalIDGenerator())
 
 	if res.Error != nil {
 		t.Logf("Network resolution error: %v", *res.Error)

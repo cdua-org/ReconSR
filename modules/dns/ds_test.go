@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestParseDS(t *testing.T) {
@@ -40,7 +41,7 @@ func TestParseDS(t *testing.T) {
 }
 
 func TestGetDSDataEmpty(t *testing.T) {
-	execution := getDSData(context.Background(), "example.com")
+	execution := getDSData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("ds lookup failed: %v", *execution.Error)
@@ -51,7 +52,7 @@ func TestGetDSDataEmpty(t *testing.T) {
 }
 
 func TestGetDSDataNX(t *testing.T) {
-	execution := getDSData(context.Background(), "nonexistent.domain.invalid")
+	execution := getDSData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("ds lookup failed: %v", *execution.Error)

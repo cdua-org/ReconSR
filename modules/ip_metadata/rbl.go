@@ -34,6 +34,7 @@ func checkRBLZone(target, query string, rawBuffer *strings.Builder) (isHit, isBl
 
 func getRBLData(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetRBL)
+	gen := modutil.NewLocalIDGenerator()
 
 	dbg.Printf("%s target=%q", constants.FuncGetRBL, target)
 
@@ -99,6 +100,7 @@ func getRBLData(target string) (execution schema.ModuleExecution) {
 			Category: constants.CategoryProperty,
 			Value:    constants.TagSpamBotnet,
 			Context:  detectedContext,
+			LocalID:  gen.NextID(),
 		})
 		dbg.Printf("%s success target=%q context=%q", constants.FuncGetRBL, target, detectedContext)
 	} else {

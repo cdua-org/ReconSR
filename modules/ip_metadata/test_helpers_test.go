@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/ripestat"
+	"cdua-org/ReconSR/schema"
 )
 
 func setTXTQueryMock(t *testing.T, fn func(target, query, queryType string) ([]string, error)) {
@@ -95,4 +96,26 @@ func mockRIPEstatSuccess(t *testing.T) {
 		}
 		return json.Unmarshal([]byte(body), result)
 	})
+}
+
+func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
+	seen := make(map[int]bool)
+	for _, res := range results {
+		if res.LocalID <= 0 {
+			t.Errorf("expected positive LocalID, got %d for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		if seen[res.LocalID] {
+			t.Errorf("duplicate LocalID %d found for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		seen[res.LocalID] = true
+
+		if res.Source != nil {
+			if res.Source.LocalID <= 0 {
+				t.Errorf("expected positive LocalID in source, got %d", res.Source.LocalID)
+			}
+			if res.Source.LocalID >= res.LocalID {
+				t.Errorf("expected source LocalID %d to be strictly less than result LocalID %d (Type: %s, Value: %s)", res.Source.LocalID, res.LocalID, res.Type, res.Value)
+			}
+		}
+	}
 }

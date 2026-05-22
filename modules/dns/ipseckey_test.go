@@ -8,11 +8,12 @@ import (
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestGetIPSECKEYDataEmpty(t *testing.T) {
-	execution := getIPSECKEYData(context.Background(), "example.com")
+	execution := getIPSECKEYData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("ipseckey lookup failed: %v", *execution.Error)
@@ -23,7 +24,7 @@ func TestGetIPSECKEYDataEmpty(t *testing.T) {
 }
 
 func TestGetIPSECKEYDataNX(t *testing.T) {
-	execution := getIPSECKEYData(context.Background(), "nonexistent.domain.invalid")
+	execution := getIPSECKEYData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("ipseckey lookup failed: %v", *execution.Error)
@@ -101,7 +102,7 @@ func TestClassifyIPSECKEYGateway(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := classifyIPSECKEYGateway(tt.gwType, tt.gateway, "gateway.ipseckey.example.com")
+			got, ok := classifyIPSECKEYGateway(tt.gwType, tt.gateway, "gateway.ipseckey.example.com", modutil.NewLocalIDGenerator())
 			if ok != tt.wantOK {
 				t.Fatalf("classifyIPSECKEYGateway() ok = %v, want %v", ok, tt.wantOK)
 			}
@@ -204,7 +205,7 @@ func TestBuildIPSECKEYResults(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			parsed := dnsutils.ParseIPSECKEY(tt.raw)
 			source := &schema.EntityRef{Type: constants.TypeIPSECKEY, Value: "dummy"}
-			results := buildIPSECKEYResults(parsed, "results.ipseckey.example.com", source)
+			results := buildIPSECKEYResults(parsed, "results.ipseckey.example.com", source, modutil.NewLocalIDGenerator())
 			if len(results) != tt.wantLen {
 				t.Fatalf("buildIPSECKEYResults() len = %d, want %d", len(results), tt.wantLen)
 			}

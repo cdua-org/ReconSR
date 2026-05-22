@@ -12,7 +12,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
+func getSVCBData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetSVCB)
 	log.Printf("%s query_start target=%q", constants.FuncGetSVCB, target)
 
@@ -63,6 +63,7 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 					Category: constants.CategoryProperty,
 					Value:    rec,
 					Context:  res.qtype + " Record",
+					LocalID:  gen.NextID(),
 				})
 				continue
 			}
@@ -81,6 +82,7 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 				Category: constants.CategoryProperty,
 				Value:    val,
 				Context:  res.qtype + " Record",
+				LocalID:  gen.NextID(),
 			})
 
 			if v, ok := params["ipv4hint"]; ok {
@@ -91,6 +93,7 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 						Value:    ip,
 						Context:  res.qtype + " IPv4 Hint",
 						Source:   svcbRef,
+						LocalID:  gen.NextID(),
 					})
 				}
 			}
@@ -102,6 +105,7 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 						Value:    ip,
 						Context:  res.qtype + " IPv6 Hint",
 						Source:   svcbRef,
+						LocalID:  gen.NextID(),
 					})
 				}
 			}
@@ -113,6 +117,7 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 					Value:    v,
 					Context:  res.qtype + " ALPN Protocols",
 					Source:   svcbRef,
+					LocalID:  gen.NextID(),
 				})
 			}
 
@@ -123,6 +128,7 @@ func getSVCBData(ctx context.Context, target string) schema.ModuleExecution {
 					Value:    v,
 					Context:  res.qtype + " ECH Config",
 					Source:   svcbRef,
+					LocalID:  gen.NextID(),
 				})
 			}
 		}

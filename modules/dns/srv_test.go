@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -59,7 +60,7 @@ func TestBuildSRVHostResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, ok := buildSRVHostResult(tt.host, tt.target, srvRef)
+			result, ok := buildSRVHostResult(tt.host, tt.target, srvRef, modutil.NewLocalIDGenerator())
 			if ok != tt.wantOK {
 				t.Fatalf("buildSRVHostResult() ok = %v, want %v", ok, tt.wantOK)
 			}
@@ -86,7 +87,7 @@ func TestBuildSRVHostResult(t *testing.T) {
 }
 
 func TestGetSRVDataEmpty(t *testing.T) {
-	execution := getSRVData(context.Background(), "nonexistent.domain.invalid")
+	execution := getSRVData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("srv lookup failed: %v", *execution.Error)

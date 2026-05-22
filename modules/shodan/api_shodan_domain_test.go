@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
@@ -62,6 +63,46 @@ func TestParseShodanAPIDomainHistorical(t *testing.T) {
 	}
 	if !slices.Contains(wwwSubdomain.Tags, constants.TagPDNS) {
 		t.Fatalf("expected passive_dns tag, got %v", wwwSubdomain.Tags)
+	}
+}
+
+func TestModule_LocalIDChaining(t *testing.T) {
+	rootDomainValue := "localid-chain.example.net"
+	apiKey := shodanTestAPIKey()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case shodanTestPreflightPath():
+			writeTestResponse(t, w, `{"query_credits":1}`)
+		case "/dns/domain/" + rootDomainValue:
+			writeTestResponse(t, w, `{"data":[{"subdomain":"www","type":"A","value":"198.51.100.25"}, {"subdomain":"mail","type":"MX","value":"mail.localid-chain.example.net"}]}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := shodanAPIBaseURL
+	shodanAPIBaseURL = server.URL
+	defer func() { shodanAPIBaseURL = originalBaseURL }()
+
+	module := &shodanModule{apiKey: apiKey}
+	module.lastReqTime = time.Now().Add(-2 * time.Second)
+
+	exec := module.getShodanAPIDomain(schema.Entity{Type: constants.TypeDomain, Value: rootDomainValue})
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %v", *exec.Error)
+	}
+
+	if len(exec.Results) < 2 {
+		t.Fatalf("Expected multiple results to verify chaining, got %d", len(exec.Results))
+	}
+
+	for i, res := range exec.Results {
+		expectedID := i + 1
+		if res.LocalID != expectedID {
+			t.Errorf("Expected LocalID %d at index %d, got %d (Type: %s, Value: %s)", expectedID, i, res.LocalID, res.Type, res.Value)
+		}
 	}
 }
 
@@ -294,7 +335,8 @@ func TestShodanNAPTRSelfReferentialSkip(t *testing.T) {
 	sourceDomain := &schema.EntityRef{Type: constants.TypeSubdomain, Value: "node.example.org"}
 	rawNaptr := "100 50 \"s\" \"SIP+D2U\" \"\" _sip._udp.example.org."
 
-	appendShodanNAPTRResult(exec, rawNaptr, "example.org", sourceDomain)
+	gen := modutil.NewLocalIDGenerator()
+	appendShodanNAPTRResult(exec, rawNaptr, "example.org", sourceDomain, gen)
 
 	for _, res := range exec.Results {
 		if res.Type == constants.TypeDomain && res.Value == "example.org" {
@@ -308,7 +350,8 @@ func TestAppendShodanNAPTRResultRegexp(t *testing.T) {
 	sourceDomain := &schema.EntityRef{Type: constants.TypeDomain, Value: "example.edu"}
 	rawNaptr := "10 100 \"u\" \"E2U+sip\" \"!^.*$!sip:info@example.edu!\" ."
 
-	ref := appendShodanNAPTRResult(exec, rawNaptr, "example.edu", sourceDomain)
+	gen := modutil.NewLocalIDGenerator()
+	ref := appendShodanNAPTRResult(exec, rawNaptr, "example.edu", sourceDomain, gen)
 
 	if ref == nil || ref.Type != constants.TypeNAPTR {
 		t.Fatalf("expected ref type NAPTR, got %+v", ref)

@@ -8,11 +8,12 @@ import (
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestGetHINFODataEmpty(t *testing.T) {
-	execution := getHINFOData(context.Background(), "example.com")
+	execution := getHINFOData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("hinfo lookup failed: %v", *execution.Error)
@@ -25,7 +26,7 @@ func TestGetHINFODataEmpty(t *testing.T) {
 }
 
 func TestGetHINFODataNX(t *testing.T) {
-	execution := getHINFOData(context.Background(), "nonexistent.domain.invalid")
+	execution := getHINFOData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("hinfo lookup failed: %v", *execution.Error)
@@ -52,7 +53,7 @@ func TestBuildHINFOResults(t *testing.T) {
 	}
 	source := &schema.EntityRef{Type: constants.TypeHINFO, Value: parsed.Formatted}
 
-	results := buildHINFOResults(parsed, source)
+	results := buildHINFOResults(parsed, source, modutil.NewLocalIDGenerator())
 
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(results))

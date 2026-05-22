@@ -7,12 +7,13 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestGetNSECData(t *testing.T) {
-	execution := getNSECData(context.Background(), "example.com")
+	execution := getNSECData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("nsec lookup failed (this can vary by network): %v", *execution.Error)
@@ -33,7 +34,7 @@ func TestGetNSECData(t *testing.T) {
 }
 
 func TestGetNSECDataEmpty(t *testing.T) {
-	execution := getNSECData(context.Background(), "nonexistent.domain.invalid")
+	execution := getNSECData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("nsec lookup failed: %v", *execution.Error)
@@ -48,7 +49,7 @@ func TestGetNSECDataEmpty(t *testing.T) {
 }
 
 func TestExtractNSECDomainWildcard(t *testing.T) {
-	rootResult := extractNSECDomain("*.example.org.", "example.org", "missing.example.net", "NSEC Next Domain")
+	rootResult := extractNSECDomain("*.example.org.", "example.org", "missing.example.net", "NSEC Next Domain", modutil.NewLocalIDGenerator())
 	if rootResult == nil {
 		t.Fatal("expected wildcard root domain result")
 	}
@@ -62,7 +63,7 @@ func TestExtractNSECDomainWildcard(t *testing.T) {
 		t.Fatalf("expected nsec tag on root result, got %+v", rootResult.Tags)
 	}
 
-	result := extractNSECDomain("*.wild.example.net.", "example.net", "missing.example.edu", "NSEC Next Domain")
+	result := extractNSECDomain("*.wild.example.net.", "example.net", "missing.example.edu", "NSEC Next Domain", modutil.NewLocalIDGenerator())
 	if result == nil {
 		t.Fatal("expected wildcard NSEC domain result")
 	}
@@ -101,7 +102,7 @@ func TestParseNSECRecordSource(t *testing.T) {
 		Data: "next.example.com. A AAAA RRSIG NSEC",
 	}
 
-	results := parseNSECRecord(rec, "example.com", "nx.example.com", "NSEC Context")
+	results := parseNSECRecord(rec, "example.com", "nx.example.com", "NSEC Context", modutil.NewLocalIDGenerator())
 
 	if len(results) < 3 {
 		t.Fatalf("expected at least 3 results, got %d", len(results))
@@ -142,7 +143,7 @@ func TestParseNSEC3RecordSource(t *testing.T) {
 		Data: "1 0 10 AABBCCDD EEFF00112233 A RRSIG",
 	}
 
-	results := parseNSEC3Record(rec, "NSEC3 Context")
+	results := parseNSEC3Record(rec, "NSEC3 Context", modutil.NewLocalIDGenerator())
 
 	if len(results) < 2 {
 		t.Fatalf("expected at least 2 results, got %d", len(results))

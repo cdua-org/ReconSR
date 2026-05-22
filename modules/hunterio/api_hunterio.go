@@ -148,9 +148,10 @@ func (m *module) handlePreflightAPI(ctx context.Context) {
 
 func (m *module) getDomainSearch(ctx context.Context, targetType, targetValue string) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetHunterioDomainSearch)
+	gen := modutil.NewLocalIDGenerator()
 
 	if m.apiKey == "demo-api-key" {
-		return m.getDomainSearchDemo(&exec, targetType, targetValue)
+		return m.getDomainSearchDemo(&exec, targetType, targetValue, gen)
 	}
 
 	m.preflightOnce.Do(func() { m.handlePreflightAPI(ctx) })
@@ -164,6 +165,7 @@ func (m *module) getDomainSearch(ctx context.Context, targetType, targetValue st
 			Type:     constants.TypeInfo,
 			Category: constants.CategoryProperty,
 			Value:    "Hunter.io API key is invalid",
+			LocalID:  gen.NextID(),
 		})
 		return exec
 	}
@@ -172,6 +174,7 @@ func (m *module) getDomainSearch(ctx context.Context, targetType, targetValue st
 			Type:     constants.TypeInfo,
 			Category: constants.CategoryProperty,
 			Value:    "Hunter.io API quota exceeded or credits exhausted",
+			LocalID:  gen.NextID(),
 		})
 		return exec
 	}
@@ -198,7 +201,7 @@ func (m *module) getDomainSearch(ctx context.Context, targetType, targetValue st
 
 		rawResponses = appendRaw(rawResponses, respBody)
 
-		if m.handlePageResponse(&exec, statusCode, respBody) {
+		if m.handlePageResponse(&exec, statusCode, respBody, gen) {
 			break
 		}
 
@@ -213,11 +216,11 @@ func (m *module) getDomainSearch(ctx context.Context, targetType, targetValue st
 			if targetType == constants.TypeOrganization && parsedResp.Data.Domain != "" {
 				domainForScope = parsedResp.Data.Domain
 			}
-			appendDomainProperties(&exec, &parsedResp)
+			appendDomainProperties(&exec, &parsedResp, gen)
 			linkedDomains = append(linkedDomains, parsedResp.Data.LinkedDomains...)
 		}
 
-		allEmails = append(allEmails, extractEmails(&parsedResp, domainForScope)...)
+		allEmails = append(allEmails, extractEmails(&parsedResp, domainForScope, gen)...)
 
 		dlog.Printf("%s success target=%q page=%d results=%d", constants.FuncGetHunterioDomainSearch, targetValue, page+1, parsedResp.Meta.Results)
 
@@ -235,6 +238,7 @@ func (m *module) getDomainSearch(ctx context.Context, targetType, targetValue st
 			Tags:       []string{constants.TagLinked},
 			OutOfScope: orgdomain.IsOutOfScope(ld, domainForScope),
 			Applied:    true,
+			LocalID:    gen.NextID(),
 		})
 	}
 
@@ -243,7 +247,7 @@ func (m *module) getDomainSearch(ctx context.Context, targetType, targetValue st
 	return exec
 }
 
-func (m *module) handlePageResponse(exec *schema.ModuleExecution, statusCode int, respBody []byte) bool {
+func (m *module) handlePageResponse(exec *schema.ModuleExecution, statusCode int, respBody []byte, gen *modutil.LocalIDGenerator) bool {
 	if statusCode == http.StatusOK {
 		m.mu.Lock()
 		m.queryCredits--
@@ -254,7 +258,7 @@ func (m *module) handlePageResponse(exec *schema.ModuleExecution, statusCode int
 		modutil.SetError(exec, "hunterio server error (retryable)", fmt.Errorf("%d", statusCode))
 		return true
 	} else if statusCode >= 400 {
-		appendAPIErrorResult(exec, statusCode, respBody)
+		appendAPIErrorResult(exec, statusCode, respBody, gen)
 
 		if statusCode == http.StatusTooManyRequests || statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden {
 			m.mu.Lock()
@@ -296,7 +300,7 @@ func appendRaw(dst, src []byte) []byte {
 	return dst
 }
 
-func appendAPIErrorResult(exec *schema.ModuleExecution, statusCode int, respBody []byte) {
+func appendAPIErrorResult(exec *schema.ModuleExecution, statusCode int, respBody []byte, gen *modutil.LocalIDGenerator) {
 	userMsg := fmt.Sprintf("Hunter.io API error (HTTP %d)", statusCode)
 
 	var searchErr apiDomainSearchResponse
@@ -308,14 +312,16 @@ func appendAPIErrorResult(exec *schema.ModuleExecution, statusCode int, respBody
 		Type:     constants.TypeInfo,
 		Category: constants.CategoryProperty,
 		Value:    userMsg,
+		LocalID:  gen.NextID(),
 	})
 }
 
-func appendDomainProperties(exec *schema.ModuleExecution, parsedResp *apiDomainSearchResponse) {
+func appendDomainProperties(exec *schema.ModuleExecution, parsedResp *apiDomainSearchResponse, gen *modutil.LocalIDGenerator) {
 	if parsedResp.Data.Organization != "" {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:  constants.TypeOrganization,
-			Value: parsedResp.Data.Organization,
+			Type:    constants.TypeOrganization,
+			Value:   parsedResp.Data.Organization,
+			LocalID: gen.NextID(),
 		})
 	}
 	if parsedResp.Data.Pattern != "" {
@@ -323,6 +329,7 @@ func appendDomainProperties(exec *schema.ModuleExecution, parsedResp *apiDomainS
 			Type:     constants.TypeEmailPattern,
 			Category: constants.CategoryProperty,
 			Value:    parsedResp.Data.Pattern,
+			LocalID:  gen.NextID(),
 		})
 	}
 	if parsedResp.Data.Disposable {
@@ -330,6 +337,7 @@ func appendDomainProperties(exec *schema.ModuleExecution, parsedResp *apiDomainS
 			Type:     constants.TypeInfo,
 			Category: constants.CategoryProperty,
 			Value:    "Disposable Email Domain",
+			LocalID:  gen.NextID(),
 		})
 	}
 	if parsedResp.Data.Webmail {
@@ -337,6 +345,7 @@ func appendDomainProperties(exec *schema.ModuleExecution, parsedResp *apiDomainS
 			Type:     constants.TypeInfo,
 			Category: constants.CategoryProperty,
 			Value:    "Webmail Provider",
+			LocalID:  gen.NextID(),
 		})
 	}
 	if parsedResp.Data.AcceptAll {
@@ -344,6 +353,7 @@ func appendDomainProperties(exec *schema.ModuleExecution, parsedResp *apiDomainS
 			Type:     constants.TypeInfo,
 			Category: constants.CategoryProperty,
 			Value:    "Accept-All Domain",
+			LocalID:  gen.NextID(),
 		})
 	}
 }
@@ -431,41 +441,44 @@ func (m *module) doPageRequest(ctx context.Context, u string) (respBody []byte, 
 	return respBody, statusCode, attemptErr
 }
 
-func extractEmails(parsedResp *apiDomainSearchResponse, targetDomain string) []schema.ModuleResult {
+func extractEmails(parsedResp *apiDomainSearchResponse, targetDomain string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	var results []schema.ModuleResult
 	for i := range parsedResp.Data.Emails {
-		results = extractEmailEntry(&parsedResp.Data.Emails[i], results, targetDomain)
+		results = extractEmailEntry(&parsedResp.Data.Emails[i], results, targetDomain, gen)
 	}
 	return results
 }
 
-func extractEmailEntry(e *apiEmailEntry, results []schema.ModuleResult, targetDomain string) []schema.ModuleResult {
+func extractEmailEntry(e *apiEmailEntry, results []schema.ModuleResult, targetDomain string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
+	emailID := gen.NextID()
 	emailRes := schema.ModuleResult{
-		Type:  constants.TypeEmail,
-		Value: e.Value,
+		Type:    constants.TypeEmail,
+		Value:   e.Value,
+		LocalID: emailID,
 	}
 	if e.Type != "" {
 		emailRes.Context = strings.ToUpper(e.Type[:1]) + e.Type[1:] + " email"
 	}
 	results = append(results, emailRes)
 
-	emailRef := &schema.EntityRef{Type: constants.TypeEmail, Value: e.Value}
+	emailRef := &schema.EntityRef{Type: constants.TypeEmail, Value: e.Value, LocalID: emailID}
 
-	results = appendEmailProperties(e, results, emailRef)
-	targetRef := appendPersonData(e, &results, emailRef)
-	results = appendProfileData(e, results, targetRef)
-	results = appendSources(e, results, emailRef, targetDomain)
+	results = appendEmailProperties(e, results, emailRef, gen)
+	targetRef := appendPersonData(e, &results, emailRef, gen)
+	results = appendProfileData(e, results, targetRef, gen)
+	results = appendSources(e, results, emailRef, targetDomain, gen)
 
 	return results
 }
 
-func appendEmailProperties(e *apiEmailEntry, results []schema.ModuleResult, emailRef *schema.EntityRef) []schema.ModuleResult {
+func appendEmailProperties(e *apiEmailEntry, results []schema.ModuleResult, emailRef *schema.EntityRef, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	if e.Confidence > 0 {
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypeConfidenceScore,
 			Category: constants.CategoryProperty,
 			Value:    strconv.Itoa(e.Confidence),
 			Source:   emailRef,
+			LocalID:  gen.NextID(),
 		})
 	}
 	if e.Verification.Status != "" {
@@ -478,32 +491,36 @@ func appendEmailProperties(e *apiEmailEntry, results []schema.ModuleResult, emai
 			Category: constants.CategoryProperty,
 			Value:    val,
 			Source:   emailRef,
+			LocalID:  gen.NextID(),
 		})
 	}
 	return results
 }
 
-func appendPersonData(e *apiEmailEntry, results *[]schema.ModuleResult, emailRef *schema.EntityRef) *schema.EntityRef {
+func appendPersonData(e *apiEmailEntry, results *[]schema.ModuleResult, emailRef *schema.EntityRef, gen *modutil.LocalIDGenerator) *schema.EntityRef {
 	personName := strings.TrimSpace(e.FirstName + " " + e.LastName)
 	if personName == "" {
 		return emailRef
 	}
 
+	personID := gen.NextID()
 	*results = append(*results, schema.ModuleResult{
-		Type:   constants.TypePerson,
-		Value:  personName,
-		Source: emailRef,
+		Type:    constants.TypePerson,
+		Value:   personName,
+		Source:  emailRef,
+		LocalID: personID,
 	})
-	return &schema.EntityRef{Type: constants.TypePerson, Value: personName}
+	return &schema.EntityRef{Type: constants.TypePerson, Value: personName, LocalID: personID}
 }
 
-func appendProfileData(e *apiEmailEntry, results []schema.ModuleResult, targetRef *schema.EntityRef) []schema.ModuleResult {
+func appendProfileData(e *apiEmailEntry, results []schema.ModuleResult, targetRef *schema.EntityRef, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	if e.Position != "" {
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypePosition,
 			Category: constants.CategoryProperty,
 			Value:    e.Position,
 			Source:   targetRef,
+			LocalID:  gen.NextID(),
 		})
 	}
 	if e.Department != "" {
@@ -512,6 +529,7 @@ func appendProfileData(e *apiEmailEntry, results []schema.ModuleResult, targetRe
 			Category: constants.CategoryProperty,
 			Value:    e.Department,
 			Source:   targetRef,
+			LocalID:  gen.NextID(),
 		})
 	}
 	if e.Seniority != "" {
@@ -520,6 +538,7 @@ func appendProfileData(e *apiEmailEntry, results []schema.ModuleResult, targetRe
 			Category: constants.CategoryProperty,
 			Value:    e.Seniority,
 			Source:   targetRef,
+			LocalID:  gen.NextID(),
 		})
 	}
 	const ctxLinkedIn = "LinkedIn"
@@ -530,6 +549,7 @@ func appendProfileData(e *apiEmailEntry, results []schema.ModuleResult, targetRe
 			Context: ctxLinkedIn,
 			Tags:    []string{constants.TagSocial},
 			Source:  targetRef,
+			LocalID: gen.NextID(),
 		})
 	}
 	if e.Twitter != "" {
@@ -543,35 +563,39 @@ func appendProfileData(e *apiEmailEntry, results []schema.ModuleResult, targetRe
 			Context: "Twitter",
 			Tags:    []string{constants.TagSocial},
 			Source:  targetRef,
+			LocalID: gen.NextID(),
 		})
 	}
 	if e.PhoneNumber != "" {
 		results = append(results, schema.ModuleResult{
-			Type:   constants.TypePhone,
-			Value:  e.PhoneNumber,
-			Source: targetRef,
+			Type:    constants.TypePhone,
+			Value:   e.PhoneNumber,
+			Source:  targetRef,
+			LocalID: gen.NextID(),
 		})
 	}
 	return results
 }
 
-func appendSources(e *apiEmailEntry, results []schema.ModuleResult, emailRef *schema.EntityRef, targetDomain string) []schema.ModuleResult {
+func appendSources(e *apiEmailEntry, results []schema.ModuleResult, emailRef *schema.EntityRef, targetDomain string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	if len(e.Sources) == 0 {
 		return results
 	}
 
 	sourceGroupVal := "Sources for " + e.Value
-	sourceGroupRef := &schema.EntityRef{Type: constants.TypeSource, Value: sourceGroupVal}
+	sourceGroupID := gen.NextID()
+	sourceGroupRef := &schema.EntityRef{Type: constants.TypeSource, Value: sourceGroupVal, LocalID: sourceGroupID}
 	results = append(results, schema.ModuleResult{
 		Type:     constants.TypeSource,
 		Category: constants.CategoryNode,
 		Value:    sourceGroupVal,
 		Source:   emailRef,
+		LocalID:  sourceGroupID,
 	})
 
 	for _, s := range e.Sources {
 		if s.URI != "" {
-			results = appendSourceWithURI(s, results, sourceGroupRef, targetDomain)
+			results = appendSourceWithURI(s, results, sourceGroupRef, targetDomain, gen)
 		} else if s.Domain != "" {
 			results = append(results, schema.ModuleResult{
 				Type:       constants.TypeDomain,
@@ -579,19 +603,22 @@ func appendSources(e *apiEmailEntry, results []schema.ModuleResult, emailRef *sc
 				Tags:       []string{constants.TagScrape},
 				Source:     sourceGroupRef,
 				OutOfScope: orgdomain.IsOutOfScope(s.Domain, targetDomain),
+				LocalID:    gen.NextID(),
 			})
 		}
 	}
 	return results
 }
 
-func appendSourceWithURI(s apiEmailSource, results []schema.ModuleResult, sourceGroupRef *schema.EntityRef, targetDomain string) []schema.ModuleResult {
+func appendSourceWithURI(s apiEmailSource, results []schema.ModuleResult, sourceGroupRef *schema.EntityRef, targetDomain string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
+	sourceID := gen.NextID()
 	results = append(results, schema.ModuleResult{
-		Type:   constants.TypeURL,
-		Value:  s.URI,
-		Source: sourceGroupRef,
+		Type:    constants.TypeURL,
+		Value:   s.URI,
+		Source:  sourceGroupRef,
+		LocalID: sourceID,
 	})
-	sourceRef := &schema.EntityRef{Type: constants.TypeURL, Value: s.URI}
+	sourceRef := &schema.EntityRef{Type: constants.TypeURL, Value: s.URI, LocalID: sourceID}
 
 	if s.Domain != "" {
 		results = append(results, schema.ModuleResult{
@@ -600,6 +627,7 @@ func appendSourceWithURI(s apiEmailSource, results []schema.ModuleResult, source
 			Tags:       []string{constants.TagScrape},
 			Source:     sourceRef,
 			OutOfScope: orgdomain.IsOutOfScope(s.Domain, targetDomain),
+			LocalID:    gen.NextID(),
 		})
 	}
 	if s.ExtractedOn != "" {
@@ -608,6 +636,7 @@ func appendSourceWithURI(s apiEmailSource, results []schema.ModuleResult, source
 			Category: constants.CategoryProperty,
 			Value:    "Extracted on: " + s.ExtractedOn,
 			Source:   sourceRef,
+			LocalID:  gen.NextID(),
 		})
 	}
 	if s.LastSeenOn != "" {
@@ -616,6 +645,7 @@ func appendSourceWithURI(s apiEmailSource, results []schema.ModuleResult, source
 			Category: constants.CategoryProperty,
 			Value:    "Last seen: " + s.LastSeenOn,
 			Source:   sourceRef,
+			LocalID:  gen.NextID(),
 		})
 	}
 	if s.StillOnPage {
@@ -624,6 +654,7 @@ func appendSourceWithURI(s apiEmailSource, results []schema.ModuleResult, source
 			Category: constants.CategoryProperty,
 			Value:    "Still on page",
 			Source:   sourceRef,
+			LocalID:  gen.NextID(),
 		})
 	}
 	return results

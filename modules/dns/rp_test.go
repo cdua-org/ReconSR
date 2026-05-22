@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -64,7 +65,7 @@ func TestProcessRPMailbox(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := processRPMailbox(parseRPMailbox(tt.input), "mailbox.rp.example.com")
+			results := processRPMailbox(parseRPMailbox(tt.input), "mailbox.rp.example.com", modutil.NewLocalIDGenerator())
 			if len(results) != tt.wantResults {
 				t.Fatalf("processRPMailbox(%q) returned %d results, want %d", tt.input, len(results), tt.wantResults)
 			}
@@ -131,7 +132,7 @@ func TestProcessRPTXTDomain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := processRPTXTDomain(tt.input, "txt.rp.example.com")
+			results := processRPTXTDomain(tt.input, "txt.rp.example.com", modutil.NewLocalIDGenerator())
 			if len(results) != tt.wantResults {
 				t.Fatalf("processRPTXTDomain(%q) returned %d results, want %d", tt.input, len(results), tt.wantResults)
 			}
@@ -199,7 +200,7 @@ func TestProcessRPRecord(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := processRPRecord(tt.record, "record.rp.example.com")
+			results := processRPRecord(tt.record, "record.rp.example.com", modutil.NewLocalIDGenerator())
 			if len(results) != tt.wantCount {
 				t.Fatalf("processRPRecord(%q) returned %d results, want %d", tt.record, len(results), tt.wantCount)
 			}
@@ -286,7 +287,7 @@ func findResult(results []schema.ModuleResult, typ, value string) (schema.Module
 }
 
 func TestGetRPDataEmpty(t *testing.T) {
-	execution := getRPData(context.Background(), "example.com")
+	execution := getRPData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("rp lookup failed: %v", *execution.Error)
@@ -299,7 +300,7 @@ func TestGetRPDataEmpty(t *testing.T) {
 }
 
 func TestGetRPDataNX(t *testing.T) {
-	execution := getRPData(context.Background(), "nonexistent.domain.invalid")
+	execution := getRPData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("rp lookup failed: %v", *execution.Error)

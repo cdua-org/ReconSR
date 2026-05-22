@@ -14,6 +14,7 @@ import (
 
 func getIPInfo(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetIPInfo)
+	gen := modutil.NewLocalIDGenerator()
 	dbg.Printf("%s target=%q", constants.FuncGetIPInfo, target)
 
 	if target == "" {
@@ -62,6 +63,7 @@ func getIPInfo(target string) (execution schema.ModuleExecution) {
 			Value:      netname,
 			Context:    "Network Name",
 			OutOfScope: true,
+			LocalID:    gen.NextID(),
 		})
 	}
 
@@ -73,6 +75,7 @@ func getIPInfo(target string) (execution schema.ModuleExecution) {
 			Value:      description,
 			Context:    "Network Description",
 			OutOfScope: true,
+			LocalID:    gen.NextID(),
 		})
 	}
 

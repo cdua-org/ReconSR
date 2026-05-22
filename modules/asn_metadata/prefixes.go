@@ -10,7 +10,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getASNPrefixes(target string) (execution schema.ModuleExecution) {
+func getASNPrefixes(target string, gen *modutil.LocalIDGenerator) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetASNPrefixes)
 
 	dbg.Printf("%s target=%q", constants.FuncGetASNPrefixes, target)
@@ -44,6 +44,7 @@ func getASNPrefixes(target string) (execution schema.ModuleExecution) {
 		Value:    originASN,
 		Context:  "Origin AS",
 		Applied:  true,
+		LocalID:  gen.NextID(),
 	})
 
 	for _, p := range resp.Data.Prefixes {
@@ -53,6 +54,7 @@ func getASNPrefixes(target string) (execution schema.ModuleExecution) {
 				Category: constants.CategoryProperty,
 				Value:    p.Prefix,
 				Context:  "Announced Prefix",
+				LocalID:  gen.NextID(),
 			})
 		}
 	}

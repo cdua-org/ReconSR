@@ -49,7 +49,7 @@ func parseHIP(raw string) string {
 	return fmt.Sprintf("%d %s %s", alg, strings.ToUpper(hit), pubKeyBase64)
 }
 
-func getHIPData(ctx context.Context, target string) schema.ModuleExecution {
+func getHIPData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetHIP)
 	log.Printf("%s query_start target=%q", constants.FuncGetHIP, target)
 
@@ -66,14 +66,14 @@ func getHIPData(ctx context.Context, target string) schema.ModuleExecution {
 	modutil.SetRawFromBytes(&exec, raw)
 
 	for _, rec := range records {
-		exec.Results = append(exec.Results, buildHIPResults(parseHIP(rec), target)...)
+		exec.Results = append(exec.Results, buildHIPResults(parseHIP(rec), target, gen)...)
 	}
 
 	log.Printf("%s success target=%q records=%d", constants.FuncGetHIP, target, len(records))
 	return exec
 }
 
-func buildHIPResults(parsed, target string) []schema.ModuleResult {
+func buildHIPResults(parsed, target string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	parts := strings.Fields(parsed)
 	if len(parts) < 3 {
 		return nil
@@ -95,11 +95,12 @@ func buildHIPResults(parsed, target string) []schema.ModuleResult {
 		Category: constants.CategoryProperty,
 		Value:    pubKey,
 		Context:  ctxStr,
+		LocalID:  gen.NextID(),
 	}}
 
 	hipSource := &schema.EntityRef{Type: constants.TypeHIP, Value: pubKey}
 	for _, rv := range parts[3:] {
-		result := buildHIPRendezvousResult(rv, target, hipSource)
+		result := buildHIPRendezvousResult(rv, target, hipSource, gen)
 		if result == nil {
 			continue
 		}
@@ -109,7 +110,7 @@ func buildHIPResults(parsed, target string) []schema.ModuleResult {
 	return results
 }
 
-func buildHIPRendezvousResult(rawRV, target string, hipSource *schema.EntityRef) *schema.ModuleResult {
+func buildHIPRendezvousResult(rawRV, target string, hipSource *schema.EntityRef, gen *modutil.LocalIDGenerator) *schema.ModuleResult {
 	rv := strings.TrimSuffix(rawRV, ".")
 	if rv == "" {
 		return nil
@@ -136,5 +137,6 @@ func buildHIPRendezvousResult(rawRV, target string, hipSource *schema.EntityRef)
 		Context:    "HIP Rendezvous Server",
 		OutOfScope: isOOS,
 		Source:     hipSource,
+		LocalID:    gen.NextID(),
 	}
 }

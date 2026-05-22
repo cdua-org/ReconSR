@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestGetDomainKeyDataEmpty(t *testing.T) {
-	execution := getDomainKeyData(context.Background(), "nonexistent.domain.invalid")
+	execution := getDomainKeyData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("domainkey lookup failed: %v", *execution.Error)
@@ -22,7 +23,7 @@ func TestGetDomainKeyDataEmpty(t *testing.T) {
 }
 
 func TestGetDomainKeyData(t *testing.T) {
-	res := getDomainKeyData(context.Background(), "example.com")
+	res := getDomainKeyData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if res.Error != nil {
 		t.Logf("Network resolution error: %v", *res.Error)

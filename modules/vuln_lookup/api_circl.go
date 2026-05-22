@@ -18,12 +18,12 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getCirclVuln(ctx context.Context, targetType, targetValue string) schema.ModuleExecution {
+func getCirclVuln(ctx context.Context, targetType, targetValue string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetCirclVuln)
 
 	switch targetType {
 	case constants.TypeCVE:
-		fetchAndParseCVE(ctx, &exec, targetValue)
+		fetchAndParseCVE(ctx, &exec, targetValue, gen)
 
 	default:
 		modutil.SetError(&exec, "unsupported target type: %v", fmt.Errorf("%s", targetType))
@@ -32,7 +32,7 @@ func getCirclVuln(ctx context.Context, targetType, targetValue string) schema.Mo
 	return exec
 }
 
-func fetchAndParseCVE(ctx context.Context, exec *schema.ModuleExecution, cve string) {
+func fetchAndParseCVE(ctx context.Context, exec *schema.ModuleExecution, cve string, gen *modutil.LocalIDGenerator) {
 	apiURL := buildCVESearchURL(cve)
 	raw, err := fetchCircl(ctx, apiURL)
 	if err != nil {
@@ -44,20 +44,20 @@ func fetchAndParseCVE(ctx context.Context, exec *schema.ModuleExecution, cve str
 		return
 	}
 	modutil.SetRawFromBytes(exec, raw)
-	parseCVEResponse(exec, raw)
+	parseCVEResponse(exec, raw, gen)
 }
 
-func parseCVEResponse(exec *schema.ModuleExecution, raw []byte) {
+func parseCVEResponse(exec *schema.ModuleExecution, raw []byte, gen *modutil.LocalIDGenerator) {
 	var resp CIRCLCVEResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		dlog.Printf("%s error stage=parse_cve_response err=%v", constants.FuncGetCirclVuln, err)
 		return
 	}
 
-	extractCVEResults(exec, &resp, nil)
+	extractCVEResults(exec, &resp, nil, gen)
 }
 
-func extractCVEResults(exec *schema.ModuleExecution, resp *CIRCLCVEResponse, source *schema.EntityRef) {
+func extractCVEResults(exec *schema.ModuleExecution, resp *CIRCLCVEResponse, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	for _, desc := range resp.Containers.CNA.Descriptions {
 		if desc.Lang == "en" || desc.Lang == "en-US" {
 			exec.Results = append(exec.Results, schema.ModuleResult{
@@ -65,23 +65,24 @@ func extractCVEResults(exec *schema.ModuleExecution, resp *CIRCLCVEResponse, sou
 				Category: constants.CategoryProperty,
 				Value:    desc.Value,
 				Source:   source,
+				LocalID:  gen.NextID(),
 			})
 			break
 		}
 	}
 
-	extractProblemTypes(exec, resp.Containers.CNA.ProblemTypes, source)
-	extractMetrics(exec, resp.Containers.CNA.Metrics, source)
-	extractCPEs(exec, resp.Containers.CNA.CpeApplicability, source)
+	extractProblemTypes(exec, resp.Containers.CNA.ProblemTypes, source, gen)
+	extractMetrics(exec, resp.Containers.CNA.Metrics, source, gen)
+	extractCPEs(exec, resp.Containers.CNA.CpeApplicability, source, gen)
 
 	for _, adp := range resp.Containers.ADP {
-		extractProblemTypes(exec, adp.ProblemTypes, source)
-		extractMetrics(exec, adp.Metrics, source)
+		extractProblemTypes(exec, adp.ProblemTypes, source, gen)
+		extractMetrics(exec, adp.Metrics, source, gen)
 	}
 
 	hasCNAMetrics := len(resp.Containers.CNA.Metrics) > 0
 	hasCNACWE := hasCWEResults(resp.Containers.CNA.ProblemTypes)
-	extractVulnLookupMeta(exec, resp.VulnLookupMeta, source, hasCNAMetrics, hasCNACWE)
+	extractVulnLookupMeta(exec, resp.VulnLookupMeta, source, hasCNAMetrics, hasCNACWE, gen)
 }
 
 func hasCWEResults(problemTypes []ProblemType) bool {
@@ -95,7 +96,7 @@ func hasCWEResults(problemTypes []ProblemType) bool {
 	return false
 }
 
-func extractCPEs(exec *schema.ModuleExecution, applicability []CpeApplicability, source *schema.EntityRef) {
+func extractCPEs(exec *schema.ModuleExecution, applicability []CpeApplicability, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	seen := make(map[string]bool)
 	for _, app := range applicability {
 		for _, node := range app.Nodes {
@@ -103,9 +104,10 @@ func extractCPEs(exec *schema.ModuleExecution, applicability []CpeApplicability,
 				if match.Criteria != "" && !seen[match.Criteria] {
 					seen[match.Criteria] = true
 					exec.Results = append(exec.Results, schema.ModuleResult{
-						Type:   constants.TypeCPE,
-						Value:  match.Criteria,
-						Source: source,
+						Type:    constants.TypeCPE,
+						Value:   match.Criteria,
+						Source:  source,
+						LocalID: gen.NextID(),
 					})
 				}
 			}
@@ -113,7 +115,7 @@ func extractCPEs(exec *schema.ModuleExecution, applicability []CpeApplicability,
 	}
 }
 
-func extractProblemTypes(exec *schema.ModuleExecution, problemTypes []ProblemType, source *schema.EntityRef) {
+func extractProblemTypes(exec *schema.ModuleExecution, problemTypes []ProblemType, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	for _, pt := range problemTypes {
 		for _, desc := range pt.Descriptions {
 			if desc.CWEId != "" {
@@ -123,34 +125,35 @@ func extractProblemTypes(exec *schema.ModuleExecution, problemTypes []ProblemTyp
 					Value:    desc.CWEId,
 					Context:  desc.Description,
 					Source:   source,
+					LocalID:  gen.NextID(),
 				})
 			}
 		}
 	}
 }
 
-func extractMetrics(exec *schema.ModuleExecution, metrics []Metric, source *schema.EntityRef) {
+func extractMetrics(exec *schema.ModuleExecution, metrics []Metric, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	for _, m := range metrics {
 		if m.Other != nil {
-			extractOtherMetric(exec, m.Other, source)
+			extractOtherMetric(exec, m.Other, source, gen)
 			continue
 		}
 
 		if m.CVSSV40 != nil {
-			appendCVSS(exec, "CVSS 4.0", m.CVSSV40.BaseSeverity, m.CVSSV40.VectorString, m.CVSSV40.BaseScore, source)
+			appendCVSS(exec, "CVSS 4.0", m.CVSSV40.BaseSeverity, m.CVSSV40.VectorString, m.CVSSV40.BaseScore, source, gen)
 			continue
 		}
 		if m.CVSSV31 != nil {
-			appendCVSS(exec, "CVSS 3.1", m.CVSSV31.BaseSeverity, m.CVSSV31.VectorString, m.CVSSV31.BaseScore, source)
+			appendCVSS(exec, "CVSS 3.1", m.CVSSV31.BaseSeverity, m.CVSSV31.VectorString, m.CVSSV31.BaseScore, source, gen)
 			continue
 		}
 		if m.CVSSV30 != nil {
-			appendCVSS(exec, "CVSS 3.0", m.CVSSV30.BaseSeverity, m.CVSSV30.VectorString, m.CVSSV30.BaseScore, source)
+			appendCVSS(exec, "CVSS 3.0", m.CVSSV30.BaseSeverity, m.CVSSV30.VectorString, m.CVSSV30.BaseScore, source, gen)
 		}
 	}
 }
 
-func extractOtherMetric(exec *schema.ModuleExecution, other *OtherMetric, source *schema.EntityRef) {
+func extractOtherMetric(exec *schema.ModuleExecution, other *OtherMetric, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	switch other.Type {
 	case "ssvc":
 		for _, opt := range other.Content.Options {
@@ -160,6 +163,7 @@ func extractOtherMetric(exec *schema.ModuleExecution, other *OtherMetric, source
 					Category: constants.CategoryProperty,
 					Value:    "Exploitation: " + opt.Exploitation,
 					Source:   source,
+					LocalID:  gen.NextID(),
 				})
 			}
 			if opt.Automatable != "" {
@@ -168,6 +172,7 @@ func extractOtherMetric(exec *schema.ModuleExecution, other *OtherMetric, source
 					Category: constants.CategoryProperty,
 					Value:    "Automatable: " + opt.Automatable,
 					Source:   source,
+					LocalID:  gen.NextID(),
 				})
 			}
 		}
@@ -178,12 +183,13 @@ func extractOtherMetric(exec *schema.ModuleExecution, other *OtherMetric, source
 				Category: constants.CategoryProperty,
 				Value:    other.Content.DateAdded,
 				Source:   source,
+				LocalID:  gen.NextID(),
 			})
 		}
 	}
 }
 
-func appendCVSS(exec *schema.ModuleExecution, ctx, severity, vector string, score float64, source *schema.EntityRef) {
+func appendCVSS(exec *schema.ModuleExecution, ctx, severity, vector string, score float64, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	val := fmt.Sprintf("%s / %s / %.1f", severity, vector, score)
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeCVSS,
@@ -191,15 +197,16 @@ func appendCVSS(exec *schema.ModuleExecution, ctx, severity, vector string, scor
 		Value:    val,
 		Context:  ctx,
 		Source:   source,
+		LocalID:  gen.NextID(),
 	})
 }
 
-func extractVulnLookupMeta(exec *schema.ModuleExecution, meta *VulnLookupMeta, source *schema.EntityRef, hasCNAMetrics, hasCNACWE bool) {
+func extractVulnLookupMeta(exec *schema.ModuleExecution, meta *VulnLookupMeta, source *schema.EntityRef, hasCNAMetrics, hasCNACWE bool, gen *modutil.LocalIDGenerator) {
 	if meta == nil {
 		return
 	}
 
-	extractEPSS(exec, meta.EPSS, source)
+	extractEPSS(exec, meta.EPSS, source, gen)
 
 	if meta.NVD == "" {
 		return
@@ -212,14 +219,14 @@ func extractVulnLookupMeta(exec *schema.ModuleExecution, meta *VulnLookupMeta, s
 	}
 
 	if !hasCNAMetrics {
-		extractNVDMetrics(exec, &nvd.CVE.Metrics, source)
+		extractNVDMetrics(exec, &nvd.CVE.Metrics, source, gen)
 	}
 	if !hasCNACWE {
-		extractNVDWeaknesses(exec, nvd.CVE.Weaknesses, source)
+		extractNVDWeaknesses(exec, nvd.CVE.Weaknesses, source, gen)
 	}
 }
 
-func extractEPSS(exec *schema.ModuleExecution, epss *EPSSData, source *schema.EntityRef) {
+func extractEPSS(exec *schema.ModuleExecution, epss *EPSSData, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	if epss == nil {
 		return
 	}
@@ -229,6 +236,7 @@ func extractEPSS(exec *schema.ModuleExecution, epss *EPSSData, source *schema.En
 			Category: constants.CategoryProperty,
 			Value:    formatAsPercentage(epss.EPSS),
 			Source:   source,
+			LocalID:  gen.NextID(),
 		})
 	}
 	if epss.Percentile != "" {
@@ -237,6 +245,7 @@ func extractEPSS(exec *schema.ModuleExecution, epss *EPSSData, source *schema.En
 			Category: constants.CategoryProperty,
 			Value:    formatAsPercentage(epss.Percentile),
 			Source:   source,
+			LocalID:  gen.NextID(),
 		})
 	}
 }
@@ -249,29 +258,29 @@ func formatAsPercentage(val string) string {
 	return val
 }
 
-func extractNVDMetrics(exec *schema.ModuleExecution, metrics *NVDMetrics, source *schema.EntityRef) {
-	if extractNVDCVSSEntries(exec, metrics.CVSSV40, "CVSS 4.0", source) {
+func extractNVDMetrics(exec *schema.ModuleExecution, metrics *NVDMetrics, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
+	if extractNVDCVSSEntries(exec, metrics.CVSSV40, "CVSS 4.0", source, gen) {
 		return
 	}
-	if extractNVDCVSSEntries(exec, metrics.CVSSV31, "CVSS 3.1", source) {
+	if extractNVDCVSSEntries(exec, metrics.CVSSV31, "CVSS 3.1", source, gen) {
 		return
 	}
-	if extractNVDCVSSEntries(exec, metrics.CVSSV30, "CVSS 3.0", source) {
+	if extractNVDCVSSEntries(exec, metrics.CVSSV30, "CVSS 3.0", source, gen) {
 		return
 	}
-	extractNVDCVSSV2(exec, metrics.CVSSV2, source)
+	extractNVDCVSSV2(exec, metrics.CVSSV2, source, gen)
 }
 
-func extractNVDCVSSEntries(exec *schema.ModuleExecution, entries []NVDCVSSEntry, ctx string, source *schema.EntityRef) bool {
+func extractNVDCVSSEntries(exec *schema.ModuleExecution, entries []NVDCVSSEntry, ctx string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) bool {
 	if len(entries) == 0 {
 		return false
 	}
 	d := entries[0].CVSSData
-	appendCVSS(exec, ctx, d.BaseSeverity, d.VectorString, d.BaseScore, source)
+	appendCVSS(exec, ctx, d.BaseSeverity, d.VectorString, d.BaseScore, source, gen)
 	return true
 }
 
-func extractNVDCVSSV2(exec *schema.ModuleExecution, entries []NVDCVSSEntryV2, source *schema.EntityRef) {
+func extractNVDCVSSV2(exec *schema.ModuleExecution, entries []NVDCVSSEntryV2, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	if len(entries) == 0 {
 		return
 	}
@@ -280,10 +289,10 @@ func extractNVDCVSSV2(exec *schema.ModuleExecution, entries []NVDCVSSEntryV2, so
 	if severity == "" {
 		severity = e.CVSSData.BaseSeverity
 	}
-	appendCVSS(exec, "CVSS 2.0", severity, e.CVSSData.VectorString, e.CVSSData.BaseScore, source)
+	appendCVSS(exec, "CVSS 2.0", severity, e.CVSSData.VectorString, e.CVSSData.BaseScore, source, gen)
 }
 
-func extractNVDWeaknesses(exec *schema.ModuleExecution, weaknesses []NVDWeakness, source *schema.EntityRef) {
+func extractNVDWeaknesses(exec *schema.ModuleExecution, weaknesses []NVDWeakness, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	for _, w := range weaknesses {
 		for _, desc := range w.Description {
 			if isValidCWE(desc.Value) {
@@ -292,6 +301,7 @@ func extractNVDWeaknesses(exec *schema.ModuleExecution, weaknesses []NVDWeakness
 					Category: constants.CategoryProperty,
 					Value:    desc.Value,
 					Source:   source,
+					LocalID:  gen.NextID(),
 				})
 			}
 		}

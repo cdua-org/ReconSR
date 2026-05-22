@@ -62,3 +62,17 @@ func TestGetOPENPGPKEYDataEmptyTarget(t *testing.T) {
 		t.Fatalf("expected empty raw data, got %q", execution.RawData)
 	}
 }
+
+func TestModule_LocalIDChaining_OpenPGP(t *testing.T) {
+	originalResolveRecord := resolveRecord
+	t.Cleanup(func() {
+		resolveRecord = originalResolveRecord
+	})
+
+	resolveRecord = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return []string{"\\# 4 01020304"}, []byte("test_raw"), nil
+	}
+
+	execution := getOPENPGPKEYData([]string{"testuser2"}, "openpgp.example.net")
+	requireUniqueLocalIDs(t, execution.Results)
+}

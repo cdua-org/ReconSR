@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestParseSSHFP(t *testing.T) {
@@ -43,7 +44,7 @@ func TestParseSSHFP(t *testing.T) {
 }
 
 func TestGetSSHFPDataEmpty(t *testing.T) {
-	execution := getSSHFPData(context.Background(), "example.com")
+	execution := getSSHFPData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("sshfp lookup failed: %v", *execution.Error)
@@ -54,7 +55,7 @@ func TestGetSSHFPDataEmpty(t *testing.T) {
 }
 
 func TestGetSSHFPDataNX(t *testing.T) {
-	execution := getSSHFPData(context.Background(), "nonexistent.domain.invalid")
+	execution := getSSHFPData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("sshfp lookup failed: %v", *execution.Error)

@@ -75,3 +75,16 @@ func TestGetRBLDataDebug(t *testing.T) {
 	getRBLData("198.51.100.2")
 	getRBLData("192.0.2.1")
 }
+
+func TestModule_LocalIDChaining_RBL(t *testing.T) {
+	mockAQueryResponses(t, map[string][]string{
+		".b.barracudacentral.org": {"127.0.0.3"},
+	}, nil)
+
+	resKnown := getRBLData("203.0.113.25")
+	if resKnown.Error != nil {
+		t.Fatalf("expected no error, got: %v", *resKnown.Error)
+	}
+
+	requireUniqueLocalIDs(t, resKnown.Results)
+}

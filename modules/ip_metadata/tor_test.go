@@ -75,3 +75,16 @@ func TestGetTorDataDebug(t *testing.T) {
 	getTorData("198.51.100.2")
 	getTorData("192.0.2.1")
 }
+
+func TestModule_LocalIDChaining_TOR(t *testing.T) {
+	mockAQueryResponses(t, map[string][]string{
+		".torexit.dan.me.uk": {dnsblPositive},
+	}, nil)
+
+	resKnown := getTorData("203.0.113.25")
+	if resKnown.Error != nil {
+		t.Fatalf("expected no error, got: %v", *resKnown.Error)
+	}
+
+	requireUniqueLocalIDs(t, resKnown.Results)
+}

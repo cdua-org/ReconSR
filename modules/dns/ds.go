@@ -35,7 +35,7 @@ func parseDS(raw string) string {
 	return fmt.Sprintf("%d %d %d %s", keyTag, alg, digestType, strings.ToUpper(digest))
 }
 
-func getDSData(ctx context.Context, target string) schema.ModuleExecution {
+func getDSData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetDS)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetDS, target)
@@ -83,6 +83,7 @@ func getDSData(ctx context.Context, target string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    parts[3],
 			Context:  "DS Record, KeyTag: " + keyTag + ", Alg: " + algName + ", Hash: " + digestName,
+			LocalID:  gen.NextID(),
 		})
 	}
 

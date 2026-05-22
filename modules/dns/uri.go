@@ -10,7 +10,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getURIData(ctx context.Context, target string) schema.ModuleExecution {
+func getURIData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetURI)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetURI, target)
@@ -40,17 +40,18 @@ func getURIData(ctx context.Context, target string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    parsed.Formatted,
 			Context:  "URI Record",
+			LocalID:  gen.NextID(),
 		}
 		exec.Results = append(exec.Results, uriRes)
 
 		source := &schema.EntityRef{Type: uriRes.Type, Value: uriRes.Value}
-		exec.Results = append(exec.Results, buildURIResults(parsed, source)...)
+		exec.Results = append(exec.Results, buildURIResults(parsed, source, gen)...)
 	}
 
 	return exec
 }
 
-func buildURIResults(parsed *dnsutils.URIRecord, source *schema.EntityRef) []schema.ModuleResult {
+func buildURIResults(parsed *dnsutils.URIRecord, source *schema.EntityRef, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	var results []schema.ModuleResult
 	if parsed.Target != "" {
 		results = append(results, schema.ModuleResult{
@@ -59,6 +60,7 @@ func buildURIResults(parsed *dnsutils.URIRecord, source *schema.EntityRef) []sch
 			Value:    parsed.Target,
 			Context:  "URI Endpoint",
 			Source:   source,
+			LocalID:  gen.NextID(),
 		})
 	}
 	return results

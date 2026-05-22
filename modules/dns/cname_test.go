@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestGetCNAMEDataEmpty(t *testing.T) {
-	execution := getCNAMEData(context.Background(), "nonexistent.domain.invalid")
+	execution := getCNAMEData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("cname lookup failed: %v", *execution.Error)
@@ -22,7 +23,7 @@ func TestGetCNAMEDataEmpty(t *testing.T) {
 }
 
 func TestGetCNAMEData(t *testing.T) {
-	res := getCNAMEData(context.Background(), "example.com")
+	res := getCNAMEData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if res.Error != nil {
 		t.Logf("Network resolution error: %v", *res.Error)
@@ -30,7 +31,7 @@ func TestGetCNAMEData(t *testing.T) {
 }
 
 func TestBuildCNAMEResultInScopeSubdomain(t *testing.T) {
-	result, ok := buildCNAMEResult("cdn.example.com.", "cname-scope.example.com", "CNAME Record")
+	result, ok := buildCNAMEResult("cdn.example.com.", "cname-scope.example.com", "CNAME Record", modutil.NewLocalIDGenerator())
 	if !ok {
 		t.Fatal("expected valid CNAME result")
 	}
@@ -49,7 +50,7 @@ func TestBuildCNAMEResultInScopeSubdomain(t *testing.T) {
 }
 
 func TestBuildCNAMEResultOutOfScope(t *testing.T) {
-	result, ok := buildCNAMEResult("vendor.foo.example.net.", "cname-oos.example.com", "CNAME Record")
+	result, ok := buildCNAMEResult("vendor.foo.example.net.", "cname-oos.example.com", "CNAME Record", modutil.NewLocalIDGenerator())
 	if !ok {
 		t.Fatal("expected valid CNAME result")
 	}
@@ -68,14 +69,14 @@ func TestBuildCNAMEResultOutOfScope(t *testing.T) {
 }
 
 func TestBuildCNAMEResultInvalid(t *testing.T) {
-	_, ok := buildCNAMEResult("bad target", "cname-invalid.example.com", "CNAME Record")
+	_, ok := buildCNAMEResult("bad target", "cname-invalid.example.com", "CNAME Record", modutil.NewLocalIDGenerator())
 	if ok {
 		t.Fatal("expected invalid CNAME target to be skipped")
 	}
 }
 
 func TestBuildCNAMEResultSelfReferential(t *testing.T) {
-	_, ok := buildCNAMEResult("example.com.", "example.com", "CNAME Record")
+	_, ok := buildCNAMEResult("example.com.", "example.com", "CNAME Record", modutil.NewLocalIDGenerator())
 	if ok {
 		t.Fatal("expected self-referential CNAME to be skipped")
 	}

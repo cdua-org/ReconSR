@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestGetNSDataEmpty(t *testing.T) {
-	execution := getNSData(context.Background(), "nonexistent.domain.invalid")
+	execution := getNSData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("ns lookup failed: %v", *execution.Error)
@@ -22,7 +23,7 @@ func TestGetNSDataEmpty(t *testing.T) {
 }
 
 func TestGetNSData(t *testing.T) {
-	res := getNSData(context.Background(), "example.com")
+	res := getNSData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	switch {
 	case res.Error != nil:
@@ -35,7 +36,7 @@ func TestGetNSData(t *testing.T) {
 }
 
 func TestBuildNSResultInScope(t *testing.T) {
-	result, ok := buildNSResult("ns1.example.com.", "example.com")
+	result, ok := buildNSResult("ns1.example.com.", "example.com", modutil.NewLocalIDGenerator())
 	if !ok {
 		t.Fatal("expected valid NS result")
 	}
@@ -54,7 +55,7 @@ func TestBuildNSResultInScope(t *testing.T) {
 }
 
 func TestBuildNSResultOutOfScope(t *testing.T) {
-	result, ok := buildNSResult("ns1.example.net.", "example.com")
+	result, ok := buildNSResult("ns1.example.net.", "example.com", modutil.NewLocalIDGenerator())
 	if !ok {
 		t.Fatal("expected valid NS result")
 	}
@@ -67,14 +68,14 @@ func TestBuildNSResultOutOfScope(t *testing.T) {
 }
 
 func TestBuildNSResultInvalid(t *testing.T) {
-	_, ok := buildNSResult("bad target", "example.com")
+	_, ok := buildNSResult("bad target", "example.com", modutil.NewLocalIDGenerator())
 	if ok {
 		t.Fatal("expected invalid NS target to be skipped")
 	}
 }
 
 func TestBuildNSResultSelfReferential(t *testing.T) {
-	_, ok := buildNSResult("example.com.", "example.com")
+	_, ok := buildNSResult("example.com.", "example.com", modutil.NewLocalIDGenerator())
 	if ok {
 		t.Fatal("expected self-referential NS to be skipped")
 	}

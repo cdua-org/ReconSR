@@ -17,13 +17,16 @@ func parseShodanAPIIP(exec *schema.ModuleExecution, rawBody []byte, target strin
 		return
 	}
 
-	appendShodanTagResults(exec, payload.Tags)
-	extractIPDomains(exec, payload.Domains)
-	extractIPASN(exec, payload.ASN)
-	extractIPProperties(exec, &payload, target)
-	extractIPLastUpdate(exec, payload.LastUpdate, target)
-	extractIPHostnames(exec, payload.Hostnames)
-	extractIPBanners(exec, payload.Data, target)
+	gen := modutil.NewLocalIDGenerator()
+
+	appendShodanTagResults(exec, payload.Tags, gen)
+	extractIPDomains(exec, payload.Domains, gen)
+	extractIPASN(exec, payload.ASN, gen)
+	extractIPProperties(exec, &payload, target, gen)
+	extractIPLastUpdate(exec, payload.LastUpdate, target, gen)
+	extractIPHostnames(exec, payload.Hostnames, gen)
+
+	extractIPBanners(exec, payload.Data, target, gen)
 
 	hasCVE := false
 	for _, banner := range payload.Data {
@@ -39,12 +42,13 @@ func parseShodanAPIIP(exec *schema.ModuleExecution, rawBody []byte, target strin
 				Category: constants.CategoryNode,
 				Value:    val.Value,
 				Tags:     []string{constants.TagCVE},
+				LocalID:  gen.NextID(),
 			})
 		}
 	}
 }
 
-func extractIPDomains(exec *schema.ModuleExecution, domains []string) {
+func extractIPDomains(exec *schema.ModuleExecution, domains []string, gen *modutil.LocalIDGenerator) {
 	for _, domain := range domains {
 		if val, err := validator.Validate(constants.TypeDomain, domain); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
@@ -52,12 +56,13 @@ func extractIPDomains(exec *schema.ModuleExecution, domains []string) {
 				Category: constants.CategoryNode,
 				Value:    val.Value,
 				Tags:     []string{constants.TagReverseIP},
+				LocalID:  gen.NextID(),
 			})
 		}
 	}
 }
 
-func extractIPASN(exec *schema.ModuleExecution, asn string) {
+func extractIPASN(exec *schema.ModuleExecution, asn string, gen *modutil.LocalIDGenerator) {
 	if asn == "" {
 		return
 	}
@@ -67,18 +72,19 @@ func extractIPASN(exec *schema.ModuleExecution, asn string) {
 		Type:     constants.TypeASN,
 		Category: constants.CategoryNode,
 		Value:    asnNumber,
+		LocalID:  gen.NextID(),
 	})
 }
 
-func extractIPProperties(exec *schema.ModuleExecution, payload *shodanIPResponse, target string) {
-	appendIPProperty(exec, constants.TypeOrganization, payload.Org, "Organization for "+target)
+func extractIPProperties(exec *schema.ModuleExecution, payload *shodanIPResponse, target string, gen *modutil.LocalIDGenerator) {
+	appendIPProperty(exec, constants.TypeOrganization, payload.Org, "Organization for "+target, gen)
 	if !strings.EqualFold(payload.ISP, payload.Org) {
-		appendIPProperty(exec, constants.TypeISP, payload.ISP, "ISP for "+target)
+		appendIPProperty(exec, constants.TypeISP, payload.ISP, "ISP for "+target, gen)
 	}
-	appendIPProperty(exec, constants.TypeOS, payload.OS, "OS for "+target)
+	appendIPProperty(exec, constants.TypeOS, payload.OS, "OS for "+target, gen)
 }
 
-func appendIPProperty(exec *schema.ModuleExecution, resultType, value, context string) {
+func appendIPProperty(exec *schema.ModuleExecution, resultType, value, context string, gen *modutil.LocalIDGenerator) {
 	if value == "" {
 		return
 	}
@@ -88,10 +94,11 @@ func appendIPProperty(exec *schema.ModuleExecution, resultType, value, context s
 		Category: constants.CategoryProperty,
 		Value:    value,
 		Context:  context,
+		LocalID:  gen.NextID(),
 	})
 }
 
-func extractIPLastUpdate(exec *schema.ModuleExecution, lastUpdate, target string) {
+func extractIPLastUpdate(exec *schema.ModuleExecution, lastUpdate, target string, gen *modutil.LocalIDGenerator) {
 	if lastUpdate == "" {
 		return
 	}
@@ -101,16 +108,17 @@ func extractIPLastUpdate(exec *schema.ModuleExecution, lastUpdate, target string
 		Category: constants.CategoryProperty,
 		Value:    lastUpdate,
 		Context:  "Last Update for " + target,
+		LocalID:  gen.NextID(),
 	})
 }
 
-func extractIPHostnames(exec *schema.ModuleExecution, hostnames []string) {
+func extractIPHostnames(exec *schema.ModuleExecution, hostnames []string, gen *modutil.LocalIDGenerator) {
 	for _, hostname := range hostnames {
-		appendReverseIPHostnameResult(exec, hostname, "Shodan PTR")
+		appendReverseIPHostnameResult(exec, hostname, "Shodan PTR", gen)
 	}
 }
 
-func appendReverseIPHostnameResult(exec *schema.ModuleExecution, hostname, context string) {
+func appendReverseIPHostnameResult(exec *schema.ModuleExecution, hostname, context string, gen *modutil.LocalIDGenerator) {
 	if hostname == "" {
 		return
 	}
@@ -122,6 +130,7 @@ func appendReverseIPHostnameResult(exec *schema.ModuleExecution, hostname, conte
 			Value:    validated.Value,
 			Context:  context,
 			Tags:     []string{constants.TagReverseIP},
+			LocalID:  gen.NextID(),
 		})
 		return
 	}
@@ -131,5 +140,6 @@ func appendReverseIPHostnameResult(exec *schema.ModuleExecution, hostname, conte
 		Category: constants.CategoryProperty,
 		Value:    hostname,
 		Context:  context,
+		LocalID:  gen.NextID(),
 	})
 }

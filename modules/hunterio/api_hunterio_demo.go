@@ -12,7 +12,7 @@ import (
 
 // getDomainSearchDemo is a demo function that loads a local JSON fixture
 // instead of querying the Hunter.io API when the "demo-api-key" is used.
-func (m *module) getDomainSearchDemo(exec *schema.ModuleExecution, targetType, targetValue string) schema.ModuleExecution {
+func (m *module) getDomainSearchDemo(exec *schema.ModuleExecution, targetType, targetValue string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	if !m.demoFired.CompareAndSwap(false, true) {
 		dlog.Printf("%s skipped stage=demo_already_fired target=%q", constants.FuncGetHunterioDomainSearch, targetValue)
 		return *exec
@@ -24,6 +24,7 @@ func (m *module) getDomainSearchDemo(exec *schema.ModuleExecution, targetType, t
 		Type:     constants.TypeInfo,
 		Category: constants.CategoryProperty,
 		Value:    "⚠️ DEMO MODE: Showing sample data for Hunter.io (API key not configured)",
+		LocalID:  gen.NextID(),
 	})
 
 	data, err := os.ReadFile("modules/hunterio/testdata/domain_search_b2b.json")
@@ -40,7 +41,7 @@ func (m *module) getDomainSearchDemo(exec *schema.ModuleExecution, targetType, t
 
 	if len(parsedResp.Errors) > 0 {
 		dlog.Printf("%s success stage=demo_error parsed_errors=%d", constants.FuncGetHunterioDomainSearch, len(parsedResp.Errors))
-		appendAPIErrorResult(exec, 429, data)
+		appendAPIErrorResult(exec, 429, data, gen)
 		return *exec
 	}
 
@@ -51,8 +52,8 @@ func (m *module) getDomainSearchDemo(exec *schema.ModuleExecution, targetType, t
 		domainForScope = parsedResp.Data.Domain
 	}
 
-	appendDomainProperties(exec, &parsedResp)
-	results := extractEmails(&parsedResp, domainForScope)
+	appendDomainProperties(exec, &parsedResp, gen)
+	results := extractEmails(&parsedResp, domainForScope, gen)
 	exec.Results = append(exec.Results, results...)
 
 	for _, ld := range parsedResp.Data.LinkedDomains {
@@ -62,6 +63,7 @@ func (m *module) getDomainSearchDemo(exec *schema.ModuleExecution, targetType, t
 			Tags:       []string{constants.TagLinked},
 			OutOfScope: orgdomain.IsOutOfScope(ld, domainForScope),
 			Applied:    true,
+			LocalID:    gen.NextID(),
 		})
 	}
 

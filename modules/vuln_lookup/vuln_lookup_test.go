@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -144,7 +145,7 @@ func TestGetCirclVuln_CVE_WithCNAMetrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.cve, func(t *testing.T) {
-			exec := getCirclVuln(context.Background(), constants.TypeCVE, tt.cve)
+			exec := getCirclVuln(context.Background(), constants.TypeCVE, tt.cve, modutil.NewLocalIDGenerator())
 
 			if exec.Error != nil {
 				t.Fatalf("unexpected error: %s", *exec.Error)
@@ -152,6 +153,7 @@ func TestGetCirclVuln_CVE_WithCNAMetrics(t *testing.T) {
 			if exec.RawData == "" {
 				t.Error("expected RawData to be populated")
 			}
+			requireUniqueLocalIDs(t, exec.Results)
 
 			verifyCVEResults(t, tt.cve, exec.Results, tt.expectCWE, tt.expectSSVC, tt.expectKEV)
 		})
@@ -188,7 +190,7 @@ func TestGetCirclVuln_CVE_NVDFallback(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			exec := getCirclVuln(context.Background(), constants.TypeCVE, tt.cve)
+			exec := getCirclVuln(context.Background(), constants.TypeCVE, tt.cve, modutil.NewLocalIDGenerator())
 
 			if exec.Error != nil {
 				t.Fatalf("unexpected error: %s", *exec.Error)
@@ -207,10 +209,11 @@ func TestGetCirclVuln_CVE2026_MultipleMetricVersions(t *testing.T) {
 	defer server.Close()
 	overrideBaseURL(t, server.URL)
 
-	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-2026-41872")
+	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-2026-41872", modutil.NewLocalIDGenerator())
 	if exec.Error != nil {
 		t.Fatalf("unexpected error: %s", *exec.Error)
 	}
+	requireUniqueLocalIDs(t, exec.Results)
 
 	cvssContexts := make(map[string]bool)
 	for _, res := range exec.Results {
@@ -298,7 +301,7 @@ func TestGetCirclVuln_NotFound(t *testing.T) {
 	defer server.Close()
 	overrideBaseURL(t, server.URL)
 
-	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-UNKNOWN")
+	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-UNKNOWN", modutil.NewLocalIDGenerator())
 
 	if exec.Error != nil {
 		t.Errorf("did not expect error for 404, got: %s", *exec.Error)
@@ -318,7 +321,7 @@ func TestGetCirclVuln_ServerError(t *testing.T) {
 	defer server.Close()
 	overrideBaseURL(t, server.URL)
 
-	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-ERROR")
+	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-ERROR", modutil.NewLocalIDGenerator())
 
 	if exec.Error == nil {
 		t.Fatal("expected error for 500 status code")
@@ -351,5 +354,44 @@ func TestIsValidCWE(t *testing.T) {
 				t.Errorf("isValidCWE(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestModule_LocalIDChaining(t *testing.T) {
+	server := setupMockServer(t)
+	defer server.Close()
+	overrideBaseURL(t, server.URL)
+
+	gen := modutil.NewLocalIDGenerator()
+	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-2024-38063", gen)
+
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %s", *exec.Error)
+	}
+
+	if len(exec.Results) < 2 {
+		t.Fatalf("Expected multiple results to verify chaining, got %d", len(exec.Results))
+	}
+
+	for i, res := range exec.Results {
+		expectedID := i + 1
+		if res.LocalID != expectedID {
+			t.Errorf("Expected LocalID %d at index %d, got %d (Type: %s, Value: %s)", expectedID, i, res.LocalID, res.Type, res.Value)
+		}
+	}
+}
+
+func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
+	t.Helper()
+
+	seen := make(map[int]bool)
+	for _, res := range results {
+		if res.LocalID <= 0 {
+			t.Errorf("expected positive LocalID, got %d for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		if seen[res.LocalID] {
+			t.Errorf("duplicate LocalID %d found for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		seen[res.LocalID] = true
 	}
 }

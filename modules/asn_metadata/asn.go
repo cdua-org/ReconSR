@@ -41,16 +41,17 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 
 	for _, f := range data.Functions {
 		var execution schema.ModuleExecution
+		gen := modutil.NewLocalIDGenerator()
 
 		switch f {
 		case constants.FuncGetASNPeers:
-			execution = getASNPeers(data.Target.Value)
+			execution = getASNPeers(data.Target.Value, gen)
 		case constants.FuncGetASNPrefixes:
-			execution = getASNPrefixes(data.Target.Value)
+			execution = getASNPrefixes(data.Target.Value, gen)
 		case constants.FuncGetASNInfo:
-			execution = getASNInfo(data.Target.Value)
+			execution = getASNInfo(data.Target.Value, gen)
 		case constants.FuncGetASNAbuseContacts:
-			execution = getASNAbuseContacts(data.Target.Value)
+			execution = getASNAbuseContacts(data.Target.Value, gen)
 		default:
 			execution = modutil.NewExecution(f)
 			errMsg := "unsupported function: " + f

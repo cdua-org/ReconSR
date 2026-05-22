@@ -7,13 +7,14 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
 func TestBuildNAPTRServiceResult(t *testing.T) {
 	const parsedRecord = "100 10 \"s\" \"SIP+D2U\" \"!^.*$!sip:customer@example.com!\" _sip._udp.example.com."
 
-	result := buildNAPTRServiceResult(parsedRecord, "SIP+D2U")
+	result := buildNAPTRServiceResult(parsedRecord, "SIP+D2U", modutil.NewLocalIDGenerator())
 	if result.Type != constants.TypeNAPTR {
 		t.Fatalf("unexpected type: %s", result.Type)
 	}
@@ -76,7 +77,7 @@ func TestBuildNAPTRTargetResult(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			source := &schema.EntityRef{Type: constants.TypeNAPTR, Value: "naptr-service"}
-			result := buildNAPTRTargetResult(source, tt.target, tt.replacement)
+			result := buildNAPTRTargetResult(source, tt.target, tt.replacement, modutil.NewLocalIDGenerator())
 			if tt.wantNil {
 				if result != nil {
 					t.Fatalf("expected nil result, got %+v", result)
@@ -115,7 +116,7 @@ func TestBuildNAPTRTargetResultInvalid(t *testing.T) {
 	tests := []string{".", "", "bad target", "\"quoted\"", "_sip.only-one-prefix.example.org.", "_sip._tcp.invalid_target"}
 	source := &schema.EntityRef{Type: constants.TypeNAPTR, Value: "naptr-service"}
 	for _, replacement := range tests {
-		if result := buildNAPTRTargetResult(source, "invalid.naptr.example.com", replacement); result != nil {
+		if result := buildNAPTRTargetResult(source, "invalid.naptr.example.com", replacement, modutil.NewLocalIDGenerator()); result != nil {
 			t.Fatalf("expected nil result for replacement %q", replacement)
 		}
 	}
@@ -124,7 +125,7 @@ func TestBuildNAPTRTargetResultInvalid(t *testing.T) {
 func TestBuildNAPTRRegexpResults(t *testing.T) {
 	source := &schema.EntityRef{Type: constants.TypeNAPTR, Value: "E2U+sip"}
 
-	results := buildNAPTRRegexpResults(source, "!^.*$!sip:info@example.org!", "sip:info@example.org")
+	results := buildNAPTRRegexpResults(source, "!^.*$!sip:info@example.org!", "sip:info@example.org", modutil.NewLocalIDGenerator())
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(results))
 	}
@@ -146,14 +147,14 @@ func TestBuildNAPTRRegexpResults(t *testing.T) {
 	}
 
 	// Test without target
-	resultsOnlyRegexp := buildNAPTRRegexpResults(source, "!^.*$!$1!", "")
+	resultsOnlyRegexp := buildNAPTRRegexpResults(source, "!^.*$!$1!", "", modutil.NewLocalIDGenerator())
 	if len(resultsOnlyRegexp) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(resultsOnlyRegexp))
 	}
 }
 
 func TestGetNAPTRDataEmpty(t *testing.T) {
-	execution := getNAPTRData(context.Background(), "example.com")
+	execution := getNAPTRData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("naptr lookup failed: %v", *execution.Error)
@@ -164,7 +165,7 @@ func TestGetNAPTRDataEmpty(t *testing.T) {
 }
 
 func TestGetNAPTRDataNX(t *testing.T) {
-	execution := getNAPTRData(context.Background(), "nonexistent.domain.invalid")
+	execution := getNAPTRData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
 		t.Logf("naptr lookup failed: %v", *execution.Error)

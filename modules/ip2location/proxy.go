@@ -22,6 +22,8 @@ func getProxyCheck(target, dbPath string) schema.ModuleExecution {
 		return execution
 	}
 
+	gen := modutil.NewLocalIDGenerator()
+
 	var rawBuffer strings.Builder
 	defer func() {
 		if rawBuffer.Len() > 0 {
@@ -40,6 +42,7 @@ func getProxyCheck(target, dbPath string) schema.ModuleExecution {
 			Type:     constants.TypeTag,
 			Category: constants.CategoryProperty,
 			Value:    mapProxyTypeToTag(res.ProxyType),
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "ProxyType", res.ProxyType)
 	}
@@ -50,6 +53,7 @@ func getProxyCheck(target, dbPath string) schema.ModuleExecution {
 				Type:     constants.TypeTag,
 				Category: constants.CategoryProperty,
 				Value:    mapThreatToTag(t),
+				LocalID:  gen.NextID(),
 			})
 		}
 		writeRaw(&rawBuffer, "Threat", res.Threat)
@@ -61,6 +65,7 @@ func getProxyCheck(target, dbPath string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    res.FraudScore,
 			Context:  "IP2Proxy Fraud Score",
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "FraudScore", res.FraudScore)
 	}
@@ -70,12 +75,13 @@ func getProxyCheck(target, dbPath string) schema.ModuleExecution {
 			Type:     constants.TypeLastSeen,
 			Category: constants.CategoryProperty,
 			Value:    res.LastSeen + " days ago",
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "LastSeen", res.LastSeen)
 	}
 
 	if !isUnavailable(res.Provider) {
-		appendInfo(&execution, "VPN/Proxy Provider", res.Provider)
+		appendInfo(&execution, "VPN/Proxy Provider", res.Provider, gen)
 		writeRaw(&rawBuffer, "Provider", res.Provider)
 	}
 
@@ -85,6 +91,7 @@ func getProxyCheck(target, dbPath string) schema.ModuleExecution {
 			Category: constants.CategoryNode,
 			Value:    res.Domain,
 			Tags:     []string{constants.TagReverseIP},
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "Domain", res.Domain)
 	}
@@ -95,6 +102,7 @@ func getProxyCheck(target, dbPath string) schema.ModuleExecution {
 			Category: constants.CategoryProperty,
 			Value:    ParseUsageType(res.UsageType),
 			Context:  "Proxy Usage Type",
+			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "UsageType", res.UsageType)
 	}

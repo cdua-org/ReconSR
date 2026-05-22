@@ -15,7 +15,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getDMARCData(ctx context.Context, target string) schema.ModuleExecution {
+func getDMARCData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetDMARC)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetDMARC, target)
@@ -53,12 +53,13 @@ func getDMARCData(ctx context.Context, target string) schema.ModuleExecution {
 			Type:     constants.TypeDMARC,
 			Category: constants.CategoryProperty,
 			Value:    rec,
+			LocalID:  gen.NextID(),
 		}
 		exec.Results = append(exec.Results, dmarcRes)
 
 		parsed := dnsutils.ParseDMARC(rec)
 		source := &schema.EntityRef{Type: dmarcRes.Type, Value: dmarcRes.Value}
-		exec.Results = append(exec.Results, processDMARCEmails(target, parsed, source)...)
+		exec.Results = append(exec.Results, processDMARCEmails(target, parsed, source, gen)...)
 	}
 
 	log.Printf("%s success target=%q results=%d", constants.FuncGetDMARC, target, len(exec.Results))
@@ -77,7 +78,7 @@ func filterDMARC(records []string) []string {
 	return dmarc
 }
 
-func processDMARCEmails(target string, parsed map[string]string, source *schema.EntityRef) []schema.ModuleResult {
+func processDMARCEmails(target string, parsed map[string]string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	var results []schema.ModuleResult
 	for _, key := range []string{"ruf", "rua"} {
 		val, ok := parsed[key]
@@ -107,6 +108,7 @@ func processDMARCEmails(target string, parsed map[string]string, source *schema.
 				Context:    contextMsg,
 				OutOfScope: isOOS,
 				Source:     source,
+				LocalID:    gen.NextID(),
 			})
 		}
 	}

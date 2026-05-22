@@ -83,6 +83,7 @@ func getASNInfo(asn string) string {
 
 func getASNData(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetASN)
+	gen := modutil.NewLocalIDGenerator()
 
 	dbg.Printf("%s target=%q", constants.FuncGetASN, target)
 
@@ -131,6 +132,7 @@ func getASNData(target string) (execution schema.ModuleExecution) {
 				Category: constants.CategoryProperty,
 				Value:    prefix,
 				Context:  "BGP Prefix",
+				LocalID:  gen.NextID(),
 			})
 
 			for asn := range strings.FieldsSeq(asnPart) {
@@ -146,6 +148,7 @@ func getASNData(target string) (execution schema.ModuleExecution) {
 					Category: constants.CategoryNode,
 					Value:    val,
 					Context:  "ASN Origin" + info,
+					LocalID:  gen.NextID(),
 				})
 			}
 		}

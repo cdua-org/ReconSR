@@ -59,7 +59,7 @@ type srvResult struct {
 	host   string
 }
 
-func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
+func getSRVData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetSRV)
 	log.Printf("%s query_start target=%q", constants.FuncGetSRV, target)
 
@@ -121,11 +121,12 @@ func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
 			Type:     constants.TypeSRV,
 			Category: constants.CategoryProperty,
 			Value:    res.record,
+			LocalID:  gen.NextID(),
 		}
 		exec.Results = append(exec.Results, srvRes)
 
 		source := &schema.EntityRef{Type: srvRes.Type, Value: srvRes.Value}
-		if srvHost, ok := buildSRVHostResult(res.host, target, source); ok {
+		if srvHost, ok := buildSRVHostResult(res.host, target, source, gen); ok {
 			exec.Results = append(exec.Results, srvHost)
 		}
 	}
@@ -138,7 +139,7 @@ func getSRVData(ctx context.Context, target string) schema.ModuleExecution {
 	return exec
 }
 
-func buildSRVHostResult(host, target string, source *schema.EntityRef) (schema.ModuleResult, bool) {
+func buildSRVHostResult(host, target string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) (schema.ModuleResult, bool) {
 	res, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
 		log.Printf("%s skip_invalid_srv_host target=%q entity=%q err=%v", constants.FuncGetSRV, target, host, err)
@@ -159,6 +160,7 @@ func buildSRVHostResult(host, target string, source *schema.EntityRef) (schema.M
 		Tags:       []string{constants.TagSRV},
 		OutOfScope: isOOS,
 		Source:     source,
+		LocalID:    gen.NextID(),
 	}, true
 }
 

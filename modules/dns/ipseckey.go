@@ -47,7 +47,7 @@ func mapIPSECKEYContext(precedence, gwTypeStr, algStr string) (ctx, gwTypeName s
 	return ctx, gwTypeName
 }
 
-func classifyIPSECKEYGateway(gwTypeStr, gateway, target string) (schema.ModuleResult, bool) {
+func classifyIPSECKEYGateway(gwTypeStr, gateway, target string, gen *modutil.LocalIDGenerator) (schema.ModuleResult, bool) {
 	var validationType string
 
 	switch gwTypeStr {
@@ -85,10 +85,11 @@ func classifyIPSECKEYGateway(gwTypeStr, gateway, target string) (schema.ModuleRe
 		Value:      res.Value,
 		Tags:       []string{constants.TagIPSECKEY},
 		OutOfScope: isOOS,
+		LocalID:    gen.NextID(),
 	}, true
 }
 
-func buildIPSECKEYResults(parsed *dnsutils.IPSECKEYRecord, target string, source *schema.EntityRef) []schema.ModuleResult {
+func buildIPSECKEYResults(parsed *dnsutils.IPSECKEYRecord, target string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	if parsed == nil {
 		return nil
 	}
@@ -101,7 +102,7 @@ func buildIPSECKEYResults(parsed *dnsutils.IPSECKEYRecord, target string, source
 		return results
 	}
 
-	gatewayResult, ok := classifyIPSECKEYGateway(parsed.GatewayType, parsed.Gateway, target)
+	gatewayResult, ok := classifyIPSECKEYGateway(parsed.GatewayType, parsed.Gateway, target, gen)
 	if !ok {
 		return results
 	}
@@ -114,7 +115,7 @@ func buildIPSECKEYResults(parsed *dnsutils.IPSECKEYRecord, target string, source
 	return results
 }
 
-func getIPSECKEYData(ctx context.Context, target string) schema.ModuleExecution {
+func getIPSECKEYData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetIPSECKEY)
 	log.Printf("%s query_start target=%q", constants.FuncGetIPSECKEY, target)
 
@@ -142,11 +143,12 @@ func getIPSECKEYData(ctx context.Context, target string) schema.ModuleExecution 
 			Category: constants.CategoryProperty,
 			Value:    parsed.Formatted,
 			Context:  ctxStr,
+			LocalID:  gen.NextID(),
 		}
 		exec.Results = append(exec.Results, ipseckeyRes)
 
 		source := &schema.EntityRef{Type: ipseckeyRes.Type, Value: ipseckeyRes.Value}
-		exec.Results = append(exec.Results, buildIPSECKEYResults(parsed, target, source)...)
+		exec.Results = append(exec.Results, buildIPSECKEYResults(parsed, target, source, gen)...)
 	}
 
 	log.Printf("%s success target=%q records=%d", constants.FuncGetIPSECKEY, target, len(records))

@@ -13,6 +13,7 @@ import (
 
 func getIPAbuseContacts(target string) (execution schema.ModuleExecution) {
 	execution = modutil.NewExecution(constants.FuncGetIPAbuseContacts)
+	gen := modutil.NewLocalIDGenerator()
 
 	dbg.Printf("%s target=%q", constants.FuncGetIPAbuseContacts, target)
 
@@ -46,6 +47,7 @@ func getIPAbuseContacts(target string) (execution schema.ModuleExecution) {
 				Value:      contact,
 				Context:    "Abuse Contact",
 				OutOfScope: true,
+				LocalID:    gen.NextID(),
 			})
 		}
 	}

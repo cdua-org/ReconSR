@@ -22,7 +22,7 @@ type mxRecord struct {
 	pref uint16
 }
 
-func getMXData(ctx context.Context, target string) schema.ModuleExecution {
+func getMXData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetMX)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetMX, target)
@@ -73,10 +73,11 @@ func getMXData(ctx context.Context, target string) schema.ModuleExecution {
 			Type:     constants.TypeMX,
 			Category: constants.CategoryProperty,
 			Value:    mxValue,
+			LocalID:  gen.NextID(),
 		})
 
 		mxRef := &schema.EntityRef{Type: constants.TypeMX, Value: mxValue}
-		hostResult := buildMXHostResult(mxRef, mx.host, target)
+		hostResult := buildMXHostResult(mxRef, mx.host, target, gen)
 		if hostResult != nil {
 			exec.Results = append(exec.Results, *hostResult)
 		}
@@ -87,7 +88,7 @@ func getMXData(ctx context.Context, target string) schema.ModuleExecution {
 	return exec
 }
 
-func buildMXHostResult(source *schema.EntityRef, host, target string) *schema.ModuleResult {
+func buildMXHostResult(source *schema.EntityRef, host, target string, gen *modutil.LocalIDGenerator) *schema.ModuleResult {
 	res, err := validator.Validate(constants.TypeDomain, host)
 	if err != nil {
 		log.Printf("%s skip_invalid_mx_host target=%q entity=%q err=%v", constants.FuncGetMX, target, host, err)
@@ -109,6 +110,7 @@ func buildMXHostResult(source *schema.EntityRef, host, target string) *schema.Mo
 		Tags:       []string{constants.TagMX},
 		OutOfScope: isOOS,
 		Source:     source,
+		LocalID:    gen.NextID(),
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -259,7 +260,7 @@ func TestFormatResults_CertExpiredFiltering(t *testing.T) {
 		targetSource:    srcCrtsh,
 	}
 
-	results := formatResults(classified, false)
+	results := formatResults(classified, false, modutil.NewLocalIDGenerator())
 
 	var subdomains, emails, certExpired, certNotAfter, emailNotAfter, statuses int
 	for _, r := range results {
@@ -316,7 +317,7 @@ func TestFormatResults_DisableCertExpiredSubdomains(t *testing.T) {
 		targetSource:    srcCrtsh,
 	}
 
-	results := formatResults(classified, true)
+	results := formatResults(classified, true, modutil.NewLocalIDGenerator())
 
 	var subdomains, emails, certExpired, certNotAfter, emailNotAfter, statuses int
 	for _, r := range results {
@@ -365,7 +366,7 @@ func TestFormatResults_WildcardSubdomain(t *testing.T) {
 		emails: make(map[string]classifiedIdentity),
 	}
 
-	results := formatResults(classified, false)
+	results := formatResults(classified, false, modutil.NewLocalIDGenerator())
 	wildcard := findDomainCertResult(results, constants.TypeSubdomain, "wild.example.com")
 	if wildcard == nil {
 		t.Fatalf("expected normalized wildcard subdomain result, got %+v", results)
@@ -418,9 +419,45 @@ func TestFormatResults_ExpiredTarget(t *testing.T) {
 		targetSource:    srcCrtsh,
 	}
 
-	results := formatResults(classified, false)
+	results := formatResults(classified, false, modutil.NewLocalIDGenerator())
 
 	if len(results) > 0 {
 		t.Errorf("expected 0 results for expired target, got %d", len(results))
+	}
+}
+
+func TestModule_LocalIDChaining(t *testing.T) {
+	exec := getDomains("example.com")
+
+	if exec.Error != nil {
+		t.Fatalf("Expected no error, got: %s", *exec.Error)
+	}
+
+	if len(exec.Results) < 2 {
+		t.Skip("Expected multiple results to verify chaining, skipping test")
+	}
+
+	requireUniqueLocalIDs(t, exec.Results)
+}
+
+func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
+	seen := make(map[int]bool)
+	for _, res := range results {
+		if res.LocalID <= 0 {
+			t.Errorf("expected positive LocalID, got %d for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		if seen[res.LocalID] {
+			t.Errorf("duplicate LocalID %d found for type %s value %s", res.LocalID, res.Type, res.Value)
+		}
+		seen[res.LocalID] = true
+
+		if res.Source != nil {
+			if res.Source.LocalID <= 0 {
+				t.Errorf("expected positive LocalID in source, got %d", res.Source.LocalID)
+			}
+			if res.Source.LocalID >= res.LocalID {
+				t.Errorf("expected source LocalID %d to be strictly less than result LocalID %d (Type: %s, Value: %s)", res.Source.LocalID, res.LocalID, res.Type, res.Value)
+			}
+		}
 	}
 }

@@ -14,7 +14,7 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getNSData(ctx context.Context, target string) schema.ModuleExecution {
+func getNSData(ctx context.Context, target string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetNS)
 
 	log.Printf("%s query_start target=%q", constants.FuncGetNS, target)
@@ -44,7 +44,7 @@ func getNSData(ctx context.Context, target string) schema.ModuleExecution {
 	modutil.SetRawFallback(&exec, raw, records, ", ")
 
 	for _, rec := range records {
-		result, ok := buildNSResult(rec, target)
+		result, ok := buildNSResult(rec, target, gen)
 		if !ok {
 			continue
 		}
@@ -61,7 +61,7 @@ func getNSData(ctx context.Context, target string) schema.ModuleExecution {
 	return exec
 }
 
-func buildNSResult(rawNS, target string) (schema.ModuleResult, bool) {
+func buildNSResult(rawNS, target string, gen *modutil.LocalIDGenerator) (schema.ModuleResult, bool) {
 	ns := strings.TrimSuffix(strings.TrimSpace(rawNS), ".")
 	if ns == "" {
 		return schema.ModuleResult{}, false
@@ -84,5 +84,6 @@ func buildNSResult(rawNS, target string) (schema.ModuleResult, bool) {
 		Value:      res.Value,
 		Tags:       []string{constants.TagNS},
 		OutOfScope: isOOS,
+		LocalID:    gen.NextID(),
 	}, true
 }

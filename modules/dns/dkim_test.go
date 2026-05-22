@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
 func TestGetDKIMDataEmpty(t *testing.T) {
-	execution := getDKIMData(context.Background(), "nonexistent.domain.invalid")
+	execution := getDKIMData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
 		t.Logf("dkim lookup failed: %v", *execution.Error)
@@ -22,7 +23,7 @@ func TestGetDKIMDataEmpty(t *testing.T) {
 }
 
 func TestGetDKIMData(t *testing.T) {
-	res := getDKIMData(context.Background(), "example.com")
+	res := getDKIMData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if res.Error != nil {
 		t.Logf("Network resolution error: %v", *res.Error)
