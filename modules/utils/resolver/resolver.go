@@ -130,6 +130,9 @@ var (
 	// MaxRetriesCircl defines maximum attempts for CIRCL API.
 	MaxRetriesCircl = 3
 
+	// CirclRetryBaseDelay is the base pause between CIRCL API retry attempts.
+	CirclRetryBaseDelay = 5 * time.Second
+
 	// AbuseIPDBmaxAgeInDays defines how far back in time we go to fetch reports (default 30, max 365).
 	AbuseIPDBmaxAgeInDays = 30
 
@@ -272,15 +275,16 @@ var stringOptions map[string]*string
 
 func initOptionMaps() {
 	durationOptions = map[string]*time.Duration{
-		"Timeout":            &Timeout,
-		"KeepAlive":          &KeepAlive,
-		"TimeoutASNMeta":     &TimeoutASNMeta,
-		"DNSQueryTimeout":    &DNSQueryTimeout,
-		"DNSFallbackTimeout": &DNSFallbackTimeout,
-		"DNSBruteTimeout":    &DNSBruteTimeout,
-		"CrtshPGTimeout":     &CrtshPGTimeout,
-		"RetryBaseDelay":     &RetryBaseDelay,
-		"HTTPTimeout":        &HTTPTimeout,
+		"Timeout":             &Timeout,
+		"KeepAlive":           &KeepAlive,
+		"TimeoutASNMeta":      &TimeoutASNMeta,
+		"DNSQueryTimeout":     &DNSQueryTimeout,
+		"DNSFallbackTimeout":  &DNSFallbackTimeout,
+		"DNSBruteTimeout":     &DNSBruteTimeout,
+		"CrtshPGTimeout":      &CrtshPGTimeout,
+		"RetryBaseDelay":      &RetryBaseDelay,
+		"HTTPTimeout":         &HTTPTimeout,
+		"CirclRetryBaseDelay": &CirclRetryBaseDelay,
 	}
 	boolOptions = map[string]*bool{
 		"DisableMailcryptoBruteForce": &DisableMailcryptoBruteForce,

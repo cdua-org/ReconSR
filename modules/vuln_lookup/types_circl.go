@@ -1,5 +1,11 @@
 package vuln_lookup
 
+import (
+	"encoding/json"
+	"strconv"
+	"strings"
+)
+
 // CIRCLCVEResponse models the root structure of the CIRCL Vulnerability API
 // response for a single CVE record conforming to the cvelistV5 standard.
 type CIRCLCVEResponse struct {
@@ -77,14 +83,61 @@ type Description struct {
 	Value string `json:"value"`
 }
 
-// Metric consolidates various scoring formats under a unified structure,
-// guaranteeing all available CVSS versions can be parsed without type assertions.
+// UniversalCVSS is a dynamic unified struct for all CVSS versions (V2, V3, V4, V5+).
+type UniversalCVSS struct {
+	Version      string  `json:"version"`
+	VectorString string  `json:"vectorString"`
+	BaseSeverity string  `json:"baseSeverity"`
+	BaseScore    float64 `json:"baseScore"`
+}
+
+// Metric consolidates scoring formats dynamically via a custom JSON unmarshaler.
 type Metric struct {
-	CVSSV31 *CVSSV3      `json:"cvssV3_1"`
-	CVSSV30 *CVSSV3      `json:"cvssV3_0"`
-	CVSSV40 *CVSSV4      `json:"cvssV4_0"`
-	Other   *OtherMetric `json:"other"`
-	Format  string       `json:"format"`
+	Other           *OtherMetric
+	BestCVSS        *UniversalCVSS
+	Format          string
+	BestCVSSVersion float64
+}
+
+// UnmarshalJSON implements custom JSON parsing to dynamically select the highest CVSS metric.
+func (m *Metric) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if other, ok := raw["other"]; ok {
+		var om OtherMetric
+		if err := json.Unmarshal(other, &om); err == nil {
+			m.Other = &om
+		}
+	}
+	if format, ok := raw["format"]; ok {
+		if err := json.Unmarshal(format, &m.Format); err != nil {
+			m.Format = ""
+		}
+	}
+	for k, v := range raw {
+		m.processRawKey(k, v)
+	}
+	return nil
+}
+
+func (m *Metric) processRawKey(k string, v json.RawMessage) {
+	if !strings.HasPrefix(k, "cvssV") {
+		return
+	}
+	var cvss UniversalCVSS
+	if err := json.Unmarshal(v, &cvss); err != nil {
+		return
+	}
+	verStr := cvss.Version
+	if verStr == "" {
+		verStr = strings.ReplaceAll(strings.TrimPrefix(k, "cvssV"), "_", ".")
+	}
+	if ver, err := strconv.ParseFloat(verStr, 64); err == nil && ver > m.BestCVSSVersion {
+		m.BestCVSSVersion = ver
+		m.BestCVSS = &cvss
+	}
 }
 
 // OtherMetric extracts alternative metric structures like SSVC or KEV.
@@ -98,22 +151,6 @@ type OtherMetric struct {
 			TechnicalImpact string `json:"Technical Impact"`
 		} `json:"options"`
 	} `json:"content"`
-}
-
-// CVSSV3 maps the Common Vulnerability Scoring System version 3 schema,
-// extracting the vector string alongside the base score for impact analysis.
-type CVSSV3 struct {
-	VectorString string  `json:"vectorString"`
-	BaseSeverity string  `json:"baseSeverity"`
-	BaseScore    float64 `json:"baseScore"`
-}
-
-// CVSSV4 maps the Common Vulnerability Scoring System version 4 schema,
-// reflecting structural updates for accurate parsing of newer disclosures.
-type CVSSV4 struct {
-	VectorString string  `json:"vectorString"`
-	BaseSeverity string  `json:"baseSeverity"`
-	BaseScore    float64 `json:"baseScore"`
 }
 
 // VulnLookupMeta holds enrichment data from the vulnerability-lookup
@@ -145,33 +182,58 @@ type NVDCVEData struct {
 	Weaknesses []NVDWeakness `json:"weaknesses"`
 }
 
-// NVDMetrics aggregates all CVSS version entries published by NVD.
+// NVDMetrics aggregates all CVSS version entries dynamically.
 type NVDMetrics struct {
-	CVSSV40 []NVDCVSSEntry   `json:"cvssMetricV40"`
-	CVSSV31 []NVDCVSSEntry   `json:"cvssMetricV31"`
-	CVSSV30 []NVDCVSSEntry   `json:"cvssMetricV30"`
-	CVSSV2  []NVDCVSSEntryV2 `json:"cvssMetricV2"`
+	BestCVSS        *UniversalCVSS
+	BestCVSSVersion float64
 }
 
-// NVDCVSSEntry represents a single NVD CVSS v3.x or v4.0 metric entry
-// where baseSeverity resides inside the cvssData object.
-type NVDCVSSEntry struct {
-	CVSSData NVDCVSSData `json:"cvssData"`
+// UnmarshalJSON implements custom JSON parsing to dynamically select the highest CVSS metric from NVD array formats.
+func (n *NVDMetrics) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	for k, v := range raw {
+		n.processRawKey(k, v)
+	}
+	return nil
 }
 
-// NVDCVSSEntryV2 represents a single NVD CVSS v2 metric entry where
-// baseSeverity is at the outer level rather than inside cvssData.
-type NVDCVSSEntryV2 struct {
-	BaseSeverity string      `json:"baseSeverity"`
-	CVSSData     NVDCVSSData `json:"cvssData"`
-}
-
-// NVDCVSSData holds the version-agnostic CVSS score fields from NVD.
-type NVDCVSSData struct {
-	Version      string  `json:"version"`
-	VectorString string  `json:"vectorString"`
-	BaseSeverity string  `json:"baseSeverity"`
-	BaseScore    float64 `json:"baseScore"`
+func (n *NVDMetrics) processRawKey(k string, v json.RawMessage) {
+	if !strings.HasPrefix(k, "cvssMetricV") {
+		return
+	}
+	var entries []map[string]json.RawMessage
+	if err := json.Unmarshal(v, &entries); err != nil || len(entries) == 0 {
+		return
+	}
+	first := entries[0]
+	var cvss UniversalCVSS
+	if cvssData, ok := first["cvssData"]; ok {
+		if err := json.Unmarshal(cvssData, &cvss); err != nil {
+			cvss = UniversalCVSS{}
+		}
+	}
+	if bsRaw, ok := first["baseSeverity"]; ok && cvss.BaseSeverity == "" {
+		var bs string
+		if json.Unmarshal(bsRaw, &bs) == nil {
+			cvss.BaseSeverity = bs
+		}
+	}
+	verStr := cvss.Version
+	if verStr == "" {
+		verStr = strings.TrimPrefix(k, "cvssMetricV")
+		if len(verStr) == 2 {
+			verStr = verStr[0:1] + "." + verStr[1:2]
+		} else if len(verStr) == 1 {
+			verStr += ".0"
+		}
+	}
+	if ver, err := strconv.ParseFloat(verStr, 64); err == nil && ver > n.BestCVSSVersion {
+		n.BestCVSSVersion = ver
+		n.BestCVSS = &cvss
+	}
 }
 
 // NVDWeakness holds a CWE classification entry from the NVD dataset.

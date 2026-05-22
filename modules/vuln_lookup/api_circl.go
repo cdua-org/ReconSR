@@ -116,16 +116,36 @@ func extractCPEs(exec *schema.ModuleExecution, applicability []CpeApplicability,
 }
 
 func extractProblemTypes(exec *schema.ModuleExecution, problemTypes []ProblemType, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
+	seenCWEs := make(map[string]bool)
 	for _, pt := range problemTypes {
 		for _, desc := range pt.Descriptions {
-			if desc.CWEId != "" {
+			cweID := strings.ToUpper(desc.CWEId)
+			if cweID == "" || seenCWEs[cweID] {
+				continue
+			}
+			seenCWEs[cweID] = true
+
+			cweLocalID := gen.NextID()
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     constants.TypeCWE,
+				Category: constants.CategoryProperty,
+				Value:    cweID,
+				Source:   source,
+				LocalID:  cweLocalID,
+			})
+
+			ctxDesc := getCWEDescription(cweID)
+			if ctxDesc != "" {
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     constants.TypeCWE,
+					Type:     constants.TypeDescription,
 					Category: constants.CategoryProperty,
-					Value:    desc.CWEId,
-					Context:  desc.Description,
-					Source:   source,
-					LocalID:  gen.NextID(),
+					Value:    ctxDesc,
+					Source: &schema.EntityRef{
+						Type:    constants.TypeCWE,
+						Value:   cweID,
+						LocalID: cweLocalID,
+					},
+					LocalID: gen.NextID(),
 				})
 			}
 		}
@@ -133,23 +153,24 @@ func extractProblemTypes(exec *schema.ModuleExecution, problemTypes []ProblemTyp
 }
 
 func extractMetrics(exec *schema.ModuleExecution, metrics []Metric, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
+	var overallBestVersion float64
+	var overallBestCVSS *UniversalCVSS
+
 	for _, m := range metrics {
 		if m.Other != nil {
 			extractOtherMetric(exec, m.Other, source, gen)
 			continue
 		}
 
-		if m.CVSSV40 != nil {
-			appendCVSS(exec, "CVSS 4.0", m.CVSSV40.BaseSeverity, m.CVSSV40.VectorString, m.CVSSV40.BaseScore, source, gen)
-			continue
+		if m.BestCVSS != nil && m.BestCVSSVersion > overallBestVersion {
+			overallBestVersion = m.BestCVSSVersion
+			overallBestCVSS = m.BestCVSS
 		}
-		if m.CVSSV31 != nil {
-			appendCVSS(exec, "CVSS 3.1", m.CVSSV31.BaseSeverity, m.CVSSV31.VectorString, m.CVSSV31.BaseScore, source, gen)
-			continue
-		}
-		if m.CVSSV30 != nil {
-			appendCVSS(exec, "CVSS 3.0", m.CVSSV30.BaseSeverity, m.CVSSV30.VectorString, m.CVSSV30.BaseScore, source, gen)
-		}
+	}
+
+	if overallBestCVSS != nil {
+		ctx := fmt.Sprintf("CVSS %.1f", overallBestVersion)
+		appendCVSS(exec, ctx, overallBestCVSS.BaseSeverity, overallBestCVSS.VectorString, overallBestCVSS.BaseScore, source, gen)
 	}
 }
 
@@ -259,49 +280,43 @@ func formatAsPercentage(val string) string {
 }
 
 func extractNVDMetrics(exec *schema.ModuleExecution, metrics *NVDMetrics, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
-	if extractNVDCVSSEntries(exec, metrics.CVSSV40, "CVSS 4.0", source, gen) {
-		return
+	if metrics != nil && metrics.BestCVSS != nil {
+		ctx := fmt.Sprintf("CVSS %.1f", metrics.BestCVSSVersion)
+		appendCVSS(exec, ctx, metrics.BestCVSS.BaseSeverity, metrics.BestCVSS.VectorString, metrics.BestCVSS.BaseScore, source, gen)
 	}
-	if extractNVDCVSSEntries(exec, metrics.CVSSV31, "CVSS 3.1", source, gen) {
-		return
-	}
-	if extractNVDCVSSEntries(exec, metrics.CVSSV30, "CVSS 3.0", source, gen) {
-		return
-	}
-	extractNVDCVSSV2(exec, metrics.CVSSV2, source, gen)
-}
-
-func extractNVDCVSSEntries(exec *schema.ModuleExecution, entries []NVDCVSSEntry, ctx string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) bool {
-	if len(entries) == 0 {
-		return false
-	}
-	d := entries[0].CVSSData
-	appendCVSS(exec, ctx, d.BaseSeverity, d.VectorString, d.BaseScore, source, gen)
-	return true
-}
-
-func extractNVDCVSSV2(exec *schema.ModuleExecution, entries []NVDCVSSEntryV2, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
-	if len(entries) == 0 {
-		return
-	}
-	e := entries[0]
-	severity := e.BaseSeverity
-	if severity == "" {
-		severity = e.CVSSData.BaseSeverity
-	}
-	appendCVSS(exec, "CVSS 2.0", severity, e.CVSSData.VectorString, e.CVSSData.BaseScore, source, gen)
 }
 
 func extractNVDWeaknesses(exec *schema.ModuleExecution, weaknesses []NVDWeakness, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
+	seenCWEs := make(map[string]bool)
 	for _, w := range weaknesses {
 		for _, desc := range w.Description {
-			if isValidCWE(desc.Value) {
+			cweID := strings.ToUpper(desc.Value)
+			if !isValidCWE(cweID) || seenCWEs[cweID] {
+				continue
+			}
+			seenCWEs[cweID] = true
+
+			cweLocalID := gen.NextID()
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     constants.TypeCWE,
+				Category: constants.CategoryProperty,
+				Value:    cweID,
+				Source:   source,
+				LocalID:  cweLocalID,
+			})
+
+			ctxDesc := getCWEDescription(cweID)
+			if ctxDesc != "" {
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     constants.TypeCWE,
+					Type:     constants.TypeDescription,
 					Category: constants.CategoryProperty,
-					Value:    desc.Value,
-					Source:   source,
-					LocalID:  gen.NextID(),
+					Value:    ctxDesc,
+					Source: &schema.EntityRef{
+						Type:    constants.TypeCWE,
+						Value:   cweID,
+						LocalID: cweLocalID,
+					},
+					LocalID: gen.NextID(),
 				})
 			}
 		}
@@ -368,7 +383,7 @@ func fetchCircl(ctx context.Context, apiURL string) ([]byte, error) {
 		}
 		if action == httputil.RateLimit {
 			dlog.Printf("%s rate_limited url=%q attempt=%d", constants.FuncGetCirclVuln, apiURL, attempt)
-			if !httputil.SleepContext(ctx, httputil.RetryDelay(action, attempt, resolver.RetryBaseDelay)) {
+			if !httputil.SleepContext(ctx, httputil.RetryDelay(action, attempt, resolver.CirclRetryBaseDelay)) {
 				return body, fmt.Errorf("context canceled: %w", ctx.Err())
 			}
 			lastErr = errors.New("http 429")
@@ -376,7 +391,7 @@ func fetchCircl(ctx context.Context, apiURL string) ([]byte, error) {
 		}
 		if action == httputil.Retry {
 			dlog.Printf("%s retry_status=%d url=%q attempt=%d", constants.FuncGetCirclVuln, resp.StatusCode, apiURL, attempt)
-			if !httputil.SleepContext(ctx, httputil.RetryDelay(action, attempt, resolver.RetryBaseDelay)) {
+			if !httputil.SleepContext(ctx, httputil.RetryDelay(action, attempt, resolver.CirclRetryBaseDelay)) {
 				return body, fmt.Errorf("context canceled: %w", ctx.Err())
 			}
 			lastErr = fmt.Errorf("http %d", resp.StatusCode)
@@ -384,6 +399,9 @@ func fetchCircl(ctx context.Context, apiURL string) ([]byte, error) {
 		}
 	}
 
+	if lastErr != nil {
+		dlog.Printf("%s error stage=retries_exhausted url=%q attempts=%d err=%v", constants.FuncGetCirclVuln, apiURL, resolver.MaxRetriesCircl, lastErr)
+	}
 	return body, lastErr
 }
 

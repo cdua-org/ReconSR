@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -127,6 +129,13 @@ func overrideBaseURL(t *testing.T, serverURL string) {
 	t.Cleanup(func() { circlAPIBaseURL = originalBaseURL })
 }
 
+func overrideRetryDelay(t *testing.T) {
+	t.Helper()
+	original := resolver.CirclRetryBaseDelay
+	resolver.CirclRetryBaseDelay = time.Millisecond
+	t.Cleanup(func() { resolver.CirclRetryBaseDelay = original })
+}
+
 func TestGetCirclVuln_CVE_WithCNAMetrics(t *testing.T) {
 	server := setupMockServer(t)
 	defer server.Close()
@@ -222,77 +231,74 @@ func TestGetCirclVuln_CVE2026_MultipleMetricVersions(t *testing.T) {
 		}
 	}
 
-	if !cvssContexts["CVSS 3.0"] {
-		t.Error("expected CVSS 3.0 result")
+	if cvssContexts["CVSS 3.0"] {
+		t.Error("expected CVSS 3.0 result to be excluded in favor of higher version")
 	}
 	if !cvssContexts["CVSS 4.0"] {
-		t.Error("expected CVSS 4.0 result")
+		t.Error("expected CVSS 4.0 result to be the only CVSS emitted")
 	}
 }
 
 func verifyCVEResults(t *testing.T, cve string, results []schema.ModuleResult, expectCWE, expectSSVC, expectKEV bool) {
 	t.Helper()
-	foundCVSS, foundSummary, foundCWE, foundSSVC, foundKEV := false, false, false, false, false
+	found := make(map[string]bool)
 
 	for _, res := range results {
-		switch res.Type {
-		case constants.TypeCVSS:
-			foundCVSS = true
-		case constants.TypeSummary:
-			foundSummary = true
-		case constants.TypeCWE:
-			foundCWE = true
-		case constants.TypeSSVC:
-			foundSSVC = true
-		case constants.TypeKEV:
-			foundKEV = true
+		found[res.Type] = true
+		if res.Type == constants.TypeDescription {
+			if res.Source == nil || res.Source.LocalID == 0 {
+				t.Error("Description result must have a valid Source.LocalID linking to parent")
+			}
 		}
 	}
 
-	if !foundCVSS {
+	if !found[constants.TypeCVSS] {
 		t.Error("expected CVSS result")
 	}
-	if !foundSummary {
+	if !found[constants.TypeSummary] {
 		t.Error("expected Summary result")
 	}
-	if expectCWE && !foundCWE {
+	if expectCWE && !found[constants.TypeCWE] {
 		t.Errorf("expected CWE result for %s", cve)
 	}
-	if expectSSVC && !foundSSVC {
+	if expectCWE && !found[constants.TypeDescription] {
+		t.Errorf("expected Description result for CWE in %s", cve)
+	}
+	if expectSSVC && !found[constants.TypeSSVC] {
 		t.Errorf("expected SSVC result for %s", cve)
 	}
-	if expectKEV && !foundKEV {
+	if expectKEV && !found[constants.TypeKEV] {
 		t.Errorf("expected KEV result for %s", cve)
 	}
 }
 
 func verifyFallbackResults(t *testing.T, cve string, results []schema.ModuleResult, expectCVSS, expectEPSS, expectCWE bool) {
 	t.Helper()
-	foundCVSS, foundEPSS, foundSummary, foundCWE := false, false, false, false
+	found := make(map[string]bool)
+
 	for _, res := range results {
-		switch res.Type {
-		case constants.TypeCVSS:
-			foundCVSS = true
-		case constants.TypeEPSS:
-			foundEPSS = true
-		case constants.TypeSummary:
-			foundSummary = true
-		case constants.TypeCWE:
-			foundCWE = true
+		found[res.Type] = true
+		if res.Type == constants.TypeDescription {
+			if res.Source == nil || res.Source.LocalID == 0 {
+				t.Error("Description result must have a valid Source.LocalID linking to parent")
+			}
 		}
 	}
 
-	if !foundSummary {
+	if !found[constants.TypeSummary] {
 		t.Error("expected Summary result")
 	}
-	if expectCVSS && !foundCVSS {
+	if expectCVSS && !found[constants.TypeCVSS] {
 		t.Errorf("expected CVSS result for %s", cve)
 	}
-	if expectEPSS && !foundEPSS {
+	if expectEPSS && !found[constants.TypeEPSS] {
 		t.Errorf("expected EPSS result for %s", cve)
 	}
-	if expectCWE && !foundCWE {
+	if expectCWE && !found[constants.TypeCWE] {
 		t.Errorf("expected CWE result for %s", cve)
+	}
+	if expectCWE && !found[constants.TypeDescription] {
+		t.Errorf("expected Description result for CWE in %s", cve)
 	}
 }
 
@@ -320,6 +326,7 @@ func TestGetCirclVuln_ServerError(t *testing.T) {
 	server := setupMockServer(t)
 	defer server.Close()
 	overrideBaseURL(t, server.URL)
+	overrideRetryDelay(t)
 
 	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-ERROR", modutil.NewLocalIDGenerator())
 

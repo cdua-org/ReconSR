@@ -26,7 +26,7 @@ func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
 		ModuleConfig: &schema.FunctionCapabilities{
 			Limit:      1,
-			DelayMs:    2000,
+			DelayMs:    3000,
 			InputTypes: []string{constants.TypeCVE},
 		},
 		Functions: []string{constants.FuncGetCirclVuln},

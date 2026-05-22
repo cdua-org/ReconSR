@@ -156,6 +156,9 @@ CirclWithSightings=false
 # Maximum retry attempts for CIRCL API requests (default: 3)
 MaxRetriesCircl=3
 
+# Base pause between CIRCL API retry attempts, in seconds (default: 5)
+CirclRetryBaseDelay=5
+
 
 ### Hunter.io Options ###
 
