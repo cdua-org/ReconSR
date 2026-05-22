@@ -1886,12 +1886,26 @@
                     function getRawDataHTML(funcName, executions) {
                         if (executions && executions[funcName]) {
                             const rawId = 'raw-' + Math.random().toString(36).substr(2, 9);
+                            let btnHtml = '<div style="display: flex; align-items: center; gap: 6px;">';
+                            btnHtml += '<span style="color: #94a3b8; font-size: 0.7rem; text-transform: uppercase;">Raw Data:</span>';
+                            btnHtml += '<button class="raw-data-btn" title="View Raw Data" style="padding: 2px 4px; display: flex; align-items: center; justify-content: center; margin: 0;" onclick="toggleRawData(\'' + rawId + '\')">';
+                            btnHtml += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+                            btnHtml += '</button>';
+                            btnHtml += '<button class="raw-data-btn" title="Copy Raw Data" style="padding: 2px 4px; display: flex; align-items: center; justify-content: center; margin: 0;" onclick="navigator.clipboard.writeText(document.getElementById(\'' + rawId + '\').innerText)">';
+                            btnHtml += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+                            btnHtml += '</button>';
+                            btnHtml += '</div>';
                             return {
-                                btn: '<button class="raw-data-btn" onclick="toggleRawData(\'' + rawId + '\')">Raw Data</button>',
+                                btn: btnHtml,
                                 content: '<div id="' + rawId + '" class="raw-data-content">' + escapeHTML(executions[funcName]) + '</div>'
                             };
                         }
                         return { btn: '', content: '' };
+                    }
+
+                    function getCopyBtnHTML(textToCopy) {
+                        const encoded = encodeURIComponent(textToCopy);
+                        return '<button title="Copy Value" style="background: transparent; border: none; color: #64748b; cursor: pointer; padding: 0; margin-left: 8px; display: inline-flex; align-items: center;" onmouseover="this.style.color=\'#38bdf8\'" onmouseout="this.style.color=\'#64748b\'" onclick="navigator.clipboard.writeText(decodeURIComponent(\'' + encoded + '\')); event.stopPropagation();"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>';
                     }
 
                     function renderProperties(props, executions, depth = 0) {
@@ -1904,21 +1918,29 @@
                         });
 
                         for (let fn in propGroups) {
+                            const listId = 'list-prop-' + Math.random().toString(36).substr(2, 9);
                             htmlStr += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
-                            htmlStr += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px;">';
+
+                            htmlStr += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
                             htmlStr += '<span class="prop-title" style="color: #a78bfa; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
+                            htmlStr += '<div style="display: flex; align-items: center; gap: 12px;">';
                             let rawHtml = getRawDataHTML(fn, executions);
-                            htmlStr += rawHtml.btn;
+                            if (rawHtml.btn) {
+                                htmlStr += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
+                            }
+                            htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
+                            htmlStr += '</div>';
                             htmlStr += '</div>';
                             if (rawHtml.content) {
                                 htmlStr += rawHtml.content;
                             }
 
+                            htmlStr += '<div id="' + listId + '">';
                             propGroups[fn].forEach((prop) => {
                                 htmlStr += '<div style="margin-bottom: 8px; padding: 8px; background: #1e293b; border-left: 3px solid #a78bfa; border-radius: 0 4px 4px 0;">';
                                 htmlStr += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
                                 htmlStr += '<span style="color: #38bdf8; font-weight: bold;">' + escapeHTML(prop.type) + '</span></div>';
-                                htmlStr += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all;">' + escapeHTML(prop.value) + '</div>';
+                                htmlStr += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(prop.value) + '</span>' + getCopyBtnHTML(prop.value) + '</div>';
 
                                 let metaHtml = '';
                                 if (prop.contexts && prop.contexts.length > 0) {
@@ -1938,6 +1960,7 @@
                                 }
                                 htmlStr += "</div>";
                             });
+                            htmlStr += "</div>";
                             htmlStr += "</div>";
                         }
                         return htmlStr;
@@ -2013,9 +2036,9 @@
                             const node = nodes.get(nodeId);
                             if (node) {
                                 content += '<div class="prop-container" style="position: relative;">';
-                                content += '<button class="raw-data-btn focus-btn" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(nodeId) + '">Focus</button>';
+                                content += '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(nodeId) + '">Focus</button>';
                                 content += '<div class="prop-header" style="margin-right: 50px;"><span class="prop-title" style="font-size: 1rem;">' + escapeHTML(node.group) + '</span></div>';
-                                content += '<div class="prop-value" style="font-size: 1.1rem; color: #fff;">' + escapeHTML(node.label) + '</div>';
+                                content += '<div class="prop-value" style="font-size: 1.1rem; color: #fff; display: flex; align-items: flex-start;"><span>' + escapeHTML(node.label) + '</span>' + getCopyBtnHTML(node.label) + '</div>';
                                 if (node.outOfScope) {
                                     content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
                                     content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
@@ -2053,16 +2076,24 @@
 
                                     content += '<div id="' + sectionId + '" style="display: none;">';
                                     for (let fn in outgoingGroups) {
+                                        const listId = 'list-out-' + Math.random().toString(36).substr(2, 9);
                                         content += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
-                                        content += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px;">';
+
+                                        content += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
                                         content += '<span class="prop-title" style="color: #10b981; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
+                                        content += '<div style="display: flex; align-items: center; gap: 12px;">';
                                         let rawHtml = getRawDataHTML(fn, node.executions);
-                                        content += rawHtml.btn;
+                                        if (rawHtml.btn) {
+                                            content += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
+                                        }
+                                        content += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
+                                        content += '</div>';
                                         content += '</div>';
                                         if (rawHtml.content) {
                                             content += rawHtml.content;
                                         }
 
+                                        content += '<div id="' + listId + '">';
                                         outgoingGroups[fn].forEach(e => {
                                             const targetNode = nodes.get(e.to);
                                             const targetLabel = targetNode ? targetNode.label : e.to;
@@ -2072,8 +2103,8 @@
                                             content += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #10b981; border-radius: 0 4px 4px 0;">';
                                             content += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
                                             content += '<span>' + escapeHTML(targetGroup) + '</span>';
-                                            content += '<button class="raw-data-btn focus-btn" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.to) + '">Focus</button></div>';
-                                            content += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all;">' + escapeHTML(targetLabel) + '</div>';
+                                            content += '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.to) + '">Focus</button></div>';
+                                            content += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(targetLabel) + '</span>' + getCopyBtnHTML(targetLabel) + '</div>';
 
                                             let metaHtml = '';
                                             if (isOOS) {
@@ -2090,6 +2121,7 @@
                                             }
                                             content += '</div>';
                                         });
+                                        content += '</div>';
                                         content += '</div>';
                                     }
                                     content += '</div></div>';
@@ -2111,21 +2143,26 @@
 
                                     content += '<div id="' + sectionId + '" style="display: none;">';
                                     for (let fn in incomingGroups) {
+                                        const listId = 'list-in-' + Math.random().toString(36).substr(2, 9);
                                         content += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
-                                        content += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px;">';
+
+                                        content += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
                                         content += '<span class="prop-title" style="color: #8b5cf6; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
+                                        content += '<div style="display: flex; align-items: center; gap: 12px;">';
                                         const sourceNodeId = incomingGroups[fn][0].from;
                                         const sourceNode = nodes.get(sourceNodeId);
-                                        let rawHtml = { btn: '', content: '' };
-                                        if (sourceNode) {
-                                             rawHtml = getRawDataHTML(fn, sourceNode.executions);
-                                             content += rawHtml.btn;
+                                        let rawHtml = getRawDataHTML(fn, sourceNode ? sourceNode.executions : null);
+                                        if (rawHtml.btn) {
+                                            content += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
                                         }
+                                        content += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
+                                        content += '</div>';
                                         content += '</div>';
                                         if (rawHtml.content) {
                                             content += rawHtml.content;
                                         }
 
+                                        content += '<div id="' + listId + '">';
                                         incomingGroups[fn].forEach(e => {
                                             const sourceNode2 = nodes.get(e.from);
                                             const sourceLabel = sourceNode2 ? sourceNode2.label : e.from;
@@ -2135,8 +2172,8 @@
                                             content += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #8b5cf6; border-radius: 0 4px 4px 0;">';
                                             content += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
                                             content += '<span>' + escapeHTML(sourceGroup) + '</span>';
-                                            content += '<button class="raw-data-btn focus-btn" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.from) + '">Focus</button></div>';
-                                            content += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all;">' + escapeHTML(sourceLabel) + '</div>';
+                                            content += '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.from) + '">Focus</button></div>';
+                                            content += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(sourceLabel) + '</span>' + getCopyBtnHTML(sourceLabel) + '</div>';
 
                                             let metaHtml = '';
                                             if (isOOS) {
@@ -2153,6 +2190,7 @@
                                             }
                                             content += '</div>';
                                         });
+                                        content += '</div>';
                                         content += '</div>';
                                     }
                                     content += '</div></div>';
@@ -2172,14 +2210,14 @@
                                     const sourceNode = nodes.get(edge.from);
                                     if (sourceNode) {
                                         const isHiddenSource = !sourceNode.hidden === false;
-                                        const focusBtnHtml = !isHiddenSource ? '<button class="raw-data-btn focus-btn" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(sourceNode.id) + '">Focus</button>' : '';
+                                        const focusBtnHtml = !isHiddenSource ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(sourceNode.id) + '">Focus</button>' : '';
                                         const opacityStyle = isHiddenSource ? 'opacity: 0.7;' : '';
                                         const badgeHtml = isHiddenSource ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
 
                                         content += '<div class="prop-container" style="position: relative; ' + opacityStyle + '">';
                                         content += focusBtnHtml;
                                         content += '<div class="prop-header" style="margin-right: 50px;"><span class="prop-title" style="font-size: 0.85rem;">' + escapeHTML(sourceNode.group) + badgeHtml + '</span></div>';
-                                        content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff;">' + escapeHTML(sourceNode.label) + '</div>';
+                                        content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff; display: flex; align-items: flex-start;"><span>' + escapeHTML(sourceNode.label) + '</span>' + getCopyBtnHTML(sourceNode.label) + '</div>';
                                         if (sourceNode.outOfScope) {
                                             content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
                                             content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
@@ -2210,10 +2248,15 @@
 
                                         const chainSourceNode = nodes.get(chainEdge.from);
                                         if (chainSourceNode && chainSourceNode.executions && chainSourceNode.executions[chainEdge.function]) {
-                                            const rawId = 'raw-chain-' + chainEdge.id;
                                             content += '<div style="margin-top: 8px;">';
-                                            content += '<button class="raw-data-btn" style="margin-left:0;" onclick="toggleRawData(\'' + rawId + '\')">Show Raw Data</button>';
-                                            content += '<div id="' + rawId + '" class="raw-data-content">' + escapeHTML(chainSourceNode.executions[chainEdge.function]) + '</div></div>';
+                                            let rawHtml = getRawDataHTML(chainEdge.function, chainSourceNode.executions);
+                                            if (rawHtml.btn) {
+                                                content += '<div style="margin-bottom: 8px;">' + rawHtml.btn + '</div>';
+                                            }
+                                            if (rawHtml.content) {
+                                                content += rawHtml.content;
+                                            }
+                                            content += '</div>';
                                         }
                                         content += '</div></div>';
 
@@ -2223,13 +2266,13 @@
 
                                             const isHiddenNode = !targetNode.hidden === false;
                                             const badgeHtml = isHiddenNode ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
-                                            const focusBtnHtml = !isHiddenNode ? '<button class="raw-data-btn focus-btn" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(targetNode.id) + '">Focus</button>' : '';
+                                            const focusBtnHtml = !isHiddenNode ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(targetNode.id) + '">Focus</button>' : '';
                                             const opacityStyle = isHiddenNode ? 'opacity: 0.7;' : '';
 
                                             content += '<div class="prop-container" style="position: relative; ' + opacityStyle + '">';
                                             content += focusBtnHtml;
                                             content += '<div class="prop-header" style="margin-right: 50px;"><span class="prop-title" style="font-size: 0.85rem;">' + escapeHTML(targetNode.group) + badgeHtml + '</span></div>';
-                                            content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff;">' + escapeHTML(targetNode.label) + '</div>';
+                                            content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff; display: flex; align-items: flex-start;"><span>' + escapeHTML(targetNode.label) + '</span>' + getCopyBtnHTML(targetNode.label) + '</div>';
                                             if (targetNode.outOfScope) {
                                                 content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
                                                 content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
@@ -2241,12 +2284,12 @@
                                 } else {
                                     const sourceNode = nodes.get(edge.from);
                                     if (sourceNode) {
-                                        const focusBtnHtml = '<button class="raw-data-btn focus-btn" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(sourceNode.id) + '">Focus</button>';
+                                        const focusBtnHtml = '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(sourceNode.id) + '">Focus</button>';
 
                                         content += '<div class="prop-container" style="position: relative;">';
                                         content += focusBtnHtml;
                                         content += '<div class="prop-header" style="margin-right: 50px;"><span class="prop-title" style="font-size: 0.85rem;">' + escapeHTML(sourceNode.group) + '</span></div>';
-                                        content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff;">' + escapeHTML(sourceNode.label) + '</div>';
+                                        content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff; display: flex; align-items: flex-start;"><span>' + escapeHTML(sourceNode.label) + '</span>' + getCopyBtnHTML(sourceNode.label) + '</div>';
                                         if (sourceNode.outOfScope) {
                                             content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
                                             content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
@@ -2275,10 +2318,15 @@
                                     content += '<div style="margin-bottom: 8px;"><div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Discovery Time</div><div style="color: #f1f5f9; font-size: 0.85rem;">First Seen: ' + formatDateTime(edge.firstSeen) + '<br>Last Seen: ' + formatDateTime(edge.lastSeen) + '</div></div>';
 
                                     if (sourceNode && sourceNode.executions && sourceNode.executions[edge.function]) {
-                                        const rawId = 'raw-edge-' + edge.id;
                                         content += '<div style="margin-top: 8px;">';
-                                        content += '<button class="raw-data-btn" style="margin-left:0;" onclick="toggleRawData(\'' + rawId + '\')">Show Raw Data</button>';
-                                        content += '<div id="' + rawId + '" class="raw-data-content">' + escapeHTML(sourceNode.executions[edge.function]) + '</div></div>';
+                                        let rawHtml = getRawDataHTML(edge.function, sourceNode.executions);
+                                        if (rawHtml.btn) {
+                                            content += '<div style="margin-bottom: 8px;">' + rawHtml.btn + '</div>';
+                                        }
+                                        if (rawHtml.content) {
+                                            content += rawHtml.content;
+                                        }
+                                        content += '</div>';
                                     }
                                     content += '</div></div>';
 
@@ -2286,12 +2334,12 @@
                                     if (targetNode) {
                                         content += '<div style="text-align: center; color: #64748b; margin: 4px 0; font-size: 1.2rem;">↓</div>';
 
-                                        const focusBtnHtml = '<button class="raw-data-btn focus-btn" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(targetNode.id) + '">Focus</button>';
+                                        const focusBtnHtml = '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(targetNode.id) + '">Focus</button>';
 
                                         content += '<div class="prop-container" style="position: relative;">';
                                         content += focusBtnHtml;
                                         content += '<div class="prop-header" style="margin-right: 50px;"><span class="prop-title" style="font-size: 0.85rem;">' + escapeHTML(targetNode.group) + '</span></div>';
-                                        content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff;">' + escapeHTML(targetNode.label) + '</div>';
+                                        content += '<div class="prop-value" style="font-size: 0.95rem; color: #fff; display: flex; align-items: flex-start;"><span>' + escapeHTML(targetNode.label) + '</span>' + getCopyBtnHTML(targetNode.label) + '</div>';
                                         if (targetNode.outOfScope) {
                                             content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
                                             content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
