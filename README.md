@@ -1,0 +1,209 @@
+# ReconSR
+
+```text
+  ░█▀█░█▀▀░█▀▀░█▀█░█▄░█░█▀▀░█▀█
+  ░█▀▄░█▀▀░█░░░█░█░█░▀█░▀▀█░█▀▄
+  ░▀░▀░▀▀▀░▀▀▀░▀▀▀░▀░░▀░▀▀▀░▀░▀
+```
+
+ReconSR is an automated OSINT tool designed to provide cybersecurity researchers with a modular framework for mapping and analyzing complex digital footprints and attack surfaces.
+
+> [!CAUTION]
+> **Legal Disclaimer:** This tool is designed for authorized security auditing, infrastructure monitoring, and legitimate security research. The authors are not responsible for any misuse, damage, or legal consequences resulting from the use of this software. Users are solely responsible for ensuring that their activities comply with local and international laws. Scanning targets without prior explicit authorization is illegal and unethical.
+
+> [!WARNING]
+> **Third-Party Services & APIs:** > ReconSR interacts with various external APIs, public registries, and third-party databases (e.g., HackerTarget, crt.sh, RIPEstat, Shodan InternetDB). Each of these providers operates under its own Terms of Service (ToS), Acceptable Use Policies (AUP), and data licensing agreements. 
+> 
+> By using ReconSR, you acknowledge that:
+> 1. You are solely responsible for reviewing and strictly complying with the Terms of Service of any third-party data provider queried by this framework.
+> 2. The authors of ReconSR hold no liability for any rate-limiting, IP banning, API termination, or legal actions resulting from your abusive, excessive, or non-compliant use of these external services.
+
+> [!IMPORTANT]
+> **Methodology:** Current modules focus on **Passive Intelligence Collection** (leveraging DoH, public registries, and third-party datasets) to provide a structured foundation for manual investigation. Automated **Data Analysis**, **Result Verification**, and **Active Reconnaissance** (direct probing, port scanning, and service-level interaction) are slated for subsequent development phases.
+
+> [!WARNING]
+> **Status:** Active Development.
+> This project is currently in the initial design and development phase. APIs and core structures are subject to significant changes as we refine the reconnaissance logic.
+
+## System Architecture
+
+ReconSR moves beyond traditional flat-list enumeration by implementing a reactive, event-driven pipeline that recursively transforms discoveries into new investigative targets.
+
+### 1. Reactive Execution Pipeline (`internal/pipeline`)
+The core of ReconSR is a non-blocking reactive loop. The data flows in a cycle: **Dispatcher → Modules → Processor → Repository → Dispatcher**, continuing until no new entities remain.
+
+- **Controller** (`internal/controller`): Serves as the integration boundary (Facade) between external presentation layers (currently the CLI) and the core engine. By strictly isolating user interaction from the core, it enables the future addition of diverse interfaces—such as Web GUIs, REST APIs, or automated bots—without altering the underlying system architecture. Operationally, it orchestrates the initial input flow by delegating target verification to the Validator and Scope Manager before initializing the reconnaissance cycle with validated seed entities.
+- **Dispatcher** (`internal/dispatcher`): Routes entities to modules based on a type-indexed registry (`domain` → DNS, WHOIS, etc.). Tracks completed functions per entity to prevent redundant execution. Enforces a configurable global timeout per module call.
+- **Processor** (`internal/processor`): Validates module output against the contract (rejects rogue functions, incomplete data, syntax errors). Normalizes entity types via the Validator and checks scope boundaries via the Scope Manager.
+- **Repository** (`internal/repository`): A centralized data access layer. All database operations are strictly isolated here (Repository pattern) to ensure the core remains database-agnostic, facilitating seamless future migrations from the current per-project SQLite setup to enterprise RDBMS (e.g., PostgreSQL). Handles persistence, entity deduplication, and dispatch batching.
+
+### 2. Supporting Infrastructure
+- **Scope Manager** (`internal/scopemanager`): The operational firewall. Applies strict reconnaissance boundaries configured by the user in `configs/scope.txt` via allow/block rules (supporting domain suffix matching, IP CIDR ranges, and exact entity matches). Operating within these technical parameters facilitates adherence to authorized Rules of Engagement (legal compliance) and helps mitigate "scope explosion" (infinite recursive crawling into third-party infrastructure).
+- **Validator** (`internal/validator`): Centralized entity type normalization and syntax validation. Automatically classifies domains vs. subdomains, IPv4 vs. IPv6, and standard vs. extra emails (those containing non-standard characters like quotes or brackets).
+- **Report Renderer** (`internal/report`): Recursive ASCII tree visualization of the project relationship graph with scope-awareness (Out-of-Scope markers, cycle detection).
+- **Interactive Visualizer** (`internal/html`): Generates a dynamic, draggable HTML representation of the entity relationship graph. Features interactive layouts and togglable node labels to facilitate visual analysis of complex attack surfaces.
+
+### 3. External Intelligence & API Strategy
+ReconSR prioritizes accessibility and zero-configuration setups:
+- **Keyless Integration**: Currently implemented external modules (e.g., `HackerTarget`, `crt.sh`, `CertSpotter`) **do not require registration or API keys**.
+- **Rate Limiting**: While convenient, keyless access is subject to daily request limits imposed by service providers. Users experiencing rate limiting should consider rotating exit nodes (e.g., via VPN).
+- **Future Support**: Support for personalized API keys is planned to enable higher throughput and access to premium data tiers.
+- **Module Interface**: The system follows a strict **"Black Box" contract**. Developers can extend ReconSR capabilities without needing to understand the internal core logic, routing, or database structures.
+
+> [!TIP]
+> **For Developers:** Detailed specifications for building new reconnaissance plugins can be found in the [MODULE_GUIDE.md](./MODULE_GUIDE.md).
+
+---
+
+## Intelligence Modules (`modules/`)
+
+### 1. Subdomain Hierarchy (`modules/subdomain_hierarchy`) - 1 function
+- `decompose`: Hierarchical decomposition of deep subdomains. Extracts the organizational domain (eTLD+1 via the Public Suffix List) and all intermediate parent subdomains, using the `Applied` flag to prevent redundant re-processing.
+
+### 2. Advanced DNS Discovery (`modules/dns`)
+A highly specialized intelligence module for comprehensive DNS reconnaissance. Every record type is treated as a critical intelligence vector (27 functions total):
+
+#### **Infrastructure & Continuity**
+- `preflight_dns`: Lightweight zone health validation that tags resolvable targets with `dns_ok` and flags broken zones before higher-cost enumeration begins.
+- `get_ip`: IPv4/IPv6 resolution (A/AAAA).
+- `get_ns`: Identification of authoritative name servers with validation and scope analysis.
+- `get_mx`: Mail exchange discovery with priority sorting plus extraction of validated `mx_host` infrastructure nodes.
+- `get_soa`: Extracts the raw SOA record, the Serial value, the validated Primary NS (MNAME), and the validated Responsible Email (RNAME).
+- `get_cname`: Mapping of canonical aliases for the target and `www.` prefix, differentiating in-scope aliases from external `cname_target` infrastructure.
+- `check_wildcard`: Proactive detection via random subdomain probing.
+
+#### **Identity & Trust Policy**
+- `get_caa`: Extracts authorized CAs as typed infrastructure nodes and surfaces validated `iodef` violation-reporting mailboxes.
+- `get_dmarc`: Retrieves the DMARC policy and extracts failure (`ruf`) and aggregate (`rua`) emails; detects external reporting (OOS).
+- `get_dkim`: Retrieves full DKIM records via brute-force of 33 common and 2 dynamic selectors.
+- `get_domainkey`: Extraction of legacy cryptographic records.
+- `get_txt`: Retrieval of full SPF records alongside general TXT data aggregation.
+
+#### **Cryptographic Keys & Protocols**
+- `get_dnskey`: Extraction and categorization of KSK and ZSK signing keys.
+- `get_ds`: Mapping of Delegation Signer digests (SHA-1/256/384).
+- `get_cert`: Extraction of raw certificate payloads (PKIX, PGP, SPKI).
+- `get_sshfp`: Verification of SSH public key fingerprints for diverse algorithms.
+- `get_hip`: Decodes Host Identity Protocol parameters, including HIT/public keys and validated HIP rendezvous servers.
+- `get_ipseckey`: Unmasks VPN gateway topology (IPs/domains) and associated public keys with validated gateway classification.
+
+#### **Service & Metadata Discovery**
+- `get_srv`: Brute-forcing of 33 service prefixes (SIP, XMPP, LDAP, Kerberos, CalDAV, Matrix, etc.).
+- `get_tlsa`: DANE certificate fingerprinting with brute-force of 7 port-protocol prefixes (`_443._tcp`, `_25._tcp`, `_465._tcp`, `_587._tcp`, `_993._tcp`, `_853._tcp`, `_443._udp`).
+- `get_svcb`: Parallel decoding of both SVCB (type 64) and HTTPS (type 65) parameters including ALPN, ECH, IP hints, and port.
+- `get_naptr`: Extraction of service identifiers and validated replacement targets, including `_service._proto.domain` delegation patterns.
+- `get_uri`: Native URI resolution for mapped applications (priority/weight mapping).
+- `get_loc`: Precise decoding of physical coordinates (Lat/Lon/Alt/Size/Precision).
+- `get_hinfo`: Disclosure of CPU/OS metadata with automated noise filtering.
+- `get_rp`: Extraction of the Responsible Person mailbox and TXT reference domains as linked nodes.
+- `get_nsec`: Proactive zone-walking via NXDOMAIN triggers to uncover hidden subdomains and record coverage hints.
+
+### 3. Mail Identity Crypto (`modules/mailcrypto`) - 3 functions
+Specialized discovery of cryptographic communication keys linked to organizational identities:
+- **Hashing Architecture**: Implementation of RFC 7929/8162 (SHA256/Base32) for deterministic lookup hashing.
+- **Dual-Input Logic**:
+    - **Email Address**: Targeted, direct cryptographic key lookup for the specified local part.
+    - **Domain/Subdomain**: Systematic brute-force of 15 administrative aliases (`admin`, `support`, `noc`, `security`, `abuse`, etc.).
+- `preflight_dns`: Zone health validation for the target email domain before cryptographic lookups are performed.
+- `get_openpgpkey`: Discovery of PGP public keys via OPENPGPKEY DNS records.
+- `get_smimea`: Extraction of S/MIME certificate parameters with DANE mapping.
+
+### 4. WHOIS/RDAP (`modules/whois`) - 1 function
+- `get_whois`: Fallback-oriented architecture using RDAP as primary and TCP 43 as secondary. Features recursive registry discovery starting from `whois.iana.org` and registry-specific query handling (JPRS, Verisign, DENIC, NIC.name), models registrar/registrant hierarchies through anchor nodes, and extracts role-aware contacts, addresses, dates, name servers, domain status, DNSSEC state, and registrar metadata such as registrar URL, WHOIS server, and IANA ID.
+
+### 5. Certificate Transparency (`modules/domainsbycerts`) - 1 function
+- `get_domains`: Passive certificate-identity harvesting through `crt.sh`, direct PostgreSQL access to `crt.sh`, and `CertSpotter`. Discovers subdomains, wildcard subdomains, and certificate-bound email identities, attaches expiration metadata to both hostname and email identities, emits explicit `expired` status where applicable, and summarizes subdomains with expired certificates separately for triage.
+
+### 6. External Footprinting (`modules/hackertarget`) - 1 function
+- `get_hosts`: Queries the `HackerTarget` passive DNS dataset to identify validated domain and subdomain nodes and their directly linked resolved IP nodes. Includes automatic retry logic, API quota detection, and out-of-scope classification.
+
+### 7. IPv4 Deobfuscation (`modules/ipv4ambiguous`) - 1 function
+- `parse_ambiguous`: Resolution of ambiguous IPv4 addresses containing leading zeros. Decodes input (e.g., `012.012.012.012`) into both strict decimal (`12.12.12.12`) and POSIX-compliant octal (`10.10.10.10`) formats to identify obfuscation and misconfigurations.
+
+### 8. IP Intelligence (`modules/ip_metadata`) - 6 functions
+Passive reconnaissance of IPv4/IPv6 addresses via reverse DNS, public blacklists, and RIPEstat data endpoints to uncover network identity and reputation:
+- `get_ptr`: Performs reverse DNS lookups to resolve IPs back to their mapped domains.
+- `get_asn`: Resolves the originating Autonomous System Number (ASN) and BGP prefix via Team Cymru DNS TXT queries.
+- `get_tor`: Detects if the IP is an active Tor exit node using official DNSBL checks (`dnsel.torproject.org`, `dan.me.uk`).
+- `get_rbl`: Checks the IP against major Real-time Blackhole Lists (Spamhaus, Barracuda, Spamcop) to identify spam/botnet reputation.
+- `get_ip_info`: Extracts the network name (`netname`) and description from RIPE WHOIS records.
+- `get_ip_abuse_contacts`: Retrieves dedicated abuse reporting email addresses registered to the specific IP allocation.
+
+### 9. ASN Intelligence (`modules/asn_metadata`) - 4 functions
+Deep analysis of Autonomous System Numbers via RIPEstat API to map network hierarchies, ownership, and announced subnets:
+- `get_asn_peers`: Constructs a strict linear transit chain by identifying the largest upstream provider at each hop, revealing who the ASN buys transit from.
+- `get_asn_prefixes`: Retrieves all IPv4/IPv6 CIDR blocks (BGP prefixes) currently announced by the ASN.
+- `get_asn_info`: Resolves the official legal holder (organization name) of the Autonomous System.
+- `get_asn_abuse_contacts`: Extracts abuse reporting email addresses associated with the ASN infrastructure.
+
+### 10. Shodan InternetDB (`modules/shodan`) - 1 function
+- `get_idb_shodan`: Passive enrichment of IPv4/IPv6 targets through the public Shodan InternetDB endpoint. Extracts PTR hostnames, open ports, service tags, known CVEs, and CPE fingerprints for rapid exposure triage.
+
+### 11. Anubis DB (`modules/anubis`) - 1 function
+- `get_domains`: Passive subdomain enumeration through the `jldc.me` Anubis database. Returns validated subdomains and wildcard subdomains, deduplicates results, and filters ARPA/out-of-scope noise before graph insertion.
+
+---
+
+## Security by Design
+
+While ReconSR currently operates as a local CLI tool, its architecture is built with enterprise-grade security primitives to ensure a safe transition to future multi-tenant SaaS or Web environments:
+
+*   **Zero Trust Module Execution:** The core engine inherently distrusts external modules. The `Processor` strictly enforces the "Black Box" contract, validating not only the syntax of incoming intelligence but also verifying that modules only return data for explicitly requested functions. Rogue or hijacked modules attempting to inject unsolicited data are automatically rejected.
+*   **Strict Input Sanitization:** All entities (whether user-supplied or module-discovered) undergo rigorous syntax validation against expected types (e.g., IPv4, domain) before storage. Data is persisted as strict strings, structurally preventing injection attacks.
+*   **Component Isolation & Least Privilege:** Internal components interact only through strictly defined boundaries. Modules communicate exclusively with the `Dispatcher` and have zero awareness of the database, other modules, or the user interface.
+*   **Opaque Project Identifiers:** The `Repository` abstracts physical storage by generating temporary, ephemeral project identifiers during runtime. No core component other than the `Repository` has access to the true project IDs. This indirect referencing prevents data leakage and mitigates IDOR (Insecure Direct Object Reference) vulnerabilities in future multi-user deployments.
+
+## Vision & Scalability
+
+ReconSR is designed as a decoupled framework for Attack Surface Discovery and Mapping. Our long-term goal is to evolve the project from a standalone CLI tool into a comprehensive Attack Surface Management (ASM) intelligence platform. By strictly separating the execution engine, data storage, and external modules, the architecture mitigates technical debt and ensures the system can grow organically to meet enterprise demands.
+
+*   **Ecosystem Extensibility:** The "Black Box" module contract allows the open-source community or internal security teams to develop and integrate proprietary reconnaissance plugins independently. This modularity fosters an ecosystem where ReconSR can rapidly adapt to new reconnaissance techniques and exposure patterns without requiring modifications to the core engine.
+*   **Decoupled Interfaces:** Currently, the platform operates via a CLI. While we plan to develop RESTful APIs and Web GUIs, the `Controller`'s strict isolation of user interaction from the core reconnaissance pipeline (Facade pattern) also empowers developers to build custom interfaces—such as corporate ChatOps bots or proprietary dashboard integrations—leaving the underlying core logic untouched.
+*   **Database Portability:** All data operations are centralized behind the `Repository` abstraction. While the current implementation uses a portable, per-project SQLite database, migrating to a distributed RDBMS (e.g., PostgreSQL) to support massive datasets only requires implementing a new database driver for the repository interface, rather than refactoring the application structure.
+*   **Localization-Ready Architecture:** Interface text is fully decoupled from the core business logic. This separation ensures that future localization can be implemented strictly at the configuration level, without modifying the underlying engine.
+
+### Future Goals
+
+While the current alpha release is focused on automating point-in-time investigations, our long-term vision includes expanding the platform's operational capabilities:
+
+*   **Collaborative Workspaces:** We aim to implement multi-user environments where distributed security teams can work simultaneously on complex investigations, sharing real-time insights and graph visualizations within a unified project scope.
+*   **Continuous Monitoring:** We plan to extend ReconSR's capabilities to include continuous infrastructure monitoring, running alongside traditional single-run reconnaissance. Future features will focus on scheduled scanning, state comparisons, and alerting teams to unintended public exposures (e.g., forgotten subdomains, exposed sensitive data) or infrastructure changes. This paves the way for potential on-premise enterprise deployments or managed SaaS offerings.
+*   **AI-Assisted Analysis:** To enhance the efficiency of investigations, we plan to enable the use of AI for analyzing large intelligence datasets, uncovering hidden threats, mapping non-obvious attack vectors, and interpreting complex infrastructure relationships.
+
+---
+
+## Project Roadmap
+
+### Completed
+- ✅ Reactive pipeline architecture (Controller → Dispatcher → Processor → Repository).
+- ✅ Scope Manager and entity type Validator.
+- ✅ Subdomain hierarchy decomposition.
+- ✅ CLI module configuration and ASCII/HTML report renderers.
+- ✅ DNS reconnaissance: 27 functions covering infrastructure, identity, cryptography, DNSSEC, service discovery, and DNS health preflight checks.
+- ✅ RFC 3597 wire-format decoder for DoH binary responses.
+- ✅ WHOIS/RDAP with multi-registry support, structured registrar/registrant graph anchors, and registrar metadata extraction.
+- ✅ Certificate Transparency harvesting via `crt.sh`, direct PostgreSQL access to `crt.sh`, and `CertSpotter`, including wildcard identities, certificate-bound email identities, expiration metadata, and summaries of subdomains with expired certificates.
+- ✅ Passive DNS enumeration via HackerTarget with validated domain/subdomain-to-IP relationships.
+- ✅ Mail security: OPENPGPKEY and SMIMEA discovery with administrative alias enumeration and DNS preflight health checks.
+- ✅ IPv4 ambiguity resolution (Decimal vs. POSIX octal decoding).
+- ✅ Passive exposure enrichment via Shodan InternetDB.
+- ✅ Passive subdomain discovery via Anubis DB.
+- ✅ IP intelligence: PTR, DNSBL (Tor/Spam), RIPE WHOIS metadata (netname, description), and abuse contacts.
+- ✅ ASN intelligence: Transit peers hierarchy, BGP prefixes (CIDR), legal holder, and abuse contacts via RIPEstat.
+
+### Upcoming
+- Personalized API key management.
+- Active reconnaissance capabilities.
+
+---
+
+## Authors & License
+
+ReconSR is an independent project developed by cybersecurity researchers from the non-profit expert community [Cyber Defense Unbiased Analysis (CDUA)](https://cdua.org).
+
+**License:** ReconSR is distributed under the **PolyForm Noncommercial License 1.0.0**. All intellectual property and core development rights belong strictly to the individual authors: **roolsec** and **underhax**.
+
+As we continue to evolve the framework, we are open to dialogue regarding enterprise integrations, partnerships, and commercial applications. For business inquiries, collaboration, or custom licensing discussions, please reach out to the development team:
+
+* **roolsec:** roolsec [at] cdua [dot] org
+* **underhax:** underhax [at] cdua [dot] org
