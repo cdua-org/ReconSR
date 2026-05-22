@@ -309,7 +309,7 @@ func saveConfig(root *os.Root, settings map[string]map[string]bool) (err error) 
 		}
 	}()
 
-	if _, err := fmt.Fprintln(f, "# ReconSR Configuration File\n"); err != nil {
+	if _, err := fmt.Fprintln(f, "# ReconSR Configuration File"); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(f, "max_depth = %d\n", dispatcher.MaxDepth); err != nil {
