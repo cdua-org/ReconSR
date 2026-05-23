@@ -17,10 +17,10 @@ func TestModuleInfo(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(caps.Functions) == 0 || caps.Functions[0] != "parse_ambiguous" {
+	if len(caps.Functions) == 0 || caps.Functions[0] != funcParseAmbiguous {
 		t.Errorf("expected function parse_ambiguous, got %v", caps.Functions)
 	}
-	if len(caps.InputTypes) == 0 || caps.InputTypes[0] != "ipv4_ambiguous" {
+	if len(caps.InputTypes) == 0 || caps.InputTypes[0] != typeIPv4Ambiguous {
 		t.Errorf("expected input type ipv4_ambiguous, got %v", caps.InputTypes)
 	}
 }
@@ -30,7 +30,7 @@ func TestExec_UnsupportedFunction(t *testing.T) {
 	input := schema.ModuleInput{
 		Functions: []string{"unknown_func"},
 		Target: schema.Entity{
-			Type:  "ipv4_ambiguous",
+			Type:  typeIPv4Ambiguous,
 			Value: "010.0.0.1",
 		},
 	}
@@ -52,6 +52,8 @@ func TestExec_UnsupportedFunction(t *testing.T) {
 
 func TestExec_ParseAmbiguous(t *testing.T) {
 	m := New()
+
+	const testIP = "192.168.1.1"
 
 	tests := []struct {
 		name         string
@@ -80,8 +82,8 @@ func TestExec_ParseAmbiguous(t *testing.T) {
 		},
 		{
 			name:         "plain standard ip",
-			input:        "192.168.1.1",
-			expectedVals: []string{"192.168.1.1"},
+			input:        testIP,
+			expectedVals: []string{testIP},
 		},
 		{
 			name:         "octal overflow",
@@ -91,16 +93,16 @@ func TestExec_ParseAmbiguous(t *testing.T) {
 		{
 			name:         "invalid decimal but valid octal posix",
 			input:        "0300.0250.001.001",
-			expectedVals: []string{"192.168.1.1"},
+			expectedVals: []string{testIP},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			input := schema.ModuleInput{
-				Functions: []string{"parse_ambiguous"},
+				Functions: []string{funcParseAmbiguous},
 				Target: schema.Entity{
-					Type:  "ipv4_ambiguous",
+					Type:  typeIPv4Ambiguous,
 					Value: tt.input,
 				},
 			}

@@ -14,20 +14,20 @@ func TestGetCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	custom, exists := caps.CustomFunctions["decompose"]
+	custom, exists := caps.CustomFunctions[funcDecompose]
 	if !exists {
 		t.Errorf("expected decompose function in CustomFunctions")
 	}
-	if len(custom.InputTypes) == 0 || custom.InputTypes[0] != "subdomain" {
+	if len(custom.InputTypes) == 0 || custom.InputTypes[0] != typeSubdomain {
 		t.Errorf("expected subdomain input type, got %v", custom.InputTypes)
 	}
 }
 
 func TestHandleData_Decompose(t *testing.T) {
 	input := schema.ModuleInput{
-		Functions: []string{"decompose"},
+		Functions: []string{funcDecompose},
 		Target: schema.Entity{
-			Type:  "subdomain",
+			Type:  typeSubdomain,
 			Value: "dev.api.example.com",
 		},
 	}
@@ -72,7 +72,7 @@ func TestHandleData_UnsupportedFunction(t *testing.T) {
 	input := schema.ModuleInput{
 		Functions: []string{"unknown"},
 		Target: schema.Entity{
-			Type:  "subdomain",
+			Type:  typeSubdomain,
 			Value: "example.com",
 		},
 	}
@@ -91,9 +91,9 @@ func TestHandleData_UnsupportedFunction(t *testing.T) {
 
 func TestHandleData_InvalidDomain(t *testing.T) {
 	input := schema.ModuleInput{
-		Functions: []string{"decompose"},
+		Functions: []string{funcDecompose},
 		Target: schema.Entity{
-			Type: "subdomain",
+			Type: typeSubdomain,
 			// A domain that causes publicsuffix to return an error
 			Value: ".co.uk",
 		},

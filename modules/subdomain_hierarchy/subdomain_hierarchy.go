@@ -8,6 +8,11 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
+const (
+	funcDecompose = "decompose"
+	typeSubdomain = "subdomain"
+)
+
 type module struct{}
 
 // New instantiates the subdomain_hierarchy module.
@@ -30,7 +35,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		}
 
 		switch f {
-		case "decompose":
+		case funcDecompose:
 			target := data.Target.Value
 			targetType := data.Target.Type
 			org, err := publicsuffix.EffectiveTLDPlusOne(target)
@@ -52,7 +57,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 			if len(parts) > len(orgParts) {
 				for i := 1; i <= len(parts)-len(orgParts); i++ {
 					val := strings.Join(parts[i:], ".")
-					resType := "subdomain"
+					resType := typeSubdomain
 					applied := true
 
 					if val == org {
@@ -96,10 +101,10 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
 		CustomFunctions: map[string]schema.FunctionCapabilities{
-			"decompose": {
+			funcDecompose: {
 				Limit:      1000,
 				DelayMs:    0,
-				InputTypes: []string{"subdomain"},
+				InputTypes: []string{typeSubdomain},
 			},
 		},
 	}, nil

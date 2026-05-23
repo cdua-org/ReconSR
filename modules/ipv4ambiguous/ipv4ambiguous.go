@@ -10,6 +10,11 @@ import (
 	"strings"
 )
 
+const (
+	funcParseAmbiguous = "parse_ambiguous"
+	typeIPv4Ambiguous  = "ipv4_ambiguous"
+)
+
 type module struct{}
 
 // New instantiates the ipv4ambiguous module.
@@ -23,8 +28,8 @@ func (m *module) Name() string {
 
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
-		Functions:  []string{"parse_ambiguous"},
-		InputTypes: []string{"ipv4_ambiguous"},
+		Functions:  []string{funcParseAmbiguous},
+		InputTypes: []string{typeIPv4Ambiguous},
 	}, nil
 }
 
@@ -38,7 +43,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		}
 
 		switch f {
-		case "parse_ambiguous":
+		case funcParseAmbiguous:
 			execution.Results = extractIPs(data.Target.Value)
 		default:
 			errMsg := "unsupported function: " + f
