@@ -12,6 +12,7 @@ import (
 	"cdua-org/ReconSR/modules/ip_metadata"
 	"cdua-org/ReconSR/modules/ipv4ambiguous"
 	"cdua-org/ReconSR/modules/mailcrypto"
+	"cdua-org/ReconSR/modules/maxmind"
 	"cdua-org/ReconSR/modules/shodan"
 	"cdua-org/ReconSR/modules/subdomain_hierarchy"
 	"cdua-org/ReconSR/modules/virustotal"
@@ -32,6 +33,7 @@ var ModuleRegistry = []schema.Module{
 	ip_metadata.New(),
 	ipv4ambiguous.New(),
 	mailcrypto.New(),
+	maxmind.New(),
 	shodan.New(),
 	subdomain_hierarchy.New(),
 	virustotal.New(),

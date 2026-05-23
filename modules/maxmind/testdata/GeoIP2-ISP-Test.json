@@ -1,0 +1,18 @@
+[
+  {
+    "192.0.2.11/32": {
+      "AutonomousSystemNumber": 64497,
+      "AutonomousSystemOrganization": "ISP Test Organization",
+      "ISP": "Test Premium ISP",
+      "Organization": "Test Subsidiary Corp",
+      "MobileCountryCode": "310",
+      "MobileNetworkCode": "410"
+    }
+  },
+  {
+    "2001:db8::11/128": {
+      "AutonomousSystemNumber": 65537,
+      "ISP": "IPv6 Premium ISP"
+    }
+  }
+]

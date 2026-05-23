@@ -1,0 +1,26 @@
+[
+  {
+    "192.0.2.1/32": {
+      "is_anonymous": true,
+      "is_anonymous_vpn": true,
+      "anonymizer_confidence": 99,
+      "provider_name": "Test VPN",
+      "network_last_seen": "2026-05-23"
+    }
+  },
+  {
+    "192.0.2.2/32": {
+      "is_anonymous": true,
+      "is_hosting_provider": true,
+      "is_public_proxy": true,
+      "is_residential_proxy": true,
+      "is_tor_exit_node": true
+    }
+  },
+  {
+    "2001:db8::1/128": {
+      "is_anonymous": true,
+      "is_tor_exit_node": true
+    }
+  }
+]

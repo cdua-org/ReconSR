@@ -1,0 +1,23 @@
+[
+  {
+    "192.0.2.40/32": {
+      "City": { "Names": { "en": "Enterprise City" }, "Confidence": 85 },
+      "Country": { "IsoCode": "TC", "Names": { "en": "Test Country" }, "Confidence": 99 },
+      "Location": { "Latitude": 12.34, "Longitude": 56.78, "TimeZone": "Test/Zone" },
+      "Traits": {
+        "Domain": "enterprise.example.com",
+        "ConnectionType": "Corporate",
+        "UserType": "business"
+      }
+    }
+  },
+  {
+    "2001:db8::40/128": {
+      "City": { "Names": { "en": "Minimal City" } },
+      "Traits": {
+        "Domain": "minimal.example.com",
+        "UserType": "residential"
+      }
+    }
+  }
+]
