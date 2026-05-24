@@ -56,4 +56,5 @@ const (
 	FuncGetMMEnterpriseData     = "get_mm_enterprise_data"
 	FuncGetIPASN                = "get_ip_asn"
 	FuncGetProxyCheck           = "get_proxy_check"
+	FuncGetEmailBreaches        = "get_email_breaches"
 )

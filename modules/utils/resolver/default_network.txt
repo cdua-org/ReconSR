@@ -184,6 +184,15 @@ HunterioMaxPages=1
 HunterioMaxRetries=3
 
 
+### Have I Been Pwned Options ###
+
+# Delay between API requests for Have I Been Pwned, in milliseconds (default: 65)
+HaveIBeenPwnedDelayMs=65
+
+# Maximum retry attempts for Have I Been Pwned API requests (default: 3)
+HaveIBeenPwnedMaxRetries=3
+
+
 [DoH]
 https://dns.cloudflare.com/dns-query
 https://dns.google/resolve

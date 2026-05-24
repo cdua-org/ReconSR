@@ -150,6 +150,10 @@ var (
 	HunterioMaxPages = 1
 	// HunterioMaxRetries defines maximum attempts for Hunter.io API.
 	HunterioMaxRetries = 3
+	// HaveIBeenPwnedDelayMs is the delay between Have I Been Pwned API requests in milliseconds.
+	HaveIBeenPwnedDelayMs = 65
+	// HaveIBeenPwnedMaxRetries defines maximum attempts for Have I Been Pwned API.
+	HaveIBeenPwnedMaxRetries = 3
 
 	// Options acts as a generic configuration dictionary.
 	Options = make(map[string]string)
@@ -301,24 +305,26 @@ func initOptionMaps() {
 		"HunterioScanOrg":             &HunterioScanOrg,
 	}
 	intOptions = map[string]*int{
-		"MaxRetriesCert":        &MaxRetriesCert,
-		"MaxRetriesWhois":       &MaxRetriesWhois,
-		"MaxRetriesDNS":         &MaxRetriesDNS,
-		"MaxRetriesHT":          &MaxRetriesHT,
-		"MaxRetriesIPMeta":      &MaxRetriesIPMeta,
-		"MaxRetriesASNMeta":     &MaxRetriesASNMeta,
-		"MaxRecursionDepth":     &MaxRecursionDepth,
-		"AnubisLimit":           &AnubisLimit,
-		"VirustotalDelayMs":     &VirustotalDelayMs,
-		"VirustotalMaxRetries":  &VirustotalMaxRetries,
-		"VirustotalMaxPages":    &VirustotalMaxPages,
-		"ShodanMaxDomainPages":  &ShodanMaxDomainPages,
-		"DNSConcurrency":        &DNSConcurrency,
-		"MaxRetriesCircl":       &MaxRetriesCircl,
-		"AbuseIPDBmaxAgeInDays": &AbuseIPDBmaxAgeInDays,
-		"HunterioLimit":         &HunterioLimit,
-		"HunterioMaxPages":      &HunterioMaxPages,
-		"HunterioMaxRetries":    &HunterioMaxRetries,
+		"MaxRetriesCert":           &MaxRetriesCert,
+		"MaxRetriesWhois":          &MaxRetriesWhois,
+		"MaxRetriesDNS":            &MaxRetriesDNS,
+		"MaxRetriesHT":             &MaxRetriesHT,
+		"MaxRetriesIPMeta":         &MaxRetriesIPMeta,
+		"MaxRetriesASNMeta":        &MaxRetriesASNMeta,
+		"MaxRecursionDepth":        &MaxRecursionDepth,
+		"AnubisLimit":              &AnubisLimit,
+		"VirustotalDelayMs":        &VirustotalDelayMs,
+		"VirustotalMaxRetries":     &VirustotalMaxRetries,
+		"VirustotalMaxPages":       &VirustotalMaxPages,
+		"ShodanMaxDomainPages":     &ShodanMaxDomainPages,
+		"DNSConcurrency":           &DNSConcurrency,
+		"MaxRetriesCircl":          &MaxRetriesCircl,
+		"AbuseIPDBmaxAgeInDays":    &AbuseIPDBmaxAgeInDays,
+		"HunterioLimit":            &HunterioLimit,
+		"HunterioMaxPages":         &HunterioMaxPages,
+		"HunterioMaxRetries":       &HunterioMaxRetries,
+		"HaveIBeenPwnedDelayMs":    &HaveIBeenPwnedDelayMs,
+		"HaveIBeenPwnedMaxRetries": &HaveIBeenPwnedMaxRetries,
 	}
 	stringOptions = map[string]*string{
 		"ShodanDomainType":   &ShodanDomainType,

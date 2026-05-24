@@ -102,4 +102,8 @@ const (
 	TypeDepartment            = "department"
 	TypeSeniority             = "seniority"
 	TypeSource                = "source"
+	TypeBreach                = "breach"
+	TypeLeakedData            = "leaked"
+	TypePwnedRecords          = "pwned_records"
+	TypeAttribution           = "attribution"
 )

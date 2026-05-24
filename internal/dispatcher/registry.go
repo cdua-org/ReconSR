@@ -7,6 +7,7 @@ import (
 	"cdua-org/ReconSR/modules/dns"
 	"cdua-org/ReconSR/modules/domainsbycerts"
 	"cdua-org/ReconSR/modules/hackertarget"
+	"cdua-org/ReconSR/modules/haveibeenpwned"
 	"cdua-org/ReconSR/modules/hunterio"
 	"cdua-org/ReconSR/modules/ip2location"
 	"cdua-org/ReconSR/modules/ip_metadata"
@@ -28,6 +29,7 @@ var ModuleRegistry = []schema.Module{
 	dns.New(),
 	domainsbycerts.New(),
 	hackertarget.New(),
+	haveibeenpwned.New(),
 	hunterio.New(),
 	ip2location.New(),
 	ip_metadata.New(),

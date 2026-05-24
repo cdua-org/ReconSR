@@ -124,19 +124,22 @@ Specialized discovery of cryptographic communication keys linked to organization
 ### 5. Hunter.io Email Intelligence (`modules/hunterio`) - 1 function
 - `get_hunterio_domain_search`: Queries Hunter.io Domain Search for domains, and optionally organizations, when an API key is configured. Extracts discovered email addresses, confidence and verification status, email pattern, organization metadata, linked domains, person names, roles, departments, seniority, phone numbers, social profiles, source URLs/domains, source dates, and provider flags such as disposable, webmail, accept-all, etc., with API preflight, credit tracking, pagination, retry handling, and explicit demo-mode support.
 
-### 6. Certificate Transparency (`modules/domainsbycerts`) - 1 function
+### 6. HaveIBeenPwned Data Breaches (`modules/haveibeenpwned`) - 1 function
+- `get_email_breaches`: Queries the HaveIBeenPwned API for compromised email accounts. Extracts breach metadata including description, leaked data classes, pwned records count, dates, related domain, etc. Evaluates risk indicators (malware, stealer logs, etc.), with explicit demo-mode support.
+
+### 7. Certificate Transparency (`modules/domainsbycerts`) - 1 function
 - `get_domains`: Passive certificate-identity harvesting through configurable Certificate Transparency sources, including `crt.sh`, direct PostgreSQL access to `crt.sh`, and `CertSpotter`. Discovers subdomains, wildcard subdomains, and certificate-bound email identities, attaches expiration metadata to both hostname and email identities, emits explicit `expired` status where applicable, and summarizes subdomains with expired certificates separately for triage.
 
-### 7. HackerTarget Passive DNS (`modules/hackertarget`) - 1 function
+### 8. HackerTarget Passive DNS (`modules/hackertarget`) - 1 function
 - `get_hosts`: Queries the `HackerTarget` passive DNS dataset to identify validated domain and subdomain nodes and their directly linked resolved IP nodes. Supports an optional API key; without one, requests use the public keyless endpoint and remain subject to IP-based service limits. Includes automatic retry logic, API quota detection, and out-of-scope classification.
 
-### 8. Anubis DB (`modules/anubis`) - 1 function
+### 9. Anubis DB (`modules/anubis`) - 1 function
 - `get_domains`: Passive subdomain enumeration through the `anubisdb.com` Anubis database. Returns validated subdomains and wildcard subdomains, deduplicates results, and filters ARPA/out-of-scope noise before graph insertion.
 
-### 9. IPv4 Deobfuscation (`modules/ipv4ambiguous`) - 1 function
+### 10. IPv4 Deobfuscation (`modules/ipv4ambiguous`) - 1 function
 - `parse_ambiguous`: Resolution of ambiguous IPv4 addresses containing leading zeros. Decodes input (e.g., `012.012.012.012`) into both strict decimal (`12.12.12.12`) and POSIX-compliant octal (`10.10.10.10`) formats to identify obfuscation and misconfigurations.
 
-### 10. IP Intelligence (`modules/ip_metadata`) - 6 functions
+### 11. IP Intelligence (`modules/ip_metadata`) - 6 functions
 Passive reconnaissance of IPv4/IPv6 addresses via reverse DNS, public blacklists, and RIPEstat data endpoints to uncover network identity and reputation:
 - `get_ptr`: Performs reverse DNS lookups to resolve IPs back to their mapped domains.
 - `get_asn`: Resolves the originating Autonomous System Number (ASN) and BGP prefix via Team Cymru DNS TXT queries.
@@ -145,41 +148,41 @@ Passive reconnaissance of IPv4/IPv6 addresses via reverse DNS, public blacklists
 - `get_ip_info`: Extracts the network name (`netname`) and description from RIPE WHOIS records.
 - `get_ip_abuse_contacts`: Retrieves dedicated abuse reporting email addresses registered to the specific IP allocation.
 
-### 11. AbuseIPDB Reputation (`modules/abuseipdb`) - 1 function
+### 12. AbuseIPDB Reputation (`modules/abuseipdb`) - 1 function
 - `check_abuseipdb`: Queries AbuseIPDB for IPv4/IPv6 reputation when an API key is configured. Extracts abuse confidence score, report count, report summaries, network metadata (country, ISP, usage type, etc.), risk indicators (malicious, suspicious, whitelisted, Tor exit, etc.), category-derived threat tags, and reverse-IP hostnames/domains, with retry, daily quota detection, and explicit demo-mode support.
 
-### 12. IP2Location Local Intelligence (`modules/ip2location`) - 3 functions
+### 13. IP2Location Local Intelligence (`modules/ip2location`) - 3 functions
 Offline IPv4/IPv6 enrichment backed by locally installed IP2Location/IP2Proxy BIN databases under `data/ip2location`:
 - `get_geo_ip`: Extracts geolocation, ISP, reverse-IP domain, usage type, mobile network metadata, connection speed, address type, IAB category, etc. from DB11 Geo IP data.
 - `get_ip_asn`: Resolves ASN, AS owner, linked AS domain, AS usage type, and AS CIDR from IP2Location ASN data.
 - `get_proxy_check`: Detects proxy/VPN/Tor/datacenter/residential/privacy-network indicators through IP2Proxy data, extracting fraud score, last-seen age, provider, reverse-IP domain, usage type, and threat-derived tags such as scanner, spam, botnet, etc.
 
-### 13. MaxMind Local Intelligence (`modules/maxmind`) - 4 functions
+### 14. MaxMind Local Intelligence (`modules/maxmind`) - 4 functions
 Offline IPv4/IPv6 enrichment backed by locally installed MaxMind MMDB databases under `data/maxmind`:
 - `get_geo_ip`: Extracts comprehensive geolocation metadata (city, region, country, coordinates, timezone, etc.) from City databases.
 - `get_ip_asn`: Resolves Autonomous System Number (ASN), associated organization, ISP, etc. from ASN and ISP databases.
 - `get_proxy_check`: Identifies anonymous IPs, VPNs, Tor exit nodes, etc. from Anonymous IP databases, emitting standardized threat tags.
 - `get_mm_enterprise_data`: Provides maximum data density by aggressively parsing Enterprise databases. Combines all available geo, ASN, ISP, connection type, user type, etc. into a single unified output.
 
-### 14. ASN Intelligence (`modules/asn_metadata`) - 4 functions
+### 15. ASN Intelligence (`modules/asn_metadata`) - 4 functions
 Deep analysis of Autonomous System Numbers via RIPEstat API to map network hierarchies, ownership, and announced subnets:
 - `get_asn_peers`: Constructs a strict linear transit chain by identifying the largest upstream provider at each hop, revealing who the ASN buys transit from.
 - `get_asn_prefixes`: Retrieves all IPv4/IPv6 CIDR blocks (BGP prefixes) currently announced by the ASN.
 - `get_asn_info`: Resolves the official legal holder (organization name) of the Autonomous System.
 - `get_asn_abuse_contacts`: Extracts abuse reporting email addresses associated with the ASN infrastructure.
 
-### 15. Shodan Intelligence (`modules/shodan`) - 3 conditional functions
+### 16. Shodan Intelligence (`modules/shodan`) - 3 conditional functions
 Shodan enrichment uses two capability modes: without an API key, only the public InternetDB function is advertised with reduced host exposure data; when a Shodan API key is configured, InternetDB is replaced by API-backed IP and domain functions with richer results and explicit demo-mode support:
 - `get_idb_shodan`: Passive enrichment of IPv4/IPv6 targets through the public Shodan InternetDB endpoint. Extracts PTR hostnames, open ports, service tags, known CVEs, and CPE fingerprints for rapid exposure triage.
 - `get_shodan_api_ip`: Queries the Shodan Host API for IPv4/IPv6 targets. Extracts reverse-IP domains, ASN, organization, ISP, OS, hostnames, tags, last update, service banners, ports, CVEs, CPEs, SSL/TLS metadata, etc.
 - `get_shodan_api_domain`: Queries the Shodan DNS Domain API for domains, and optionally subdomains. Extracts passive DNS subdomains and a broad set of DNS-derived entities that can overlap with multiple dedicated DNS modules, including record values, last-seen dates, wildcard markers, historical tags, out-of-scope classifications, etc.
 
-### 16. VirusTotal Intelligence (`modules/virustotal`) - 2 functions
+### 17. VirusTotal Intelligence (`modules/virustotal`) - 2 functions
 API-backed enrichment for domains, optionally subdomains, and IPv4/IPv6 targets through VirusTotal API v3. Without a VirusTotal API key, no functions are advertised to the dispatcher; with a configured key, the module exposes both functions and supports explicit demo mode:
 - `get_vt_api_domain`: Queries VirusTotal domain metadata and, when enabled, related subdomains. Extracts tags, reputation and threat scores, categories, popularity ranks, JARM, crowdsourced context, certificate identities and fingerprints, DNS-derived entities, expired-certificate subdomain summaries, out-of-scope classifications, etc.
 - `get_vt_api_ip`: Queries VirusTotal IP metadata and passive DNS resolutions. Extracts ASN, network CIDR, AS owner, geo metadata, JARM, tags, threat scores, last update, passive DNS hostnames, etc.
 
-### 17. Vulnerability Lookup (`modules/vuln_lookup`) - 1 function
+### 18. Vulnerability Lookup (`modules/vuln_lookup`) - 1 function
 - `get_circl_vuln`: Queries the CIRCL Vulnerability API for CVE entities. Extracts vulnerability summaries, CWE classifications with local descriptions, best available CVSS metrics, affected CPE criteria, EPSS probability and percentile, SSVC/KEV indicators, additional metadata included in CIRCL responses, etc.
 
 ---
@@ -225,6 +228,7 @@ While the current alpha release is focused on automating point-in-time investiga
 - ✅ Certificate Transparency harvesting via configurable CT sources, including `crt.sh`, direct PostgreSQL access to `crt.sh`, and `CertSpotter`, with wildcard identities, certificate-bound email identities, expiration metadata, and summaries of subdomains with expired certificates.
 - ✅ Passive DNS enumeration via HackerTarget with validated domain/subdomain-to-IP relationships and optional API-key support.
 - ✅ Hunter.io email intelligence with domain/organization search, contact enrichment, source evidence, and explicit demo mode.
+- ✅ HaveIBeenPwned data breach intelligence for email targets, extracting compromised data classes, threat tags, metadata, and demo mode.
 - ✅ Mail security: OPENPGPKEY and SMIMEA discovery with optional administrative alias enumeration and DNS preflight health checks.
 - ✅ IPv4 ambiguity resolution (Decimal vs. POSIX octal decoding).
 - ✅ Passive exposure enrichment via Shodan InternetDB and API-backed Shodan Host/DNS intelligence with demo mode.

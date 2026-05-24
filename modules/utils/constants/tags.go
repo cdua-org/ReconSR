@@ -20,4 +20,5 @@ const (
 	TagResidentialProxy = "residential_proxy"
 	TagPrivacyNetwork   = "privacy_network"
 	TagBogon            = "bogon"
+	TagCompromised      = "compromised"
 )
