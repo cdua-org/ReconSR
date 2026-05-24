@@ -12,19 +12,6 @@ jobs:
   release:
     name: Build and Release
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - os: linux
-            arch: amd64
-          - os: linux
-            arch: arm64
-          - os: darwin
-            arch: amd64
-          - os: darwin
-            arch: arm64
-          - os: windows
-            arch: amd64
     
     steps:
       - name: Checkout Code
@@ -35,34 +22,43 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Build Binary
-        run: |
-          mkdir -p temp_build
-          if [ "${{ matrix.os }}" = "windows" ]; then
-            GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o temp_build/ReconSR.exe ./cmd/ReconSR-cli
-          else
-            GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o temp_build/ReconSR ./cmd/ReconSR-cli
-          fi
-
       - name: Extract Licenses
         run: |
           go install github.com/google/go-licenses@latest
-          go-licenses save ./... --save_path=temp_build/third_party_licenses/
+          go-licenses save ./... --save_path=third_party_licenses/
 
-      - name: Create Archive
+      - name: Build and Archive
         run: |
-          cd temp_build
-          if [ "${{ matrix.os }}" = "windows" ]; then
-            zip -r ../ReconSR-${{ matrix.os }}-${{ matrix.arch }}.zip ./*
-          else
-            tar -czvf ../ReconSR-${{ matrix.os }}-${{ matrix.arch }}.tar.gz ./*
-          fi
+          mkdir -p release_assets
+          
+          # List of OS/ARCH targets
+          TARGETS="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
+          
+          for target in $TARGETS; do
+            GOOS=${target%/*}
+            GOARCH=${target#*/}
+            echo "Building for $GOOS/$GOARCH..."
+            
+            mkdir -p "build_${GOOS}_${GOARCH}"
+            cp -r third_party_licenses "build_${GOOS}_${GOARCH}/"
+            
+            if [ "$GOOS" = "windows" ]; then
+              GOOS=$GOOS GOARCH=$GOARCH go build -o "build_${GOOS}_${GOARCH}/ReconSR.exe" ./cmd/ReconSR-cli
+              cd "build_${GOOS}_${GOARCH}"
+              zip -r "../release_assets/ReconSR-${GOOS}-${GOARCH}.zip" ./*
+              cd ..
+            else
+              GOOS=$GOOS GOARCH=$GOARCH go build -o "build_${GOOS}_${GOARCH}/ReconSR" ./cmd/ReconSR-cli
+              cd "build_${GOOS}_${GOARCH}"
+              tar -czvf "../release_assets/ReconSR-${GOOS}-${GOARCH}.tar.gz" ./*
+              cd ..
+            fi
+          done
 
       - name: Publish Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
-          files: |
-            ReconSR-${{ matrix.os }}-${{ matrix.arch }}.zip
-            ReconSR-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          generate_release_notes: true
+          files: release_assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
