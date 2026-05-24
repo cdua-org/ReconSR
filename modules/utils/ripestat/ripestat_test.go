@@ -299,23 +299,23 @@ func TestQuery_AllAttemptsFail(t *testing.T) {
 func TestQuery_ContextCancelled_StopsRetries(t *testing.T) {
 	defer withFastRetries(t)()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls.Add(1)
+		cancel()
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	defer srv.Close()
 	defer withMockHost(t, srv.URL)()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
 
 	var resp ASOverviewResponse
 	err := Query(ctx, "AS1", "as-overview", &resp, 10)
 	if err == nil {
 		t.Fatal("expected error on cancelled context")
 	}
-	// With 10 max retries but a 100ms context, it should stop well before 10 calls.
 	if c := calls.Load(); c >= 10 {
 		t.Errorf("calls = %d, expected fewer than 10 (context should cancel retries)", c)
 	}

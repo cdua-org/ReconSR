@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,15 +27,13 @@ jobs:
           git diff --exit-code
 
       - name: go vet
-        run: go vet ./modules/...
+        run: go vet ./...
 
       - name: Unit tests
-        run: go test -race ./modules/...
+        run: go test -v -race ./...
 
       - name: Build check
-        run: |
-          go build -v ./modules/...
-          go build -v ./cmd/ReconSR-cli
+        run: go build -v ./...
 
   golangci:
     name: golangci-lint
@@ -62,12 +61,13 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
       - name: Run govulncheck
         uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1.0.4
         with:
           go-version-file: go.mod
-          go-package: ./modules/...
-
+          go-package: ./...
+          repo-checkout: false
   trivy:
     name: Trivy Scan
     runs-on: ubuntu-latest
