@@ -32,7 +32,7 @@ jobs:
           mkdir -p release_assets
           
           # List of OS/ARCH targets
-          TARGETS="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
+          TARGETS="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64"
           
           for target in $TARGETS; do
             GOOS=${target%/*}
@@ -44,15 +44,31 @@ jobs:
             cp LICENSE "build_${GOOS}_${GOARCH}/"
             cp README.md "build_${GOOS}_${GOARCH}/"
             
+            FRIENDLY_OS=$GOOS
+            FRIENDLY_ARCH=$GOARCH
+            
+            if [ "$GOOS" = "darwin" ]; then
+              FRIENDLY_OS="macos"
+              if [ "$GOARCH" = "amd64" ]; then
+                FRIENDLY_ARCH="intel"
+              elif [ "$GOARCH" = "arm64" ]; then
+                FRIENDLY_ARCH="apple-silicon"
+              fi
+            elif [ "$GOOS" = "windows" ]; then
+              if [ "$GOARCH" = "amd64" ]; then
+                FRIENDLY_ARCH="x64"
+              fi
+            fi
+            
             if [ "$GOOS" = "windows" ]; then
               GOOS=$GOOS GOARCH=$GOARCH go build -o "build_${GOOS}_${GOARCH}/ReconSR.exe" ./cmd/ReconSR-cli
               cd "build_${GOOS}_${GOARCH}"
-              zip -r "../release_assets/ReconSR-${GOOS}-${GOARCH}.zip" ./*
+              zip -r "../release_assets/ReconSR-${FRIENDLY_OS}-${FRIENDLY_ARCH}.zip" ./*
               cd ..
             else
               GOOS=$GOOS GOARCH=$GOARCH go build -o "build_${GOOS}_${GOARCH}/ReconSR" ./cmd/ReconSR-cli
               cd "build_${GOOS}_${GOARCH}"
-              tar -czvf "../release_assets/ReconSR-${GOOS}-${GOARCH}.tar.gz" ./*
+              tar -czvf "../release_assets/ReconSR-${FRIENDLY_OS}-${FRIENDLY_ARCH}.tar.gz" ./*
               cd ..
             fi
           done
@@ -61,6 +77,7 @@ jobs:
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: release_assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
