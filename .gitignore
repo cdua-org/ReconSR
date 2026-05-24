@@ -39,9 +39,8 @@ go.work.sum
 *.md
 !README.md
 !MODULE_GUIDE.md
-!.github/CONTRIBUTOR-LICENSE-AGREEMENT.md
 !CONTRIBUTING.md
-
+!.github/**/*.md
 
 storage/
 reports/
