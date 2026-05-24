@@ -25,7 +25,7 @@ jobs:
       - name: Extract Licenses
         run: |
           go install github.com/google/go-licenses@latest
-          go-licenses save ./... --save_path=third_party_licenses/
+          go-licenses save ./... --save_path=third_party_licenses/ --ignore cdua-org/ReconSR --confidence_threshold 0.85
 
       - name: Build and Archive
         run: |
@@ -41,6 +41,8 @@ jobs:
             
             mkdir -p "build_${GOOS}_${GOARCH}"
             cp -r third_party_licenses "build_${GOOS}_${GOARCH}/"
+            cp LICENSE "build_${GOOS}_${GOARCH}/"
+            cp README.md "build_${GOOS}_${GOARCH}/"
             
             if [ "$GOOS" = "windows" ]; then
               GOOS=$GOOS GOARCH=$GOARCH go build -o "build_${GOOS}_${GOARCH}/ReconSR.exe" ./cmd/ReconSR-cli
