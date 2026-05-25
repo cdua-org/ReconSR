@@ -12,6 +12,15 @@ import (
 	"cdua-org/ReconSR/internal/report"
 )
 
+// Application metadata variables. Can be overridden at build time via ldflags.
+// Example: go build -ldflags "-X 'cdua-org/ReconSR/internal/cli.AppVersion=v1.0.0'"
+var (
+	AppName    = "ReconSR"
+	AppVersion = "dev"
+	AppDesc    = "Automated OSINT tool"
+	AppStage   = "Initial design and development phase"
+)
+
 // WikiURL is the link to the project documentation and setup guides.
 const WikiURL = "https://github.com/cdua-org/ReconSR/wiki"
 
@@ -70,9 +79,9 @@ func ShowBanner(ctx context.Context) {
 
 	fmt.Println(colorMagenta + colorBold + logo + colorReset)
 	fmt.Println()
-	fmt.Printf(colorCyan+"  :: %s %s ::"+colorReset+"\n", i18n.T["BANNER_NAME"], i18n.T["BANNER_VERSION"])
-	fmt.Printf(colorCyan+"  :: %s ::"+colorReset+"\n", i18n.T["BANNER_DESC"])
-	fmt.Printf(colorCyan+"  :: %s ::"+colorReset+"\n", i18n.T["BANNER_STAGE"])
+	fmt.Printf(colorCyan+"  :: %s %s ::"+colorReset+"\n", AppName, AppVersion)
+	fmt.Printf(colorCyan+"  :: %s ::"+colorReset+"\n", AppDesc)
+	fmt.Printf(colorCyan+"  :: %s ::"+colorReset+"\n", AppStage)
 	fmt.Println()
 
 	fmt.Println(colorCyan + colorBold + "[ " + i18n.T["LBL_SYS_INFO"] + " ]" + colorReset)

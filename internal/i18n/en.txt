@@ -1,8 +1,3 @@
-BANNER_NAME = ReconSR
-BANNER_VERSION = v0.1.0-alpha
-BANNER_DESC = Automated OSINT tool
-BANNER_STAGE = Initial design and development phase
-BANNER_STATUS = [Development Stage]
 LBL_USAGE = Usage
 LBL_TARGET_HINT = target
 MSG_PROJECTS_EXIST_1=Projects already exist for target:
