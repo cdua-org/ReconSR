@@ -7,10 +7,10 @@
 ```
 
 [![CI](https://github.com/cdua-org/ReconSR/actions/workflows/ci.yml/badge.svg)](https://github.com/cdua-org/ReconSR/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/cdua-org/ReconSR?include_prereleases&label=Release)](https://github.com/cdua-org/ReconSR/releases)
-[![GitHub last commit](https://img.shields.io/github/last-commit/cdua-org/ReconSR)](https://github.com/cdua-org/ReconSR/commits/main)
-[![GitHub issues](https://img.shields.io/github/issues/cdua-org/ReconSR)](https://github.com/cdua-org/ReconSR/issues)
-[![GitHub repo size](https://img.shields.io/github/repo-size/cdua-org/ReconSR)](https://github.com/cdua-org/ReconSR)
+[![Release](https://img.shields.io/github/v/release/cdua-org/reconsr?label=Release&include_prereleases)](https://github.com/cdua-org/ReconSR/releases)
+[![GitHub last commit](https://img.shields.io/github/last-commit/cdua-org/reconsr)](https://github.com/cdua-org/ReconSR/commits/main)
+[![GitHub issues](https://img.shields.io/github/issues/cdua-org/reconsr)](https://github.com/cdua-org/ReconSR/issues)
+[![GitHub repo size](https://img.shields.io/github/repo-size/cdua-org/reconsr)](https://github.com/cdua-org/ReconSR)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/static/v1?label=License&message=PolyForm%20Noncommercial%201.0.0&color=blue)](LICENSE)
 
 ReconSR is an automated OSINT tool designed to provide cybersecurity researchers with a modular framework for mapping and analyzing complex digital footprints and attack surfaces.
