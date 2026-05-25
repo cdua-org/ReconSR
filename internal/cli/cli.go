@@ -134,8 +134,15 @@ func ShowScanCompleteBanner(ctx context.Context) {
 // GetRawTarget extracts the target from args.
 func GetRawTarget(args []string) string {
 	if len(args) < 2 {
-		fmt.Println(i18n.T["LBL_USAGE"] + ": " + args[0] + " <" + i18n.T["LBL_DOMAIN"] + ">")
-		os.Exit(1)
+		fmt.Printf("\n%s%s %s", colorGreen, i18n.T["LBL_INPUT_TARGET_PROMPT"], colorReset)
+		var target string
+		fmt.Scanln(&target)
+		target = strings.TrimSpace(target)
+		if target == "" {
+			fmt.Println(i18n.T["LBL_USAGE"] + ": " + args[0] + " <" + i18n.T["LBL_TARGET_HINT"] + ">")
+			os.Exit(1)
+		}
+		return target
 	}
 	return args[1]
 }
