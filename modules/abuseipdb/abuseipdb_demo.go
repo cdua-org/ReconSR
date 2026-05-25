@@ -1,13 +1,16 @@
 package abuseipdb
 
 import (
+	"embed"
 	"encoding/json"
-	"os"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
+
+//go:embed testdata/ip.json
+var demoData embed.FS
 
 func (m *module) processCheckDemo(exec *schema.ModuleExecution, target string, gen *modutil.LocalIDGenerator) {
 	if !m.demoFired.CompareAndSwap(false, true) {
@@ -24,7 +27,7 @@ func (m *module) processCheckDemo(exec *schema.ModuleExecution, target string, g
 		LocalID:  gen.NextID(),
 	})
 
-	data, err := os.ReadFile("modules/abuseipdb/testdata/ip.json")
+	data, err := demoData.ReadFile("testdata/ip.json")
 	if err != nil {
 		modutil.SetError(exec, "read fixture err: %v", err)
 		return

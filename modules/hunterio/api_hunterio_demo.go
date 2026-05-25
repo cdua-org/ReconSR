@@ -1,14 +1,17 @@
 package hunterio
 
 import (
+	"embed"
 	"encoding/json"
-	"os"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/schema"
 )
+
+//go:embed testdata/domain_search_b2b.json
+var demoData embed.FS
 
 // getDomainSearchDemo is a demo function that loads a local JSON fixture
 // instead of querying the Hunter.io API when the "demo-api-key" is used.
@@ -27,7 +30,7 @@ func (m *module) getDomainSearchDemo(exec *schema.ModuleExecution, targetType, t
 		LocalID:  gen.NextID(),
 	})
 
-	data, err := os.ReadFile("modules/hunterio/testdata/domain_search_b2b.json")
+	data, err := demoData.ReadFile("testdata/domain_search_b2b.json")
 	if err != nil {
 		modutil.SetError(exec, "read fixture err: %v", err)
 		return *exec

@@ -2,10 +2,9 @@ package virustotal
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -13,6 +12,9 @@ import (
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
+
+//go:embed testdata/domain_page1.json testdata/subdomains_page1.json testdata/subdomains_page2.json testdata/ip_page1.json testdata/resolutions_page1.json testdata/resolutions_page2.json
+var demoData embed.FS
 
 func (m *module) processDomainDemo(_ context.Context, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	if !m.demoDomainFired.CompareAndSwap(false, true) {
@@ -29,7 +31,7 @@ func (m *module) processDomainDemo(_ context.Context, target string, exec *schem
 		LocalID:  gen.NextID(),
 	})
 
-	dataBytes, err := os.ReadFile("modules/virustotal/testdata/domain_page1.json")
+	dataBytes, err := demoData.ReadFile("testdata/domain_page1.json")
 	if err != nil {
 		modutil.SetError(exec, "read fixture err: %v", err)
 		return
@@ -54,8 +56,8 @@ func (m *module) processDomainDemo(_ context.Context, target string, exec *schem
 
 	for _, i := range []int{1, 2} {
 		fixture := fmt.Sprintf("subdomains_page%d.json", i)
-		fixturePath := filepath.Join("modules", "virustotal", "testdata", filepath.Clean(fixture))
-		subDataBytes, err := os.ReadFile(filepath.Clean(fixturePath))
+		fixturePath := "testdata/" + fixture
+		subDataBytes, err := demoData.ReadFile(fixturePath)
 		if err != nil {
 			continue
 		}
@@ -111,7 +113,7 @@ func (m *module) processIPDemo(_ context.Context, target string, exec *schema.Mo
 		LocalID:  gen.NextID(),
 	})
 
-	dataBytes, err := os.ReadFile("modules/virustotal/testdata/ip_page1.json")
+	dataBytes, err := demoData.ReadFile("testdata/ip_page1.json")
 	if err != nil {
 		modutil.SetError(exec, "read fixture err: %v", err)
 		return
@@ -132,8 +134,8 @@ func (m *module) processIPDemo(_ context.Context, target string, exec *schema.Mo
 
 	for _, i := range []int{1, 2} {
 		fixture := fmt.Sprintf("resolutions_page%d.json", i)
-		fixturePath := filepath.Join("modules", "virustotal", "testdata", filepath.Clean(fixture))
-		resDataBytes, err := os.ReadFile(filepath.Clean(fixturePath))
+		fixturePath := "testdata/" + fixture
+		resDataBytes, err := demoData.ReadFile(fixturePath)
 		if err != nil {
 			continue
 		}

@@ -1,13 +1,16 @@
 package haveibeenpwned
 
 import (
+	"embed"
 	"encoding/json"
-	"os"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
+
+//go:embed testdata/multiple-breaches.json
+var demoData embed.FS
 
 func (m *module) getEmailBreachesDemo(exec *schema.ModuleExecution, email string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	dlog.Printf("%s success stage=demo email=%s", constants.FuncGetEmailBreaches, email)
@@ -16,13 +19,10 @@ func (m *module) getEmailBreachesDemo(exec *schema.ModuleExecution, email string
 		return *exec
 	}
 
-	data, err := os.ReadFile("modules/haveibeenpwned/testdata/multiple-breaches.json")
+	data, err := demoData.ReadFile("testdata/multiple-breaches.json")
 	if err != nil {
-		data, err = os.ReadFile("testdata/multiple-breaches.json")
-		if err != nil {
-			modutil.SetError(exec, "demo failed to read testdata: %v", err)
-			return *exec
-		}
+		modutil.SetError(exec, "demo failed to read testdata: %v", err)
+		return *exec
 	}
 
 	var breaches []apiBreachEntry

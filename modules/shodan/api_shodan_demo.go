@@ -1,12 +1,15 @@
 package shodan
 
 import (
-	"os"
+	"embed"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
+
+//go:embed testdata/ip_full.json testdata/domain.json
+var demoData embed.FS
 
 // getShodanAPIIPDemo is a demo function that loads a local JSON fixture
 // instead of querying the Shodan API when the "demo-api-key" is used.
@@ -24,7 +27,7 @@ func (m *shodanModule) getShodanAPIIPDemo(exec *schema.ModuleExecution, target s
 		Value:    "⚠️ DEMO MODE: Showing sample data for Shodan (API key not configured)",
 	})
 
-	data, err := os.ReadFile("modules/shodan/testdata/ip_full.json")
+	data, err := demoData.ReadFile("testdata/ip_full.json")
 	if err != nil {
 		modutil.SetError(exec, "read fixture err: %v", err)
 		return *exec
@@ -54,7 +57,7 @@ func (m *shodanModule) getShodanAPIDomainDemo(exec *schema.ModuleExecution, targ
 		Value:    "⚠️ DEMO MODE: Showing sample data for Shodan (API key not configured)",
 	})
 
-	data, err := os.ReadFile("modules/shodan/testdata/domain.json")
+	data, err := demoData.ReadFile("testdata/domain.json")
 	if err != nil {
 		modutil.SetError(exec, "read fixture err: %v", err)
 		return *exec
