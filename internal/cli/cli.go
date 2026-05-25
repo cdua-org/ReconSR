@@ -12,6 +12,9 @@ import (
 	"cdua-org/ReconSR/internal/report"
 )
 
+// WikiURL is the link to the project documentation and setup guides.
+const WikiURL = "https://github.com/cdua-org/ReconSR/wiki"
+
 // ShowResultsMenu presents visualization options.
 func ShowResultsMenu(ctx context.Context) {
 	for {
@@ -81,6 +84,9 @@ func ShowBanner(ctx context.Context) {
 	fmt.Printf("  + %-18s %s\n", i18n.T["LBL_MODS"]+"/"+i18n.T["LBL_FUNCS"]+":", modInfo)
 
 	fmt.Printf("  + %-18s %s\n", i18n.T["MSG_CONN_DB"]+":", colorGreen+i18n.T["MSG_STATUS_CONN"]+colorReset)
+	fmt.Println()
+	fmt.Println(colorYellow + "  [!] " + i18n.T["MSG_API_KEYS_NOTE"] + colorReset)
+	fmt.Println(colorYellow + "      " + i18n.T["MSG_API_KEYS_SETUP"] + " " + WikiURL + colorReset)
 	fmt.Println(colorCyan + "--------------------------------------------------" + colorReset)
 }
 
