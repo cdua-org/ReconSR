@@ -190,7 +190,7 @@ API-backed enrichment for domains, optionally subdomains, and IPv4/IPv6 targets 
 - `get_vt_api_ip`: Queries VirusTotal IP metadata and passive DNS resolutions. Extracts ASN, network CIDR, AS owner, geo metadata, JARM, tags, threat scores, last update, passive DNS hostnames, etc.
 
 ### 18. Vulnerability Lookup (`modules/vuln_lookup`) - 1 function
-- `get_circl_vuln`: Queries the CIRCL Vulnerability API for CVE entities. Extracts vulnerability summaries, CWE classifications with local descriptions, best available CVSS metrics, affected CPE criteria, EPSS probability and percentile, SSVC/KEV indicators, additional metadata included in CIRCL responses, etc.
+- `get_circl_vuln`: Queries the CIRCL Vulnerability API for CVE entities. Supports an optional API key; without one, requests use the public keyless endpoint and remain subject to strict rate limits. Extracts vulnerability summaries, CWE classifications with local descriptions, best available CVSS metrics, affected CPE criteria, EPSS probability and percentile, SSVC/KEV indicators, additional metadata included in CIRCL responses, etc.
 
 ---
 

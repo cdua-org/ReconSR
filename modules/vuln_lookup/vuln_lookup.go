@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"cdua-org/ReconSR/modules/utils/apiconfig"
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/debuglog"
 	"cdua-org/ReconSR/modules/utils/modutil"
@@ -15,10 +16,16 @@ import (
 
 var dlog = debuglog.New("vuln_lookup")
 
-type module struct{}
+type module struct {
+	apiKey string
+}
 
 // New instantiates the module for registration.
-func New() schema.Module { return &module{} }
+func New() schema.Module {
+	return &module{
+		apiKey: apiconfig.GetKey("Circl"),
+	}
+}
 
 func (m *module) Name() string { return "vuln_lookup" }
 
@@ -41,7 +48,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		switch f {
 		case constants.FuncGetCirclVuln:
 			gen := modutil.NewLocalIDGenerator()
-			executions = append(executions, getCirclVuln(ctx, data.Target.Type, data.Target.Value, gen))
+			executions = append(executions, getCirclVuln(ctx, data.Target.Type, data.Target.Value, m.apiKey, gen))
 		default:
 			exec := modutil.NewExecution(f)
 			modutil.SetError(&exec, "unsupported function: %v", fmt.Errorf("%s", f))

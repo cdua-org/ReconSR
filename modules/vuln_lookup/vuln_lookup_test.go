@@ -154,7 +154,7 @@ func TestGetCirclVuln_CVE_WithCNAMetrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.cve, func(t *testing.T) {
-			exec := getCirclVuln(context.Background(), constants.TypeCVE, tt.cve, modutil.NewLocalIDGenerator())
+			exec := getCirclVuln(context.Background(), constants.TypeCVE, tt.cve, "", modutil.NewLocalIDGenerator())
 
 			if exec.Error != nil {
 				t.Fatalf("unexpected error: %s", *exec.Error)
@@ -199,7 +199,7 @@ func TestGetCirclVuln_CVE_NVDFallback(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			exec := getCirclVuln(context.Background(), constants.TypeCVE, tt.cve, modutil.NewLocalIDGenerator())
+			exec := getCirclVuln(context.Background(), constants.TypeCVE, tt.cve, "", modutil.NewLocalIDGenerator())
 
 			if exec.Error != nil {
 				t.Fatalf("unexpected error: %s", *exec.Error)
@@ -218,7 +218,7 @@ func TestGetCirclVuln_CVE2026_MultipleMetricVersions(t *testing.T) {
 	defer server.Close()
 	overrideBaseURL(t, server.URL)
 
-	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-2026-41872", modutil.NewLocalIDGenerator())
+	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-2026-41872", "", modutil.NewLocalIDGenerator())
 	if exec.Error != nil {
 		t.Fatalf("unexpected error: %s", *exec.Error)
 	}
@@ -307,7 +307,7 @@ func TestGetCirclVuln_NotFound(t *testing.T) {
 	defer server.Close()
 	overrideBaseURL(t, server.URL)
 
-	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-UNKNOWN", modutil.NewLocalIDGenerator())
+	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-UNKNOWN", "", modutil.NewLocalIDGenerator())
 
 	if exec.Error != nil {
 		t.Errorf("did not expect error for 404, got: %s", *exec.Error)
@@ -328,7 +328,7 @@ func TestGetCirclVuln_ServerError(t *testing.T) {
 	overrideBaseURL(t, server.URL)
 	overrideRetryDelay(t)
 
-	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-ERROR", modutil.NewLocalIDGenerator())
+	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-ERROR", "", modutil.NewLocalIDGenerator())
 
 	if exec.Error == nil {
 		t.Fatal("expected error for 500 status code")
@@ -370,7 +370,7 @@ func TestModule_LocalIDChaining(t *testing.T) {
 	overrideBaseURL(t, server.URL)
 
 	gen := modutil.NewLocalIDGenerator()
-	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-2024-38063", gen)
+	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-2024-38063", "", gen)
 
 	if exec.Error != nil {
 		t.Fatalf("unexpected error: %s", *exec.Error)

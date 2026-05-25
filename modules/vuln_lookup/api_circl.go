@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/httputil"
@@ -18,12 +19,12 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func getCirclVuln(ctx context.Context, targetType, targetValue string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
+func getCirclVuln(ctx context.Context, targetType, targetValue, apiKey string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetCirclVuln)
 
 	switch targetType {
 	case constants.TypeCVE:
-		fetchAndParseCVE(ctx, &exec, targetValue, gen)
+		fetchAndParseCVE(ctx, &exec, targetValue, apiKey, gen)
 
 	default:
 		modutil.SetError(&exec, "unsupported target type: %v", fmt.Errorf("%s", targetType))
@@ -32,9 +33,9 @@ func getCirclVuln(ctx context.Context, targetType, targetValue string, gen *modu
 	return exec
 }
 
-func fetchAndParseCVE(ctx context.Context, exec *schema.ModuleExecution, cve string, gen *modutil.LocalIDGenerator) {
+func fetchAndParseCVE(ctx context.Context, exec *schema.ModuleExecution, cve, apiKey string, gen *modutil.LocalIDGenerator) {
 	apiURL := buildCVESearchURL(cve)
-	raw, err := fetchCircl(ctx, apiURL)
+	raw, err := fetchCircl(ctx, apiURL, apiKey)
 	if err != nil {
 		modutil.SetError(exec, "%v", err)
 		modutil.SetRawFromBytes(exec, raw)
@@ -339,13 +340,16 @@ func isValidCWE(val string) bool {
 	return true
 }
 
-func fetchCircl(ctx context.Context, apiURL string) ([]byte, error) {
+func fetchCircl(ctx context.Context, apiURL, apiKey string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", resolver.GetRandomUserAgent())
+	if apiKey != "" {
+		req.Header.Set("X-API-KEY", apiKey)
+	}
 
 	client := &http.Client{Timeout: resolver.HTTPTimeout}
 
@@ -382,8 +386,11 @@ func fetchCircl(ctx context.Context, apiURL string) ([]byte, error) {
 			return body, fmt.Errorf("http %d", resp.StatusCode)
 		}
 		if action == httputil.RateLimit {
-			dlog.Printf("%s rate_limited url=%q attempt=%d", constants.FuncGetCirclVuln, apiURL, attempt)
-			if !httputil.SleepContext(ctx, httputil.RetryDelay(action, attempt, resolver.CirclRetryBaseDelay)) {
+			baseDelay := httputil.RetryDelay(action, attempt, resolver.CirclRetryBaseDelay)
+			delay, source := parseRateLimitDelay(resp, baseDelay)
+			dlog.Printf("%s rate_limited url=%q attempt=%d delay=%v source=%s", constants.FuncGetCirclVuln, apiURL, attempt, delay, source)
+
+			if !httputil.SleepContext(ctx, delay) {
 				return body, fmt.Errorf("context canceled: %w", ctx.Err())
 			}
 			lastErr = errors.New("http 429")
@@ -420,4 +427,21 @@ func buildCVESearchURL(cve string) string {
 	q.Set("with_sightings", strconv.FormatBool(resolver.CirclWithSightings))
 	u.RawQuery = q.Encode()
 	return u.String()
+}
+
+func parseRateLimitDelay(resp *http.Response, fallback time.Duration) (delay time.Duration, source string) {
+	if retryAfterStr := resp.Header.Get("Retry-After"); retryAfterStr != "" {
+		if retryAfterSecs, err := strconv.Atoi(retryAfterStr); err == nil && retryAfterSecs > 0 {
+			return time.Duration(retryAfterSecs)*time.Second + time.Second, "retry_after"
+		}
+	}
+	if resetStr := resp.Header.Get("X-RateLimit-Reset"); resetStr != "" {
+		if resetUnix, err := strconv.ParseInt(resetStr, 10, 64); err == nil {
+			resetTime := time.Unix(resetUnix, 0)
+			if timeUntil := time.Until(resetTime); timeUntil > 0 {
+				return timeUntil + time.Second, "ratelimit_reset"
+			}
+		}
+	}
+	return fallback, "fallback"
 }
