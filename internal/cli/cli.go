@@ -86,6 +86,7 @@ func ShowBanner(ctx context.Context) {
 	fmt.Printf("  + %-18s %s\n", i18n.T["MSG_CONN_DB"]+":", colorGreen+i18n.T["MSG_STATUS_CONN"]+colorReset)
 	fmt.Println()
 	fmt.Println(colorYellow + "  [!] " + i18n.T["MSG_API_KEYS_NOTE"] + colorReset)
+	fmt.Println(colorYellow + "      " + i18n.T["MSG_EMPTY_RESULTS_NOTE"] + colorReset)
 	fmt.Println(colorYellow + "      " + i18n.T["MSG_API_KEYS_SETUP"] + " " + WikiURL + colorReset)
 	fmt.Println(colorCyan + "--------------------------------------------------" + colorReset)
 }
