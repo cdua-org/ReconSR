@@ -19,7 +19,7 @@ ReconSR is an automated OSINT tool designed to provide cybersecurity researchers
 > **Legal Disclaimer:** This tool is designed for authorized security auditing, infrastructure monitoring, and legitimate security research. ReconSR is provided "as is", without warranty of any kind. The authors are not liable for any direct or indirect damages, data loss, systemic failures, misuse, or legal consequences resulting from the use of this software. Users are solely responsible for ensuring that their activities comply with local and international laws. Scanning targets without prior explicit authorization is illegal and unethical.
 
 > [!WARNING]
-> **Third-Party Services & APIs:** > ReconSR interacts with various external APIs, public registries, and third-party databases (e.g., HackerTarget, crt.sh, RIPEstat, Shodan InternetDB). Each of these providers operates under its own Terms of Service (ToS), Acceptable Use Policies (AUP), and data licensing agreements.
+> **Third-Party Services & APIs:** ReconSR interacts with various external APIs, public registries, and third-party databases. Each of these providers operates under its own Terms of Service (ToS), Acceptable Use Policies (AUP), and data licensing agreements.
 >
 > By using ReconSR, you acknowledge that:
 > 1. You are solely responsible for reviewing and strictly complying with the Terms of Service of any third-party data provider queried by this framework.
