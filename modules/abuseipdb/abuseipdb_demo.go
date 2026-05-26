@@ -12,9 +12,9 @@ import (
 //go:embed testdata/ip.json
 var demoData embed.FS
 
-func (m *module) processCheckDemo(exec *schema.ModuleExecution, target string, gen *modutil.LocalIDGenerator) {
+func (m *module) processCheckDemo(exec *schema.ModuleExecution, targetType, targetValue string, gen *modutil.LocalIDGenerator) {
 	if !m.demoFired.CompareAndSwap(false, true) {
-		dbg.Printf("%s skipped stage=demo_already_fired target=%q", constants.FuncCheckAbuseIPDB, target)
+		dbg.Printf("%s skipped stage=demo_already_fired target=%q", constants.FuncCheckAbuseIPDB, targetValue)
 		return
 	}
 
@@ -40,7 +40,7 @@ func (m *module) processCheckDemo(exec *schema.ModuleExecution, target string, g
 		return
 	}
 
-	populateResults(exec, &parsed, gen)
+	populateResults(exec, targetType, targetValue, &parsed, gen)
 
 	dbg.Printf("%s success stage=demo_parsed score=%d reports=%d", constants.FuncCheckAbuseIPDB, parsed.Data.AbuseConfidenceScore, parsed.Data.TotalReports)
 }

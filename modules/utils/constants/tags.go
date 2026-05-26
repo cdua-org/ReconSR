@@ -6,8 +6,6 @@ const (
 	TagTorExit          = "tor_exit"
 	TagWhitelisted      = "whitelisted"
 	TagPublicIP         = "public_ip"
-	TagSuspicious       = "suspicious"
-	TagMalicious        = "malicious"
 	TagSpam             = "spam"
 	TagDDoS             = "ddos"
 	TagBruteforce       = "bruteforce"

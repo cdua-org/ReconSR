@@ -26,4 +26,6 @@ const (
 	TagSocial      = "social"
 	TagScrape      = "scrape"
 	TagCVE         = "cve"
+	TagMalicious   = "malicious"
+	TagSuspicious  = "suspicious"
 )

@@ -76,7 +76,7 @@ func runModuleTest(t *testing.T, target, fixture string, statusCode int, customH
 
 	m := New()
 	out, err := m.Exec(schema.ModuleInput{
-		Target:    schema.Entity{Value: target},
+		Target:    schema.Entity{Type: constants.TypeIPv4, Value: target},
 		Functions: []string{constants.FuncCheckAbuseIPDB},
 	})
 	if err != nil {
@@ -137,7 +137,7 @@ func TestAbuseIPDB_Successful(t *testing.T) {
 	if !hasReport(exec.Results) {
 		t.Errorf("Missing abuse report")
 	}
-	if !hasResult(exec.Results, constants.TypeTag, constants.TagMalicious) {
+	if !hasResultWithTag(exec.Results, constants.TypeIPv4, "192.0.2.1", constants.TagMalicious) {
 		t.Errorf("Missing malicious tag")
 	}
 	if !hasResult(exec.Results, constants.TypeTag, constants.TagBruteforce) {
@@ -177,7 +177,7 @@ func TestAbuseIPDB_Tor(t *testing.T) {
 	if !hasResult(exec.Results, constants.TypeTag, constants.TagTorExit) {
 		t.Errorf("Expected tor tag")
 	}
-	if !hasResult(exec.Results, constants.TypeTag, constants.TagMalicious) {
+	if !hasResultWithTag(exec.Results, constants.TypeIPv4, "192.0.2.3", constants.TagMalicious) {
 		t.Errorf("Expected malicious tag")
 	}
 	if !hasResult(exec.Results, constants.TypeTag, constants.TagBruteforce) {
@@ -236,13 +236,13 @@ func TestAbuseIPDB_SuspiciousAndTags(t *testing.T) {
 	defer func() { defaultAPIURL = origAPIURL }()
 
 	m := New()
-	out, err := m.Exec(schema.ModuleInput{Target: schema.Entity{Value: "192.0.2.10"}, Functions: []string{constants.FuncCheckAbuseIPDB}})
+	out, err := m.Exec(schema.ModuleInput{Target: schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.10"}, Functions: []string{constants.FuncCheckAbuseIPDB}})
 	if err != nil {
 		t.Fatalf("m.Exec failed: %v", err)
 	}
 	exec := out.Executions[0]
 
-	if !hasResult(exec.Results, constants.TypeTag, constants.TagSuspicious) {
+	if !hasResultWithTag(exec.Results, constants.TypeIPv4, "192.0.2.10", constants.TagSuspicious) {
 		t.Errorf("Missing suspicious tag")
 	}
 	if !hasResult(exec.Results, constants.TypeTag, constants.TagSpam) {
@@ -262,15 +262,18 @@ func TestAbuseIPDB_DomainReverseIPTag(t *testing.T) {
 		t.Fatalf("Expected no error, got: %s", *exec.Error)
 	}
 
-	domains := []string{"example.com", "node1.example.com", "mail.example.org"}
-	for _, d := range domains {
-		if !hasResultWithTag(exec.Results, constants.TypeDomain, d, constants.TagReverseIP) {
-			t.Errorf("Domain %q missing %s tag", d, constants.TagReverseIP)
-		}
+	if !hasResultWithTag(exec.Results, constants.TypeDomain, "example.com", constants.TagReverseIP) {
+		t.Errorf("Domain %q missing %s tag", "example.com", constants.TagReverseIP)
+	}
+	if !hasResultWithTag(exec.Results, constants.TypeSubdomain, "node1.example.com", constants.TagReverseIP) {
+		t.Errorf("Subdomain %q missing %s tag", "node1.example.com", constants.TagReverseIP)
+	}
+	if !hasResultWithTag(exec.Results, constants.TypeSubdomain, "mail.example.org", constants.TagReverseIP) {
+		t.Errorf("Subdomain %q missing %s tag", "mail.example.org", constants.TagReverseIP)
 	}
 
 	for _, r := range exec.Results {
-		if r.Type == constants.TypeDomain && r.OutOfScope {
+		if (r.Type == constants.TypeDomain || r.Type == constants.TypeSubdomain) && r.OutOfScope {
 			t.Errorf("Domain %q must not be OutOfScope", r.Value)
 		}
 	}
@@ -311,4 +314,46 @@ func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
 		}
 		seen[res.LocalID] = true
 	}
+}
+
+func TestAbuseIPDB_DemoMode(t *testing.T) {
+	if err := os.Setenv("RECONSR_ABUSEIPDB", "demo-api-key"); err != nil {
+		t.Fatalf("setenv: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Unsetenv("RECONSR_ABUSEIPDB"); err != nil {
+			t.Logf("unsetenv failed: %v", err)
+		}
+	})
+
+	m := New()
+	out, err := m.Exec(schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.1"},
+		Functions: []string{constants.FuncCheckAbuseIPDB},
+	})
+	if err != nil {
+		t.Fatalf("m.Exec failed: %v", err)
+	}
+	exec := out.Executions[0]
+
+	if exec.Error != nil {
+		t.Fatalf("Expected no error, got: %s", *exec.Error)
+	}
+	if len(exec.Results) == 0 {
+		t.Fatal("Expected results, got 0")
+	}
+
+	if !hasResult(exec.Results, constants.TypeInfo, "⚠️ DEMO MODE: Showing sample data for AbuseIPDB (API key not configured)") {
+		t.Errorf("Missing demo mode info message")
+	}
+	if !hasResultWithTag(exec.Results, constants.TypeIPv4, "192.0.2.1", constants.TagMalicious) {
+		t.Errorf("Missing malicious tag on target in demo mode")
+	}
+	if !hasResultWithTag(exec.Results, constants.TypeDomain, "example.com", constants.TagReverseIP) {
+		t.Errorf("Missing domain example.com with reverse_ip tag in demo mode")
+	}
+	if !hasResultWithTag(exec.Results, constants.TypeSubdomain, "node1.example.com", constants.TagReverseIP) {
+		t.Errorf("Missing subdomain node1.example.com with reverse_ip tag in demo mode")
+	}
+	requireUniqueLocalIDs(t, exec.Results)
 }

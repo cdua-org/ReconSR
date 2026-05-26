@@ -58,7 +58,7 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 		appendVTProperty(exec, constants.TypeLastUpdate, formattedDate, "Last Update for "+target, nil, gen)
 	}
 
-	m.extractThreatScore(attr, nil, exec, gen)
+	m.extractThreatScore(attr, constants.TypeIP, target, nil, exec, gen)
 }
 
 func (m *module) extractIPResolution(item map[string]any, _ string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {

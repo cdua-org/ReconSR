@@ -10,6 +10,7 @@ const (
 	TypeIPv6                  = "ipv6"
 	TypeASN                   = "asn"
 	TypeIPv4Ambiguous         = "ipv4_ambiguous"
+	TypeHostname              = "hostname"
 	TypeWhoisRegistrar        = "whois_registrar"
 	TypeWhoisRegistrant       = "whois_registrant"
 	TypeWhoisAdmin            = "whois_admin"

@@ -56,7 +56,7 @@ func extractVTTags(attr map[string]any) []string {
 	return tags
 }
 
-func (m *module) extractThreatScore(attr map[string]any, src *schema.EntityRef, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
+func (m *module) extractThreatScore(attr map[string]any, entityType, entityValue string, src *schema.EntityRef, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	stats, ok := attr["last_analysis_stats"].(map[string]any)
 	if !ok {
 		return
@@ -72,6 +72,22 @@ func (m *module) extractThreatScore(attr map[string]any, src *schema.EntityRef, 
 
 	if malicious == 0 && suspicious == 0 {
 		return
+	}
+
+	var tag string
+	if malicious > 0 {
+		tag = constants.TagMalicious
+	} else if suspicious > 0 {
+		tag = constants.TagSuspicious
+	}
+
+	if tag != "" && entityType != "" && entityValue != "" {
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:    entityType,
+			Value:   entityValue,
+			Tags:    []string{tag},
+			LocalID: gen.NextID(),
+		})
 	}
 
 	engines := extractEngines(attr)

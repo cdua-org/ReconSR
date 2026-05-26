@@ -34,7 +34,7 @@ func (m *module) extractDomainMetadata(attr map[string]any, target string, exec 
 		}
 	}
 
-	m.extractThreatScore(attr, nil, exec, gen)
+	m.extractThreatScore(attr, constants.TypeDomain, target, nil, exec, gen)
 	appendDomainCategories(exec, attr, gen)
 	appendDomainReputation(exec, attr, gen)
 	appendDomainPopularityRanks(exec, attr, gen)
@@ -428,7 +428,7 @@ func (m *module) appendSubdomainDeepResults(attr map[string]any, scopeTarget str
 		}
 	}
 
-	m.extractThreatScore(attr, subRef, exec, gen)
+	m.extractThreatScore(attr, subRef.Type, subRef.Value, subRef, exec, gen)
 }
 
 func (m *module) logIgnoredSubdomainFields(attr map[string]any, subdomain string) {
