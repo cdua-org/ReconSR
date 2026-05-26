@@ -42,6 +42,7 @@ microsoft.com, azure.com, windows.net, onmicrosoft.com, office.com, windows.com,
 apple.com, icloud.com, apple-dns.net
 digitalocean.com, digitaloceanspaces.com
 github.com, github.io, githubusercontent.com
+dropbox.com, dropboxusercontent.com, addtodropbox.com, hellosign.com, dash.ai, db.tt, docsend.com, dropbox.com, dropboxapi.com, dropboxbusiness.com, dropboxcaptcha.com, dropboxexperiment.com, dropboxforums.com, dropboxforum.com, dropboxinsiders.com, dropboxlegal.com, dropboxmail.com, dropboxpartners.com, dropboxstatic.com, dropboxteam.com, dropbox.tech, getdropbox.com, hellofax.com
 
 # CDNs and Edge Networks
 # -- Tier-1 CDNs --
