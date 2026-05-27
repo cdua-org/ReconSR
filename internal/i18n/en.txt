@@ -1,11 +1,32 @@
-LBL_USAGE = Usage
-LBL_TARGET_HINT = target
-MSG_PROJECTS_EXIST_1=Projects already exist for target:
-MSG_PROJECTS_EXIST_2=What would you like to do?
-OPT_NEW_PROJECT=Start a new project.
-OPT_CONTINUE_PROJECT=Continue project
+# ==========================================
+# LABELS
+# ==========================================
+LBL_USAGE=Usage
+LBL_TARGET_HINT=target
 LBL_CREATED=Created
 LBL_PROJECT_STATUS=Project Status Report
+LBL_PROJECT=Project
+LBL_RESULTS_FOR=Results for
+LBL_ERROR=Error
+LBL_CHOICE_PROMPT=Choice
+LBL_TARGET=Target:
+LBL_INPUT_TARGET_PROMPT=Enter target (domain, ip, etc.):
+LBL_TYPE=Type:
+LBL_LOADED=active
+LBL_MODS=Modules
+LBL_FUNCS=Functions
+LBL_SYS_INFO=System Information
+LBL_OUT_OF_SCOPE=(out of scope)
+LBL_LIMIT_REACHED=(depth limit reached)
+LBL_CONFIG_TITLE=Module Configuration
+LBL_SELECT_MODULE=Select a module to configure:
+LBL_CONFIG_FUNCS=Configure functions for
+
+# ==========================================
+# OPTIONS
+# ==========================================
+OPT_NEW_PROJECT=Start a new project.
+OPT_CONTINUE_PROJECT=Continue project
 OPT_FULL_RESCAN=Full rescan (forces active functions to run again).
 OPT_CONTINUE_PENDING=Continue unexecuted modules.
 OPT_RETRY_ERRORS=Retry modules with errors.
@@ -14,62 +35,57 @@ OPT_BACK=Back
 OPT_EXIT=Exit
 OPT_TREE_CONSOLE=Results Tree (Console)
 OPT_GRAPH_HTML=Interactive Graph (HTML)
-LBL_PROJECT=Project
-LBL_RESULTS_FOR=Results for
-LBL_ERROR=Error
+OPT_START_SCAN=Start scan
+OPT_CONFIG_MODULES=Configure modules and functions
+OPT_SAVE_EXIT=Save and go back
+OPT_TOGGLE_ALL=Toggle All Functions
+
+# ==========================================
+# MESSAGES
+# ==========================================
+MSG_PROJECTS_EXIST_1=Projects already exist for target:
+MSG_PROJECTS_EXIST_2=What would you like to do?
 MSG_REPORT_SAVED=Report saved
 MSG_SCAN_COMPLETE=Scan sequence finished.
-MSG_HISTORY_FOUND = History for
-MSG_SCANS_COUNT = scans
-MSG_LATEST_FOUND = Latest session found
-MSG_STATUS_COMPLETED = Status: fully completed based on current modules
-MSG_STATUS_INCOMPLETE = Status: incomplete. Missing modules
-MSG_STATUS_FAILED = Status: modules failed
-MSG_CHOICE_FRESH = Fresh Scan (Create new history entry)
-MSG_CHOICE_RESUME = Resume scan
-MSG_CHOICE_RERUN_FAILED = Rerun failed modules
+MSG_HISTORY_FOUND=History for
+MSG_SCANS_COUNT=scans
+MSG_LATEST_FOUND=Latest session found
+MSG_STATUS_COMPLETED=Status: fully completed based on current modules
+MSG_STATUS_INCOMPLETE=Status: incomplete. Missing modules
+MSG_STATUS_FAILED=Status: modules failed
+MSG_CHOICE_FRESH=Fresh Scan (Create new history entry)
+MSG_CHOICE_RESUME=Resume scan
+MSG_CHOICE_RERUN_FAILED=Rerun failed modules
 MSG_PROJ_COMPLETE=All active functions successfully applied.
 MSG_RESCANNING=Rescanning project...
 MSG_NEW_PROJ_OK=New project created successfully!
-OPT_START_SCAN=Start scan
 MSG_PENDING_FOUND=Unexecuted modules/functions found:
 MSG_ERRORS_FOUND=Modules/functions with errors found:
 MSG_PROJ_ACTION=Select an action:
-LBL_CHOICE_PROMPT = Choice
-MSG_RESUMING = Resuming and completing
-MSG_NEW_SESSION = New history entry
-MSG_SESSION_UPDATED = Session updated and saved
+MSG_RESUMING=Resuming and completing
+MSG_NEW_SESSION=New history entry
+MSG_SESSION_UPDATED=Session updated and saved
+MSG_SCAN_STARTED=Scan in progress. Press Ctrl+C to stop safely.
+MSG_IDENTIFIED_AS=Target type identified as:
+MSG_INIT_CORE=Core Engine
+MSG_CONN_DB=Database
+MSG_STATUS_READY=Ready
+MSG_STATUS_CONN=Connected
+MSG_ACTIVE_TOOLS=Active Tools
+MSG_CONFIG_INFO=Press 0 to Configure modules and functions.
+MSG_API_KEYS_NOTE=Note: Some modules require API keys for full results.
+MSG_EMPTY_RESULTS_NOTE=Empty results mean either nothing was found or required API keys are missing.
+MSG_API_KEYS_SETUP=Please check the Wiki for setup instructions:
+MSG_CONFIG_SAVED=Configuration saved successfully.
+
+# ==========================================
+# ERRORS
+# ==========================================
 ERR_INVALID_FORMAT=Error: invalid format.
 ERR_OUT_OF_SCOPE=Error: target is out of scope (check scope.txt).
 ERR_INVALID_CHOICE=Invalid choice.
 ERR_UNSUPPORTED_TYPE=Error: unsupported entity type.
 ERR_EXAMPLE_DOMAIN=Expected format: example.com
 ERR_EXAMPLE_IP=Expected format: 192.168.1.1
-ERR_NO_MODULES=No modules are currently registered to analyze the target type '%s'.
+ERR_NO_MODULES=No modules are currently registered to analyze the target type:
 ERR_NO_ACTIVE_FUNCS=No active functions enabled for this target type.
-MSG_IDENTIFIED_AS=Target type identified as:
-LBL_TARGET=Target:
-LBL_INPUT_TARGET_PROMPT=Enter target (domain, ip, etc.):
-LBL_TYPE=Type:
-MSG_INIT_CORE=Core Engine
-MSG_CONN_DB=Database
-LBL_LOADED=active
-LBL_MODS=Modules
-LBL_FUNCS=Functions
-MSG_STATUS_READY=Ready
-MSG_STATUS_CONN=Connected
-LBL_SYS_INFO=System Information
-MSG_ACTIVE_TOOLS=Active Tools
-MSG_CONFIG_INFO=Press 0 to Configure modules and functions.
-MSG_API_KEYS_NOTE=Note: Some modules require API keys for full results.
-MSG_EMPTY_RESULTS_NOTE=Empty results mean either nothing was found or required API keys are missing.
-MSG_API_KEYS_SETUP=Please check the Wiki for setup instructions:
-LBL_OUT_OF_SCOPE=(out of scope)
-LBL_LIMIT_REACHED=(depth limit reached)
-OPT_CONFIG_MODULES=Configure modules and functions
-LBL_CONFIG_TITLE=Module Configuration
-LBL_SELECT_MODULE=Select a module to configure:
-LBL_CONFIG_FUNCS=Configure functions for
-MSG_CONFIG_SAVED=Configuration saved successfully.
-OPT_SAVE_EXIT=Save and go back
-OPT_TOGGLE_ALL=Toggle All Functions
