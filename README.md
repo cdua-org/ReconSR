@@ -15,6 +15,21 @@
 
 ReconSR is an automated OSINT tool designed to provide cybersecurity researchers with a modular framework for mapping and analyzing complex digital footprints and attack surfaces.
 
+<table>
+  <tr>
+    <td width="50%">
+      <a href=".github/images/ReconSR-cli.webp">
+        <img src=".github/images/ReconSR-cli.webp" alt="ReconSR cli">
+      </a>
+    </td>
+    <td width="50%">
+      <a href=".github/images/ReconSR-html.webp">
+        <img src=".github/images/ReconSR-html.webp" alt="ReconSR html">
+      </a>
+    </td>
+  </tr>
+</table>
+
 > [!CAUTION]
 > **Legal Disclaimer:** This tool is designed for authorized security auditing, infrastructure monitoring, and legitimate security research. ReconSR is provided "as is", without warranty of any kind. The authors are not liable for any direct or indirect damages, data loss, systemic failures, misuse, or legal consequences resulting from the use of this software. Users are solely responsible for ensuring that their activities comply with local and international laws. Scanning targets without prior explicit authorization is illegal and unethical.
 
