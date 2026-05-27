@@ -239,10 +239,9 @@ func TestGetCirclVuln_CVE2026_MultipleMetricVersions(t *testing.T) {
 	}
 }
 
-func verifyCVEResults(t *testing.T, cve string, results []schema.ModuleResult, expectCWE, expectSSVC, expectKEV bool) {
+func collectTypesAndVerify(t *testing.T, results []schema.ModuleResult) map[string]bool {
 	t.Helper()
 	found := make(map[string]bool)
-
 	for _, res := range results {
 		found[res.Type] = true
 		if res.Type == constants.TypeDescription {
@@ -250,7 +249,18 @@ func verifyCVEResults(t *testing.T, cve string, results []schema.ModuleResult, e
 				t.Error("Description result must have a valid Source.LocalID linking to parent")
 			}
 		}
+		if res.Type == constants.TypeCPE {
+			if res.Category != constants.CategoryProperty {
+				t.Errorf("CPE result must have Category %s, got %s", constants.CategoryProperty, res.Category)
+			}
+		}
 	}
+	return found
+}
+
+func verifyCVEResults(t *testing.T, cve string, results []schema.ModuleResult, expectCWE, expectSSVC, expectKEV bool) {
+	t.Helper()
+	found := collectTypesAndVerify(t, results)
 
 	if !found[constants.TypeCVSS] {
 		t.Error("expected CVSS result")
@@ -274,16 +284,7 @@ func verifyCVEResults(t *testing.T, cve string, results []schema.ModuleResult, e
 
 func verifyFallbackResults(t *testing.T, cve string, results []schema.ModuleResult, expectCVSS, expectEPSS, expectCWE bool) {
 	t.Helper()
-	found := make(map[string]bool)
-
-	for _, res := range results {
-		found[res.Type] = true
-		if res.Type == constants.TypeDescription {
-			if res.Source == nil || res.Source.LocalID == 0 {
-				t.Error("Description result must have a valid Source.LocalID linking to parent")
-			}
-		}
-	}
+	found := collectTypesAndVerify(t, results)
 
 	if !found[constants.TypeSummary] {
 		t.Error("expected Summary result")

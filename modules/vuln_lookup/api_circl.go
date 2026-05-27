@@ -105,10 +105,11 @@ func extractCPEs(exec *schema.ModuleExecution, applicability []CpeApplicability,
 				if match.Criteria != "" && !seen[match.Criteria] {
 					seen[match.Criteria] = true
 					exec.Results = append(exec.Results, schema.ModuleResult{
-						Type:    constants.TypeCPE,
-						Value:   match.Criteria,
-						Source:  source,
-						LocalID: gen.NextID(),
+						Type:     constants.TypeCPE,
+						Category: constants.CategoryProperty,
+						Value:    match.Criteria,
+						Source:   source,
+						LocalID:  gen.NextID(),
 					})
 				}
 			}
