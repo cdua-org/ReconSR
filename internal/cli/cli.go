@@ -100,11 +100,7 @@ func ShowBanner(ctx context.Context) {
 	fmt.Println(colorCyan + "--------------------------------------------------" + colorReset)
 }
 
-// ShowReconCompleteBanner prints the post-scan status message and entity statistics.
-func ShowReconCompleteBanner(ctx context.Context) {
-	fmt.Println("\n" + colorGreen + colorBold + "--------------------------------------------------" + colorReset)
-	fmt.Println(colorGreen + colorBold + "[*] " + i18n.T["MSG_RECON_COMPLETE"] + colorReset)
-
+func printProjectStats(ctx context.Context) {
 	if projectID := controller.GetActiveProjectID(); projectID != "" {
 		totalEntities, statsByCat, totalsByCat, err := controller.GetActiveProjectStats(ctx)
 		if err == nil && len(statsByCat) > 0 {
@@ -145,6 +141,13 @@ func ShowReconCompleteBanner(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// ShowReconCompleteBanner prints the post-scan status message and entity statistics.
+func ShowReconCompleteBanner(ctx context.Context) {
+	fmt.Println("\n" + colorGreen + colorBold + "--------------------------------------------------" + colorReset)
+	fmt.Println(colorGreen + colorBold + "[*] " + i18n.T["MSG_RECON_COMPLETE"] + colorReset)
+	printProjectStats(ctx)
 	fmt.Println(colorGreen + colorBold + "--------------------------------------------------" + colorReset)
 }
 
