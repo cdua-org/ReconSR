@@ -1,0 +1,47 @@
+{
+  "ip": "203.0.113.30",
+  "hostname": "vpn.example.org",
+  "geo": {
+    "city": "AnotherFakeCity",
+    "region": "AnotherFakeRegion",
+    "region_code": "AR",
+    "country": "AnotherFakeCountry",
+    "country_code": "YY",
+    "continent": "AnotherFakeContinent",
+    "continent_code": "YY",
+    "latitude": 1.1111,
+    "longitude": -1.1111,
+    "timezone": "Fake/Timezone_Two",
+    "postal_code": "11111",
+    "geoname_id": "1111111",
+    "radius": 2,
+    "last_changed": "2000-01-01"
+  },
+  "as": {
+    "asn": "AS77777",
+    "name": "Fake Hosting",
+    "domain": "example.org",
+    "type": "hosting",
+    "last_changed": "2000-01-01"
+  },
+  "mobile": {
+    "name": "FakeTelecom",
+    "mcc": "999",
+    "mnc": "99"
+  },
+  "anonymous": {
+    "name": "FakeVPN Service",
+    "last_seen": "2000-01-01",
+    "percent_days_seen": 100,
+    "is_proxy": true,
+    "is_relay": true,
+    "is_tor": true,
+    "is_vpn": true,
+    "is_res_proxy": false
+  },
+  "is_anonymous": true,
+  "is_anycast": true,
+  "is_hosting": true,
+  "is_mobile": true,
+  "is_satellite": false
+}

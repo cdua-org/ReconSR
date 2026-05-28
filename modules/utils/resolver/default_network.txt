@@ -193,6 +193,13 @@ HaveIBeenPwnedDelayMs=65
 HaveIBeenPwnedMaxRetries=3
 
 
+### IPinfo Options ###
+
+# IPINFOPaid indicates whether the configured API key belongs to a paid tier (Core, Plus, Max).
+# Set to false if you are using the free Lite tier. Note: Enterprise tier is not supported. (default: false)
+IPINFOPaid=false
+
+
 [DoH]
 https://dns.cloudflare.com/dns-query
 https://dns.google/resolve

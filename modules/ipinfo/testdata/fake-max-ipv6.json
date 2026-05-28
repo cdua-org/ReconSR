@@ -1,0 +1,44 @@
+{
+  "ip": "2001:db8::8a2e:370:7334",
+  "hostname": "mobile.example.net",
+  "geo": {
+    "city": "FakeMobileCity",
+    "region": "FakeMobileRegion",
+    "region_code": "FM",
+    "country": "FakeMobileCountry",
+    "country_code": "ZZ",
+    "continent": "FakeMobileContinent",
+    "continent_code": "ZZ",
+    "latitude": 2.2222,
+    "longitude": -2.2222,
+    "timezone": "Fake/Timezone_Three",
+    "postal_code": "22222",
+    "geoname_id": "2222222",
+    "radius": 5,
+    "last_changed": "2000-01-01"
+  },
+  "as": {
+    "asn": "AS66666",
+    "name": "Fake Mobile AS",
+    "domain": "example.com",
+    "type": "isp",
+    "last_changed": "2000-01-01"
+  },
+  "mobile": {
+    "name": "FakeTelecom",
+    "mcc": "999",
+    "mnc": "99"
+  },
+  "anonymous": {
+    "is_proxy": false,
+    "is_relay": false,
+    "is_tor": false,
+    "is_vpn": false,
+    "is_res_proxy": false
+  },
+  "is_anonymous": false,
+  "is_anycast": false,
+  "is_hosting": false,
+  "is_mobile": true,
+  "is_satellite": false
+}

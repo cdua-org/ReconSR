@@ -6,3 +6,4 @@ VirusTotal=
 Hunterio=
 HaveIBeenPwned=
 Circl=
+IPinfo=

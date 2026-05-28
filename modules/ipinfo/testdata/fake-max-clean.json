@@ -1,0 +1,40 @@
+{
+  "ip": "198.51.100.20",
+  "hostname": "host.example.net",
+  "geo": {
+    "city": "FakeCity",
+    "region": "FakeRegion",
+    "region_code": "FR",
+    "country": "FakeCountry",
+    "country_code": "XX",
+    "continent": "FakeContinent",
+    "continent_code": "XX",
+    "latitude": 0.00000,
+    "longitude": 0.00000,
+    "timezone": "Fake/Timezone",
+    "postal_code": "00000",
+    "geoname_id": "0000000",
+    "radius": 1,
+    "last_changed": "2000-01-01"
+  },
+  "as": {
+    "asn": "AS88888",
+    "name": "Fake ISP",
+    "domain": "example.net",
+    "type": "isp",
+    "last_changed": "2000-01-01"
+  },
+  "mobile": {},
+  "anonymous": {
+    "is_proxy": false,
+    "is_relay": false,
+    "is_tor": false,
+    "is_vpn": false,
+    "is_res_proxy": false
+  },
+  "is_anonymous": false,
+  "is_anycast": false,
+  "is_hosting": false,
+  "is_mobile": false,
+  "is_satellite": false
+}

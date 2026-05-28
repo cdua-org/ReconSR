@@ -1,0 +1,10 @@
+{
+  "ip": "192.0.2.10",
+  "asn": "AS99999",
+  "as_name": "Fake AS",
+  "as_domain": "example.com",
+  "country_code": "XX",
+  "country": "FakeCountry",
+  "continent_code": "XX",
+  "continent": "FakeContinent"
+}

@@ -155,6 +155,9 @@ var (
 	// HaveIBeenPwnedMaxRetries defines maximum attempts for Have I Been Pwned API.
 	HaveIBeenPwnedMaxRetries = 3
 
+	// IPINFOPaid defines whether to use the paid endpoint (https://api.ipinfo.io/lookup/) or the free lite endpoint (https://api.ipinfo.io/lite/).
+	IPINFOPaid = false
+
 	// Options acts as a generic configuration dictionary.
 	Options = make(map[string]string)
 
@@ -303,6 +306,7 @@ func initOptionMaps() {
 		"CirclWithBundles":            &CirclWithBundles,
 		"CirclWithSightings":          &CirclWithSightings,
 		"HunterioScanOrg":             &HunterioScanOrg,
+		"IPINFOPaid":                  &IPINFOPaid,
 	}
 	intOptions = map[string]*int{
 		"MaxRetriesCert":           &MaxRetriesCert,

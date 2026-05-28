@@ -10,6 +10,7 @@ import (
 	"cdua-org/ReconSR/modules/haveibeenpwned"
 	"cdua-org/ReconSR/modules/hunterio"
 	"cdua-org/ReconSR/modules/ip2location"
+	"cdua-org/ReconSR/modules/ipinfo"
 	"cdua-org/ReconSR/modules/ip_metadata"
 	"cdua-org/ReconSR/modules/ipv4ambiguous"
 	"cdua-org/ReconSR/modules/mailcrypto"
@@ -32,6 +33,7 @@ var ModuleRegistry = []schema.Module{
 	haveibeenpwned.New(),
 	hunterio.New(),
 	ip2location.New(),
+	ipinfo.New(),
 	ip_metadata.New(),
 	ipv4ambiguous.New(),
 	mailcrypto.New(),
