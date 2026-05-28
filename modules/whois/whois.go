@@ -344,13 +344,13 @@ func (m *module) buildMetadataResults(metadata *Metadata, target, sourceCtx stri
 		results = append(results, m.result(constants.TypeDNSSEC, constants.CategoryProperty, metadata.DNSSEC, "DNSSEC Status ("+sourceCtx+")", false, nil, gen))
 	}
 	if metadata.CreationDate != "" {
-		results = append(results, m.result(constants.TypeDate, constants.CategoryProperty, metadata.CreationDate, "Creation Date ("+sourceCtx+")", false, nil, gen))
+		results = append(results, m.result(constants.TypeDate, constants.CategoryProperty, "Creation Date: "+metadata.CreationDate, sourceCtx, false, nil, gen))
 	}
 	if metadata.UpdatedDate != "" {
-		results = append(results, m.result(constants.TypeDate, constants.CategoryProperty, metadata.UpdatedDate, "Updated Date ("+sourceCtx+")", false, nil, gen))
+		results = append(results, m.result(constants.TypeDate, constants.CategoryProperty, "Updated Date: "+metadata.UpdatedDate, sourceCtx, false, nil, gen))
 	}
 	if metadata.ExpirationDate != "" {
-		results = append(results, m.result(constants.TypeDate, constants.CategoryProperty, metadata.ExpirationDate, "Expiration Date ("+sourceCtx+")", false, nil, gen))
+		results = append(results, m.result(constants.TypeDate, constants.CategoryProperty, "Expiration Date: "+metadata.ExpirationDate, sourceCtx, false, nil, gen))
 	}
 	for _, ns := range metadata.NameServers {
 		if !strings.Contains(ns, ".") {
