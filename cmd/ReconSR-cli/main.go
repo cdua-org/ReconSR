@@ -21,7 +21,13 @@ func main() {
 	rawTarget := cli.GetRawTarget(os.Args)
 
 	for cli.HandleUserInput(ctx, rawTarget) {
-		pipeline.Run(ctx)
-		cli.ShowScanCompleteBanner(ctx)
+		done := make(chan struct{})
+		go func() {
+			pipeline.Run(ctx)
+			close(done)
+		}()
+
+		cli.InteractiveControl(ctx, done)
+		cli.ShowReconCompleteBanner(ctx)
 	}
 }

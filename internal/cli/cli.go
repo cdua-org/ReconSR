@@ -100,10 +100,10 @@ func ShowBanner(ctx context.Context) {
 	fmt.Println(colorCyan + "--------------------------------------------------" + colorReset)
 }
 
-// ShowScanCompleteBanner prints the post-scan status message and entity statistics.
-func ShowScanCompleteBanner(ctx context.Context) {
+// ShowReconCompleteBanner prints the post-scan status message and entity statistics.
+func ShowReconCompleteBanner(ctx context.Context) {
 	fmt.Println("\n" + colorGreen + colorBold + "--------------------------------------------------" + colorReset)
-	fmt.Println(colorGreen + colorBold + "[*] " + i18n.T["MSG_SCAN_COMPLETE"] + colorReset)
+	fmt.Println(colorGreen + colorBold + "[*] " + i18n.T["MSG_RECON_COMPLETE"] + colorReset)
 
 	if projectID := controller.GetActiveProjectID(); projectID != "" {
 		totalEntities, statsByCat, totalsByCat, err := controller.GetActiveProjectStats(ctx)
@@ -147,12 +147,13 @@ func ShowScanCompleteBanner(ctx context.Context) {
 	}
 	fmt.Println(colorGreen + colorBold + "--------------------------------------------------" + colorReset)
 }
+
 // GetRawTarget extracts the target from args.
 func GetRawTarget(args []string) string {
 	if len(args) < 2 {
 		fmt.Printf("\n%s%s %s", colorGreen, i18n.T["LBL_INPUT_TARGET_PROMPT"], colorReset)
 		var target string
-		fmt.Scanln(&target)
+		_, _ = fmt.Scanln(&target)
 		target = strings.TrimSpace(target)
 		if target == "" {
 			fmt.Println(i18n.T["LBL_USAGE"] + ": " + args[0] + " <" + i18n.T["LBL_TARGET_HINT"] + ">")
@@ -182,7 +183,7 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 		if projectID := controller.GetActiveProjectID(); projectID != "" {
 			if run := handleProjectActions(ctx, projectID, targetType, targetValue); run != nil {
 				if *run {
-					fmt.Println("\n" + colorCyan + colorBold + i18n.T["MSG_SCAN_STARTED"] + colorReset)
+					fmt.Println("\n" + colorCyan + colorBold + i18n.T["MSG_RECON_STARTED"] + colorReset)
 				}
 				return *run
 			}
@@ -284,7 +285,7 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 				continue
 			}
 			controller.SetActiveProject(newID)
-			fmt.Println("\n" + colorCyan + colorBold + i18n.T["MSG_SCAN_STARTED"] + colorReset)
+			fmt.Println("\n" + colorCyan + colorBold + i18n.T["MSG_RECON_STARTED"] + colorReset)
 			return true
 		} else if idx >= 2 && idx <= len(projects)+1 {
 			controller.SetActiveProject(projects[idx-2].DBIdentifier)

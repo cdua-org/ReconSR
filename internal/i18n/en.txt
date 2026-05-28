@@ -21,6 +21,7 @@ LBL_LIMIT_REACHED=(depth limit reached)
 LBL_CONFIG_TITLE=Module Configuration
 LBL_SELECT_MODULE=Select a module to configure:
 LBL_CONFIG_FUNCS=Configure functions for
+LBL_MONITOR_HINT=Press 'p' to pause, 'c' to continue, Ctrl+C to stop.
 
 # ==========================================
 # OPTIONS
@@ -46,7 +47,7 @@ OPT_TOGGLE_ALL=Toggle All Functions
 MSG_PROJECTS_EXIST_1=Projects already exist for target:
 MSG_PROJECTS_EXIST_2=What would you like to do?
 MSG_REPORT_SAVED=Report saved
-MSG_SCAN_COMPLETE=Scan sequence finished.
+MSG_RECON_COMPLETE=Scan sequence finished.
 MSG_HISTORY_FOUND=History for
 MSG_SCANS_COUNT=scans
 MSG_LATEST_FOUND=Latest session found
@@ -65,7 +66,8 @@ MSG_PROJ_ACTION=Select an action:
 MSG_RESUMING=Resuming and completing
 MSG_NEW_SESSION=New history entry
 MSG_SESSION_UPDATED=Session updated and saved
-MSG_SCAN_STARTED=Scan in progress. Press Ctrl+C to stop safely.
+MSG_RECON_STARTED=Recon in progress. Enter 1 to pause, 0 to stop and exit.
+MSG_RECON_PAUSED=Recon paused. Enter 1 to resume, 0 to stop and exit.
 MSG_IDENTIFIED_AS=Target type identified as:
 MSG_INIT_CORE=Core Engine
 MSG_CONN_DB=Database

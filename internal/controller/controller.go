@@ -271,3 +271,11 @@ func GetProjectGraph(ctx context.Context, projectID string, includeRawData bool)
 func GetModuleCount() int {
 	return len(dispatcher.ModuleRegistry)
 }
+
+func PauseRecon() {
+	dispatcher.SetPause(true)
+}
+
+func ResumeRecon() {
+	dispatcher.SetPause(false)
+}

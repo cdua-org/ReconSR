@@ -32,7 +32,20 @@ var (
 	funcDelays                 = make(map[string]map[string]int)
 	cfgFuncLimits              map[string]map[string]int
 	cfgFuncDelays              map[string]map[string]int
+
+	pauseMu   sync.Mutex
+	pauseCond = sync.NewCond(&pauseMu)
+	isPaused  bool
 )
+
+func SetPause(pause bool) {
+	pauseMu.Lock()
+	defer pauseMu.Unlock()
+	isPaused = pause
+	if !pause {
+		pauseCond.Broadcast()
+	}
+}
 
 type moduleLimit struct {
 	sem     chan struct{}
@@ -491,6 +504,13 @@ func Dispatch(data *schema.RepoToDispatcherData, out chan<- *schema.ProcessorToR
 										<-modLim.sem
 									}()
 								}
+
+								pauseMu.Lock()
+								for isPaused {
+									pauseCond.Wait()
+								}
+								pauseMu.Unlock()
+
 								res, err := entry.mod.Exec(payload)
 								resChan <- modResult{res, err}
 							}()
