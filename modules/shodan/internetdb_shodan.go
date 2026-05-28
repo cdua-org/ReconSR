@@ -145,7 +145,7 @@ func parseInternetDBResponse(exec *schema.ModuleExecution, rawBody []byte, targe
 	}
 
 	for _, h := range parsed.Hostnames {
-		appendReverseIPHostnameResult(exec, h, "Shodan InternetDB PTR", gen)
+		appendReverseIPHostnameResult(exec, h, gen)
 	}
 	for _, p := range parsed.Ports {
 		exec.Results = append(exec.Results, schema.ModuleResult{

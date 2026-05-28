@@ -25,13 +25,13 @@ func TestParseShodanAPIIP(t *testing.T) {
 	}
 
 	requireTagPropertyResults(t, exec.Results, "faketag")
-	assertShodanIPServiceChain(t, exec.Results, targetIP, service)
+	assertShodanIPServiceChain(t, exec.Results, service)
 	assertShodanIPCoreResults(t, exec.Results)
 	assertShodanIPResultTypeAbsent(t, exec.Results, constants.TypeHeartbleed)
 	requireUniqueLocalIDs(t, exec.Results)
 }
 
-func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult, targetIP, service string) {
+func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult, service string) {
 	t.Helper()
 
 	portResult := requireModuleResult(t, results, constants.TypePort, "443/tcp")
@@ -57,20 +57,18 @@ func assertShodanIPServiceChain(t *testing.T, results []schema.ModuleResult, tar
 	assertShodanIPResultSource(t, results, constants.TypeCPE, "cpe:/a:fake:product:9.9", constants.TypeService, service)
 	assertShodanIPResultSource(t, results, constants.TypeCPE23, "cpe:2.3:a:fake:product:9.9", constants.TypeService, service)
 
-	assertShodanIPCVEChain(t, results, targetIP, service)
+	assertShodanIPCVEChain(t, results, service)
 }
 
-func assertShodanIPCVEChain(t *testing.T, results []schema.ModuleResult, targetIP, service string) {
+func assertShodanIPCVEChain(t *testing.T, results []schema.ModuleResult, service string) {
 	t.Helper()
 
-	vulnCtx := targetIP + ":443/tcp (" + service + ")"
-
-	assertCVEWithSummary(t, results, service, vulnCtx)
-	assertCVEWithCVSS(t, results, vulnCtx)
-	assertCVEWithEPSS(t, results, vulnCtx)
+	assertCVEWithSummary(t, results, service)
+	assertCVEWithCVSS(t, results)
+	assertCVEWithEPSS(t, results)
 }
 
-func assertCVEWithSummary(t *testing.T, results []schema.ModuleResult, service, vulnCtx string) {
+func assertCVEWithSummary(t *testing.T, results []schema.ModuleResult, service string) {
 	t.Helper()
 
 	cve := requireModuleResult(t, results, constants.TypeCVE, "CVE-1111-1001")
@@ -81,39 +79,39 @@ func assertCVEWithSummary(t *testing.T, results []schema.ModuleResult, service, 
 		t.Fatalf("expected cve to be chained to service, got %+v", cve.Source)
 	}
 
-	verified := requireModuleResultWithContext(t, results, constants.TypeVerified, "true", vulnCtx)
+	verified := requireModuleResult(t, results, constants.TypeVerified, "true")
 	if verified.Source == nil || verified.Source.Value != "CVE-1111-1001" {
 		t.Fatalf("expected verified to be chained to cve, got %+v", verified.Source)
 	}
 
-	summary := requireModuleResultWithContext(t, results, constants.TypeSummary, "Fake vulnerability alpha", vulnCtx)
+	summary := requireModuleResult(t, results, constants.TypeSummary, "Fake vulnerability alpha")
 	if summary.Source == nil || summary.Source.Value != "CVE-1111-1001" {
 		t.Fatalf("expected summary to be chained to cve, got %+v", summary.Source)
 	}
 }
 
-func assertCVEWithCVSS(t *testing.T, results []schema.ModuleResult, vulnCtx string) {
+func assertCVEWithCVSS(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
 	requireModuleResult(t, results, constants.TypeCVE, "CVE-2222-2002")
 
-	cvss := requireModuleResultWithContext(t, results, constants.TypeCVSS, "9.8 (v3.0)", vulnCtx)
+	cvss := requireModuleResult(t, results, constants.TypeCVSS, "9.8 (v3.0)")
 	if cvss.Source == nil || cvss.Source.Value != "CVE-2222-2002" {
 		t.Fatalf("expected cvss to be chained to cve, got %+v", cvss.Source)
 	}
 }
 
-func assertCVEWithEPSS(t *testing.T, results []schema.ModuleResult, vulnCtx string) {
+func assertCVEWithEPSS(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
 	requireModuleResult(t, results, constants.TypeCVE, "CVE-3333-3003")
 
-	epss := requireModuleResultWithContext(t, results, constants.TypeEPSS, "0.03%", vulnCtx)
+	epss := requireModuleResult(t, results, constants.TypeEPSS, "0.03%")
 	if epss.Source == nil || epss.Source.Value != "CVE-3333-3003" {
 		t.Fatalf("expected epss to be chained to cve, got %+v", epss.Source)
 	}
 
-	rank := requireModuleResultWithContext(t, results, constants.TypeRankEPSS, "7.15%", vulnCtx)
+	rank := requireModuleResult(t, results, constants.TypeRankEPSS, "7.15%")
 	if rank.Source == nil || rank.Source.Value != "CVE-3333-3003" {
 		t.Fatalf("expected ranking_epss to be chained to cve, got %+v", rank.Source)
 	}
@@ -145,7 +143,7 @@ func assertShodanIPCoreResults(t *testing.T, results []schema.ModuleResult) {
 		t.Fatalf("expected shodan domain to have tag %q, got tags %v", constants.TagReverseIP, shodanDomain.Tags)
 	}
 	requireModuleResult(t, results, constants.TypeASN, "99999")
-	ptrDomain := requireModuleResultWithContext(t, results, constants.TypeSubdomain, "ptr.fake.example.com", "Shodan PTR")
+	ptrDomain := requireModuleResult(t, results, constants.TypeSubdomain, "ptr.fake.example.com")
 	if !slices.Contains(ptrDomain.Tags, constants.TagReverseIP) {
 		t.Fatalf("expected validated PTR domain to have tag %q, got tags %v", constants.TagReverseIP, ptrDomain.Tags)
 	}
@@ -223,9 +221,9 @@ func TestParseShodanAPIIPSkipsDuplicateWebServerValue(t *testing.T) {
 func TestAppendReverseIPHostnameResultKeepsInvalidPTRProperty(t *testing.T) {
 	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
 	gen := modutil.NewLocalIDGenerator()
-	appendReverseIPHostnameResult(&exec, "invalid ptr hostname", "Synthetic PTR", gen)
+	appendReverseIPHostnameResult(&exec, "invalid ptr hostname", gen)
 
-	result := requireModuleResultWithContext(t, exec.Results, constants.TypePTR, "invalid ptr hostname", "Synthetic PTR")
+	result := requireModuleResult(t, exec.Results, constants.TypePTR, "invalid ptr hostname")
 	if result.Category != constants.CategoryProperty {
 		t.Fatalf("expected invalid PTR hostname to stay property, got %+v", result)
 	}

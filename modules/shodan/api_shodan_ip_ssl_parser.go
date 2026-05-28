@@ -21,7 +21,7 @@ var (
 	shodanDomainPatternRegex   = regexp.MustCompile(`(?i)(?:\*\.)?(?:[a-z0-9-]+\.)+[a-z]{2,63}`)
 )
 
-func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, source *schema.EntityRef, target string, gen *modutil.LocalIDGenerator) {
+func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	if banner.Details == nil || banner.Details.SSL == nil {
 		return
 	}
@@ -32,10 +32,10 @@ func extractBannerSSL(exec *schema.ModuleExecution, banner *shodanIPBanner, sour
 		}
 
 		sources := parseSubjectAltName(exec, extension.Data, gen)
-		appendSubjectAltNameMetadata(exec, banner.Details.SSL, sources, target, gen)
+		appendSubjectAltNameMetadata(exec, banner.Details.SSL, sources, gen)
 	}
 
-	appendBannerSSLProperties(exec, banner.Details.SSL, source, target, gen)
+	appendBannerSSLProperties(exec, banner.Details.SSL, source, gen)
 }
 
 func parseSubjectAltName(exec *schema.ModuleExecution, value string, gen *modutil.LocalIDGenerator) []schema.EntityRef {
@@ -98,7 +98,7 @@ func classifySubjectAltName(match string) (resultType, resultValue, wildcardCont
 	return validated.Type, validated.Value, wildcardContext, true
 }
 
-func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBanner, sources []schema.EntityRef, target string, gen *modutil.LocalIDGenerator) {
+func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBanner, sources []schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	if len(sources) == 0 {
 		return
 	}
@@ -109,13 +109,13 @@ func appendSubjectAltNameMetadata(exec *schema.ModuleExecution, ssl *shodanSSLBa
 
 	for i := range sources {
 		source := &sources[i]
-		appendSubjectAltNameProperty(exec, constants.TypeCertIssuer, issuerValue, source, "Cert Issuer for "+target, gen)
-		appendSubjectAltNameProperty(exec, constants.TypeCertNotAfter, notAfterValue, source, "Cert Expiration for "+target, gen)
-		appendSubjectAltNameProperty(exec, constants.TypeTLSVersions, tlsVersionsValue, source, "TLS Versions for "+target, gen)
+		appendSubjectAltNameProperty(exec, constants.TypeCertIssuer, issuerValue, source, gen)
+		appendSubjectAltNameProperty(exec, constants.TypeCertNotAfter, notAfterValue, source, gen)
+		appendSubjectAltNameProperty(exec, constants.TypeTLSVersions, tlsVersionsValue, source, gen)
 	}
 }
 
-func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, value string, source *schema.EntityRef, context string, gen *modutil.LocalIDGenerator) {
+func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, value string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	if value == "" {
 		return
 	}
@@ -125,24 +125,23 @@ func appendSubjectAltNameProperty(exec *schema.ModuleExecution, resultType, valu
 		Type:     resultType,
 		Category: constants.CategoryProperty,
 		Value:    value,
-		Context:  context,
 		Source:   source,
 		LocalID:  localID,
 	})
 }
 
-func appendBannerSSLProperties(exec *schema.ModuleExecution, ssl *shodanSSLBanner, source *schema.EntityRef, target string, gen *modutil.LocalIDGenerator) {
+func appendBannerSSLProperties(exec *schema.ModuleExecution, ssl *shodanSSLBanner, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	if ssl == nil {
 		return
 	}
 
 	for _, fingerprint := range ssl.CertFingerprintValues {
-		appendBannerSSLProperty(exec, constants.TypeCertFingerprint, fingerprint, source, "Cert Fingerprint for "+target, gen)
+		appendBannerSSLProperty(exec, constants.TypeCertFingerprint, fingerprint, source, gen)
 	}
-	appendBannerSSLProperty(exec, constants.TypeJARM, ssl.JARMValue, source, "JARM for "+target, gen)
+	appendBannerSSLProperty(exec, constants.TypeJARM, ssl.JARMValue, source, gen)
 }
 
-func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value string, source *schema.EntityRef, context string, gen *modutil.LocalIDGenerator) {
+func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	if value == "" {
 		return
 	}
@@ -152,7 +151,6 @@ func appendBannerSSLProperty(exec *schema.ModuleExecution, resultType, value str
 		Type:     resultType,
 		Category: constants.CategoryProperty,
 		Value:    value,
-		Context:  context,
 		Source:   source,
 		LocalID:  localID,
 	})
