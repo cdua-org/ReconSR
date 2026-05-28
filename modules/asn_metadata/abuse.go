@@ -32,7 +32,7 @@ func getASNAbuseContacts(target string, gen *modutil.LocalIDGenerator) (executio
 		execution.RawData = resp.RawJSON
 	}()
 
-	if err := ripestat.Query(ctx, originASN, constants.RIPEstatEndpointAbuseContactFinder, &resp, resolver.MaxRetriesASNMeta); err != nil {
+	if err := ripestatQueryFunc(ctx, originASN, constants.RIPEstatEndpointAbuseContactFinder, &resp, resolver.MaxRetriesASNMeta); err != nil {
 		errMsg := "asn abuse lookup failed: " + err.Error()
 		execution.Error = &errMsg
 		dbg.Printf("%s error target=%q stage=query_lookup err=%v", constants.FuncGetASNAbuseContacts, target, err)

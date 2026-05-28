@@ -3,11 +3,9 @@ package ip_metadata
 import (
 	"context"
 	"slices"
-	"strconv"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
-	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
 func TestGetTorDataSupported(t *testing.T) {
@@ -63,17 +61,6 @@ func TestGetTorDataTimeout(t *testing.T) {
 	if res.Error == nil {
 		t.Error("expected timeout error, got nil")
 	}
-}
-
-func TestGetTorDataDebug(t *testing.T) {
-	t.Log("Testing debug output for Tor")
-	resolver.Options["Debug"] = strconv.FormatBool(true)
-	defer func() { resolver.Options["Debug"] = strconv.FormatBool(false) }()
-
-	mockAQueryResponses(t, nil, nil)
-
-	getTorData("198.51.100.2")
-	getTorData("192.0.2.1")
 }
 
 func TestModule_LocalIDChaining_TOR(t *testing.T) {

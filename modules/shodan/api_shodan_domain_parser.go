@@ -464,9 +464,9 @@ func appendShodanLastSeen(exec *schema.ModuleExecution, lastSeen string, source 
 	localID := gen.NextID()
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     constants.TypeLastSeen,
+		Type:     constants.TypeDate,
 		Category: constants.CategoryProperty,
-		Value:    lastSeen,
+		Value:    "Last Seen: " + lastSeen,
 		Source:   source,
 		LocalID:  localID,
 	})

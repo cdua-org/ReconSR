@@ -151,7 +151,7 @@ func assertShodanIPCoreResults(t *testing.T, results []schema.ModuleResult) {
 	requireModuleResult(t, results, constants.TypeOrganization, "Fake Org")
 	requireModuleResult(t, results, constants.TypeOS, "FakeOS")
 	requireModuleResult(t, results, constants.TypePort, "443/tcp")
-	requireModuleResult(t, results, constants.TypeLastUpdate, "2027-05-05T16:15:08Z")
+	requireModuleResult(t, results, constants.TypeDate, "Last Update: 2027-05-05T16:15:08Z")
 
 	geoResult := requireModuleResult(t, results, constants.TypeGeo, "City: FakeCity | Country: Fakeland (FC) | Lat/Lon: 10.123400, 20.567800")
 	if geoResult.Category != constants.CategoryProperty {

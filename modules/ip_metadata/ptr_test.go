@@ -3,11 +3,9 @@ package ip_metadata
 import (
 	"context"
 	"slices"
-	"strconv"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
-	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -158,20 +156,6 @@ func TestGetPTRDataInvalidIP(t *testing.T) {
 	if res.Error == nil {
 		t.Error("expected error for invalid IP, got nil")
 	}
-}
-
-func TestGetPTRDataDebug(t *testing.T) {
-	t.Log("Testing debug output")
-	resolver.Options["Debug"] = strconv.FormatBool(true)
-	defer func() { resolver.Options["Debug"] = strconv.FormatBool(false) }()
-
-	setPTRQueryMock(t, func(string) ([]string, error) {
-		return nil, nil
-	})
-
-	getPTRData("198.51.100.2")
-	getPTRData("192.0.2.1")
-	getPTRData("invalid")
 }
 
 func TestGetPTRDataTimeout(t *testing.T) {

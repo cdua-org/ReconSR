@@ -118,7 +118,7 @@ func traverseUpstream(ctx context.Context, asn string, depth int, visited map[st
 	dbg.Printf("%s asn=%q depth=%d querying_ripestat", constants.FuncGetASNPeers, asn, depth)
 
 	var resp ripestat.APIResponse
-	if err := ripestat.Query(ctx, asn, constants.RIPEstatEndpointASNNeighbours, &resp, resolver.MaxRetriesASNMeta); err != nil {
+	if err := ripestatQueryFunc(ctx, asn, constants.RIPEstatEndpointASNNeighbours, &resp, resolver.MaxRetriesASNMeta); err != nil {
 		dbg.Printf("%s error asn=%q depth=%d stage=query_ripestat err=%v", constants.FuncGetASNPeers, asn, depth, err)
 		return fmt.Errorf("ripestat query: %w", err)
 	}

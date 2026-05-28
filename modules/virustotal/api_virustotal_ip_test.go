@@ -100,7 +100,7 @@ func assertIPMetadataExtractionCore(t *testing.T, results []schema.ModuleResult)
 	})
 
 	requireResult(t, results, "ip last update result", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeLastUpdate && strings.Contains(result.Value, "2026-02-13T16:30:00Z")
+		return result.Type == constants.TypeDate && strings.Contains(result.Value, "Last Update: 2026-02-13T16:30:00Z")
 	})
 
 	assertTagResult(t, results, "synthetic")

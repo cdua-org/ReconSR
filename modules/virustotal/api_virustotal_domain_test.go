@@ -206,7 +206,7 @@ func assertDomainStableMetadataExtraction(t *testing.T, results []schema.ModuleR
 	})
 
 	requireResult(t, results, "domain last update property", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeLastUpdate && strings.Contains(result.Value, "2026-05-09T08:42:44Z")
+		return result.Type == constants.TypeDate && strings.Contains(result.Value, "Last Update: 2026-05-09T08:42:44Z")
 	})
 
 	requireResult(t, results, "crowdsourced context property", func(result schema.ModuleResult) bool {

@@ -422,27 +422,27 @@ func assertShodanDomainInvalidSubdomains(t *testing.T, results []schema.ModuleRe
 func assertShodanDomainLastSeen(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
-	wwwIPLastSeen := findModuleResultBySource(results, constants.TypeLastSeen, constants.TypeIPv4, "198.51.100.25")
+	wwwIPLastSeen := findModuleResultBySource(results, constants.TypeDate, constants.TypeIPv4, "198.51.100.25")
 	if wwwIPLastSeen == nil {
 		t.Fatal("expected last_seen for www A record")
 	}
-	if wwwIPLastSeen.Value != "2026-05-02T12:30:00.000000" {
+	if wwwIPLastSeen.Value != "Last Seen: 2026-05-02T12:30:00.000000" {
 		t.Fatalf("expected www IP last_seen 2026-05-02T12:30:00.000000, got %q", wwwIPLastSeen.Value)
 	}
 
-	mxLastSeen := findModuleResultBySource(results, constants.TypeLastSeen, constants.TypeMX, "10 mx.example.com")
+	mxLastSeen := findModuleResultBySource(results, constants.TypeDate, constants.TypeMX, "10 mx.example.com")
 	if mxLastSeen == nil {
 		t.Fatal("expected last_seen for MX record")
 	}
-	if mxLastSeen.Value != "2026-05-02T12:32:00.000000" {
+	if mxLastSeen.Value != "Last Seen: 2026-05-02T12:32:00.000000" {
 		t.Fatalf("expected MX last_seen 2026-05-02T12:32:00.000000, got %q", mxLastSeen.Value)
 	}
 
-	soaLastSeen := findModuleResultBySource(results, constants.TypeLastSeen, constants.TypeSOA, "ns1.example.com. dns.example.net. 1234567890 10000 2400 604800 1800")
+	soaLastSeen := findModuleResultBySource(results, constants.TypeDate, constants.TypeSOA, "ns1.example.com. dns.example.net. 1234567890 10000 2400 604800 1800")
 	if soaLastSeen == nil {
 		t.Fatal("expected last_seen for SOA record")
 	}
-	if soaLastSeen.Value != "2026-05-02T12:38:00.000000" {
+	if soaLastSeen.Value != "Last Seen: 2026-05-02T12:38:00.000000" {
 		t.Fatalf("expected SOA last_seen 2026-05-02T12:38:00.000000, got %q", soaLastSeen.Value)
 	}
 }

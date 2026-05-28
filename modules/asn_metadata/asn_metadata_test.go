@@ -6,7 +6,6 @@ import (
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
-	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -35,6 +34,7 @@ func TestModuleCapabilities(t *testing.T) {
 }
 
 func TestGetASNPeersClean(t *testing.T) {
+	mockRIPEstatSuccess(t)
 	gen := modutil.NewLocalIDGenerator()
 	res := getASNPeers("AS64512", gen)
 	if res.Error == nil {
@@ -44,6 +44,7 @@ func TestGetASNPeersClean(t *testing.T) {
 }
 
 func TestGetASNPrefixesClean(t *testing.T) {
+	mockRIPEstatSuccess(t)
 	gen := modutil.NewLocalIDGenerator()
 	res := getASNPrefixes("AS64513", gen)
 	if res.Error == nil {
@@ -53,6 +54,7 @@ func TestGetASNPrefixesClean(t *testing.T) {
 }
 
 func TestGetASNInfoClean(t *testing.T) {
+	mockRIPEstatSuccess(t)
 	gen := modutil.NewLocalIDGenerator()
 	res := getASNInfo("AS64514", gen)
 	if res.Error == nil {
@@ -62,6 +64,7 @@ func TestGetASNInfoClean(t *testing.T) {
 }
 
 func TestGetASNAbuseContactsClean(t *testing.T) {
+	mockRIPEstatSuccess(t)
 	gen := modutil.NewLocalIDGenerator()
 	res := getASNAbuseContacts("AS64515", gen)
 	if res.Error == nil {
@@ -102,18 +105,6 @@ func TestGetASNAbuseContactsInvalid(t *testing.T) {
 	}
 }
 
-func TestGetASNPeersDebug(t *testing.T) {
-	t.Log("Testing debug output for ASN peers")
-	resolver.Options["Debug"] = "true"
-	defer func() { resolver.Options["Debug"] = "false" }()
-
-	gen := modutil.NewLocalIDGenerator()
-	getASNPeers("AS64516", gen)
-	getASNPrefixes("AS64516", gen)
-	getASNInfo("AS64516", gen)
-	getASNAbuseContacts("AS64516", gen)
-}
-
 func TestBuildChainString(t *testing.T) {
 	const (
 		leftASN   = "AS64518"
@@ -142,6 +133,7 @@ func TestModuleName(t *testing.T) {
 }
 
 func TestModuleExec(t *testing.T) {
+	mockRIPEstatSuccess(t)
 	mod := New()
 	input := schema.ModuleInput{
 		Target: schema.Entity{
@@ -189,6 +181,7 @@ func TestModuleExec(t *testing.T) {
 }
 
 func TestModule_LocalIDChaining(t *testing.T) {
+	mockRIPEstatSuccess(t)
 	mod := New()
 	input := schema.ModuleInput{
 		Target: schema.Entity{

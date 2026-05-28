@@ -55,7 +55,7 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 
 	if lastUpdateRaw, ok := attr["last_modification_date"].(float64); ok {
 		formattedDate := time.Unix(int64(lastUpdateRaw), 0).UTC().Format(time.RFC3339)
-		appendVTProperty(exec, constants.TypeLastUpdate, formattedDate, "Last Update for "+target, nil, gen)
+		appendVTProperty(exec, constants.TypeDate, "Last Update: "+formattedDate, "Last Update for "+target, nil, gen)
 	}
 
 	m.extractThreatScore(attr, constants.TypeIP, target, nil, exec, gen)

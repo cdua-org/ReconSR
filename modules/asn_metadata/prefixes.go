@@ -31,7 +31,7 @@ func getASNPrefixes(target string, gen *modutil.LocalIDGenerator) (execution sch
 		execution.RawData = resp.RawJSON
 	}()
 
-	if err := ripestat.Query(ctx, originASN, constants.RIPEstatEndpointAnnouncedPrefixes, &resp, resolver.MaxRetriesASNMeta); err != nil {
+	if err := ripestatQueryFunc(ctx, originASN, constants.RIPEstatEndpointAnnouncedPrefixes, &resp, resolver.MaxRetriesASNMeta); err != nil {
 		errMsg := "asn prefixes lookup failed: " + err.Error()
 		execution.Error = &errMsg
 		dbg.Printf("%s error target=%q stage=query_lookup err=%v", constants.FuncGetASNPrefixes, target, err)

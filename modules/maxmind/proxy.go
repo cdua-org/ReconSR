@@ -96,9 +96,9 @@ func getProxyCheck(target, dbPath string) schema.ModuleExecution {
 
 	if res.NetworkLastSeen != "" {
 		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:     constants.TypeLastSeen,
+			Type:     constants.TypeDate,
 			Category: constants.CategoryProperty,
-			Value:    res.NetworkLastSeen,
+			Value:    "Last Seen: " + res.NetworkLastSeen,
 			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "NetworkLastSeen", res.NetworkLastSeen)

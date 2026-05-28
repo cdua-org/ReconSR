@@ -3,11 +3,9 @@ package ip_metadata
 import (
 	"context"
 	"slices"
-	"strconv"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
-	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
 func TestExtraCapabilities(t *testing.T) {
@@ -81,17 +79,6 @@ func TestGetIPAbuseContactsInvalid(t *testing.T) {
 	if res.Error == nil {
 		t.Error("expected error for empty IP")
 	}
-}
-
-func TestExtraDebug(t *testing.T) {
-	t.Log("Testing debug output for Extra")
-	resolver.Options["Debug"] = strconv.FormatBool(true)
-	defer func() { resolver.Options["Debug"] = strconv.FormatBool(false) }()
-
-	mockRIPEstatSuccess(t)
-
-	getIPInfo("198.51.100.2")
-	getIPAbuseContacts("198.51.100.2")
 }
 
 func TestExtraTimeout(t *testing.T) {

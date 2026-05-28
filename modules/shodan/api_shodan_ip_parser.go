@@ -103,9 +103,9 @@ func extractIPLastUpdate(exec *schema.ModuleExecution, lastUpdate string, gen *m
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     constants.TypeLastUpdate,
+		Type:     constants.TypeDate,
 		Category: constants.CategoryProperty,
-		Value:    lastUpdate,
+		Value:    "Last Update: " + lastUpdate,
 		LocalID:  gen.NextID(),
 	})
 }

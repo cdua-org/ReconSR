@@ -165,7 +165,7 @@ func appendDomainLastUpdate(exec *schema.ModuleExecution, attr map[string]any, t
 	}
 
 	formattedDate := time.Unix(int64(lastUpdateRaw), 0).UTC().Format(time.RFC3339)
-	appendVTProperty(exec, constants.TypeLastUpdate, formattedDate, "Last Update for "+target, nil, gen)
+	appendVTProperty(exec, constants.TypeDate, "Last Update: "+formattedDate, "Last Update for "+target, nil, gen)
 }
 
 func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[string]any, target string, gen *modutil.LocalIDGenerator) {

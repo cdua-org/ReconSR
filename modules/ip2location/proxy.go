@@ -72,9 +72,9 @@ func getProxyCheck(target, dbPath string) schema.ModuleExecution {
 
 	if !isUnavailable(res.LastSeen) {
 		execution.Results = append(execution.Results, schema.ModuleResult{
-			Type:     constants.TypeLastSeen,
+			Type:     constants.TypeDate,
 			Category: constants.CategoryProperty,
-			Value:    res.LastSeen + " days ago",
+			Value:    "Last Seen: " + res.LastSeen + " days ago",
 			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "LastSeen", res.LastSeen)

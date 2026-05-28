@@ -26,7 +26,7 @@ func TestGetProxyCheck_Full(t *testing.T) {
 	requireModuleResult(t, exec.Results, constants.TypeTag, constants.TagSpam)
 
 	requireResultWithContext(t, exec.Results, constants.TypeAbuseScore, "99", "IP2Proxy Fraud Score")
-	requireModuleResult(t, exec.Results, constants.TypeLastSeen, "14 days ago")
+	requireModuleResult(t, exec.Results, constants.TypeDate, "Last Seen: 14 days ago")
 	requireResultWithContext(t, exec.Results, constants.TypeInfo, "Example VPN Provider", "VPN/Proxy Provider")
 	requireModuleResult(t, exec.Results, constants.TypeDomain, "example.net")
 	requireResultWithContext(t, exec.Results, constants.TypeUsageType, "University/College/School", "Proxy Usage Type")
