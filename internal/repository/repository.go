@@ -2345,7 +2345,7 @@ func GetProjectStats(ctx context.Context, projectID string) (map[string]map[stri
 		}
 	}()
 
-	query := "SELECT e.category, e.type, COUNT(DISTINCT d.value) FROM entities e JOIN dictionary d ON e.value_id = d.id WHERE e.is_anchor = 0 GROUP BY e.category, e.type"
+	query := "SELECT e.category, e.type, COUNT(e.id) FROM entities e JOIN dictionary d ON e.value_id = d.id WHERE e.is_anchor = 0 GROUP BY e.category, e.type"
 	rows, rErr := db.QueryContext(ctx, query)
 	if rErr != nil {
 		return nil, rErr
