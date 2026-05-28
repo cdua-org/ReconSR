@@ -2097,11 +2097,16 @@
                                             const targetLabel = targetNode ? targetNode.label : e.to;
                                             const targetGroup = targetNode ? targetNode.group : '';
                                             const isOOS = targetNode ? targetNode.outOfScope : false;
+                                            const isHidden = targetNode ? targetNode.hidden : false;
 
-                                            content += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #10b981; border-radius: 0 4px 4px 0;">';
+                                            const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
+                                            const focusBtnHtml = !isHidden ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.to) + '">Focus</button>' : '';
+                                            const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
+
+                                            content += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #10b981; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
                                             content += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
-                                            content += '<span>' + escapeHTML(targetGroup) + '</span>';
-                                            content += '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.to) + '">Focus</button></div>';
+                                            content += '<span>' + escapeHTML(targetGroup) + badgeHtml + '</span>';
+                                            content += focusBtnHtml + '</div>';
                                             content += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(targetLabel) + '</span>' + getCopyBtnHTML(targetLabel) + '</div>';
 
                                             let metaHtml = '';
@@ -2166,11 +2171,16 @@
                                             const sourceLabel = sourceNode2 ? sourceNode2.label : e.from;
                                             const sourceGroup = sourceNode2 ? sourceNode2.group : '';
                                             const isOOS = sourceNode2 ? sourceNode2.outOfScope : false;
+                                            const isHidden = sourceNode2 ? sourceNode2.hidden : false;
 
-                                            content += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #8b5cf6; border-radius: 0 4px 4px 0;">';
+                                            const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
+                                            const focusBtnHtml = !isHidden ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.from) + '">Focus</button>' : '';
+                                            const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
+
+                                            content += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #8b5cf6; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
                                             content += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
-                                            content += '<span>' + escapeHTML(sourceGroup) + '</span>';
-                                            content += '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.from) + '">Focus</button></div>';
+                                            content += '<span>' + escapeHTML(sourceGroup) + badgeHtml + '</span>';
+                                            content += focusBtnHtml + '</div>';
                                             content += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(sourceLabel) + '</span>' + getCopyBtnHTML(sourceLabel) + '</div>';
 
                                             let metaHtml = '';
