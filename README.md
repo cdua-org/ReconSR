@@ -170,41 +170,44 @@ Passive reconnaissance of IPv4/IPv6 addresses via reverse DNS, public blacklists
 - `get_ip_info`: Extracts the network name (`netname`) and description from RIPE WHOIS records.
 - `get_ip_abuse_contacts`: Retrieves dedicated abuse reporting email addresses registered to the specific IP allocation.
 
-### 12. AbuseIPDB Reputation (`modules/abuseipdb`) - 1 function
+### 12. IPinfo Intelligence (`modules/ipinfo`) - 1 function
+- `get_ip_info`: Queries the IPinfo API for IPv4/IPv6 targets when an API key is configured. Extracts Geo, ASN, Privacy, Mobile, Hosting, Anycast, Satellite, Reverse IP metadata, etc. Depending on the configuration, it queries either the rich lookup endpoint or defaults to the free lite endpoint. Includes explicit demo-mode support.
+
+### 13. AbuseIPDB Reputation (`modules/abuseipdb`) - 1 function
 - `check_abuseipdb`: Queries AbuseIPDB for IPv4/IPv6 reputation when an API key is configured. Extracts abuse confidence score, report count, report summaries, network metadata (country, ISP, usage type, etc.), risk indicators (malicious, suspicious, whitelisted, Tor exit, etc.), category-derived threat tags, and reverse-IP hostnames/domains, with retry, daily quota detection, and explicit demo-mode support.
 
-### 13. IP2Location Local Intelligence (`modules/ip2location`) - 3 functions
+### 14. IP2Location Local Intelligence (`modules/ip2location`) - 3 functions
 Offline IPv4/IPv6 enrichment backed by locally installed IP2Location/IP2Proxy BIN databases under `data/ip2location`:
 - `get_geo_ip`: Extracts geolocation, ISP, reverse-IP domain, usage type, mobile network metadata, connection speed, address type, IAB category, etc. from DB11 Geo IP data.
 - `get_ip_asn`: Resolves ASN, AS owner, linked AS domain, AS usage type, and AS CIDR from IP2Location ASN data.
 - `get_proxy_check`: Detects proxy/VPN/Tor/datacenter/residential/privacy-network indicators through IP2Proxy data, extracting fraud score, last-seen age, provider, reverse-IP domain, usage type, and threat-derived tags such as scanner, spam, botnet, etc.
 
-### 14. MaxMind Local Intelligence (`modules/maxmind`) - 4 functions
+### 15. MaxMind Local Intelligence (`modules/maxmind`) - 4 functions
 Offline IPv4/IPv6 enrichment backed by locally installed MaxMind MMDB databases under `data/maxmind`:
 - `get_geo_ip`: Extracts comprehensive geolocation metadata (city, region, country, coordinates, timezone, etc.) from City databases.
 - `get_ip_asn`: Resolves Autonomous System Number (ASN), associated organization, ISP, etc. from ASN and ISP databases.
 - `get_proxy_check`: Identifies anonymous IPs, VPNs, Tor exit nodes, etc. from Anonymous IP databases, emitting standardized threat tags.
 - `get_mm_enterprise_data`: Provides maximum data density by aggressively parsing Enterprise databases. Combines all available geo, ASN, ISP, connection type, user type, etc. into a single unified output.
 
-### 15. ASN Intelligence (`modules/asn_metadata`) - 4 functions
+### 16. ASN Intelligence (`modules/asn_metadata`) - 4 functions
 Deep analysis of Autonomous System Numbers via RIPEstat API to map network hierarchies, ownership, and announced subnets:
 - `get_asn_peers`: Constructs a strict linear transit chain by identifying the largest upstream provider at each hop, revealing who the ASN buys transit from.
 - `get_asn_prefixes`: Retrieves all IPv4/IPv6 CIDR blocks (BGP prefixes) currently announced by the ASN.
 - `get_asn_info`: Resolves the official legal holder (organization name) of the Autonomous System.
 - `get_asn_abuse_contacts`: Extracts abuse reporting email addresses associated with the ASN infrastructure.
 
-### 16. Shodan Intelligence (`modules/shodan`) - 3 conditional functions
+### 17. Shodan Intelligence (`modules/shodan`) - 3 conditional functions
 Shodan enrichment uses two capability modes: without an API key, only the public InternetDB function is advertised with reduced host exposure data; when a Shodan API key is configured, InternetDB is replaced by API-backed IP and domain functions with richer results and explicit demo-mode support:
 - `get_idb_shodan`: Passive enrichment of IPv4/IPv6 targets through the public Shodan InternetDB endpoint. Extracts PTR hostnames, open ports, service tags, known CVEs, and CPE fingerprints for rapid exposure triage.
 - `get_shodan_api_ip`: Queries the Shodan Host API for IPv4/IPv6 targets. Extracts reverse-IP domains, ASN, organization, ISP, OS, hostnames, tags, last update, service banners, ports, CVEs, CPEs, SSL/TLS metadata, etc.
 - `get_shodan_api_domain`: Queries the Shodan DNS Domain API for domains, and optionally subdomains. Extracts passive DNS subdomains and a broad set of DNS-derived entities that can overlap with multiple dedicated DNS modules, including record values, last-seen dates, wildcard markers, historical tags, out-of-scope classifications, etc.
 
-### 17. VirusTotal Intelligence (`modules/virustotal`) - 2 functions
+### 18. VirusTotal Intelligence (`modules/virustotal`) - 2 functions
 API-backed enrichment for domains, optionally subdomains, and IPv4/IPv6 targets through VirusTotal API v3. Without a VirusTotal API key, no functions are advertised to the dispatcher; with a configured key, the module exposes both functions and supports explicit demo mode:
 - `get_vt_api_domain`: Queries VirusTotal domain metadata and, when enabled, related subdomains. Extracts tags, reputation and threat scores, categories, popularity ranks, JARM, crowdsourced context, certificate identities and fingerprints, DNS-derived entities, expired-certificate subdomain summaries, out-of-scope classifications, etc.
 - `get_vt_api_ip`: Queries VirusTotal IP metadata and passive DNS resolutions. Extracts ASN, network CIDR, AS owner, geo metadata, JARM, tags, threat scores, last update, passive DNS hostnames, etc.
 
-### 18. Vulnerability Lookup (`modules/vuln_lookup`) - 1 function
+### 19. Vulnerability Lookup (`modules/vuln_lookup`) - 1 function
 - `get_circl_vuln`: Queries the CIRCL Vulnerability API for CVE entities. Supports an optional API key; without one, requests use the public keyless endpoint and remain subject to strict rate limits. Extracts vulnerability summaries, CWE classifications with local descriptions, best available CVSS metrics, affected CPE criteria, EPSS probability and percentile, SSVC/KEV indicators, additional metadata included in CIRCL responses, etc.
 
 ---
@@ -256,6 +259,7 @@ While the current alpha release is focused on automating point-in-time investiga
 - ✅ Passive exposure enrichment via Shodan InternetDB and API-backed Shodan Host/DNS intelligence with demo mode.
 - ✅ Passive subdomain discovery via Anubis DB.
 - ✅ IP intelligence: PTR, DNSBL (Tor/Spam), RIPE WHOIS metadata (netname, description), and abuse contacts.
+- ✅ IPinfo API enrichment for IPv4/IPv6 targets, extracting Geo, ASN, Privacy, Mobile, Hosting properties, etc., with Lite/Paid endpoint toggle and demo mode.
 - ✅ AbuseIPDB reputation checks with abuse scores, report summaries, threat tags, reverse-IP context, and demo mode.
 - ✅ Offline IP2Location/IP2Proxy enrichment for geolocation, ASN, proxy/VPN/Tor indicators, and related IP metadata.
 - ✅ Offline MaxMind enrichment via locally installed MMDB databases for geolocation, ASN, proxy/VPN indicators, and comprehensive Enterprise data aggregation.
