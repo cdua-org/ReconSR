@@ -1346,7 +1346,6 @@
                         const currentNodes = nodes.get();
                         document.querySelectorAll('.label-toggle-btn').forEach(btn => {
                             const btnType = btn.getAttribute('data-type');
-                            if (btnType === 'root') return;
 
                             const isGroup = !btnType.includes(':');
                             const [g, s] = btnType.split(':');
@@ -1477,7 +1476,6 @@
                         const labelBtn = e.target.closest('.label-toggle-btn');
                         if (labelBtn) {
                             const type = labelBtn.getAttribute('data-type');
-                            if (type === 'root') return;
 
                             const isGroup = !type.includes(':');
                             const [g, s] = type.split(':');
