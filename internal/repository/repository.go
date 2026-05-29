@@ -68,6 +68,12 @@ func ResolveWorkspaceRoute(ref string) (string, error) {
 	return internalName, nil
 }
 
+// openDB handles SQLite connections with WAL mode and busy timeout to prevent locks.
+func openDB(dbPath string) (*sql.DB, error) {
+	dsn := dbPath + "?_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)"
+	return sql.Open("sqlite", dsn)
+}
+
 // SyncMasterDB creates or updates the master database with projects and available modules.
 func SyncMasterDB(ctx context.Context, regs []schema.ModuleRegistration) (err error) {
 	if err := os.MkdirAll(StorageBaseDir, 0750); err != nil {
@@ -75,7 +81,7 @@ func SyncMasterDB(ctx context.Context, regs []schema.ModuleRegistration) (err er
 	}
 
 	dbPath := filepath.Join(StorageBaseDir, MasterDBName)
-	db, dbErr := sql.Open("sqlite", dbPath)
+	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return dbErr
 	}
@@ -167,7 +173,7 @@ func SyncMasterDB(ctx context.Context, regs []schema.ModuleRegistration) (err er
 // FindProjects searches for projects and checks module support for a target type in the master database.
 func FindProjects(ctx context.Context, targetType, targetValue string) (projects []schema.ProjectInfo, hasModules bool, hasActiveFuncs bool, err error) {
 	dbPath := filepath.Join(StorageBaseDir, MasterDBName)
-	db, dbErr := sql.Open("sqlite", dbPath)
+	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, false, false, dbErr
 	}
@@ -246,7 +252,7 @@ func CreateProjectDB(ctx context.Context, targetType, targetValue, anchor string
 	projectID := "proj_" + hex.EncodeToString(uuidBytes)
 
 	projectDBPath := filepath.Join(StorageProjectsDir, projectID+".db")
-	db, dbErr := sql.Open("sqlite", projectDBPath)
+	db, dbErr := openDB(projectDBPath)
 	if dbErr != nil {
 		return "", dbErr
 	}
@@ -357,7 +363,7 @@ func CreateProjectDB(ctx context.Context, targetType, targetValue, anchor string
 	}
 
 	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
-	masterDB, mdbErr := sql.Open("sqlite", masterDBPath)
+	masterDB, mdbErr := openDB(masterDBPath)
 	if mdbErr != nil {
 		return "", mdbErr
 	}
@@ -1307,7 +1313,7 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 	}
 
 	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
-	db, dbErr := sql.Open("sqlite", dbPath)
+	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, dbErr
 	}
@@ -1968,7 +1974,7 @@ func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.P
 	}
 
 	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
-	db, dbErr := sql.Open("sqlite", dbPath)
+	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, nil, dbErr
 	}
@@ -2079,7 +2085,7 @@ func ResetProjectLog(ctx context.Context, projectID string, clearAll, clearError
 	}
 
 	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
-	db, dbErr := sql.Open("sqlite", dbPath)
+	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return dbErr
 	}
@@ -2125,7 +2131,7 @@ func GetResumePayload(ctx context.Context, projectID string, resumePending, retr
 	}
 
 	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
-	db, dbErr := sql.Open("sqlite", dbPath)
+	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, dbErr
 	}
@@ -2334,7 +2340,7 @@ func GetProjectStats(ctx context.Context, projectID string) (map[string]map[stri
 	}
 
 	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
-	db, dbErr := sql.Open("sqlite", dbPath)
+	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, dbErr
 	}
@@ -2380,7 +2386,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 	}
 
 	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
-	masterDB, mdbErr := sql.Open("sqlite", masterDBPath)
+	masterDB, mdbErr := openDB(masterDBPath)
 	if mdbErr != nil {
 		return nil, mdbErr
 	}
@@ -2397,7 +2403,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 	}
 
 	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
-	db, dbErr := sql.Open("sqlite", dbPath)
+	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, dbErr
 	}

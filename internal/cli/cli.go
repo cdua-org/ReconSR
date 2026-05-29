@@ -34,10 +34,7 @@ func ShowResultsMenu(ctx context.Context) {
 		fmt.Println("4. " + i18n.T["OPT_EXIT"])
 		fmt.Print("\n" + colorGreen + i18n.T["LBL_CHOICE_PROMPT"] + ": " + colorReset)
 
-		var choice string
-		if _, err := fmt.Scanln(&choice); err != nil {
-			return
-		}
+		choice := readUserInput()
 		fmt.Println("--------------------------------------------------")
 
 		switch choice {
@@ -103,7 +100,11 @@ func ShowBanner(ctx context.Context) {
 func printProjectStats(ctx context.Context) {
 	if projectID := controller.GetActiveProjectID(); projectID != "" {
 		totalEntities, statsByCat, totalsByCat, err := controller.GetActiveProjectStats(ctx)
-		if err == nil && len(statsByCat) > 0 {
+		if err != nil {
+			fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
+			return
+		}
+		if len(statsByCat) > 0 {
 			fmt.Printf(colorCyan+"Total entities: %d"+colorReset+"\n", totalEntities)
 
 			var catKeys []string
@@ -155,9 +156,7 @@ func ShowReconCompleteBanner(ctx context.Context) {
 func GetRawTarget(args []string) string {
 	if len(args) < 2 {
 		fmt.Printf("\n%s%s %s", colorGreen, i18n.T["LBL_INPUT_TARGET_PROMPT"], colorReset)
-		var target string
-		_, _ = fmt.Scanln(&target)
-		target = strings.TrimSpace(target)
+		target := readUserInput()
 		if target == "" {
 			fmt.Println(i18n.T["LBL_USAGE"] + ": " + args[0] + " <" + i18n.T["LBL_TARGET_HINT"] + ">")
 			os.Exit(1)
@@ -216,10 +215,7 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 			fmt.Printf("\n1. %s\n", i18n.T["OPT_EXIT"])
 			fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
 
-			var choice string
-			if _, err := fmt.Scanln(&choice); err != nil {
-				os.Exit(0)
-			}
+			choice := readUserInput()
 			fmt.Println("--------------------------------------------------")
 
 			if choice == "0" {
@@ -257,10 +253,7 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 		fmt.Printf("%d. %s\n", exitIdx, i18n.T["OPT_EXIT"])
 		fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
 
-		var choice string
-		if _, err := fmt.Scanln(&choice); err != nil {
-			os.Exit(0)
-		}
+		choice := readUserInput()
 		fmt.Println("--------------------------------------------------")
 
 		var idx int
@@ -354,10 +347,7 @@ func handleModuleConfiguration(ctx context.Context) {
 		fmt.Printf("\n0. %s[ %s ]%s\n", colorGreen, i18n.T["OPT_SAVE_EXIT"], colorReset)
 
 		fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
-		var choice string
-		if _, err := fmt.Scanln(&choice); err != nil {
-			return
-		}
+		choice := readUserInput()
 
 		var idx int
 		if _, err := fmt.Sscanf(choice, "%d", &idx); err != nil {
@@ -464,10 +454,7 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 		fmt.Printf("%d. %s\n", optIdx, i18n.T["OPT_EXIT"])
 
 		fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
-		var choice string
-		if _, err := fmt.Scanln(&choice); err != nil {
-			return nil
-		}
+		choice := readUserInput()
 		fmt.Println("--------------------------------------------------")
 		var idx int
 		if _, err := fmt.Sscanf(choice, "%d", &idx); err != nil {
