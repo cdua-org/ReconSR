@@ -1,12 +1,13 @@
 package cli
 
 import (
-	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
+	"syscall"
+	"time"
 
 	"cdua-org/ReconSR/internal/controller"
 	"cdua-org/ReconSR/internal/i18n"
@@ -15,28 +16,60 @@ import (
 
 // InteractiveControl listens for terminal input to pause, resume, or stop execution.
 func InteractiveControl(ctx context.Context, done <-chan struct{}) {
-	ttyPath := "/dev/tty"
-	if runtime.GOOS == "windows" {
-		ttyPath = "CONIN$"
-	}
+	ttyPath := getTTYPath()
+	openFlags := getTTYOpenFlags()
 
-	tty, err := os.Open(ttyPath)
+	tty, err := os.OpenFile(ttyPath, openFlags, 0)
 	if err != nil {
-		<-done
-		return
+		tty, err = os.Open(ttyPath)
+		if err != nil {
+			<-done
+			return
+		}
 	}
 	defer tty.Close()
 
 	inputChan := make(chan string)
 	go func() {
-		scanner := bufio.NewScanner(tty)
-		for scanner.Scan() {
+		buf := make([]byte, 128)
+		var currentLine string
+		for {
 			select {
 			case <-done:
 				return
 			case <-ctx.Done():
 				return
-			case inputChan <- strings.TrimSpace(scanner.Text()):
+			default:
+			}
+
+			_ = tty.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+			n, err := tty.Read(buf)
+			if n > 0 {
+				for _, ch := range string(buf[:n]) {
+					if ch == '\n' || ch == '\r' {
+						val := strings.TrimSpace(currentLine)
+						if val != "" {
+							select {
+							case inputChan <- val:
+							case <-done:
+								return
+							case <-ctx.Done():
+								return
+							}
+						}
+						currentLine = ""
+					} else {
+						currentLine += string(ch)
+					}
+				}
+			}
+
+			if err != nil {
+				if os.IsTimeout(err) || errors.Is(err, syscall.EAGAIN) || errors.Is(err, syscall.EWOULDBLOCK) {
+					time.Sleep(200 * time.Millisecond)
+					continue
+				}
+				return
 			}
 		}
 	}()
