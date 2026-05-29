@@ -7,7 +7,7 @@ require (
 	github.com/ip2location/ip2proxy-go/v4 v4.2.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/oschwald/geoip2-golang v1.13.0
-	github.com/oschwald/maxminddb-golang v1.13.0
+	github.com/oschwald/maxminddb-golang v1.13.1
 	golang.org/x/net v0.55.0
 	golang.org/x/sys v0.45.0
 	modernc.org/sqlite v1.50.1
