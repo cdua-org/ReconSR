@@ -13,6 +13,7 @@ import (
 	"cdua-org/ReconSR/modules/ipinfo"
 	"cdua-org/ReconSR/modules/ip_metadata"
 	"cdua-org/ReconSR/modules/ipv4ambiguous"
+	"cdua-org/ReconSR/modules/leakix"
 	"cdua-org/ReconSR/modules/mailcrypto"
 	"cdua-org/ReconSR/modules/maxmind"
 	"cdua-org/ReconSR/modules/shodan"
@@ -36,6 +37,7 @@ var ModuleRegistry = []schema.Module{
 	ipinfo.New(),
 	ip_metadata.New(),
 	ipv4ambiguous.New(),
+	leakix.New(),
 	mailcrypto.New(),
 	maxmind.New(),
 	shodan.New(),

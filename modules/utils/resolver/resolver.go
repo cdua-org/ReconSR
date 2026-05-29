@@ -60,6 +60,8 @@ var (
 	MaxRetriesDNS = 3
 	// MaxRetriesHT defines maximum attempts for hackertarget API.
 	MaxRetriesHT = 3
+	// MaxRetriesLeakIX defines maximum attempts for LeakIX API.
+	MaxRetriesLeakIX = 3
 	// MaxRetriesIPMeta defines maximum attempts for IP metadata lookups.
 	MaxRetriesIPMeta = 3
 	// MaxRetriesASNMeta defines maximum attempts for ASN metadata lookups.
@@ -313,6 +315,7 @@ func initOptionMaps() {
 		"MaxRetriesWhois":          &MaxRetriesWhois,
 		"MaxRetriesDNS":            &MaxRetriesDNS,
 		"MaxRetriesHT":             &MaxRetriesHT,
+		"MaxRetriesLeakIX":         &MaxRetriesLeakIX,
 		"MaxRetriesIPMeta":         &MaxRetriesIPMeta,
 		"MaxRetriesASNMeta":        &MaxRetriesASNMeta,
 		"MaxRecursionDepth":        &MaxRecursionDepth,

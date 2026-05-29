@@ -57,4 +57,7 @@ const (
 	FuncGetIPASN                = "get_ip_asn"
 	FuncGetProxyCheck           = "get_proxy_check"
 	FuncGetEmailBreaches        = "get_email_breaches"
+	FuncGetLeakIXDomain         = "get_leakix_domain"
+	FuncGetLeakIXIP             = "get_leakix_ip"
+	FuncGetLeakIXSubdomains     = "get_leakix_subdomains"
 )

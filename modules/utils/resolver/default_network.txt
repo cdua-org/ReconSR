@@ -200,6 +200,12 @@ HaveIBeenPwnedMaxRetries=3
 IPINFOPaid=false
 
 
+### LeakIX Options ###
+
+# Maximum retry attempts for LeakIX API requests (default: 3)
+MaxRetriesLeakIX=3
+
+
 [DoH]
 https://dns.cloudflare.com/dns-query
 https://dns.google/resolve

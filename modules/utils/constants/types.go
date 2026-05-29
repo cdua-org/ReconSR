@@ -105,4 +105,6 @@ const (
 	TypeLeakedData            = "leaked"
 	TypePwnedRecords          = "pwned_records"
 	TypeAttribution           = "attribution"
+	TypeMAC                   = "mac"
+	TypeVendor                = "vendor"
 )

@@ -28,4 +28,5 @@ const (
 	TagCVE         = "cve"
 	TagMalicious   = "malicious"
 	TagSuspicious  = "suspicious"
+	TagCompromised = "compromised"
 )
