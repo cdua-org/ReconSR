@@ -1,0 +1,301 @@
+{
+  "Services": [
+    {
+      "event_type": "service",
+      "event_source": "HttpPlugin",
+      "event_pipeline": ["ip4scout", "l9tcpid", "l9explore", "HttpPlugin"],
+      "event_fingerprint": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      "ip": "192.0.2.1",
+      "host": "www.example.com",
+      "reverse": "ptr.example.com",
+      "port": "443",
+      "mac": "00:11:22:33:44:55",
+      "vendor": "Fake Hardware Vendor",
+      "transport": ["tcp", "tls", "http"],
+      "protocol": "https",
+      "http": {
+        "root": "/",
+        "url": "/",
+        "status": 200,
+        "length": 12423,
+        "header": {
+          "server": "nginx/1.18.0"
+        },
+        "title": "Welcome to Example",
+        "favicon_hash": "deadbeef1234"
+      },
+      "summary": "HTTP/1.1 200 OK\r\nServer: nginx/1.18.0\r\n\r\nWelcome to Example",
+      "time": "2026-05-20T10:00:00Z",
+      "ssl": {
+        "detected": true,
+        "enabled": true,
+        "jarm": "1111222233334444555566667777888811112222333344445555666677778888",
+        "cypher_suite": "TLS_AES_256_GCM_SHA384",
+        "version": "TLSv1.3",
+        "certificate": {
+          "cn": "example.com",
+          "domain": ["example.com", "www.example.com", "mail.example.com"],
+          "fingerprint": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+          "key_algo": "RSA",
+          "key_size": 2048,
+          "issuer_name": "O: Fake CA | CN: Fake Issuer | C: FK",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2027-01-01T00:00:00Z",
+          "valid": true
+        }
+      },
+      "ssh": {},
+      "service": {
+        "credentials": {
+          "noauth": false,
+          "username": "",
+          "password": "",
+          "key": "",
+          "raw": null
+        },
+        "software": {
+          "name": "nginx",
+          "version": "1.18.0",
+          "os": "",
+          "modules": null,
+          "fingerprint": ""
+        }
+      },
+      "leak": {},
+      "tags": ["web"],
+      "geoip": {
+        "continent_name": "FakeContinent",
+        "region_iso_code": "FK-REG",
+        "city_name": "FakeCity",
+        "country_iso_code": "FK",
+        "country_name": "Fakeland",
+        "region_name": "FakeRegion",
+        "location": { "lat": 12.3456, "lon": -12.3456 }
+      },
+      "network": {
+        "organization_name": "Fake Corp",
+        "asn": 64496,
+        "network": "192.0.2.0/24"
+      }
+    },
+    {
+      "event_type": "service",
+      "event_source": "HttpPlugin",
+      "event_pipeline": ["ip4scout", "l9tcpid", "l9explore", "HttpPlugin"],
+      "event_fingerprint": "oldold1234567890oldold1234567890oldold1234567890oldold1234567890",
+      "ip": "192.0.2.1",
+      "host": "www.example.com",
+      "reverse": "ptr.example.com",
+      "port": "443",
+      "mac": "",
+      "vendor": "",
+      "transport": ["tcp", "tls", "http"],
+      "protocol": "https",
+      "http": {
+        "root": "/",
+        "url": "/",
+        "status": 200,
+        "length": 8000,
+        "header": {
+          "server": "nginx/1.14.0"
+        },
+        "title": "Welcome",
+        "favicon_hash": "deadbeef1234"
+      },
+      "summary": "HTTP/1.1 200 OK\r\nServer: nginx/1.14.0",
+      "time": "2025-06-01T10:00:00Z",
+      "ssl": {
+        "detected": true,
+        "enabled": true,
+        "jarm": "1111222233334444555566667777888811112222333344445555666677778888",
+        "cypher_suite": "TLS_AES_256_GCM_SHA384",
+        "version": "TLSv1.3",
+        "certificate": {
+          "cn": "example.com",
+          "domain": ["example.com", "www.example.com", "mail.example.com"],
+          "fingerprint": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+          "key_algo": "RSA",
+          "key_size": 2048,
+          "issuer_name": "O: Fake CA | CN: Fake Issuer | C: FK",
+          "not_before": "2025-01-01T00:00:00Z",
+          "not_after": "2026-01-01T00:00:00Z",
+          "valid": true
+        }
+      },
+      "ssh": {},
+      "service": {
+        "credentials": {
+          "noauth": false,
+          "username": "fake_admin",
+          "password": "fake_password",
+          "key": "",
+          "raw": null
+        },
+        "software": {
+          "name": "nginx",
+          "version": "1.14.0",
+          "os": "",
+          "modules": null,
+          "fingerprint": ""
+        }
+      },
+      "leak": {},
+      "tags": ["web"],
+      "geoip": {
+        "continent_name": "FakeContinent",
+        "region_iso_code": "FK-REG",
+        "city_name": "FakeCity",
+        "country_iso_code": "FK",
+        "country_name": "Fakeland",
+        "region_name": "FakeRegion",
+        "location": { "lat": 12.3456, "lon": -12.3456 }
+      },
+      "network": {
+        "organization_name": "Fake Corp",
+        "asn": 64496,
+        "network": "192.0.2.0/24"
+      }
+    },
+    {
+      "event_type": "service",
+      "event_source": "SshPlugin",
+      "event_pipeline": ["ip4scout", "l9tcpid", "SshPlugin"],
+      "event_fingerprint": "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+      "ip": "192.0.2.1",
+      "host": "www.example.com",
+      "reverse": "ptr.example.com",
+      "port": "22",
+      "mac": "",
+      "vendor": "",
+      "transport": ["tcp"],
+      "protocol": "ssh",
+      "http": {},
+      "summary": "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.3",
+      "time": "2026-05-20T10:01:00Z",
+      "ssl": {},
+      "ssh": {
+        "fingerprint": "SHA256:fakeSshFingerprint1234567890abcdef",
+        "version": 2,
+        "banner": "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.3",
+        "motd": "Welcome to Ubuntu 20.04.2 LTS"
+      },
+      "service": {
+        "credentials": {
+          "noauth": false,
+          "username": "",
+          "password": "",
+          "key": "",
+          "raw": null
+        },
+        "software": {
+          "name": "OpenSSH",
+          "version": "8.2p1",
+          "os": "Ubuntu",
+          "modules": null,
+          "fingerprint": ""
+        }
+      },
+      "leak": {},
+      "tags": [],
+      "geoip": {
+        "continent_name": "FakeContinent",
+        "region_iso_code": "FK-REG",
+        "city_name": "FakeCity",
+        "country_iso_code": "FK",
+        "country_name": "Fakeland",
+        "region_name": "FakeRegion",
+        "location": { "lat": 12.3456, "lon": -12.3456 }
+      },
+      "network": {
+        "organization_name": "Fake Corp",
+        "asn": 64496,
+        "network": "192.0.2.0/24"
+      }
+    }
+  ],
+  "Leaks": [
+    {
+      "Summary": "Found critical config leaks",
+      "Ip": "192.0.2.1",
+      "resource_id": "www.example.com",
+      "open_ports": ["443"],
+      "leak_count": 1,
+      "leak_event_count": 1,
+      "events": [
+        {
+      "event_type": "leak",
+      "event_source": "DotEnvConfigPlugin",
+      "event_pipeline": ["ip4scout", "l9tcpid", "l9explore", "DotEnvConfigPlugin"],
+      "event_fingerprint": "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1",
+      "ip": "192.0.2.1",
+      "host": "www.example.com",
+      "reverse": "ptr.example.com",
+      "port": "443",
+      "mac": "",
+      "vendor": "",
+      "transport": ["tcp", "tls", "http"],
+      "protocol": "https",
+      "http": {
+        "root": "/",
+        "url": "/.env",
+        "status": 200,
+        "length": 950,
+        "header": {
+          "server": "nginx/1.18.0"
+        },
+        "title": "",
+        "favicon_hash": ""
+      },
+      "summary": "DB_HOST=db.internal.example.com\nDB_USER=production\nDB_PASS=s3cr3t_pr0d_pass!",
+      "time": "2026-05-20T10:05:00Z",
+      "ssl": {},
+      "ssh": {},
+      "service": {
+        "credentials": {
+          "noauth": false,
+          "username": "production",
+          "password": "s3cr3t_pr0d_pass!",
+          "key": "",
+          "raw": null
+        },
+        "software": {
+          "name": "nginx",
+          "version": "1.18.0",
+          "os": "",
+          "modules": null,
+          "fingerprint": ""
+        }
+      },
+      "leak": {
+        "stage": "open",
+        "type": "configuration",
+        "severity": "high",
+        "dataset": {
+          "rows": 0,
+          "files": 1,
+          "size": 950,
+          "collections": 0,
+          "infected": false,
+          "ransom_notes": null
+        }
+      },
+      "tags": ["config-leak"],
+      "geoip": {
+        "continent_name": "FakeContinent",
+        "region_iso_code": "FK-REG",
+        "city_name": "FakeCity",
+        "country_iso_code": "FK",
+        "country_name": "Fakeland",
+        "region_name": "FakeRegion",
+        "location": { "lat": 12.3456, "lon": -12.3456 }
+      },
+      "network": {
+        "organization_name": "Fake Corp",
+        "asn": 64496,
+        "network": "192.0.2.0/24"
+      }
+        }
+      ]
+    }
+  ]
+}

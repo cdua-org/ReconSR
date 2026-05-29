@@ -1,0 +1,17 @@
+[
+  {
+    "subdomain": "www.example.com",
+    "distinct_ips": 2,
+    "last_seen": "2026-05-20T11:25:41.243Z"
+  },
+  {
+    "subdomain": "mail.example.com",
+    "distinct_ips": 1,
+    "last_seen": "2026-05-18T09:12:03.404Z"
+  },
+  {
+    "subdomain": "staging.example.com",
+    "distinct_ips": 1,
+    "last_seen": "2026-05-15T14:33:22.100Z"
+  }
+]

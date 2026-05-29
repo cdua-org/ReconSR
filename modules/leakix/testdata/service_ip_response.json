@@ -1,0 +1,354 @@
+{
+  "Services": [
+    {
+      "event_type": "service",
+      "event_source": "HttpPlugin",
+      "event_pipeline": ["ip4scout", "l9tcpid", "l9explore", "HttpPlugin"],
+      "event_fingerprint": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+      "ip": "198.51.100.1",
+      "host": "example.net",
+      "reverse": "server.example.net",
+      "port": "443",
+      "mac": "",
+      "vendor": "",
+      "transport": ["tcp", "tls", "http"],
+      "protocol": "https",
+      "http": {
+        "root": "/",
+        "url": "/",
+        "status": 200,
+        "length": 5000,
+        "header": {
+          "server": "Apache/2.4.41"
+        },
+        "title": "Sub 1 Dashboard",
+        "favicon_hash": ""
+      },
+      "summary": "HTTP/1.1 200 OK\r\nServer: Apache/2.4.41",
+      "time": "2026-05-20T10:00:00Z",
+      "ssl": {
+        "detected": true,
+        "enabled": true,
+        "jarm": "12345678901234567890123456789012345678901234567890123456789012",
+        "cypher_suite": "TLS_AES_256_GCM_SHA384",
+        "version": "TLSv1.3",
+        "certificate": {
+          "cn": "example.net",
+          "domain": ["example.net", "admin.example.net"],
+          "fingerprint": "112233445566778899aabbccddeeff112233445566778899aabbccddeeff11",
+          "key_algo": "RSA",
+          "key_size": 2048,
+          "issuer_name": "O: Fake CA | CN: Fake Issuer | C: FK",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2027-01-01T00:00:00Z",
+          "valid": true
+        }
+      },
+      "ssh": {},
+      "service": {
+        "credentials": {
+          "noauth": false,
+          "username": "",
+          "password": "",
+          "key": "",
+          "raw": null
+        },
+        "software": {
+          "name": "Apache",
+          "version": "2.4.41",
+          "os": "",
+          "modules": null,
+          "fingerprint": ""
+        }
+      },
+      "leak": {},
+      "tags": ["web"],
+      "geoip": {
+        "continent_name": "FakeContinent",
+        "region_iso_code": "FK-REG",
+        "city_name": "FakeCity",
+        "country_iso_code": "FK",
+        "country_name": "Fakeland",
+        "region_name": "FakeRegion",
+        "location": { "lat": -34.0522, "lon": 118.2437 }
+      },
+      "network": {
+        "organization_name": "Hosting Provider",
+        "asn": 64497,
+        "network": "198.51.100.0/24"
+      }
+    },
+    {
+      "event_type": "service",
+      "event_source": "HttpPlugin",
+      "event_pipeline": ["ip4scout", "l9tcpid", "l9explore", "HttpPlugin"],
+      "event_fingerprint": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
+      "ip": "198.51.100.1",
+      "host": "sub2.example.net",
+      "reverse": "server.example.net",
+      "port": "8080",
+      "mac": "",
+      "vendor": "",
+      "transport": ["tcp", "http"],
+      "protocol": "http",
+      "http": {
+        "root": "/",
+        "url": "/",
+        "status": 403,
+        "length": 0,
+        "header": {
+          "server": "Apache/2.4.41"
+        },
+        "title": "Forbidden",
+        "favicon_hash": ""
+      },
+      "summary": "HTTP/1.1 403 Forbidden\r\nServer: Apache/2.4.41",
+      "time": "2026-05-19T10:00:00Z",
+      "ssl": {},
+      "ssh": {},
+      "service": {
+        "credentials": {
+          "noauth": false,
+          "username": "",
+          "password": "",
+          "key": "",
+          "raw": null
+        },
+        "software": {
+          "name": "Apache",
+          "version": "2.4.41",
+          "os": "",
+          "modules": null,
+          "fingerprint": ""
+        }
+      },
+      "leak": {},
+      "tags": ["web"],
+      "geoip": {
+        "continent_name": "FakeContinent",
+        "region_iso_code": "FK-REG",
+        "city_name": "FakeCity",
+        "country_iso_code": "FK",
+        "country_name": "Fakeland",
+        "region_name": "FakeRegion",
+        "location": { "lat": -34.0522, "lon": 118.2437 }
+      },
+      "network": {
+        "organization_name": "Hosting Provider",
+        "asn": 64497,
+        "network": "198.51.100.0/24"
+      }
+    },
+    {
+      "event_type": "service",
+      "event_source": "SshPlugin",
+      "event_pipeline": ["ip4scout", "l9tcpid", "SshPlugin"],
+      "event_fingerprint": "f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+      "ip": "198.51.100.1",
+      "host": "",
+      "reverse": "server.example.net",
+      "port": "22",
+      "mac": "",
+      "vendor": "",
+      "transport": ["tcp"],
+      "protocol": "ssh",
+      "http": {},
+      "summary": "SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6",
+      "time": "2026-05-20T10:01:00Z",
+      "ssl": {},
+      "ssh": {
+        "fingerprint": "SHA256:fakeIpSshFingerprint0987654321fedcba",
+        "version": 2,
+        "banner": "SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6",
+        "motd": ""
+      },
+      "service": {
+        "credentials": {
+          "noauth": false,
+          "username": "",
+          "password": "",
+          "key": "",
+          "raw": null
+        },
+        "software": {
+          "name": "OpenSSH",
+          "version": "8.9p1",
+          "os": "Ubuntu",
+          "modules": null,
+          "fingerprint": ""
+        }
+      },
+      "leak": {},
+      "tags": [],
+      "geoip": {
+        "continent_name": "FakeContinent",
+        "region_iso_code": "FK-REG",
+        "city_name": "FakeCity",
+        "country_iso_code": "FK",
+        "country_name": "Fakeland",
+        "region_name": "FakeRegion",
+        "location": { "lat": -34.0522, "lon": 118.2437 }
+      },
+      "network": {
+        "organization_name": "Hosting Provider",
+        "asn": 64497,
+        "network": "198.51.100.0/24"
+      }
+    }
+  ],
+  "Leaks": [
+    {
+      "Summary": "Found critical git config leak",
+      "Ip": "192.0.2.1",
+      "resource_id": "192.0.2.1",
+      "open_ports": ["8080"],
+      "leak_count": 1,
+      "leak_event_count": 1,
+      "events": [
+        {
+      "event_type": "leak",
+      "event_source": "GitConfigPlugin",
+      "event_pipeline": ["ip4scout", "l9tcpid", "l9explore", "GitConfigPlugin"],
+      "event_fingerprint": "a1a1b2b2c3c3d4d4e5e5f6f6a1a1b2b2a1a1b2b2c3c3d4d4e5e5f6f6a1a1b2b2",
+      "ip": "198.51.100.1",
+      "host": "example.net",
+      "reverse": "server.example.net",
+      "port": "443",
+      "mac": "",
+      "vendor": "",
+      "transport": ["tcp", "tls", "http"],
+      "protocol": "https",
+      "http": {
+        "root": "/",
+        "url": "/.git/config",
+        "status": 200,
+        "length": 340,
+        "header": {
+          "server": "Apache/2.4.41"
+        },
+        "title": "",
+        "favicon_hash": ""
+      },
+      "summary": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n[remote \"origin\"]\n\turl = https://deploy:ghp_faketoken123@github.example.org/project.git",
+      "time": "2026-05-20T10:02:00Z",
+      "ssl": {},
+      "ssh": {},
+      "service": {
+        "credentials": {
+          "noauth": false,
+          "username": "deploy",
+          "password": "ghp_faketoken123",
+          "key": "",
+          "raw": null
+        },
+        "software": {
+          "name": "Apache",
+          "version": "2.4.41",
+          "os": "",
+          "modules": null,
+          "fingerprint": ""
+        }
+      },
+      "leak": {
+        "stage": "open",
+        "type": "configuration",
+        "severity": "critical",
+        "dataset": {
+          "rows": 0,
+          "files": 1,
+          "size": 340,
+          "collections": 0,
+          "infected": false,
+          "ransom_notes": null
+        }
+      },
+      "tags": ["git-leak"],
+      "geoip": {
+        "continent_name": "FakeContinent",
+        "region_iso_code": "FK-REG",
+        "city_name": "FakeCity",
+        "country_iso_code": "FK",
+        "country_name": "Fakeland",
+        "region_name": "FakeRegion",
+        "location": { "lat": -34.0522, "lon": 118.2437 }
+      },
+      "network": {
+        "organization_name": "Hosting Provider",
+        "asn": 64497,
+        "network": "198.51.100.0/24"
+      }
+        }
+      ]
+    },
+    {
+      "Summary": "",
+      "Ip": "198.51.100.1",
+      "resource_id": "198.51.100.1",
+      "open_ports": ["22"],
+      "leak_count": 1,
+      "leak_event_count": 1,
+      "events": [
+        {
+          "event_type": "leak",
+          "event_source": "SshRegresshionPlugin",
+          "event_pipeline": ["l9filter", "tcpid", "SSHOpenPlugin", "SshRegresshionPlugin"],
+          "event_fingerprint": "f1f2f3f4f5f6f1f2f3f4f5f6f1f2f3f4f1f2f3f4f5f6f1f2f3f4f5f6f1f2f3f4",
+          "ip": "198.51.100.1",
+          "host": "",
+          "reverse": "",
+          "port": "22",
+          "mac": "",
+          "vendor": "",
+          "transport": ["tcp"],
+          "protocol": "ssh",
+          "http": {},
+          "summary": "Found potentially vulnerable SSH version:\nSSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.13\nWARNING, RISK IS ESTIMATED FALSE POSITIVE ARE LIKELY",
+          "time": "2026-05-20T10:05:00Z",
+          "ssl": {},
+          "ssh": {
+            "fingerprint": "SHA256:FakeSSHFingerprint123456789abcdef",
+            "version": 0,
+            "banner": "",
+            "motd": ""
+          },
+          "service": {
+            "credentials": {
+              "noauth": false,
+              "username": "",
+              "password": "",
+              "key": "",
+              "raw": null
+            },
+            "software": {
+              "name": "",
+              "version": "",
+              "os": "",
+              "modules": null,
+              "fingerprint": ""
+            }
+          },
+          "leak": {
+            "stage": "",
+            "type": "",
+            "severity": "info",
+            "dataset": {
+              "rows": 0,
+              "files": 0,
+              "size": 0,
+              "collections": 0,
+              "infected": false,
+              "ransom_notes": null
+            }
+          },
+          "tags": [],
+          "geoip": {},
+          "network": {
+            "organization_name": "Hosting Provider",
+            "asn": 64497,
+            "network": "198.51.100.0/24"
+          }
+        }
+      ]
+    }
+  ]
+}
