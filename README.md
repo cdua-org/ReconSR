@@ -77,9 +77,6 @@ ReconSR combines zero-configuration public sources with user-configured API inte
 - **Module Interface**: The system follows a strict **"Black Box" contract**. Developers can extend ReconSR capabilities without needing to understand the internal core logic, routing, or database structures.
 </details>
 
-> [!TIP]
-> **For Developers:** Detailed specifications for building new reconnaissance plugins can be found in the [MODULE_GUIDE.md](./MODULE_GUIDE.md).
-
 ---
 
 ## Shared Module Utilities (`modules/utils`)
@@ -90,6 +87,8 @@ ReconSR combines zero-configuration public sources with user-configured API inte
 
 > [!TIP]
 > **Documentation:** Detailed information about each module, including configuration, expected inputs, and functional behavior, is available in the [ReconSR Wiki](https://github.com/cdua-org/ReconSR/wiki).
+>
+> **For Developers:** Detailed specifications for building new reconnaissance plugins can be found in the [MODULE_GUIDE.md](./MODULE_GUIDE.md).
 
 > [!NOTE]
 > **API-backed modules and demo mode:** Modules that require personal API credentials expose their functions only when the corresponding key is configured. Users must obtain API keys independently from the relevant third-party services and configure them locally in `configs/keys.txt`. If a key is absent, those functions are not advertised to the dispatcher and are not scheduled for execution. Demo mode must be enabled explicitly by setting the corresponding service key to `demo-api-key`. In demo mode, supported modules return bundled sample data instead of querying the external API.
