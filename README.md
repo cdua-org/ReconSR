@@ -210,6 +210,12 @@ API-backed enrichment for domains, optionally subdomains, and IPv4/IPv6 targets 
 ### 19. Vulnerability Lookup (`modules/vuln_lookup`) - 1 function
 - `get_circl_vuln`: Queries the CIRCL Vulnerability API for CVE entities. Supports an optional API key; without one, requests use the public keyless endpoint and remain subject to strict rate limits. Extracts vulnerability summaries, CWE classifications with local descriptions, best available CVSS metrics, affected CPE criteria, EPSS probability and percentile, SSVC/KEV indicators, additional metadata included in CIRCL responses, etc.
 
+### 20. LeakIX Intelligence (`modules/leakix`) - 3 conditional functions
+API-backed exposure and data leak intelligence for domains and IPv4/IPv6 targets through the LeakIX API. Without a LeakIX API key, no functions are advertised to the dispatcher; with a configured key, the module exposes all three functions and supports explicit demo mode:
+- `get_leakix_domain`: Queries LeakIX domain intelligence. Extracts discovered services grouped by IP/port/protocol, open ports, protocols, software versions, web server headers, favicon hashes, SSL/TLS metadata (JARM, certificate fingerprints, SAN domains, issuer, expiration), SSH properties, leaked credentials, leak severity/type/stage, dataset statistics, network context (ASN, organization, CIDR), geolocation, reverse DNS, MAC addresses, tags, event sources, and leak summaries, with retry, rate-limit handling, and blocked-key detection.
+- `get_leakix_ip`: Queries LeakIX host intelligence for IPv4/IPv6 targets. Extracts the same comprehensive service, leak, credential, network, and SSL/SSH metadata as the domain function, organized around per-host event groups.
+- `get_leakix_subdomains`: Queries LeakIX passive subdomain enumeration for domains. Extracts validated subdomains with last-seen dates, distinct IP counts, out-of-scope classification, and passive DNS tags.
+
 ---
 
 ## Security by Design
@@ -266,6 +272,7 @@ While the current alpha release is focused on automating point-in-time investiga
 - ✅ ASN intelligence: Transit peers hierarchy, BGP prefixes (CIDR), legal holder, and abuse contacts via RIPEstat.
 - ✅ VirusTotal API enrichment for domain/IP reputation, passive DNS, certificate, DNS-derived, and threat-intelligence findings with demo mode.
 - ✅ CIRCL vulnerability lookup for CVE enrichment with CVSS, CWE, EPSS, SSVC/KEV, CPE, and related vulnerability metadata.
+- ✅ LeakIX exposure and data leak intelligence for domains and IPs, including service discovery, leaked credentials, SSL/SSH metadata, subdomain enumeration, and demo mode.
 
 ### Upcoming
 - Additional API-backed passive intelligence modules.
