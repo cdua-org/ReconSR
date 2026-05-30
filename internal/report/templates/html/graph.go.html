@@ -1440,7 +1440,7 @@
                         const setState = function(btn, visibleCount, totalCount, isGlobalOn) {
                             if (!btn) return;
 
-                            btn.classList.remove('state-none', 'state-partial', 'state-all', 'state-filtered');
+                            btn.classList.remove('state-none', 'state-partial', 'state-all', 'state-filtered', 'active');
 
                             if (isGlobalOn === false) {
                                 btn.classList.add('state-none');
@@ -1906,7 +1906,704 @@
                         return '<button title="Copy Value" style="background: transparent; border: none; color: #64748b; cursor: pointer; padding: 0; margin-left: 8px; display: inline-flex; align-items: center;" onmouseover="this.style.color=\'#38bdf8\'" onmouseout="this.style.color=\'#64748b\'" onclick="navigator.clipboard.writeText(decodeURIComponent(\'' + encoded + '\')); event.stopPropagation();"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>';
                     }
 
-                    function renderProperties(props, executions, depth = 0) {
+                    let currentHiddenPropTypes = new Set();
+                    let currentModalPropsData = null;
+                    let currentModalExecutionsData = null;
+
+                    let modalHiddenOutNodes = new Set();
+                    let currentModalOutEdgesData = null;
+                    let currentModalNodeExecutions = null;
+
+                    let modalHiddenInNodes = new Set();
+                    let currentModalInEdgesData = null;
+
+                    let modalOutShowOOS = false;
+                    let modalOutShowLimit = true;
+                    let modalInShowOOS = false;
+                    let modalInShowLimit = true;
+
+                    function toggleModalOOS(isOut) {
+                        if (isOut) modalOutShowOOS = !modalOutShowOOS;
+                        else modalInShowOOS = !modalInShowOOS;
+                        isOut ? updateOutConnectionsUI() : updateInConnectionsUI();
+                    }
+
+                    function toggleModalLimit(isOut) {
+                        if (isOut) modalOutShowLimit = !modalOutShowLimit;
+                        else modalInShowLimit = !modalInShowLimit;
+                        isOut ? updateOutConnectionsUI() : updateInConnectionsUI();
+                    }
+
+                    function getConnTypesData(groups, isOut) {
+                        const counts = {};
+                        const visibleCounts = {};
+                        const effectiveCounts = {};
+                        const stCounts = {};
+                        const stVisCounts = {};
+                        const stEffCounts = {};
+                        const showOOS = isOut ? modalOutShowOOS : modalInShowOOS;
+                        const showLimit = isOut ? modalOutShowLimit : modalInShowLimit;
+                        const hiddenNodes = isOut ? modalHiddenOutNodes : modalHiddenInNodes;
+
+                        for (let fn in groups) {
+                            groups[fn].forEach(e => {
+                                const targetId = isOut ? e.to : e.from;
+                                const n = nodes.get(targetId);
+                                const type = n ? n.group : 'unknown';
+
+                                counts[type] = (counts[type] || 0) + 1;
+
+                                let isEffectivelyVisible = true;
+                                if (n) {
+                                    if (n.outOfScope && !showOOS) isEffectivelyVisible = false;
+                                    if (n.depthLimitReached && !showLimit) isEffectivelyVisible = false;
+                                }
+
+                                if (isEffectivelyVisible) {
+                                    effectiveCounts[type] = (effectiveCounts[type] || 0) + 1;
+                                }
+
+                                let isVisible = isEffectivelyVisible;
+                                if (n && hiddenNodes.has(n.id)) {
+                                    isVisible = false;
+                                }
+
+                                if (isVisible) {
+                                    visibleCounts[type] = (visibleCounts[type] || 0) + 1;
+                                }
+
+                                if (n && n.subtypes) {
+                                    n.subtypes.forEach(st => {
+                                        const key = type + ':' + st;
+                                        stCounts[key] = (stCounts[key] || 0) + 1;
+                                        if (isEffectivelyVisible) {
+                                            stEffCounts[key] = (stEffCounts[key] || 0) + 1;
+                                        }
+                                        if (isVisible) {
+                                            stVisCounts[key] = (stVisCounts[key] || 0) + 1;
+                                        }
+                                    });
+                                }
+                            });
+                        }
+
+                        return Object.keys(counts).sort().map(k => {
+                            const subKeys = Object.keys(stCounts).filter(sk => sk.startsWith(k + ':')).sort();
+                            const subtypes = subKeys.map(sk => ({
+                                type: sk,
+                                name: sk.split(':')[1],
+                                count: stCounts[sk],
+                                effectiveCount: stEffCounts[sk] || 0,
+                                visibleCount: stVisCounts[sk] || 0
+                            }));
+
+                            return {
+                                type: k,
+                                count: counts[k],
+                                effectiveCount: effectiveCounts[k] || 0,
+                                visibleCount: visibleCounts[k] || 0,
+                                subtypes: subtypes.length > 0 ? subtypes : null
+                            };
+                        });
+                    }
+
+                    function toggleOutConnFilter(type) {
+                        let visibleCount = 0;
+                        for (let fn in currentModalOutEdgesData) {
+                            currentModalOutEdgesData[fn].forEach(e => {
+                                const n = nodes.get(e.to);
+                                if (!n) return;
+                                const scopes = [n.group];
+                                if (n.subtypes) n.subtypes.forEach(st => scopes.push(n.group + ':' + st));
+                                if (scopes.includes(type) && !modalHiddenOutNodes.has(n.id)) {
+                                    visibleCount++;
+                                }
+                            });
+                        }
+                        const actionHide = visibleCount > 0;
+
+                        for (let fn in currentModalOutEdgesData) {
+                            currentModalOutEdgesData[fn].forEach(e => {
+                                const n = nodes.get(e.to);
+                                if (!n) return;
+                                const scopes = [n.group];
+                                if (n.subtypes) n.subtypes.forEach(st => scopes.push(n.group + ':' + st));
+                                if (scopes.includes(type)) {
+                                    if (actionHide) modalHiddenOutNodes.add(n.id);
+                                    else modalHiddenOutNodes.delete(n.id);
+                                }
+                            });
+                        }
+                        updateOutConnectionsUI();
+                    }
+
+                    function toggleAllOutConnFilters() {
+                        if (!currentModalOutEdgesData) return;
+
+                        let visibleCount = 0;
+                        for (let fn in currentModalOutEdgesData) {
+                            currentModalOutEdgesData[fn].forEach(e => {
+                                const n = nodes.get(e.to);
+                                if (n && !modalHiddenOutNodes.has(n.id)) visibleCount++;
+                            });
+                        }
+                        const actionHide = visibleCount > 0;
+
+                        for (let fn in currentModalOutEdgesData) {
+                            currentModalOutEdgesData[fn].forEach(e => {
+                                const n = nodes.get(e.to);
+                                if (n) {
+                                    if (actionHide) modalHiddenOutNodes.add(n.id);
+                                    else modalHiddenOutNodes.delete(n.id);
+                                }
+                            });
+                        }
+                        updateOutConnectionsUI();
+                    }
+
+                    function toggleInConnFilter(type) {
+                        let visibleCount = 0;
+                        for (let fn in currentModalInEdgesData) {
+                            currentModalInEdgesData[fn].forEach(e => {
+                                const n = nodes.get(e.from);
+                                if (!n) return;
+                                const scopes = [n.group];
+                                if (n.subtypes) n.subtypes.forEach(st => scopes.push(n.group + ':' + st));
+                                if (scopes.includes(type) && !modalHiddenInNodes.has(n.id)) {
+                                    visibleCount++;
+                                }
+                            });
+                        }
+                        const actionHide = visibleCount > 0;
+
+                        for (let fn in currentModalInEdgesData) {
+                            currentModalInEdgesData[fn].forEach(e => {
+                                const n = nodes.get(e.from);
+                                if (!n) return;
+                                const scopes = [n.group];
+                                if (n.subtypes) n.subtypes.forEach(st => scopes.push(n.group + ':' + st));
+                                if (scopes.includes(type)) {
+                                    if (actionHide) modalHiddenInNodes.add(n.id);
+                                    else modalHiddenInNodes.delete(n.id);
+                                }
+                            });
+                        }
+                        updateInConnectionsUI();
+                    }
+
+                    function toggleAllInConnFilters() {
+                        if (!currentModalInEdgesData) return;
+
+                        let visibleCount = 0;
+                        for (let fn in currentModalInEdgesData) {
+                            currentModalInEdgesData[fn].forEach(e => {
+                                const n = nodes.get(e.from);
+                                if (n && !modalHiddenInNodes.has(n.id)) visibleCount++;
+                            });
+                        }
+                        const actionHide = visibleCount > 0;
+
+                        for (let fn in currentModalInEdgesData) {
+                            currentModalInEdgesData[fn].forEach(e => {
+                                const n = nodes.get(e.from);
+                                if (n) {
+                                    if (actionHide) modalHiddenInNodes.add(n.id);
+                                    else modalHiddenInNodes.delete(n.id);
+                                }
+                            });
+                        }
+                        updateInConnectionsUI();
+                    }
+
+                    function renderConnFilterPanelHTML(groups, isOut) {
+                        const typesData = getConnTypesData(groups, isOut);
+
+                        let allEffectiveCount = 0;
+                        let allVisibleCount = 0;
+                        typesData.forEach(t => {
+                            allEffectiveCount += t.effectiveCount;
+                            allVisibleCount += t.visibleCount;
+                        });
+
+                        const setIconStateHTML = function(visibleCount, totalCount, isGlobalOn) {
+                            if (isGlobalOn === false) return 'state-none';
+                            if (totalCount <= 0) return 'state-none';
+                            if (visibleCount >= totalCount) return 'state-all';
+                            if (visibleCount <= 0) return 'state-none';
+                            return 'state-partial';
+                        };
+
+                        let allEyeState = setIconStateHTML(allVisibleCount, allEffectiveCount);
+
+                        const panelId = isOut ? 'out-conn-filter-panel' : 'in-conn-filter-panel';
+                        const allEyeId = isOut ? 'out-conn-filter-all-eye' : 'in-conn-filter-all-eye';
+                        const toggleAllFn = isOut ? 'toggleAllOutConnFilters()' : 'toggleAllInConnFilters()';
+                        const toggleTypeFn = isOut ? 'toggleOutConnFilter' : 'toggleInConnFilter';
+                        const prefix = isOut ? 'out-conn-filter-eye-' : 'in-conn-filter-eye-';
+                        const pfx = isOut ? 'out' : 'in';
+
+                        let oosCount = 0;
+                        let limitCount = 0;
+                        for (let fn in groups) {
+                            groups[fn].forEach(e => {
+                                const targetId = isOut ? e.to : e.from;
+                                const n = nodes.get(targetId);
+                                if (n && n.outOfScope) oosCount++;
+                                if (n && n.depthLimitReached) limitCount++;
+                            });
+                        }
+
+                        let html = '<div id="' + panelId + '" style="display: none; background: #0f172a; border: 1px solid #334155; padding: 12px; border-radius: 6px; margin-bottom: 15px;">';
+
+                        let priorityHtml = '';
+                        if (oosCount > 0) {
+                            const oosState = isOut ? modalOutShowOOS : modalInShowOOS;
+                            priorityHtml += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
+                            priorityHtml += '<span style="color: #cbd5e1; font-size: 0.85rem; user-select: none;">Out of Scope</span>';
+                            priorityHtml += '<div style="display: flex; align-items: center; gap: 12px;">';
+                            priorityHtml += '<span class="stat-badge">' + oosCount + '</span>';
+                            priorityHtml += '<div class="icon-btn visibility-eye ' + (oosState ? 'active' : 'state-none') + '" id="' + pfx + '-conn-oos-btn" onclick="toggleModalOOS(' + isOut + ')" title="Toggle OOS">';
+                            priorityHtml += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+                            priorityHtml += '</div></div></div>';
+                        }
+
+                        if (limitCount > 0) {
+                            const limitState = isOut ? modalOutShowLimit : modalInShowLimit;
+                            priorityHtml += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
+                            priorityHtml += '<span style="color: #cbd5e1; font-size: 0.85rem; user-select: none;">Depth Limit Reached</span>';
+                            priorityHtml += '<div style="display: flex; align-items: center; gap: 12px;">';
+                            priorityHtml += '<span class="stat-badge">' + limitCount + '</span>';
+                            priorityHtml += '<div class="icon-btn visibility-eye ' + (limitState ? 'active' : 'state-none') + '" id="' + pfx + '-conn-limit-btn" onclick="toggleModalLimit(' + isOut + ')" title="Toggle Depth Limit">';
+                            priorityHtml += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+                            priorityHtml += '</div></div></div>';
+                        }
+
+                        if (priorityHtml) {
+                            html += '<div style="margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 4px;">' + priorityHtml + '</div>';
+                        }
+
+                        html += '<div class="meta-item" style="margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">';
+                        html += '<span style="color: #f1f5f9; font-size: 0.85rem; font-weight: bold; text-transform: uppercase;">All Connection Types</span>';
+                        html += '<div class="icon-btn ' + allEyeState + '" id="' + allEyeId + '" onclick="' + toggleAllFn + '" title="Toggle All">';
+                        html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+                        html += '</div></div>';
+
+                        html += '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                        const badgePrefix = isOut ? 'out-conn-filter-badge-' : 'in-conn-filter-badge-';
+
+                        typesData.forEach(t => {
+                            const tState = setIconStateHTML(t.visibleCount, t.effectiveCount);
+                            const eyeId = prefix + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
+                            const badgeId = badgePrefix + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
+
+                            const tBadgeText = (t.visibleCount < t.effectiveCount) ? (t.visibleCount + ' / ' + t.effectiveCount) : String(t.effectiveCount);
+                            const tBadgeTitle = 'Visible: ' + t.visibleCount + ' | Hidden: ' + (t.effectiveCount - t.visibleCount) + ' | Total: ' + t.effectiveCount;
+
+                            html += '<div class="meta-item-group" style="margin-bottom: 0;">';
+                            html += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0;' + (t.subtypes ? ' cursor: pointer;' : '') + '"';
+                            if (t.subtypes) {
+                                html += ' onclick="if (event.target.closest(\'.meta-item-controls\')) return; const st = this.nextElementSibling; const isHidden = st.style.display === \'none\'; st.style.display = isHidden ? \'block\' : \'none\'; this.querySelector(\'.expander\').innerText = isHidden ? \'▼\' : \'▶\';"';
+                            }
+                            html += '>';
+                            html += '<span style="color: #cbd5e1; font-size: 0.85rem; font-family: monospace;">' + escapeHTML(t.type);
+                            if (t.subtypes) {
+                                html += '<span class="expander" style="font-size: 0.7em; margin-left: 6px; color: #64748b;">▶</span>';
+                            }
+                            html += '</span>';
+
+                            html += '<div class="meta-item-controls" style="display: flex; align-items: center; gap: 12px;">';
+                            html += '<span class="stat-badge" id="' + badgeId + '" title="' + tBadgeTitle + '">' + tBadgeText + '</span>';
+                            html += '<div class="icon-btn visibility-eye ' + tState + '" id="' + eyeId + '" onclick="' + toggleTypeFn + '(\'' + escapeHTML(t.type.replace(/'/g, "\\'")) + '\')" title="Toggle Visibility">';
+                            html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+                            html += '</div></div></div>';
+
+                            if (t.subtypes) {
+                                html += '<div class="subtypes-container" style="display: none; margin-top: 8px;">';
+                                t.subtypes.forEach(st => {
+                                    const stState = setIconStateHTML(st.visibleCount, st.effectiveCount);
+                                    const stEyeId = prefix + btoa(encodeURIComponent(st.type)).replace(/=/g, '');
+                                    const stBadgeId = badgePrefix + btoa(encodeURIComponent(st.type)).replace(/=/g, '');
+
+                                    const stBadgeText = (st.visibleCount < st.effectiveCount) ? (st.visibleCount + ' / ' + st.effectiveCount) : String(st.effectiveCount);
+                                    const stBadgeTitle = 'Visible: ' + st.visibleCount + ' | Hidden: ' + (st.effectiveCount - st.visibleCount) + ' | Total: ' + st.effectiveCount;
+
+                                    html += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-left: 15px; border-left: 2px solid #334155; margin-left: 5px;">';
+                                    html += '<span style="color: #94a3b8; font-size: 0.8rem; font-family: monospace;">' + escapeHTML(st.name) + '</span>';
+                                    html += '<div style="display: flex; align-items: center; gap: 12px;">';
+                                    html += '<span class="stat-badge" id="' + stBadgeId + '" title="' + stBadgeTitle + '">' + stBadgeText + '</span>';
+                                    html += '<div class="icon-btn visibility-eye ' + stState + '" id="' + stEyeId + '" onclick="' + toggleTypeFn + '(\'' + escapeHTML(st.type.replace(/'/g, "\\'")) + '\')" title="Toggle Visibility">';
+                                    html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+                                    html += '</div></div></div>';
+                                });
+                                html += '</div>';
+                            }
+                            html += '</div>';
+                        });
+                        html += '</div></div>';
+                        return html;
+                    }
+
+                    function updateOutConnectionsUI() {
+                        const container = document.getElementById('out-conn-content-container');
+                        if (container && currentModalOutEdgesData) {
+                            container.innerHTML = renderOutConnectionsRoot(currentModalOutEdgesData, currentModalNodeExecutions);
+                        }
+                        updateConnFilterUIState(true);
+                    }
+
+                    function updateInConnectionsUI() {
+                        const container = document.getElementById('in-conn-content-container');
+                        if (container && currentModalInEdgesData) {
+                            container.innerHTML = renderInConnectionsRoot(currentModalInEdgesData);
+                        }
+                        updateConnFilterUIState(false);
+                    }
+
+                    function updateConnFilterUIState(isOut) {
+                        const groups = isOut ? currentModalOutEdgesData : currentModalInEdgesData;
+                        if (!groups) return;
+
+                        const hiddenNodes = isOut ? modalHiddenOutNodes : modalHiddenInNodes;
+                        let oosCount = 0;
+                        let oosVisibleCount = 0;
+                        let limitCount = 0;
+                        let limitVisibleCount = 0;
+                        for (let fn in groups) {
+                            groups[fn].forEach(e => {
+                                const targetId = isOut ? e.to : e.from;
+                                const n = nodes.get(targetId);
+                                if (n) {
+                                    const isNodeVisible = !hiddenNodes.has(n.id);
+                                    if (n.outOfScope) {
+                                        oosCount++;
+                                        if (isNodeVisible) oosVisibleCount++;
+                                    }
+                                    if (n.depthLimitReached) {
+                                        limitCount++;
+                                        if (isNodeVisible) limitVisibleCount++;
+                                    }
+                                }
+                            });
+                        }
+
+                        const typesData = getConnTypesData(groups, isOut);
+                        let allEffectiveCount = 0;
+                        let allVisibleCount = 0;
+                        typesData.forEach(t => {
+                            allEffectiveCount += t.effectiveCount;
+                            allVisibleCount += t.visibleCount;
+                        });
+
+                        const allEyeId = isOut ? 'out-conn-filter-all-eye' : 'in-conn-filter-all-eye';
+                        const filterBtnIconId = isOut ? 'out-conn-filter-btn-icon' : 'in-conn-filter-btn-icon';
+                        const prefix = isOut ? 'out-conn-filter-eye-' : 'in-conn-filter-eye-';
+                        const pfx = isOut ? 'out' : 'in';
+
+                        const setIconState = function(btn, visibleCount, totalCount, isGlobalOn) {
+                            if (!btn) return;
+                            btn.classList.remove('state-none', 'state-partial', 'state-all', 'state-filtered', 'active');
+
+                            if (isGlobalOn) btn.classList.add('active');
+
+                            if (isGlobalOn === false) {
+                                btn.classList.add('state-none');
+                            } else if (totalCount <= 0) {
+                                btn.classList.add('state-none');
+                            } else if (visibleCount >= totalCount) {
+                                btn.classList.add('state-all');
+                            } else if (visibleCount <= 0) {
+                                btn.classList.add('state-filtered');
+                            } else {
+                                btn.classList.add('state-partial');
+                            }
+                        };
+
+                        const oosGlobalOn = isOut ? modalOutShowOOS : modalInShowOOS;
+                        setIconState(document.getElementById(pfx + '-conn-oos-btn'), oosVisibleCount, oosCount, oosGlobalOn);
+
+                        const limitGlobalOn = isOut ? modalOutShowLimit : modalInShowLimit;
+                        setIconState(document.getElementById(pfx + '-conn-limit-btn'), limitVisibleCount, limitCount, limitGlobalOn);
+
+                        const allEye = document.getElementById(allEyeId);
+                        if (allEye) {
+                            allEye.classList.remove('state-none', 'state-all', 'state-partial', 'state-filtered');
+                            if (allEffectiveCount <= 0) {
+                                allEye.classList.add('state-none');
+                            } else if (allVisibleCount >= allEffectiveCount) {
+                                allEye.classList.add('state-all');
+                            } else if (allVisibleCount <= 0) {
+                                allEye.classList.add('state-none');
+                            } else {
+                                allEye.classList.add('state-partial');
+                            }
+                        }
+
+                        const filterBtnIcon = document.getElementById(filterBtnIconId);
+                        if (filterBtnIcon) {
+                            const isOOSHidden = (oosCount > 0) && !(isOut ? modalOutShowOOS : modalInShowOOS);
+                            const isLimitHidden = (limitCount > 0) && !(isOut ? modalOutShowLimit : modalInShowLimit);
+                            const hasTypeFilters = allVisibleCount < allEffectiveCount;
+                            filterBtnIcon.style.color = (hasTypeFilters || isOOSHidden || isLimitHidden) ? '#38bdf8' : '#64748b';
+                        }
+
+                        const badgePrefix = isOut ? 'out-conn-filter-badge-' : 'in-conn-filter-badge-';
+                        const updateTypeUI = (typeObj) => {
+                            const eyeId = prefix + btoa(encodeURIComponent(typeObj.type)).replace(/=/g, '');
+                            const eye = document.getElementById(eyeId);
+                            if (eye) {
+                                eye.classList.remove('active', 'state-none', 'state-all', 'state-partial', 'state-filtered');
+                                if (typeObj.effectiveCount <= 0) {
+                                    eye.classList.add('state-none');
+                                } else if (typeObj.visibleCount >= typeObj.effectiveCount) {
+                                    eye.classList.add('state-all');
+                                } else if (typeObj.visibleCount <= 0) {
+                                    eye.classList.add('state-none');
+                                } else {
+                                    eye.classList.add('state-partial');
+                                }
+                            }
+                            const badgeId = badgePrefix + btoa(encodeURIComponent(typeObj.type)).replace(/=/g, '');
+                            const badge = document.getElementById(badgeId);
+                            if (badge) {
+                                const bText = (typeObj.visibleCount < typeObj.effectiveCount) ? (typeObj.visibleCount + ' / ' + typeObj.effectiveCount) : String(typeObj.effectiveCount);
+                                badge.innerText = bText;
+                                badge.title = 'Visible: ' + typeObj.visibleCount + ' | Hidden: ' + (typeObj.effectiveCount - typeObj.visibleCount) + ' | Total: ' + typeObj.effectiveCount;
+                            }
+                        };
+
+                        typesData.forEach(t => {
+                            updateTypeUI(t);
+                            if (t.subtypes) {
+                                t.subtypes.forEach(st => updateTypeUI(st));
+                            }
+                        });
+                    }
+
+                    function renderOutConnectionsRoot(groups, executions) {
+                        let htmlStr = '';
+                        for (let fn in groups) {
+                            let fnChildrenHtml = '';
+                            let fnHasVisible = false;
+
+                            groups[fn].forEach(e => {
+                                const targetNode = nodes.get(e.to);
+                                const targetGroup = targetNode ? targetNode.group : 'unknown';
+                                if (targetNode && modalHiddenOutNodes.has(targetNode.id)) return;
+
+                                const targetLabel = targetNode ? targetNode.label : e.to;
+                                const isOOS = targetNode ? targetNode.outOfScope : false;
+                                const isLimit = targetNode ? targetNode.depthLimitReached : false;
+                                const isHidden = targetNode ? targetNode.hidden : false;
+
+                                if (isOOS && !modalOutShowOOS) return;
+                                if (isLimit && !modalOutShowLimit) return;
+
+                                fnHasVisible = true;
+
+                                const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
+                                const focusBtnHtml = !isHidden ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.to) + '">Focus</button>' : '';
+                                const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
+
+                                fnChildrenHtml += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #10b981; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
+                                fnChildrenHtml += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
+                                fnChildrenHtml += '<span>' + escapeHTML(targetGroup) + badgeHtml + '</span>';
+                                fnChildrenHtml += focusBtnHtml + '</div>';
+                                fnChildrenHtml += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(targetLabel) + '</span>' + getCopyBtnHTML(targetLabel) + '</div>';
+
+                                let metaHtml = '';
+                                if (isOOS) {
+                                    metaHtml += '<div style="color: #ef4444; font-weight: bold; margin-top: 4px;">⚠️ OUT OF SCOPE</div>';
+                                }
+                                if (e.contexts && e.contexts.length > 0) {
+                                    metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(e.contexts.join(', ')) + '</div>';
+                                }
+                                if (e.firstSeen) {
+                                    metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(e.firstSeen) + '</div>';
+                                }
+                                if (metaHtml) {
+                                    fnChildrenHtml += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
+                                }
+                                fnChildrenHtml += '</div>';
+                            });
+
+                            if (!fnHasVisible) continue;
+
+                            const listId = 'list-out-' + Math.random().toString(36).substr(2, 9);
+                            htmlStr += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
+                            htmlStr += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
+                            htmlStr += '<span class="prop-title" style="color: #10b981; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
+                            htmlStr += '<div style="display: flex; align-items: center; gap: 12px;">';
+                            let rawHtml = getRawDataHTML(fn, executions);
+                            if (rawHtml.btn) {
+                                htmlStr += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
+                            }
+                            htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
+                            htmlStr += '</div></div>';
+                            if (rawHtml.content) {
+                                htmlStr += rawHtml.content;
+                            }
+                            htmlStr += '<div id="' + listId + '">' + fnChildrenHtml + '</div></div>';
+                        }
+                        return htmlStr;
+                    }
+
+                    function renderInConnectionsRoot(groups) {
+                        let htmlStr = '';
+                        for (let fn in groups) {
+                            let fnChildrenHtml = '';
+                            let fnHasVisible = false;
+                            let sourceExecutions = null;
+
+                            groups[fn].forEach(e => {
+                                const sourceNode2 = nodes.get(e.from);
+                                const sourceGroup = sourceNode2 ? sourceNode2.group : 'unknown';
+                                if (sourceNode2 && modalHiddenInNodes.has(sourceNode2.id)) return;
+
+                                const sourceLabel = sourceNode2 ? sourceNode2.label : e.from;
+                                const isOOS = sourceNode2 ? sourceNode2.outOfScope : false;
+                                const isLimit = sourceNode2 ? sourceNode2.depthLimitReached : false;
+                                const isHidden = sourceNode2 ? sourceNode2.hidden : false;
+
+                                if (isOOS && !modalInShowOOS) return;
+                                if (isLimit && !modalInShowLimit) return;
+
+                                fnHasVisible = true;
+                                if (!sourceExecutions && sourceNode2 && sourceNode2.executions) {
+                                    sourceExecutions = sourceNode2.executions;
+                                }
+
+                                const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
+                                const focusBtnHtml = !isHidden ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.from) + '">Focus</button>' : '';
+                                const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
+
+                                fnChildrenHtml += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #8b5cf6; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
+                                fnChildrenHtml += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
+                                fnChildrenHtml += '<span>' + escapeHTML(sourceGroup) + badgeHtml + '</span>';
+                                fnChildrenHtml += focusBtnHtml + '</div>';
+                                fnChildrenHtml += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(sourceLabel) + '</span>' + getCopyBtnHTML(sourceLabel) + '</div>';
+
+                                let metaHtml = '';
+                                if (isOOS) {
+                                    metaHtml += '<div style="color: #ef4444; font-weight: bold; margin-top: 4px;">⚠️ OUT OF SCOPE</div>';
+                                }
+                                if (e.contexts && e.contexts.length > 0) {
+                                    metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(e.contexts.join(', ')) + '</div>';
+                                }
+                                if (e.firstSeen) {
+                                    metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(e.firstSeen) + '</div>';
+                                }
+                                if (metaHtml) {
+                                    fnChildrenHtml += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
+                                }
+                                fnChildrenHtml += '</div>';
+                            });
+
+                            if (!fnHasVisible) continue;
+
+                            const listId = 'list-in-' + Math.random().toString(36).substr(2, 9);
+                            htmlStr += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
+                            htmlStr += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
+                            htmlStr += '<span class="prop-title" style="color: #8b5cf6; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
+                            htmlStr += '<div style="display: flex; align-items: center; gap: 12px;">';
+                            let rawHtml = getRawDataHTML(fn, sourceExecutions);
+                            if (rawHtml.btn) {
+                                htmlStr += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
+                            }
+                            htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
+                            htmlStr += '</div></div>';
+                            if (rawHtml.content) {
+                                htmlStr += rawHtml.content;
+                            }
+                            htmlStr += '<div id="' + listId + '">' + fnChildrenHtml + '</div></div>';
+                        }
+                        return htmlStr;
+                    }
+
+                    function getPropertyTypesData(props) {
+                        const counts = {};
+                        function traverse(p) {
+                            counts[p.type] = (counts[p.type] || 0) + 1;
+                            if (p.properties) p.properties.forEach(traverse);
+                        }
+                        if (props) props.forEach(traverse);
+                        return Object.keys(counts).sort().map(k => ({ type: k, count: counts[k] }));
+                    }
+
+                    function togglePropTypeFilter(type) {
+                        if (currentHiddenPropTypes.has(type)) {
+                            currentHiddenPropTypes.delete(type);
+                        } else {
+                            currentHiddenPropTypes.add(type);
+                        }
+                        updatePropertiesUI();
+                    }
+
+                    function toggleAllPropFilters() {
+                        if (!currentModalPropsData) return;
+                        const typesData = getPropertyTypesData(currentModalPropsData);
+                        const anyVisible = typesData.some(t => !currentHiddenPropTypes.has(t.type));
+
+                        currentHiddenPropTypes.clear();
+                        if (anyVisible) {
+                            typesData.forEach(t => currentHiddenPropTypes.add(t.type));
+                        }
+                        updatePropertiesUI();
+                    }
+
+                    function renderPropNode(prop, executions, depth, isParentVisibleExplicit) {
+                        const isExplicitlyVisible = !currentHiddenPropTypes.has(prop.type);
+                        const isVisibleExplicit = isParentVisibleExplicit || isExplicitlyVisible;
+
+                        let childrenHtml = '';
+                        let hasVisibleChild = false;
+
+                        if (prop.properties && prop.properties.length > 0) {
+                            prop.properties.forEach(child => {
+                                const childRes = renderPropNode(child, executions, depth + 1, isVisibleExplicit);
+                                if (childRes.hasVisible) {
+                                    hasVisibleChild = true;
+                                    childrenHtml += childRes.html;
+                                }
+                            });
+                        }
+
+                        const isTransit = !isVisibleExplicit && hasVisibleChild;
+                        const isHidden = !isVisibleExplicit && !hasVisibleChild;
+
+                        if (isHidden) {
+                            return { html: '', hasVisible: false };
+                        }
+
+                        const opacityStyle = isTransit ? 'opacity: 0.6;' : '';
+                        const borderStyle = isTransit ? 'border-left: 3px dashed #64748b;' : 'border-left: 3px solid #a78bfa;';
+
+                        let htmlStr = '<div style="margin-bottom: 8px; padding: 8px; background: #1e293b; border-radius: 0 4px 4px 0; ' + borderStyle + ' ' + opacityStyle + '">';
+                        htmlStr += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
+                        htmlStr += '<span style="color: ' + (isTransit ? '#94a3b8' : '#38bdf8') + '; font-weight: bold;">' + escapeHTML(prop.type) + '</span></div>';
+                        htmlStr += '<div style="color: ' + (isTransit ? '#cbd5e1' : '#f1f5f9') + '; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(prop.value) + '</span>' + getCopyBtnHTML(prop.value) + '</div>';
+
+                        let metaHtml = '';
+                        if (prop.contexts && prop.contexts.length > 0) {
+                            metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(prop.contexts.join(', ')) + '</div>';
+                        }
+                        if (prop.firstSeen) {
+                            metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(prop.firstSeen) + '</div>';
+                        }
+                        if (metaHtml) {
+                            htmlStr += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
+                        }
+
+                        if (childrenHtml) {
+                            htmlStr += '<div style="margin-top: 10px;">' + childrenHtml + '</div>';
+                        }
+                        htmlStr += "</div>";
+
+                        return { html: htmlStr, hasVisible: true };
+                    }
+
+                    function renderPropertiesRoot(props, executions) {
+                        if (!props || props.length === 0) return "";
+
                         let htmlStr = "";
                         let propGroups = {};
                         props.forEach(prop => {
@@ -1916,6 +2613,19 @@
                         });
 
                         for (let fn in propGroups) {
+                            let fnChildrenHtml = '';
+                            let fnHasVisible = false;
+
+                            propGroups[fn].forEach(prop => {
+                                const res = renderPropNode(prop, executions, 0, false);
+                                if (res.hasVisible) {
+                                    fnHasVisible = true;
+                                    fnChildrenHtml += res.html;
+                                }
+                            });
+
+                            if (!fnHasVisible) continue;
+
                             const listId = 'list-prop-' + Math.random().toString(36).substr(2, 9);
                             htmlStr += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
 
@@ -1927,41 +2637,92 @@
                                 htmlStr += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
                             }
                             htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
-                            htmlStr += '</div>';
-                            htmlStr += '</div>';
-                            if (rawHtml.content) {
-                                htmlStr += rawHtml.content;
-                            }
+                            htmlStr += '</div></div>';
 
-                            htmlStr += '<div id="' + listId + '">';
-                            propGroups[fn].forEach((prop) => {
-                                htmlStr += '<div style="margin-bottom: 8px; padding: 8px; background: #1e293b; border-left: 3px solid #a78bfa; border-radius: 0 4px 4px 0;">';
-                                htmlStr += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
-                                htmlStr += '<span style="color: #38bdf8; font-weight: bold;">' + escapeHTML(prop.type) + '</span></div>';
-                                htmlStr += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(prop.value) + '</span>' + getCopyBtnHTML(prop.value) + '</div>';
-
-                                let metaHtml = '';
-                                if (prop.contexts && prop.contexts.length > 0) {
-                                    metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(prop.contexts.join(', ')) + '</div>';
-                                }
-                                if (prop.firstSeen) {
-                                    metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(prop.firstSeen) + '</div>';
-                                }
-                                if (metaHtml) {
-                                    htmlStr += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
-                                }
-
-                                if (prop.properties && prop.properties.length > 0) {
-                                    htmlStr += '<div style="margin-top: 10px;">';
-                                    htmlStr += renderProperties(prop.properties, executions, depth + 1);
-                                    htmlStr += '</div>';
-                                }
-                                htmlStr += "</div>";
-                            });
-                            htmlStr += "</div>";
-                            htmlStr += "</div>";
+                            if (rawHtml.content) htmlStr += rawHtml.content;
+                            htmlStr += '<div id="' + listId + '">' + fnChildrenHtml + '</div></div>';
                         }
                         return htmlStr;
+                    }
+
+                    function updatePropertiesUI() {
+                        const container = document.getElementById('properties-content-container');
+                        if (container && currentModalPropsData) {
+                            container.innerHTML = renderPropertiesRoot(currentModalPropsData, currentModalExecutionsData);
+                        }
+
+                        if (!currentModalPropsData) return;
+                        const typesData = getPropertyTypesData(currentModalPropsData);
+                        const anyVisible = typesData.some(t => !currentHiddenPropTypes.has(t.type));
+
+                        const allEye = document.getElementById('prop-filter-all-eye');
+                        if (allEye) {
+                            allEye.classList.remove('state-none', 'state-all', 'state-partial');
+                            if (anyVisible && currentHiddenPropTypes.size === 0) allEye.classList.add('state-all');
+                            else if (anyVisible) allEye.classList.add('state-partial');
+                            else allEye.classList.add('state-none');
+                        }
+
+                        const filterBtnIcon = document.getElementById('prop-filter-btn-icon');
+                        if (filterBtnIcon) {
+                            filterBtnIcon.style.color = currentHiddenPropTypes.size > 0 ? '#38bdf8' : '#64748b';
+                        }
+
+                        typesData.forEach(t => {
+                            const isHidden = currentHiddenPropTypes.has(t.type);
+                            const eyeId = 'prop-filter-eye-' + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
+                            const eye = document.getElementById(eyeId);
+                            if (eye) {
+                                if (isHidden) {
+                                    eye.classList.remove('active');
+                                    eye.classList.add('state-none');
+                                } else {
+                                    eye.classList.add('active');
+                                    eye.classList.remove('state-none');
+                                }
+                            }
+                            const badgeId = 'prop-filter-badge-' + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
+                            const badge = document.getElementById(badgeId);
+                            if (badge) {
+                                const visibleCount = isHidden ? 0 : t.count;
+                                const bText = isHidden ? ('0 / ' + t.count) : String(t.count);
+                                badge.innerText = bText;
+                                badge.title = 'Visible: ' + visibleCount + ' | Hidden: ' + (t.count - visibleCount) + ' | Total: ' + t.count;
+                            }
+                        });
+                    }
+
+                    function renderPropertiesFilterPanelHTML(props) {
+                        const typesData = getPropertyTypesData(props);
+                        const anyVisible = typesData.some(t => !currentHiddenPropTypes.has(t.type));
+
+                        let html = '<div id="prop-filter-panel" style="display: none; background: #0f172a; border: 1px solid #334155; padding: 12px; border-radius: 6px; margin-bottom: 15px;">';
+
+                        html += '<div class="meta-item" style="margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">';
+                        html += '<span style="color: #f1f5f9; font-size: 0.85rem; font-weight: bold; text-transform: uppercase;">All Properties</span>';
+                        html += '<div class="icon-btn ' + (anyVisible && currentHiddenPropTypes.size === 0 ? 'state-all' : (anyVisible ? 'state-partial' : 'state-none')) + '" id="prop-filter-all-eye" onclick="toggleAllPropFilters()" title="Toggle All">';
+                        html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+                        html += '</div></div>';
+
+                        html += '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                        typesData.forEach(t => {
+                            const isHidden = currentHiddenPropTypes.has(t.type);
+                            const eyeId = 'prop-filter-eye-' + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
+                            const badgeId = 'prop-filter-badge-' + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
+                            const visibleCount = isHidden ? 0 : t.count;
+                            const badgeText = isHidden ? ('0 / ' + t.count) : String(t.count);
+                            const badgeTitle = 'Visible: ' + visibleCount + ' | Hidden: ' + (t.count - visibleCount) + ' | Total: ' + t.count;
+
+                            html += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0;">';
+                            html += '<span style="color: #cbd5e1; font-size: 0.85rem; font-family: monospace;">' + escapeHTML(t.type) + '</span>';
+                            html += '<div style="display: flex; align-items: center; gap: 12px;">';
+                            html += '<span class="stat-badge" id="' + badgeId + '" title="' + badgeTitle + '">' + badgeText + '</span>';
+                            html += '<div class="icon-btn visibility-eye ' + (isHidden ? 'state-none' : 'active') + '" id="' + eyeId + '" onclick="togglePropTypeFilter(\'' + escapeHTML(t.type.replace(/'/g, "\\'")) + '\')" title="Toggle Visibility">';
+                            html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+                            html += '</div></div></div>';
+                        });
+                        html += '</div></div>';
+                        return html;
                     }
 
                     document.getElementById('modalBody').addEventListener('click', function(e) {
@@ -2049,13 +2810,29 @@
                                 content += '</div>';
 
                                 if (node.properties && node.properties.length > 0) {
+                                    currentHiddenPropTypes.clear();
+                                    currentModalPropsData = node.properties;
+                                    currentModalExecutionsData = node.executions;
+
                                     const sectionId = 'props-' + Math.random().toString(36).substr(2, 9);
+                                    const totalProps = getPropertyTypesData(node.properties).reduce((sum, t) => sum + t.count, 0);
+
                                     content += '<div class="detail-item" style="margin-top: 25px;">';
-                                    content += '<div class="detail-label" style="font-size: 0.9rem; color: #f1f5f9; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + sectionId + '\')">';
-                                    content += '<span>Properties</span><span id="' + sectionId + '-icon">▶</span></div>';
-                                    content += '<div id="' + sectionId + '" style="display: none;">';
-                                    content += renderProperties(node.properties, node.executions);
+                                    content += '<div class="detail-label" style="font-size: 0.9rem; color: #f1f5f9; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">';
+                                    content += '<div style="cursor: pointer; display: flex; align-items: center; gap: 8px;" onclick="toggleSection(\'' + sectionId + '\')"><span>Properties</span><span class="stat-badge">' + totalProps + '</span></div>';
+                                    content += '<div style="display: flex; align-items: center; gap: 12px;">';
+                                    content += '<div class="icon-btn" id="prop-filter-btn-icon" title="Filter Properties" onclick="toggleSection(\'prop-filter-panel\')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></div>';
+                                    content += '<span id="' + sectionId + '-icon" style="cursor: pointer; color: #94a3b8;" onclick="toggleSection(\'' + sectionId + '\')">▶</span>';
                                     content += '</div></div>';
+
+                                    content += '<div id="' + sectionId + '" style="display: none;">';
+                                    content += renderPropertiesFilterPanelHTML(node.properties);
+                                    content += '<div id="properties-content-container">';
+                                    content += renderPropertiesRoot(node.properties, node.executions);
+                                    content += '</div></div></div>';
+                                } else {
+                                    currentModalPropsData = null;
+                                    currentModalExecutionsData = null;
                                 }
 
                                 const outEdges = initialEdges.filter(item => item.from === nodeId && item.firstSeen <= currentSliderTime);
@@ -2067,67 +2844,29 @@
                                 });
 
                                 if (Object.keys(outgoingGroups).length > 0) {
+                                    modalHiddenOutNodes.clear();
+                                    currentModalOutEdgesData = outgoingGroups;
+                                    currentModalNodeExecutions = node.executions;
+
                                     const sectionId = 'out-' + Math.random().toString(36).substr(2, 9);
+                                    const totalConns = getConnTypesData(outgoingGroups, true).reduce((sum, t) => sum + t.count, 0);
+
                                     content += '<div class="detail-item" style="margin-top: 25px;">';
-                                    content += '<div class="detail-label" style="font-size: 0.9rem; color: #f1f5f9; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + sectionId + '\')">';
-                                    content += '<span>Outgoing Connections</span><span id="' + sectionId + '-icon">▶</span></div>';
+                                    content += '<div class="detail-label" style="font-size: 0.9rem; color: #f1f5f9; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">';
+                                    content += '<div style="cursor: pointer; display: flex; align-items: center; gap: 8px;" onclick="toggleSection(\'' + sectionId + '\')"><span>Outgoing Connections</span><span class="stat-badge">' + totalConns + '</span></div>';
+                                    content += '<div style="display: flex; align-items: center; gap: 12px;">';
+                                    content += '<div class="icon-btn" id="out-conn-filter-btn-icon" title="Filter Connections" onclick="toggleSection(\'out-conn-filter-panel\')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></div>';
+                                    content += '<span id="' + sectionId + '-icon" style="cursor: pointer; color: #94a3b8;" onclick="toggleSection(\'' + sectionId + '\')">▶</span>';
+                                    content += '</div></div>';
 
                                     content += '<div id="' + sectionId + '" style="display: none;">';
-                                    for (let fn in outgoingGroups) {
-                                        const listId = 'list-out-' + Math.random().toString(36).substr(2, 9);
-                                        content += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
-
-                                        content += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
-                                        content += '<span class="prop-title" style="color: #10b981; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
-                                        content += '<div style="display: flex; align-items: center; gap: 12px;">';
-                                        let rawHtml = getRawDataHTML(fn, node.executions);
-                                        if (rawHtml.btn) {
-                                            content += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
-                                        }
-                                        content += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
-                                        content += '</div>';
-                                        content += '</div>';
-                                        if (rawHtml.content) {
-                                            content += rawHtml.content;
-                                        }
-
-                                        content += '<div id="' + listId + '">';
-                                        outgoingGroups[fn].forEach(e => {
-                                            const targetNode = nodes.get(e.to);
-                                            const targetLabel = targetNode ? targetNode.label : e.to;
-                                            const targetGroup = targetNode ? targetNode.group : '';
-                                            const isOOS = targetNode ? targetNode.outOfScope : false;
-                                            const isHidden = targetNode ? targetNode.hidden : false;
-
-                                            const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
-                                            const focusBtnHtml = !isHidden ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.to) + '">Focus</button>' : '';
-                                            const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
-
-                                            content += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #10b981; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
-                                            content += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
-                                            content += '<span>' + escapeHTML(targetGroup) + badgeHtml + '</span>';
-                                            content += focusBtnHtml + '</div>';
-                                            content += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(targetLabel) + '</span>' + getCopyBtnHTML(targetLabel) + '</div>';
-
-                                            let metaHtml = '';
-                                            if (isOOS) {
-                                                metaHtml += '<div style="color: #ef4444; font-weight: bold; margin-top: 4px;">⚠️ OUT OF SCOPE</div>';
-                                            }
-                                            if (e.contexts && e.contexts.length > 0) {
-                                                metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(e.contexts.join(', ')) + '</div>';
-                                            }
-                                            if (e.firstSeen) {
-                                                metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(e.firstSeen) + '</div>';
-                                            }
-                                            if (metaHtml) {
-                                                content += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
-                                            }
-                                            content += '</div>';
-                                        });
-                                        content += '</div>';
-                                        content += '</div>';
-                                    }
-                                    content += '</div></div>';
+                                    content += renderConnFilterPanelHTML(outgoingGroups, true);
+                                    content += '<div id="out-conn-content-container">';
+                                    content += renderOutConnectionsRoot(outgoingGroups, node.executions);
+                                    content += '</div></div></div>';
+                                } else {
+                                    currentModalOutEdgesData = null;
+                                    currentModalNodeExecutions = null;
                                 }
 
                                 const inEdges = initialEdges.filter(item => item.to === nodeId && item.firstSeen <= currentSliderTime);
@@ -2139,73 +2878,35 @@
                                 });
 
                                 if (Object.keys(incomingGroups).length > 0) {
+                                    modalHiddenInNodes.clear();
+                                    currentModalInEdgesData = incomingGroups;
+
                                     const sectionId = 'in-' + Math.random().toString(36).substr(2, 9);
+                                    const totalConns = getConnTypesData(incomingGroups, false).reduce((sum, t) => sum + t.count, 0);
+
                                     content += '<div class="detail-item" style="margin-top: 25px;">';
-                                    content += '<div class="detail-label" style="font-size: 0.9rem; color: #f1f5f9; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + sectionId + '\')">';
-                                    content += '<span>Incoming Connections</span><span id="' + sectionId + '-icon">▶</span></div>';
+                                    content += '<div class="detail-label" style="font-size: 0.9rem; color: #f1f5f9; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">';
+                                    content += '<div style="cursor: pointer; display: flex; align-items: center; gap: 8px;" onclick="toggleSection(\'' + sectionId + '\')"><span>Incoming Connections</span><span class="stat-badge">' + totalConns + '</span></div>';
+                                    content += '<div style="display: flex; align-items: center; gap: 12px;">';
+                                    content += '<div class="icon-btn" id="in-conn-filter-btn-icon" title="Filter Connections" onclick="toggleSection(\'in-conn-filter-panel\')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></div>';
+                                    content += '<span id="' + sectionId + '-icon" style="cursor: pointer; color: #94a3b8;" onclick="toggleSection(\'' + sectionId + '\')">▶</span>';
+                                    content += '</div></div>';
 
                                     content += '<div id="' + sectionId + '" style="display: none;">';
-                                    for (let fn in incomingGroups) {
-                                        const listId = 'list-in-' + Math.random().toString(36).substr(2, 9);
-                                        content += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
-
-                                        content += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
-                                        content += '<span class="prop-title" style="color: #8b5cf6; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
-                                        content += '<div style="display: flex; align-items: center; gap: 12px;">';
-                                        const sourceNodeId = incomingGroups[fn][0].from;
-                                        const sourceNode = nodes.get(sourceNodeId);
-                                        let rawHtml = getRawDataHTML(fn, sourceNode ? sourceNode.executions : null);
-                                        if (rawHtml.btn) {
-                                            content += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
-                                        }
-                                        content += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
-                                        content += '</div>';
-                                        content += '</div>';
-                                        if (rawHtml.content) {
-                                            content += rawHtml.content;
-                                        }
-
-                                        content += '<div id="' + listId + '">';
-                                        incomingGroups[fn].forEach(e => {
-                                            const sourceNode2 = nodes.get(e.from);
-                                            const sourceLabel = sourceNode2 ? sourceNode2.label : e.from;
-                                            const sourceGroup = sourceNode2 ? sourceNode2.group : '';
-                                            const isOOS = sourceNode2 ? sourceNode2.outOfScope : false;
-                                            const isHidden = sourceNode2 ? sourceNode2.hidden : false;
-
-                                            const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
-                                            const focusBtnHtml = !isHidden ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.from) + '">Focus</button>' : '';
-                                            const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
-
-                                            content += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #8b5cf6; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
-                                            content += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
-                                            content += '<span>' + escapeHTML(sourceGroup) + badgeHtml + '</span>';
-                                            content += focusBtnHtml + '</div>';
-                                            content += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(sourceLabel) + '</span>' + getCopyBtnHTML(sourceLabel) + '</div>';
-
-                                            let metaHtml = '';
-                                            if (isOOS) {
-                                                metaHtml += '<div style="color: #ef4444; font-weight: bold; margin-top: 4px;">⚠️ OUT OF SCOPE</div>';
-                                            }
-                                            if (e.contexts && e.contexts.length > 0) {
-                                                metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(e.contexts.join(', ')) + '</div>';
-                                            }
-                                            if (e.firstSeen) {
-                                                metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(e.firstSeen) + '</div>';
-                                            }
-                                            if (metaHtml) {
-                                                content += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
-                                            }
-                                            content += '</div>';
-                                        });
-                                        content += '</div>';
-                                        content += '</div>';
-                                    }
-                                    content += '</div></div>';
+                                    content += renderConnFilterPanelHTML(incomingGroups, false);
+                                    content += '<div id="in-conn-content-container">';
+                                    content += renderInConnectionsRoot(incomingGroups);
+                                    content += '</div></div></div>';
+                                } else {
+                                    currentModalInEdgesData = null;
                                 }
 
                                 document.getElementById('modalBody').innerHTML = content;
                                 document.getElementById('modal').style.display = 'block';
+
+                                // Initialize filter icon states after elements are added to the DOM
+                                if (currentModalOutEdgesData) updateConnFilterUIState(true);
+                                if (currentModalInEdgesData) updateConnFilterUIState(false);
                             }
                         }
                         else if (params.edges.length > 0) {
