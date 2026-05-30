@@ -52,6 +52,8 @@ ReconSR is an automated OSINT tool designed to provide cybersecurity researchers
 
 ReconSR moves beyond traditional flat-list enumeration by implementing a reactive, event-driven pipeline that recursively transforms discoveries into new investigative targets.
 
+<details><summary>View detailed architecture</summary>
+
 ### 1. Reactive Execution Pipeline (`internal/pipeline`)
 The core of ReconSR is a non-blocking reactive loop. The data flows in a cycle: **Dispatcher → Modules → Processor → Repository → Dispatcher**, continuing until no new entities remain.
 
@@ -73,6 +75,7 @@ ReconSR combines zero-configuration public sources with user-configured API inte
 - **Demo Mode**: Supported key-based modules can be explicitly switched to bundled sample data by configuring their service key as `demo-api-key`. This lets users explore module output volume and data structure before deciding whether to obtain real provider credentials, without querying third-party APIs.
 - **Rate Limiting & ToS Awareness**: Both keyless and authenticated providers enforce their own quotas, rate limits, Terms of Service, and data licensing rules. Users are responsible for obtaining credentials where required and complying with each provider's policies.
 - **Module Interface**: The system follows a strict **"Black Box" contract**. Developers can extend ReconSR capabilities without needing to understand the internal core logic, routing, or database structures.
+</details>
 
 > [!TIP]
 > **For Developers:** Detailed specifications for building new reconnaissance plugins can be found in the [MODULE_GUIDE.md](./MODULE_GUIDE.md).
@@ -93,8 +96,8 @@ ReconSR combines zero-configuration public sources with user-configured API inte
 >
 > **Local database modules:** Modules backed by offline databases expose their functions only when the required database files are installed locally. Users must obtain those databases independently from the relevant providers and place them in the expected local data directory. If the required files are absent, the related functions are not advertised to the dispatcher and are not scheduled for execution.
 
-### 1. Subdomain Hierarchy (`modules/subdomain_hierarchy`) - 1 function
-<details><summary>View details</summary>
+### 1. Subdomain Hierarchy (`modules/subdomain_hierarchy`)
+<details><summary>View details (1 function)</summary>
 
 - `decompose`: Hierarchical decomposition of deep subdomains. Extracts the organizational domain (eTLD+1 via the Public Suffix List) and all intermediate parent subdomains, using the `Applied` flag to prevent redundant re-processing.
 </details>
@@ -140,8 +143,8 @@ A highly specialized intelligence module for comprehensive DNS reconnaissance. E
 - `get_nsec`: Proactive zone-walking via NXDOMAIN triggers to uncover hidden subdomains and record coverage hints.
 </details>
 
-### 3. Mail Identity Crypto (`modules/mailcrypto`) - 3 functions
-<details><summary>View details</summary>
+### 3. Mail Identity Crypto (`modules/mailcrypto`)
+<details><summary>View details (3 functions)</summary>
 
 Specialized discovery of cryptographic communication keys linked to organizational identities:
 - **Hashing Architecture**: Implementation of RFC 7929/8162 (SHA256/Base32) for deterministic lookup hashing.
@@ -153,50 +156,50 @@ Specialized discovery of cryptographic communication keys linked to organization
 - `get_smimea`: Extraction of S/MIME certificate parameters with DANE mapping.
 </details>
 
-### 4. WHOIS/RDAP (`modules/whois`) - 1 function
-<details><summary>View details</summary>
+### 4. WHOIS/RDAP (`modules/whois`)
+<details><summary>View details (1 function)</summary>
 
 - `get_whois`: Fallback-oriented architecture using RDAP as primary and TCP 43 as secondary. Features recursive registry discovery starting from `whois.iana.org` and registry-specific query handling (JPRS, Verisign, DENIC, NIC.name), models registrar/registrant hierarchies through anchor nodes, and extracts role-aware contacts, addresses, dates, name servers, domain status, DNSSEC state, and registrar metadata such as registrar URL, WHOIS server, and IANA ID.
 </details>
 
-### 5. Hunter.io Email Intelligence (`modules/hunterio`) - 1 function
-<details><summary>View details</summary>
+### 5. Hunter.io Email Intelligence (`modules/hunterio`)
+<details><summary>View details (1 function)</summary>
 
 - `get_hunterio_domain_search`: Queries Hunter.io Domain Search for domains, and optionally organizations, when an API key is configured. Extracts discovered email addresses, confidence and verification status, email pattern, organization metadata, linked domains, person names, roles, departments, seniority, phone numbers, social profiles, source URLs/domains, source dates, and provider flags such as disposable, webmail, accept-all, etc., with API preflight, credit tracking, pagination, retry handling, and explicit demo-mode support.
 </details>
 
-### 6. HaveIBeenPwned Data Breaches (`modules/haveibeenpwned`) - 1 function
-<details><summary>View details</summary>
+### 6. HaveIBeenPwned Data Breaches (`modules/haveibeenpwned`)
+<details><summary>View details (1 function)</summary>
 
 - `get_email_breaches`: Queries the HaveIBeenPwned API for compromised email accounts. Extracts breach metadata including description, leaked data classes, pwned records count, dates, related domain, etc. Evaluates risk indicators (malware, stealer logs, etc.), with explicit demo-mode support.
 </details>
 
-### 7. Certificate Transparency (`modules/domainsbycerts`) - 1 function
-<details><summary>View details</summary>
+### 7. Certificate Transparency (`modules/domainsbycerts`)
+<details><summary>View details (1 function)</summary>
 
 - `get_domains`: Passive certificate-identity harvesting through configurable Certificate Transparency sources, including `crt.sh`, direct PostgreSQL access to `crt.sh`, and `CertSpotter`. Discovers subdomains, wildcard subdomains, and certificate-bound email identities, attaches expiration metadata to both hostname and email identities, emits explicit `expired` status where applicable, and summarizes subdomains with expired certificates separately for triage.
 </details>
 
-### 8. HackerTarget Passive DNS (`modules/hackertarget`) - 1 function
-<details><summary>View details</summary>
+### 8. HackerTarget Passive DNS (`modules/hackertarget`)
+<details><summary>View details (1 function)</summary>
 
 - `get_hosts`: Queries the `HackerTarget` passive DNS dataset to identify validated domain and subdomain nodes and their directly linked resolved IP nodes. Supports an optional API key; without one, requests use the public keyless endpoint and remain subject to IP-based service limits. Includes automatic retry logic, API quota detection, and out-of-scope classification.
 </details>
 
-### 9. Anubis DB (`modules/anubis`) - 1 function
-<details><summary>View details</summary>
+### 9. Anubis DB (`modules/anubis`)
+<details><summary>View details (1 function)</summary>
 
 - `get_domains`: Passive subdomain enumeration through the `anubisdb.com` Anubis database. Returns validated subdomains and wildcard subdomains, deduplicates results, and filters ARPA/out-of-scope noise before graph insertion.
 </details>
 
-### 10. IPv4 Deobfuscation (`modules/ipv4ambiguous`) - 1 function
-<details><summary>View details</summary>
+### 10. IPv4 Deobfuscation (`modules/ipv4ambiguous`)
+<details><summary>View details (1 function)</summary>
 
 - `parse_ambiguous`: Resolution of ambiguous IPv4 addresses containing leading zeros. Decodes input (e.g., `012.012.012.012`) into both strict decimal (`12.12.12.12`) and POSIX-compliant octal (`10.10.10.10`) formats to identify obfuscation and misconfigurations.
 </details>
 
-### 11. IP Intelligence (`modules/ip_metadata`) - 6 functions
-<details><summary>View details</summary>
+### 11. IP Intelligence (`modules/ip_metadata`)
+<details><summary>View details (6 functions)</summary>
 
 Passive reconnaissance of IPv4/IPv6 addresses via reverse DNS, public blacklists, and RIPEstat data endpoints to uncover network identity and reputation:
 - `get_ptr`: Performs reverse DNS lookups to resolve IPs back to their mapped domains.
@@ -207,20 +210,20 @@ Passive reconnaissance of IPv4/IPv6 addresses via reverse DNS, public blacklists
 - `get_ip_abuse_contacts`: Retrieves dedicated abuse reporting email addresses registered to the specific IP allocation.
 </details>
 
-### 12. IPinfo Intelligence (`modules/ipinfo`) - 1 function
-<details><summary>View details</summary>
+### 12. IPinfo Intelligence (`modules/ipinfo`)
+<details><summary>View details (1 function)</summary>
 
 - `get_ip_info`: Queries the IPinfo API for IPv4/IPv6 targets when an API key is configured. Extracts Geo, ASN, Privacy, Mobile, Hosting, Anycast, Satellite, Reverse IP metadata, etc. Depending on the configuration, it queries either the rich lookup endpoint or defaults to the free lite endpoint. Includes explicit demo-mode support.
 </details>
 
-### 13. AbuseIPDB Reputation (`modules/abuseipdb`) - 1 function
-<details><summary>View details</summary>
+### 13. AbuseIPDB Reputation (`modules/abuseipdb`)
+<details><summary>View details (1 function)</summary>
 
 - `check_abuseipdb`: Queries AbuseIPDB for IPv4/IPv6 reputation when an API key is configured. Extracts abuse confidence score, report count, report summaries, network metadata (country, ISP, usage type, etc.), risk indicators (malicious, suspicious, whitelisted, Tor exit, etc.), category-derived threat tags, and reverse-IP hostnames/domains, with retry, daily quota detection, and explicit demo-mode support.
 </details>
 
-### 14. IP2Location Local Intelligence (`modules/ip2location`) - 3 functions
-<details><summary>View details</summary>
+### 14. IP2Location Local Intelligence (`modules/ip2location`)
+<details><summary>View details (3 functions)</summary>
 
 Offline IPv4/IPv6 enrichment backed by locally installed IP2Location/IP2Proxy BIN databases under `data/ip2location`:
 - `get_geo_ip`: Extracts geolocation, ISP, reverse-IP domain, usage type, mobile network metadata, connection speed, address type, IAB category, etc. from DB11 Geo IP data.
@@ -228,8 +231,8 @@ Offline IPv4/IPv6 enrichment backed by locally installed IP2Location/IP2Proxy BI
 - `get_proxy_check`: Detects proxy/VPN/Tor/datacenter/residential/privacy-network indicators through IP2Proxy data, extracting fraud score, last-seen age, provider, reverse-IP domain, usage type, and threat-derived tags such as scanner, spam, botnet, etc.
 </details>
 
-### 15. MaxMind Local Intelligence (`modules/maxmind`) - 4 functions
-<details><summary>View details</summary>
+### 15. MaxMind Local Intelligence (`modules/maxmind`)
+<details><summary>View details (4 functions)</summary>
 
 Offline IPv4/IPv6 enrichment backed by locally installed MaxMind MMDB databases under `data/maxmind`:
 - `get_geo_ip`: Extracts comprehensive geolocation metadata (city, region, country, coordinates, timezone, etc.) from City databases.
@@ -238,8 +241,8 @@ Offline IPv4/IPv6 enrichment backed by locally installed MaxMind MMDB databases 
 - `get_mm_enterprise_data`: Provides maximum data density by aggressively parsing Enterprise databases. Combines all available geo, ASN, ISP, connection type, user type, etc. into a single unified output.
 </details>
 
-### 16. ASN Intelligence (`modules/asn_metadata`) - 4 functions
-<details><summary>View details</summary>
+### 16. ASN Intelligence (`modules/asn_metadata`)
+<details><summary>View details (4 functions)</summary>
 
 Deep analysis of Autonomous System Numbers via RIPEstat API to map network hierarchies, ownership, and announced subnets:
 - `get_asn_peers`: Constructs a strict linear transit chain by identifying the largest upstream provider at each hop, revealing who the ASN buys transit from.
@@ -248,8 +251,8 @@ Deep analysis of Autonomous System Numbers via RIPEstat API to map network hiera
 - `get_asn_abuse_contacts`: Extracts abuse reporting email addresses associated with the ASN infrastructure.
 </details>
 
-### 17. Shodan Intelligence (`modules/shodan`) - 3 conditional functions
-<details><summary>View details</summary>
+### 17. Shodan Intelligence (`modules/shodan`)
+<details><summary>View details (3 conditional functions)</summary>
 
 Shodan enrichment uses two capability modes: without an API key, only the public InternetDB function is advertised with reduced host exposure data; when a Shodan API key is configured, InternetDB is replaced by API-backed IP and domain functions with richer results and explicit demo-mode support:
 - `get_idb_shodan`: Passive enrichment of IPv4/IPv6 targets through the public Shodan InternetDB endpoint. Extracts PTR hostnames, open ports, service tags, known CVEs, and CPE fingerprints for rapid exposure triage.
@@ -257,22 +260,22 @@ Shodan enrichment uses two capability modes: without an API key, only the public
 - `get_shodan_api_domain`: Queries the Shodan DNS Domain API for domains, and optionally subdomains. Extracts passive DNS subdomains and a broad set of DNS-derived entities that can overlap with multiple dedicated DNS modules, including record values, last-seen dates, wildcard markers, historical tags, out-of-scope classifications, etc.
 </details>
 
-### 18. VirusTotal Intelligence (`modules/virustotal`) - 2 functions
-<details><summary>View details</summary>
+### 18. VirusTotal Intelligence (`modules/virustotal`)
+<details><summary>View details (2 functions)</summary>
 
 API-backed enrichment for domains, optionally subdomains, and IPv4/IPv6 targets through VirusTotal API v3. Without a VirusTotal API key, no functions are advertised to the dispatcher; with a configured key, the module exposes both functions and supports explicit demo mode:
 - `get_vt_api_domain`: Queries VirusTotal domain metadata and, when enabled, related subdomains. Extracts tags, reputation and threat scores, categories, popularity ranks, JARM, crowdsourced context, certificate identities and fingerprints, DNS-derived entities, expired-certificate subdomain summaries, out-of-scope classifications, etc.
 - `get_vt_api_ip`: Queries VirusTotal IP metadata and passive DNS resolutions. Extracts ASN, network CIDR, AS owner, geo metadata, JARM, tags, threat scores, last update, passive DNS hostnames, etc.
 </details>
 
-### 19. Vulnerability Lookup (`modules/vuln_lookup`) - 1 function
-<details><summary>View details</summary>
+### 19. Vulnerability Lookup (`modules/vuln_lookup`)
+<details><summary>View details (1 function)</summary>
 
 - `get_circl_vuln`: Queries the CIRCL Vulnerability API for CVE entities. Supports an optional API key; without one, requests use the public keyless endpoint and remain subject to strict rate limits. Extracts vulnerability summaries, CWE classifications with local descriptions, best available CVSS metrics, affected CPE criteria, EPSS probability and percentile, SSVC/KEV indicators, additional metadata included in CIRCL responses, etc.
 </details>
 
-### 20. LeakIX Intelligence (`modules/leakix`) - 3 conditional functions
-<details><summary>View details</summary>
+### 20. LeakIX Intelligence (`modules/leakix`)
+<details><summary>View details (3 functions)</summary>
 
 API-backed exposure and data leak intelligence for domains and IPv4/IPv6 targets through the LeakIX API. Without a LeakIX API key, no functions are advertised to the dispatcher; with a configured key, the module exposes all three functions and supports explicit demo mode:
 - `get_leakix_domain`: Queries LeakIX domain intelligence. Extracts discovered services grouped by IP/port/protocol, open ports, protocols, software versions, web server headers, favicon hashes, SSL/TLS metadata (JARM, certificate fingerprints, SAN domains, issuer, expiration), SSH properties, leaked credentials, leak severity/type/stage, dataset statistics, network context (ASN, organization, CIDR), geolocation, reverse DNS, MAC addresses, tags, event sources, and leak summaries, with retry, rate-limit handling, and blocked-key detection.
