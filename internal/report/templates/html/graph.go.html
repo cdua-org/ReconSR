@@ -172,7 +172,6 @@
                 cursor: pointer;
                 display: flex;
                 align-items: center;
-                user-select: none;
                 flex-grow: 1;
             }
             .stat-badge {
@@ -465,7 +464,6 @@
                                 font-size: 0.95rem;
                                 font-weight: bold;
                                 text-transform: capitalize;
-                                user-select: none;
                             "
                             >Root Target</span
                         >
@@ -528,12 +526,7 @@
             <div class="sidebar-section">
                 <div class="meta-item">
                     <div class="meta-item-left">
-                        <span
-                            style="
-                                color: #cbd5e1;
-                                font-size: 0.95rem;
-                                user-select: none;
-                            "
+                        <span style="color: #cbd5e1; font-size: 0.95rem"
                             >Out of Scope</span
                         >
                     </div>
@@ -545,7 +538,6 @@
                         <div
                             class="icon-btn visibility-eye"
                             id="toggle-oos-btn"
-                            title="Toggle Out of Scope Visibility"
                         >
                             <svg
                                 width="18"
@@ -567,12 +559,7 @@
                 </div>
                 <div class="meta-item">
                     <div class="meta-item-left">
-                        <span
-                            style="
-                                color: #cbd5e1;
-                                font-size: 0.95rem;
-                                user-select: none;
-                            "
+                        <span style="color: #cbd5e1; font-size: 0.95rem"
                             >Depth Limit Reached</span
                         >
                     </div>
@@ -584,7 +571,6 @@
                         <div
                             class="icon-btn visibility-eye active"
                             id="toggle-limit-reached-btn"
-                            title="Toggle Depth Limit Reached Visibility"
                         >
                             <svg
                                 width="18"
@@ -606,12 +592,7 @@
                 </div>
                 <div class="meta-item">
                     <div class="meta-item-left">
-                        <span
-                            style="
-                                color: #cbd5e1;
-                                font-size: 0.95rem;
-                                user-select: none;
-                            "
+                        <span style="color: #cbd5e1; font-size: 0.95rem"
                             >Edge Labels</span
                         >
                     </div>
@@ -718,7 +699,6 @@
                                     color: #cbd5e1;
                                     font-size: 0.95rem;
                                     text-transform: capitalize;
-                                    user-select: none;
                                 "
                                 >{{.Type}}{{if .Subtypes}}<span
                                     class="expander"
@@ -799,7 +779,6 @@
                                         color: #94a3b8;
                                         font-size: 0.85rem;
                                         text-transform: capitalize;
-                                        user-select: none;
                                     "
                                     >{{.Type}}</span
                                 >
@@ -2173,7 +2152,7 @@
                         if (oosCount > 0) {
                             const oosState = isOut ? modalOutShowOOS : modalInShowOOS;
                             priorityHtml += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
-                            priorityHtml += '<span style="color: #cbd5e1; font-size: 0.85rem; user-select: none;">Out of Scope</span>';
+                            priorityHtml += '<span style="color: #cbd5e1; font-size: 0.85rem;">Out of Scope</span>';
                             priorityHtml += '<div style="display: flex; align-items: center; gap: 12px;">';
                             priorityHtml += '<span class="stat-badge" id="' + pfx + '-conn-oos-badge">' + oosCount + '</span>';
                             priorityHtml += '<div class="icon-btn visibility-eye ' + (oosState ? 'active' : 'state-none') + '" id="' + pfx + '-conn-oos-btn" onclick="toggleModalOOS(' + isOut + ')" title="' + UI_STRINGS.TOGGLE_OOS_VIS + '">';
@@ -2184,7 +2163,7 @@
                         if (limitCount > 0) {
                             const limitState = isOut ? modalOutShowLimit : modalInShowLimit;
                             priorityHtml += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
-                            priorityHtml += '<span style="color: #cbd5e1; font-size: 0.85rem; user-select: none;">Depth Limit Reached</span>';
+                            priorityHtml += '<span style="color: #cbd5e1; font-size: 0.85rem;">Depth Limit Reached</span>';
                             priorityHtml += '<div style="display: flex; align-items: center; gap: 12px;">';
                             priorityHtml += '<span class="stat-badge" id="' + pfx + '-conn-limit-badge">' + limitCount + '</span>';
                             priorityHtml += '<div class="icon-btn visibility-eye ' + (limitState ? 'active' : 'state-none') + '" id="' + pfx + '-conn-limit-btn" onclick="toggleModalLimit(' + isOut + ')" title="' + UI_STRINGS.TOGGLE_LIMIT_VIS + '">';
