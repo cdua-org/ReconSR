@@ -538,7 +538,9 @@
                         >
                     </div>
                     <div class="meta-item-controls">
-                        <span class="stat-badge">{{ .OutOfScopeCount }}</span>
+                        <span class="stat-badge" id="oos-stat-badge"
+                            >{{ .OutOfScopeCount }}</span
+                        >
                         <div style="width: 18px; display: inline-block"></div>
                         <div
                             class="icon-btn visibility-eye"
@@ -575,7 +577,9 @@
                         >
                     </div>
                     <div class="meta-item-controls">
-                        <span class="stat-badge">{{ .LimitReachedCount }}</span>
+                        <span class="stat-badge" id="limit-stat-badge"
+                            >{{ .LimitReachedCount }}</span
+                        >
                         <div style="width: 18px; display: inline-block"></div>
                         <div
                             class="icon-btn visibility-eye active"
@@ -946,6 +950,14 @@
                         }
                     }
 
+                    function updateBadge(el, visible, total) {
+                        const element = (typeof el === 'string') ? document.getElementById(el) : el;
+                        if (!element) return;
+                        const hidden = total - visible;
+                        element.innerText = (hidden > 0) ? (visible + ' / ' + total) : String(total);
+                        element.title = 'Visible: ' + visible + ' | Hidden: ' + hidden + ' | Total: ' + total;
+                    }
+
                     const initialNodes = [{{end}}
 
             {{define "middle"}}] ; const initialEdges = [{{end}}
@@ -981,6 +993,13 @@
                     const ctx = canvas.getContext('2d');
                     const wrapper = document.getElementById('timeline-canvas-wrapper');
                     const timeDisplay = document.getElementById('current-time-display');
+
+                    const UI_STRINGS = {
+                        TOGGLE_ALL_VIS: 'Toggle All Visibility',
+                        TOGGLE_OOS_VIS: 'Toggle Out of Scope Visibility',
+                        TOGGLE_LIMIT_VIS: 'Toggle Depth Limit Reached Visibility',
+                        TOGGLE_TYPE_VIS: 'Toggle Visibility'
+                    };
 
                     function resizeCanvas() {
                         canvas.width = wrapper.clientWidth;
@@ -1437,7 +1456,7 @@
                     let showLimitReached = true;
 
                     function syncVisibilityButtons(visibilityStats, visibleTypeCounts, effectiveTotalTypeCounts) {
-                        const setState = function(btn, visibleCount, totalCount, isGlobalOn) {
+                        const setState = function(btn, visibleCount, totalCount, isGlobalOn, title) {
                             if (!btn) return;
 
                             btn.classList.remove('state-none', 'state-partial', 'state-all', 'state-filtered', 'active');
@@ -1454,12 +1473,14 @@
                                 btn.classList.add('state-partial');
                             }
 
-                            btn.title = 'Visible: ' + visibleCount + ' | Hidden: ' + Math.max(totalCount - visibleCount, 0) + ' | Total: ' + totalCount;
+                            if (title) {
+                                btn.title = title;
+                            }
                         };
 
-                        setState(document.getElementById('toggle-all-vis-btn'), visibilityStats.all.visible, visibilityStats.all.effectiveTotal);
-                        setState(document.getElementById('toggle-oos-btn'), visibilityStats.oos.visible, visibilityStats.oos.total, showOOS);
-                        setState(document.getElementById('toggle-limit-reached-btn'), visibilityStats.limit.visible, visibilityStats.limit.total, showLimitReached);
+                        setState(document.getElementById('toggle-all-vis-btn'), visibilityStats.all.visible, visibilityStats.all.effectiveTotal, undefined, UI_STRINGS.TOGGLE_ALL_VIS);
+                        setState(document.getElementById('toggle-oos-btn'), visibilityStats.oos.visible, visibilityStats.oos.total, showOOS, UI_STRINGS.TOGGLE_OOS_VIS);
+                        setState(document.getElementById('toggle-limit-reached-btn'), visibilityStats.limit.visible, visibilityStats.limit.total, showLimitReached, UI_STRINGS.TOGGLE_LIMIT_VIS);
 
                         document.querySelectorAll('.vis-toggle-btn').forEach(btn => {
                             const type = btn.getAttribute('data-type');
@@ -1468,7 +1489,7 @@
                             const totalCount = effectiveTotalTypeCounts[type] || 0;
                             const visibleCount = visibleTypeCounts[type] || 0;
 
-                            setState(btn, visibleCount, totalCount);
+                            setState(btn, visibleCount, totalCount, undefined, UI_STRINGS.TOGGLE_TYPE_VIS);
                         });
                     }
 
@@ -1706,20 +1727,13 @@
                         });
                         nodes.update(nodeUpdates);
 
+                        updateBadge('oos-stat-badge', visibilityStats.oos.visible, visibilityStats.oos.total);
+                        updateBadge('limit-stat-badge', visibilityStats.limit.visible, visibilityStats.limit.total);
+
                         document.querySelectorAll('.type-stat-badge').forEach(badge => {
                             const type = badge.getAttribute('data-type');
                             if (!type) return;
-
-                            const totalCount = effectiveTotalTypeCounts[type] || 0;
-                            const visibleCount = visibleTypeCounts[type] || 0;
-                            const hiddenCount = totalCount - visibleCount;
-
-                            if (hiddenCount > 0) {
-                                badge.innerText = visibleCount + ' / ' + totalCount;
-                            } else {
-                                badge.innerText = String(totalCount);
-                            }
-                            badge.title = 'Visible: ' + visibleCount + ' | Hidden: ' + hiddenCount + ' | Total: ' + totalCount;
+                            updateBadge(badge, visibleTypeCounts[type] || 0, effectiveTotalTypeCounts[type] || 0);
                         });
 
                         currentVisibilityStats = visibilityStats;
@@ -2161,8 +2175,8 @@
                             priorityHtml += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
                             priorityHtml += '<span style="color: #cbd5e1; font-size: 0.85rem; user-select: none;">Out of Scope</span>';
                             priorityHtml += '<div style="display: flex; align-items: center; gap: 12px;">';
-                            priorityHtml += '<span class="stat-badge">' + oosCount + '</span>';
-                            priorityHtml += '<div class="icon-btn visibility-eye ' + (oosState ? 'active' : 'state-none') + '" id="' + pfx + '-conn-oos-btn" onclick="toggleModalOOS(' + isOut + ')" title="Toggle OOS">';
+                            priorityHtml += '<span class="stat-badge" id="' + pfx + '-conn-oos-badge">' + oosCount + '</span>';
+                            priorityHtml += '<div class="icon-btn visibility-eye ' + (oosState ? 'active' : 'state-none') + '" id="' + pfx + '-conn-oos-btn" onclick="toggleModalOOS(' + isOut + ')" title="' + UI_STRINGS.TOGGLE_OOS_VIS + '">';
                             priorityHtml += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
                             priorityHtml += '</div></div></div>';
                         }
@@ -2172,8 +2186,8 @@
                             priorityHtml += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
                             priorityHtml += '<span style="color: #cbd5e1; font-size: 0.85rem; user-select: none;">Depth Limit Reached</span>';
                             priorityHtml += '<div style="display: flex; align-items: center; gap: 12px;">';
-                            priorityHtml += '<span class="stat-badge">' + limitCount + '</span>';
-                            priorityHtml += '<div class="icon-btn visibility-eye ' + (limitState ? 'active' : 'state-none') + '" id="' + pfx + '-conn-limit-btn" onclick="toggleModalLimit(' + isOut + ')" title="Toggle Depth Limit">';
+                            priorityHtml += '<span class="stat-badge" id="' + pfx + '-conn-limit-badge">' + limitCount + '</span>';
+                            priorityHtml += '<div class="icon-btn visibility-eye ' + (limitState ? 'active' : 'state-none') + '" id="' + pfx + '-conn-limit-btn" onclick="toggleModalLimit(' + isOut + ')" title="' + UI_STRINGS.TOGGLE_LIMIT_VIS + '">';
                             priorityHtml += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
                             priorityHtml += '</div></div></div>';
                         }
@@ -2184,7 +2198,7 @@
 
                         html += '<div class="meta-item" style="margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">';
                         html += '<span style="color: #f1f5f9; font-size: 0.85rem; font-weight: bold; text-transform: uppercase;">All Connection Types</span>';
-                        html += '<div class="icon-btn ' + allEyeState + '" id="' + allEyeId + '" onclick="' + toggleAllFn + '" title="Toggle All">';
+                        html += '<div class="icon-btn ' + allEyeState + '" id="' + allEyeId + '" onclick="' + toggleAllFn + '" title="' + UI_STRINGS.TOGGLE_ALL_VIS + '">';
                         html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
                         html += '</div></div>';
 
@@ -2213,7 +2227,7 @@
 
                             html += '<div class="meta-item-controls" style="display: flex; align-items: center; gap: 12px;">';
                             html += '<span class="stat-badge" id="' + badgeId + '" title="' + tBadgeTitle + '">' + tBadgeText + '</span>';
-                            html += '<div class="icon-btn visibility-eye ' + tState + '" id="' + eyeId + '" onclick="' + toggleTypeFn + '(\'' + escapeHTML(t.type.replace(/'/g, "\\'")) + '\')" title="Toggle Visibility">';
+                            html += '<div class="icon-btn visibility-eye ' + tState + '" id="' + eyeId + '" onclick="' + toggleTypeFn + '(\'' + escapeHTML(t.type.replace(/'/g, "\\'")) + '\')" title="' + UI_STRINGS.TOGGLE_TYPE_VIS + '">';
                             html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
                             html += '</div></div></div>';
 
@@ -2231,7 +2245,7 @@
                                     html += '<span style="color: #94a3b8; font-size: 0.8rem; font-family: monospace;">' + escapeHTML(st.name) + '</span>';
                                     html += '<div style="display: flex; align-items: center; gap: 12px;">';
                                     html += '<span class="stat-badge" id="' + stBadgeId + '" title="' + stBadgeTitle + '">' + stBadgeText + '</span>';
-                                    html += '<div class="icon-btn visibility-eye ' + stState + '" id="' + stEyeId + '" onclick="' + toggleTypeFn + '(\'' + escapeHTML(st.type.replace(/'/g, "\\'")) + '\')" title="Toggle Visibility">';
+                                    html += '<div class="icon-btn visibility-eye ' + stState + '" id="' + stEyeId + '" onclick="' + toggleTypeFn + '(\'' + escapeHTML(st.type.replace(/'/g, "\\'")) + '\')" title="' + UI_STRINGS.TOGGLE_TYPE_VIS + '">';
                                     html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
                                     html += '</div></div></div>';
                                 });
@@ -2320,9 +2334,11 @@
 
                         const oosGlobalOn = isOut ? modalOutShowOOS : modalInShowOOS;
                         setIconState(document.getElementById(pfx + '-conn-oos-btn'), oosVisibleCount, oosCount, oosGlobalOn);
+                        updateBadge(pfx + '-conn-oos-badge', oosVisibleCount, oosCount);
 
                         const limitGlobalOn = isOut ? modalOutShowLimit : modalInShowLimit;
                         setIconState(document.getElementById(pfx + '-conn-limit-btn'), limitVisibleCount, limitCount, limitGlobalOn);
+                        updateBadge(pfx + '-conn-limit-badge', limitVisibleCount, limitCount);
 
                         const allEye = document.getElementById(allEyeId);
                         if (allEye) {
@@ -2363,12 +2379,7 @@
                                 }
                             }
                             const badgeId = badgePrefix + btoa(encodeURIComponent(typeObj.type)).replace(/=/g, '');
-                            const badge = document.getElementById(badgeId);
-                            if (badge) {
-                                const bText = (typeObj.visibleCount < typeObj.effectiveCount) ? (typeObj.visibleCount + ' / ' + typeObj.effectiveCount) : String(typeObj.effectiveCount);
-                                badge.innerText = bText;
-                                badge.title = 'Visible: ' + typeObj.visibleCount + ' | Hidden: ' + (typeObj.effectiveCount - typeObj.visibleCount) + ' | Total: ' + typeObj.effectiveCount;
-                            }
+                            updateBadge(badgeId, typeObj.visibleCount, typeObj.effectiveCount);
                         };
 
                         typesData.forEach(t => {
@@ -2682,13 +2693,7 @@
                                 }
                             }
                             const badgeId = 'prop-filter-badge-' + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
-                            const badge = document.getElementById(badgeId);
-                            if (badge) {
-                                const visibleCount = isHidden ? 0 : t.count;
-                                const bText = isHidden ? ('0 / ' + t.count) : String(t.count);
-                                badge.innerText = bText;
-                                badge.title = 'Visible: ' + visibleCount + ' | Hidden: ' + (t.count - visibleCount) + ' | Total: ' + t.count;
-                            }
+                            updateBadge(badgeId, isHidden ? 0 : t.count, t.count);
                         });
                     }
 
@@ -2700,7 +2705,7 @@
 
                         html += '<div class="meta-item" style="margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">';
                         html += '<span style="color: #f1f5f9; font-size: 0.85rem; font-weight: bold; text-transform: uppercase;">All Properties</span>';
-                        html += '<div class="icon-btn ' + (anyVisible && currentHiddenPropTypes.size === 0 ? 'state-all' : (anyVisible ? 'state-partial' : 'state-none')) + '" id="prop-filter-all-eye" onclick="toggleAllPropFilters()" title="Toggle All">';
+                        html += '<div class="icon-btn ' + (anyVisible && currentHiddenPropTypes.size === 0 ? 'state-all' : (anyVisible ? 'state-partial' : 'state-none')) + '" id="prop-filter-all-eye" onclick="toggleAllPropFilters()" title="' + UI_STRINGS.TOGGLE_ALL + '">';
                         html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
                         html += '</div></div>';
 
@@ -2717,7 +2722,7 @@
                             html += '<span style="color: #cbd5e1; font-size: 0.85rem; font-family: monospace;">' + escapeHTML(t.type) + '</span>';
                             html += '<div style="display: flex; align-items: center; gap: 12px;">';
                             html += '<span class="stat-badge" id="' + badgeId + '" title="' + badgeTitle + '">' + badgeText + '</span>';
-                            html += '<div class="icon-btn visibility-eye ' + (isHidden ? 'state-none' : 'active') + '" id="' + eyeId + '" onclick="togglePropTypeFilter(\'' + escapeHTML(t.type.replace(/'/g, "\\'")) + '\')" title="Toggle Visibility">';
+                            html += '<div class="icon-btn visibility-eye ' + (isHidden ? 'state-none' : 'active') + '" id="' + eyeId + '" onclick="togglePropTypeFilter(\'' + escapeHTML(t.type.replace(/'/g, "\\'")) + '\')" title="' + UI_STRINGS.TOGGLE_VIS + '">';
                             html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
                             html += '</div></div></div>';
                         });
