@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -98,8 +99,14 @@ func doPreFlightCheck(ctx context.Context, target string) error {
 	}
 
 	nsRecords, err := fetchNSRecords(ctx, baseDomain)
-	if err != nil || len(nsRecords) == 0 {
+	if err != nil {
+		if errors.Is(err, ErrZoneBroken) {
+			return ErrZoneBroken
+		}
 		return fmt.Errorf("failed to fetch NS records for %s: %w", baseDomain, err)
+	}
+	if len(nsRecords) == 0 {
+		return ErrZoneBroken
 	}
 
 	slices.Sort(nsRecords)
@@ -154,6 +161,11 @@ func fetchNSRecords(ctx context.Context, domain string) ([]string, error) {
 
 	nsRecords, err := resolver.GetResolver().LookupNS(queryCtx, domain)
 	if err != nil {
+		if dnsErr, ok := errors.AsType[*net.DNSError](err); ok {
+			if dnsErr.IsNotFound || strings.Contains(dnsErr.Error(), "no such host") || strings.Contains(dnsErr.Error(), "server misbehaving") {
+				return nil, ErrZoneBroken
+			}
+		}
 		return nil, fmt.Errorf("NS lookup failed: %w", err)
 	}
 
