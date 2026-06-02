@@ -3,9 +3,11 @@ package ip_metadata
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
 func TestGetRBLDataSupported(t *testing.T) {
@@ -60,6 +62,54 @@ func TestGetRBLDataTimeout(t *testing.T) {
 	res := getRBLData("198.51.100.2")
 	if res.Error == nil {
 		t.Error("expected timeout error, got nil")
+	}
+}
+
+func TestGetRBLDataBlockedProviderFallsBack(t *testing.T) {
+	var spamhausCalls int
+	setAQueryMock(t, func(_, query, _ string) ([]string, error) {
+		if strings.Contains(query, ".zen.spamhaus.org") {
+			spamhausCalls++
+			if spamhausCalls == 1 {
+				return []string{"127.255.255.254"}, nil
+			}
+		}
+		return nil, nil
+	})
+
+	res := getRBLData("198.51.100.2")
+	if res.Error != nil {
+		t.Fatalf("expected blocked provider fallback to avoid error, got: %v", *res.Error)
+	}
+	if len(res.Results) != 0 {
+		t.Fatalf("expected fake IP not to be listed in RBLs, got %d results", len(res.Results))
+	}
+	if spamhausCalls != 2 {
+		t.Fatalf("expected 2 Spamhaus attempts, got %d", spamhausCalls)
+	}
+}
+
+func TestGetRBLDataBlockedProviderSkipped(t *testing.T) {
+	var spamhausCalls int
+	setAQueryMock(t, func(_, query, _ string) ([]string, error) {
+		if strings.Contains(query, ".zen.spamhaus.org") {
+			spamhausCalls++
+			return []string{"127.255.255.255"}, nil
+		}
+		return nil, nil
+	})
+
+	res := getRBLData("198.51.100.2")
+	if res.Error != nil {
+		t.Fatalf("expected blocked provider skip to avoid error, got: %v", *res.Error)
+	}
+	if len(res.Results) != 0 {
+		t.Fatalf("expected fake IP not to be listed in RBLs, got %d results", len(res.Results))
+	}
+
+	expectedCalls := max(resolver.MaxRetriesIPMeta, 1)
+	if spamhausCalls != expectedCalls {
+		t.Fatalf("expected %d Spamhaus attempts, got %d", expectedCalls, spamhausCalls)
 	}
 }
 

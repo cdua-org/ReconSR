@@ -11,15 +11,38 @@ import (
 )
 
 func checkRBLZone(target, query string, rawBuffer *strings.Builder) (isHit, isBlocked bool, err error) {
-	ips, lookupErr := aQueryFunc(target, query, constants.FuncGetRBL)
-	if lookupErr != nil {
-		return false, false, lookupErr
+	maxAttempts := max(resolver.MaxRetriesIPMeta, 1)
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		ips, lookupErr := aQueryFunc(target, query, constants.FuncGetRBL)
+		if lookupErr != nil {
+			return false, false, lookupErr
+		}
+
+		zoneHit, zoneBlocked := parseRBLZoneRecords(ips, rawBuffer)
+		if zoneHit {
+			return true, false, nil
+		}
+		if zoneBlocked {
+			isBlocked = true
+			dbg.Printf("%s target=%q stage=lookup_rbl attempt=%d query=%q blocked_resolver=%q", constants.FuncGetRBL, target, attempt, query, resolver.GetLastUsedPlain())
+			continue
+		}
+
+		return false, false, nil
+	}
+
+	return false, isBlocked, nil
+}
+
+func parseRBLZoneRecords(ips []string, rawBuffer *strings.Builder) (isHit, isBlocked bool) {
+	for _, ip := range ips {
+		if ip == "127.255.255.254" || ip == "127.255.255.255" {
+			return false, true
+		}
 	}
 
 	for _, ip := range ips {
-		if ip == "127.255.255.254" || ip == "127.255.255.255" {
-			return false, true, nil
-		}
 		if strings.HasPrefix(ip, "127.0.0.") {
 			isHit = true
 			if rawBuffer.Len() > 0 {
@@ -29,7 +52,7 @@ func checkRBLZone(target, query string, rawBuffer *strings.Builder) (isHit, isBl
 		}
 	}
 
-	return isHit, false, nil
+	return isHit, false
 }
 
 func getRBLData(target string) (execution schema.ModuleExecution) {
@@ -76,7 +99,7 @@ func getRBLData(target string) (execution schema.ModuleExecution) {
 		}
 
 		if isBlocked {
-			lastErr = fmt.Errorf("provider %s blocked public resolver", zone.suffix)
+			dbg.Printf("%s target=%q stage=lookup_rbl provider=%q skipped=true reason=blocked_public_resolver", constants.FuncGetRBL, target, zone.suffix)
 			continue
 		}
 
