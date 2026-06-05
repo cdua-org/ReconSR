@@ -1,0 +1,31 @@
+{
+  "dns": {
+    "@timestamp": "2026-05-30T13:28:29.704Z",
+    "level": 3,
+    "zone": "com"
+  },
+  "related_domains": [
+    "webdisk.example.com",
+    "example.com",
+    "mail.example.com",
+    "www.example.com"
+  ],
+  "related_domains_count": 4,
+  "related_domains_query": "(domain:*.example.com AND NOT domain:cpanel.example.com) OR domain:example.com",
+  "domain": "cpanel.example.com",
+  "type": "domain",
+  "source": [
+    {
+      "id": 99999,
+      "availability": "public",
+      "type": "domains",
+      "scan_label": "2026-05-08",
+      "scan_started_at": "2026-05-08T00:00:00Z",
+      "scan_ended_at": "2026-05-30T15:57:45.375000Z",
+      "is_default": true,
+      "speed": "fast",
+      "state": "full",
+      "count": 2724038542
+    }
+  ]
+}

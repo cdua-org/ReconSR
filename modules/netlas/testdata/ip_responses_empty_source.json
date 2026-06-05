@@ -1,0 +1,74 @@
+{
+  "ioc": [
+    {
+      "lseen": "2026-05-21T00:00Z",
+      "score": {
+        "total": 34.0,
+        "src": 68.49,
+        "tags": 0.5,
+        "frequency": 1.0
+      },
+      "fseen": "2026-05-21T00:00Z",
+      "@timestamp": "2026-05-21T00:00Z",
+      "ip": "203.0.113.88",
+      "isp": "OCEAN",
+      "fp": {
+        "descr": "",
+        "alarm": "false"
+      },
+      "ports": [
+        3128,
+        8080
+      ],
+      "asn": 264617,
+      "tags": [
+        "proxy"
+      ]
+    },
+    {
+      "lseen": "2026-05-21T00:00Z",
+      "score": {
+        "total": 80.0
+      },
+      "fp": {
+        "alarm": "false"
+      },
+      "tags": [
+        "malware"
+      ]
+    }
+  ],
+  "domains": [
+    "skip1.com",
+    "skip2.com",
+    "skip3.com",
+    "skip4.com",
+    "skip5.com",
+    "skip6.com",
+    "skip7.com",
+    "skip8.com",
+    "skip9.com",
+    "skip10.com"
+  ],
+  "domains_count": 11,
+  "geo": {
+    "continent": "Oceania",
+    "country": "",
+    "tz": "Oceania/Abyss",
+    "ip": "203.0.113.0/24",
+    "accuracy": 100,
+    "location": {
+      "lon": 0.0,
+      "lat": 0.0
+    },
+    "registered_country": "ZZ"
+  },
+  "privacy": {
+    "is_vpn": false,
+    "is_proxy": false,
+    "is_tor": false
+  },
+  "ip": "203.0.113.88",
+  "type": "ip",
+  "source": []
+}

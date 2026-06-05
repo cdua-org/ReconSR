@@ -1,0 +1,67 @@
+{
+  "ports": [
+    {
+      "prot4": "tcp",
+      "protocol": "https",
+      "port": 443,
+      "prot7": "http"
+    },
+    {
+      "protocol": "http",
+      "prot4": "tcp",
+      "port": 80,
+      "prot7": "http"
+    }
+  ],
+  "dns": {
+    "txt": [
+      "v=spf1 include:_spf.example.info ~all"
+    ],
+    "a": [
+      "198.51.100.38"
+    ],
+    "@timestamp": "2026-05-12T01:49:24.949Z",
+    "level": 3,
+    "ns": [
+      "ns1.example.info",
+      "ns2.example.info"
+    ],
+    "zone": "info",
+    "cname": [
+      "cname.example.info"
+    ],
+    "mx": [
+      "mx.example.info"
+    ]
+  },
+  "related_domains": [
+    "cname.example.info",
+    "d1.example.info",
+    "d2.example.info",
+    "d3.example.info",
+    "d4.example.info",
+    "d5.example.info",
+    "d6.example.info",
+    "d7.example.info",
+    "d8.example.info",
+    "d9.example.info"
+  ],
+  "related_domains_count": 11,
+  "related_domains_query": "(domain:*.example.info AND NOT domain:www.example.info) OR domain:example.info",
+  "domain": "www.example.info",
+  "type": "domain",
+  "source": [
+    {
+      "id": 770,
+      "availability": "public",
+      "type": "responses",
+      "scan_label": "2026-04-19",
+      "scan_started_at": "2026-04-19T00:00:00Z",
+      "scan_ended_at": "2026-05-18T18:16:18.099000Z",
+      "is_default": false,
+      "speed": "fast",
+      "state": "full",
+      "count": 749615854
+    }
+  ]
+}

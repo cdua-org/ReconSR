@@ -29,4 +29,7 @@ const (
 	TagMalicious   = "malicious"
 	TagSuspicious  = "suspicious"
 	TagCompromised = "compromised"
+	TagExploit     = "exploit"
+	TagMalware     = "malware"
+	TagPhishing    = "phishing"
 )

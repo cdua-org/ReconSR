@@ -60,4 +60,6 @@ const (
 	FuncGetLeakIXDomain         = "get_leakix_domain"
 	FuncGetLeakIXIP             = "get_leakix_ip"
 	FuncGetLeakIXSubdomains     = "get_leakix_subdomains"
+	FuncGetNetlasDomain         = "get_netlas_domain"
+	FuncGetNetlasIP             = "get_netlas_ip"
 )

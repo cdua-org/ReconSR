@@ -1,0 +1,48 @@
+{
+  "dns": {
+    "@timestamp": "2026-05-18T10:14:15.000Z",
+    "level": 2,
+    "zone": "com"
+  },
+  "whois": {
+    "server": "whois.verisign-grs.com",
+    "last_updated": "2026-01-10T12:00:00.000Z",
+    "level": 2,
+    "raw": "Domain Name: EXAMPLE-DEAD.COM\nRegistry Domain ID: 123456789_DOMAIN_COM-VRSN\nRegistrar WHOIS Server: whois.godaddy.com\nRegistrar URL: http://www.godaddy.com\nUpdated Date: 2026-01-10T12:00:00Z\nCreation Date: 2010-01-01T12:00:00Z\nRegistrar Registration Expiration Date: 2027-01-01T12:00:00Z",
+    "@timestamp": "2026-05-18T10:14:15.000Z",
+    "stats": {
+      "retries": 0,
+      "quota_retries": 0,
+      "parser": "no_error",
+      "was_queued": false,
+      "total_time": 500000,
+      "error": "no_error"
+    },
+    "zone": "com",
+    "domain": "example-dead.com",
+    "name_servers": [
+      "ns_no_dot",
+      "-invalid-domain-"
+    ]
+  },
+  "related_domains_count": 0,
+  "related_domains_query": "(domain:*.example-dead.com AND NOT domain:example-dead.com)",
+  "domain": "example-dead.com",
+  "type": "domain",
+  "source": [
+    {
+      "id": 9995,
+      "availability": "public",
+      "type": "whois_domains",
+      "scan_label": "2026-05-10",
+      "created_date": "2000-01-01T00:00:00.000Z",
+      "updated_date": "2000-01-01T00:00:00.000Z",
+      "scan_started_at": "2026-05-10T00:00:00Z",
+      "scan_ended_at": "2026-05-20T18:16:18.099000Z",
+      "is_default": false,
+      "speed": "fast",
+      "state": "full",
+      "count": 100
+    }
+  ]
+}

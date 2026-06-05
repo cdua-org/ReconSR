@@ -1,0 +1,19 @@
+{
+  "ip": "203.0.113.85",
+  "type": "ip",
+  "domains_count": 0,
+  "domains": [],
+  "whois": {
+    "asn": null,
+    "net": null,
+    "related_nets": []
+  },
+  "source": [
+    {
+      "id": 88882,
+      "availability": "public",
+      "type": "ip",
+      "scan_label": "2026-05-08"
+    }
+  ]
+}

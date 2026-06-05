@@ -1,0 +1,7 @@
+{
+  "related_domains_count": 0,
+  "related_domains_query": "(domain:*.example.org AND NOT domain:example.org)",
+  "domain": "example.org",
+  "type": "domain",
+  "source": []
+}

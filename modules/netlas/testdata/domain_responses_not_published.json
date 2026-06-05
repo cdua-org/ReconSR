@@ -1,0 +1,92 @@
+{
+  "ports": [
+    {
+      "protocol": "http",
+      "prot4": "tcp",
+      "port": 80,
+      "prot7": "http"
+    }
+  ],
+  "whois": {
+    "server": "whois.nic.uk",
+    "extension": "uk",
+    "last_updated": "2025-06-02T17:53:27.352Z",
+    "registrar": {
+      "country": "UK",
+      "city": "London",
+      "organization": "Privacy Proxy LLC",
+      "name": "uk.privacy"
+    },
+    "level": 3,
+    "name_servers": [
+      "ns1.example.co.uk",
+      "ns2.example.co.uk"
+    ],
+    "raw": "Domain name:\n    example.co.uk\n\nRegistrant:\n    not published\n\nRegistrant type:\n    Unknown\n\nRegistrant's address:\n    not published\n\nData validation:\n    Nominet was not able to match the registrant's name and/or address against a 3rd party source on 22-Aug-2013\n\nRegistrar:\n    Privacy Proxy LLC t/a uk.privacy [Tag = PRIVACY]\n    URL: https://privacyprotected.net/\n\nRelevant dates:\n    Registered on: 22-Aug-2013\n    Expiry date:  22-Aug-2025\n    Last updated:  22-Jul-2024\n\nRegistration status:\n    Registered until expiry date.\n\nName servers:\n    ns1.example.co.uk\n    ns2.example.co.uk\n\nWHOIS lookup made at 17:53:27 02-Jun-2025\n\n-- \nThis WHOIS information is provided for free by Nominet UK the central registry\nfor .uk domain names. This information and the .uk WHOIS are:\n\n    Copyright Nominet UK 1996 - 2025.\n",
+    "expiration_date": "2025-08-22T11:20:05.000Z",
+    "@timestamp": "2025-06-02T17:53:27.352Z",
+    "punycode": "example.co.uk",
+    "stats": {
+      "retries": 0,
+      "quota_retries": 0,
+      "parser": "no_error",
+      "was_queued": false,
+      "total_time": 668486085,
+      "error": "no_error"
+    },
+    "zone": "co.uk",
+    "domain": "example.co.uk",
+    "name": "example",
+    "registrant": {
+      "street": "not published",
+      "name": "not published",
+      "email": "not.published@privacyprotected.net"
+    },
+    "created_date": "2013-08-22T11:20:05.000Z",
+    "updated_date": "2024-07-22T17:43:03.000Z",
+    "extracted_domain": "example.co.uk",
+    "status": [
+      "ok",
+      "linked"
+    ]
+  },
+  "dns": {
+    "a": [
+      "198.51.100.21"
+    ],
+    "txt": [
+      "v=spf1 include:_spf.example.co.uk ~all"
+    ],
+    "@timestamp": "2026-05-15T02:03:53.084Z",
+    "ns": [
+      "ns1.example.co.uk",
+      "ns2.example.co.uk"
+    ],
+    "zone": "uk",
+    "level": 3,
+    "mx": [
+      "mx1.example.co.uk"
+    ]
+  },
+  "related_domains": [
+    "www.example.co.uk"
+  ],
+  "related_domains_count": 1,
+  "related_domains_query": "(domain:*.example.co.uk AND NOT domain:example.co.uk)",
+  "domain": "example.co.uk",
+  "type": "domain",
+  "source": [
+    {
+      "id": 770,
+      "availability": "public",
+      "type": "responses",
+      "scan_label": "2026-04-19",
+      "scan_started_at": "2026-04-19T00:00:00Z",
+      "scan_ended_at": "2026-05-18T18:16:18.099000Z",
+      "is_default": false,
+      "speed": "fast",
+      "state": "full",
+      "count": 749615854
+    }
+  ]
+}

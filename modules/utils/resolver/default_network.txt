@@ -206,6 +206,18 @@ IPINFOPaid=false
 MaxRetriesLeakIX=3
 
 
+### Netlas Options ###
+
+# Maximum retry attempts for Netlas API requests (default: 3)
+MaxRetriesNetlas=3
+
+# Fallback base pause between Netlas API retry attempts (used if Retry-After header is missing), in seconds (default: 2)
+NetlasRetryBaseDelay=2
+
+# Enable routing of subdomains to the Netlas domain endpoint in addition to root domains (default: false)
+NetlasScanSubdomains=false
+
+
 [DoH]
 https://dns.cloudflare.com/dns-query
 https://dns.google/resolve

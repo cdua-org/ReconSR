@@ -62,6 +62,10 @@ var (
 	MaxRetriesHT = 3
 	// MaxRetriesLeakIX defines maximum attempts for LeakIX API.
 	MaxRetriesLeakIX = 3
+	// MaxRetriesNetlas defines maximum attempts for Netlas API.
+	MaxRetriesNetlas = 3
+	// NetlasRetryBaseDelay is the base pause between Netlas API retry attempts.
+	NetlasRetryBaseDelay = 2 * time.Second
 	// MaxRetriesIPMeta defines maximum attempts for IP metadata lookups.
 	MaxRetriesIPMeta = 3
 	// MaxRetriesASNMeta defines maximum attempts for ASN metadata lookups.
@@ -81,6 +85,8 @@ var (
 	ShodanMaxDomainPages = 1
 	// ShodanScanSubdomains enables processing of subdomains via the domain endpoint.
 	ShodanScanSubdomains = false
+	// NetlasScanSubdomains enables processing of subdomains via the domain endpoint.
+	NetlasScanSubdomains = false
 	// ShodanIPHistory includes all historical banners for Shodan IP lookups.
 	ShodanIPHistory = false
 	// ShodanIPMinify returns only ports and general info for Shodan IP lookups.
@@ -284,16 +290,17 @@ var stringOptions map[string]*string
 
 func initOptionMaps() {
 	durationOptions = map[string]*time.Duration{
-		"Timeout":             &Timeout,
-		"KeepAlive":           &KeepAlive,
-		"TimeoutASNMeta":      &TimeoutASNMeta,
-		"DNSQueryTimeout":     &DNSQueryTimeout,
-		"DNSFallbackTimeout":  &DNSFallbackTimeout,
-		"DNSBruteTimeout":     &DNSBruteTimeout,
-		"CrtshPGTimeout":      &CrtshPGTimeout,
-		"RetryBaseDelay":      &RetryBaseDelay,
-		"HTTPTimeout":         &HTTPTimeout,
-		"CirclRetryBaseDelay": &CirclRetryBaseDelay,
+		"Timeout":              &Timeout,
+		"KeepAlive":            &KeepAlive,
+		"TimeoutASNMeta":       &TimeoutASNMeta,
+		"DNSQueryTimeout":      &DNSQueryTimeout,
+		"DNSFallbackTimeout":   &DNSFallbackTimeout,
+		"DNSBruteTimeout":      &DNSBruteTimeout,
+		"CrtshPGTimeout":       &CrtshPGTimeout,
+		"RetryBaseDelay":       &RetryBaseDelay,
+		"NetlasRetryBaseDelay": &NetlasRetryBaseDelay,
+		"HTTPTimeout":          &HTTPTimeout,
+		"CirclRetryBaseDelay":  &CirclRetryBaseDelay,
 	}
 	boolOptions = map[string]*bool{
 		"DisableMailcryptoBruteForce": &DisableMailcryptoBruteForce,
@@ -309,6 +316,7 @@ func initOptionMaps() {
 		"CirclWithSightings":          &CirclWithSightings,
 		"HunterioScanOrg":             &HunterioScanOrg,
 		"IPINFOPaid":                  &IPINFOPaid,
+		"NetlasScanSubdomains":        &NetlasScanSubdomains,
 	}
 	intOptions = map[string]*int{
 		"MaxRetriesCert":           &MaxRetriesCert,
@@ -316,6 +324,7 @@ func initOptionMaps() {
 		"MaxRetriesDNS":            &MaxRetriesDNS,
 		"MaxRetriesHT":             &MaxRetriesHT,
 		"MaxRetriesLeakIX":         &MaxRetriesLeakIX,
+		"MaxRetriesNetlas":         &MaxRetriesNetlas,
 		"MaxRetriesIPMeta":         &MaxRetriesIPMeta,
 		"MaxRetriesASNMeta":        &MaxRetriesASNMeta,
 		"MaxRecursionDepth":        &MaxRecursionDepth,

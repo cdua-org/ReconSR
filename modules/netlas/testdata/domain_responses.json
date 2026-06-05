@@ -1,0 +1,506 @@
+{
+  "ports": [
+    {
+      "port": 443,
+      "protocol": "tcp",
+      "prot4": "tcp",
+      "prot7": "https",
+      "source": "http"
+    },
+    {
+      "port": 8080,
+      "protocol": "",
+      "prot4": "",
+      "prot7": "http",
+      "source": ""
+    },
+    {
+      "port": 80,
+      "protocol": "http",
+      "prot4": "tcp",
+      "prot7": "http"
+    }
+  ],
+  "software": [
+    {
+      "cve": [
+        {
+          "severity": "HIGH",
+          "attack_complexity": "LOW",
+          "base_score": "8.8",
+          "integrity_impact": "HIGH",
+          "has_exploit": true,
+          "description": "WordPress versions prior to 4.9.9 and 5.x prior to 5.0.1 are vulnerable to a Remote Code Execution (RCE) via post meta data manipulation.",
+          "published": "2019-02-19T18:15:00.000",
+          "attack_vector": "NETWORK",
+          "privileges_required": "LOW",
+          "availability_impact": "HIGH",
+          "user_interaction": "NONE",
+          "name": "CVE-2019-8942",
+          "match_type": "product",
+          "confidentiality_impact": "HIGH",
+          "exploit_links": [
+            "https://github.com/lucasvrs/CVE-2019-8942"
+          ],
+          "match_product": "WordPress"
+        },
+        {
+          "severity": "HIGH",
+          "attack_complexity": "LOW",
+          "base_score": "8.8",
+          "integrity_impact": "HIGH",
+          "has_exploit": true,
+          "description": "An escalation of privilege bug in various modules in Apache HTTP 2.4.66 and earlier allows local .htaccess authors to read files with the privileges of the httpd user. Users are recommended to upgrade to version 2.4.67, which fixes this issue.",
+          "published": "2026-05-04T13:16:00.297",
+          "attack_vector": "NETWORK",
+          "privileges_required": "LOW",
+          "availability_impact": "HIGH",
+          "user_interaction": "NONE",
+          "name": "CVE-2026-24072",
+          "match_type": "cpe",
+          "confidentiality_impact": "HIGH",
+          "exploit_links": [
+            "https://github.com/EricRHancock-coder/CVE-2026-24072-Analysis"
+          ],
+          "match_product": "Apache 2.4"
+        },
+        {
+          "severity": "HIGH",
+          "attack_complexity": "LOW",
+          "base_score": "7.5",
+          "integrity_impact": "NONE",
+          "description": "Malformed requests may cause the server to dereference a NULL pointer. This issue affects Apache HTTP Server 2.4.48 and earlier.",
+          "published": "2021-09-16T15:15:07.267",
+          "attack_vector": "NETWORK",
+          "privileges_required": "NONE",
+          "availability_impact": "HIGH",
+          "user_interaction": "NONE",
+          "name": "CVE-2021-34798",
+          "match_type": "cpe",
+          "confidentiality_impact": "NONE",
+          "match_product": "Apache 2.4"
+        },
+        {
+          "severity": "HIGH",
+          "attack_complexity": "HIGH",
+          "base_score": "8.1",
+          "integrity_impact": "HIGH",
+          "has_exploit": true,
+          "description": "Vulnerability in the Oracle Java SE, Oracle GraalVM for JDK, Oracle GraalVM Enterprise Edition product of Oracle Java SE (component: 2D). Supported versions that are affected are Oracle Java SE: 8u451, 8u451-perf, 11.0.27, 17.0.15, 21.0.7, 24.0.1; ...",
+          "published": "2025-07-15T20:15:29.313",
+          "attack_vector": "NETWORK",
+          "privileges_required": "NONE",
+          "availability_impact": "HIGH",
+          "user_interaction": "NONE",
+          "name": "CVE-2025-30749",
+          "match_type": "product",
+          "confidentiality_impact": "HIGH",
+          "match_product": "Java",
+          "exploit_links": [
+            "https://github.com/rashedhasan090/AegisJava"
+          ]
+        },
+        {
+          "severity": "MEDIUM",
+          "base_score": "5.3",
+          "name": "CVE-2023-12345",
+          "match_type": "cpe",
+          "match_product": "Apache 2.4"
+        },
+        {
+          "severity": "LOW",
+          "name": "CVE-2023-12346",
+          "match_type": "cpe",
+          "match_product": "Apache 2.4"
+        },
+        {
+          "base_score": "3.1",
+          "name": "CVE-2023-12347",
+          "match_type": "cpe",
+          "match_product": "Apache 2.4"
+        }
+      ],
+      "tag": [
+        {
+          "wordpress": {
+            "version": "4.9.8"
+          },
+          "name": "wordpress",
+          "description": "WordPress is a free and open-source content management system written in PHP and paired with a MySQL or MariaDB database. Features include a plugin architecture and a template system.",
+          "cpe": [
+            "cpe:2.3:a:wordpress:wordpress:4.9.8:*:*:*:*:*:*:*"
+          ],
+          "fullname": "WordPress",
+          "category": [
+            "CMS",
+            "Blogs"
+          ]
+        },
+        {
+          "mysql": {
+            "version": ""
+          },
+          "name": "mysql",
+          "description": "MySQL is an open-source relational database management system.",
+          "cpe": [
+            "cpe:2.3:a:mysql:mysql:*:*:*:*:*:*:*:*"
+          ],
+          "fullname": "MySQL",
+          "category": [
+            "Databases"
+          ]
+        },
+        {
+          "bootstrap": {
+            "version": ""
+          },
+          "name": "bootstrap",
+          "description": "Bootstrap is a free and open-source CSS framework directed at responsive, mobile-first front-end web development. It contains CSS and JavaScript-based design templates for typography, forms, buttons, navigation, and other interface components.",
+          "cpe": [
+            "cpe:2.3:a:getbootstrap:bootstrap:*:*:*:*:*:*:*:*"
+          ],
+          "fullname": "Bootstrap",
+          "category": [
+            "UI frameworks"
+          ]
+        },
+        {
+          "ddos_guard": {
+            "version": ""
+          },
+          "name": "ddos_guard",
+          "description": "DDoS-Guard is a Russian Internet infrastructure company which provides DDoS protection, content delivery network services, and web hosting services.",
+          "fullname": "DDoS-Guard",
+          "category": [
+            "Security"
+          ]
+        },
+        {
+          "name": "apache_http_server",
+          "cpe": [
+            "cpe:2.3:a:apache:http_server:2.4:*:*:*:*:*:*:*"
+          ],
+          "description": "Apache is a free and open-source cross-platform web server software.",
+          "fullname": "Apache HTTP Server",
+          "category": [
+            "Web servers"
+          ],
+          "apache_http_server": {
+            "version": "2.4"
+          }
+        },
+        {
+          "apache": {
+            "version": "2.4"
+          },
+          "name": "apache",
+          "description": "Apache is a free and open-source cross-platform web server software.",
+          "cpe": [
+            "cpe:2.3:a:apache:http_server:2.4:*:*:*:*:*:*:*"
+          ],
+          "fullname": "Apache",
+          "category": [
+            "Web servers"
+          ]
+        },
+        {
+          "java": {
+            "version": ""
+          },
+          "name": "java",
+          "description": "Java is a class-based, object-oriented programming language that is designed to have as few implementation dependencies as possible.",
+          "cpe": [
+            "cpe:2.3:a:oracle:jre:*:*:*:*:*:*:*:*"
+          ],
+          "fullname": "Java",
+          "category": [
+            "Programming languages"
+          ]
+        },
+        {
+          "name": "jquery",
+          "cpe": [
+            "cpe:2.3:a:jquery:jquery:3.7.1:*:*:*:*:*:*:*"
+          ],
+          "description": "jQuery is a JavaScript library which is a free, open-source software designed to simplify HTML DOM tree traversal and manipulation, as well as event handling, CSS animation, and Ajax.",
+          "fullname": "jQuery",
+          "category": [
+            "JavaScript libraries"
+          ],
+          "jquery": {
+            "version": "3.7.1"
+          }
+        },
+        {
+          "fancybox": {
+            "version": ""
+          },
+          "name": "fancybox",
+          "description": "FancyBox is a tool for displaying images, html content and multi-media in a Mac-style 'lightbox' that floats overtop of web page.",
+          "fullname": "FancyBox",
+          "category": [
+            "JavaScript libraries"
+          ]
+        },
+        {
+          "name": "cloudflare",
+          "description": "Cloudflare is a web-infrastructure and website-security company, providing content-delivery-network services, DDoS mitigation, Internet security, and distributed domain-name-server services.",
+          "fullname": "Cloudflare",
+          "cloudflare": {
+            "version": ""
+          },
+          "category": [
+            "CDN"
+          ]
+        },
+        {
+          "name": "php",
+          "cpe": [
+            "cpe:2.3:a:php:php:8.5.4:*:*:*:*:*:*:*"
+          ],
+          "description": "PHP is a general-purpose scripting language used for web development.",
+          "php": {
+            "version": "8.5.4"
+          },
+          "fullname": "PHP",
+          "category": [
+            "Programming languages"
+          ]
+        },
+        {
+          "name": "http_3",
+          "description": "HTTP/3 is the third major version of the Hypertext Transfer Protocol used to exchange information on the World Wide Web.",
+          "fullname": "HTTP/3",
+          "category": [
+            "Miscellaneous"
+          ],
+          "http_3": {
+            "version": ""
+          }
+        },
+        {
+          "name": "google_analytics",
+          "description": "Google Analytics is a free web analytics service that tracks and reports website traffic.",
+          "google_analytics": {
+            "version": ""
+          },
+          "fullname": "Google Analytics",
+          "category": [
+            "Analytics"
+          ]
+        },
+        {
+          "jquery_cdn": {
+            "version": ""
+          },
+          "name": "jquery_cdn",
+          "description": "jQuery CDN is a way to include jQuery in your website without actually downloading and keeping it your website's folder.",
+          "fullname": "jQuery CDN",
+          "category": [
+            "CDN"
+          ]
+        }
+      ],
+      "uri": "http://example.edu:80/"
+    }
+  ],
+  "ioc": [
+    {
+      "lseen": "2026-05-18T00:00Z",
+      "score": {
+        "total": 18.0,
+        "src": 70.08,
+        "tags": 0.89,
+        "frequency": 1.0
+      },
+      "fseen": "2026-05-18T00:00Z",
+      "@timestamp": "2026-05-18T00:00Z",
+      "domain": "example.edu",
+      "fp": {
+        "descr": "Resource is unavailable",
+        "alarm": "true"
+      },
+      "url": "https://example.edu/url/?q=malicious-link",
+      "tags": [
+        "malware"
+      ]
+    },
+    {
+      "domain": "example.edu",
+      "url": "https://example.edu/url/?q=bad-link",
+      "tags": [
+        "",
+        "malicious",
+        "compromised",
+        "suspicious"
+      ],
+      "threat": [
+        "",
+        "APT28"
+      ]
+    }
+  ],
+  "whois": {
+    "server": "whois.educause.edu",
+    "extension": "edu",
+    "last_updated": "2024-05-13T19:02:35.694Z",
+    "technical": {
+      "name": "Technical Contact",
+      "organization": "Example University",
+      "email": "tech@example.edu",
+      "phone": "+1-555-555-3000",
+      "fax": "+1-555-555-3001",
+      "street": "3 Example Campus",
+      "city": "Edu City",
+      "province": "State",
+      "postal_code": "00000",
+      "country": "US"
+    },
+    "administrative": {
+      "name": "Bob Edu",
+      "organization": "Example University",
+      "email": "admin@example.edu",
+      "phone": "+1-555-555-2000",
+      "fax": "+1-555-555-2001",
+      "street": "2 Example Campus, Edu City, ED 00000",
+      "city": "Edu City",
+      "province": "State",
+      "postal_code": "00000",
+      "country": "US"
+    },
+    "registrant": {
+      "name": "Registrant Name",
+      "organization": "Example University",
+      "email": "registrant@example.edu",
+      "phone": "+1-555-555-1000",
+      "fax": "+1-555-555-1001",
+      "street": "1 Example Campus",
+      "city": "Edu City",
+      "province": "State",
+      "postal_code": "00000",
+      "country": "US"
+    },
+    "registrar": {
+      "phone": "+1-000-000-0003",
+      "fax": "+1-000-000-0004",
+      "referral_url": "http://www.fake-registrar.example.com",
+      "name": "Fake Registrar LLC",
+      "organization": "Fake Registrar Inc",
+      "id": "999",
+      "email": "abuse@fake-registrar.example.com",
+      "street": "100 Registrar Way",
+      "city": "Example City",
+      "province": "Registrar State",
+      "postal_code": "99999",
+      "country": "US"
+    },
+    "level": 2,
+    "name_servers": [
+      "ns1.example.net",
+      "ns2.example.net"
+    ],
+    "raw": "Domain Name: EXAMPLE.EDU\n\nRegistrant:\n\tExample University\n\t1 Example Campus\n\tEdu City, ED 00000\n\nAdministrative Contact:\n\tBob Edu\n\tExample University\n\t1 Example Campus\n\tEdu City, ED 00000\n\t+1-000-000-0002\n\tbob@example.edu\n\nTechnical Contact:\n\tAlice Edu\n\tExample University\n\t1 Example Campus\n\tEdu City, ED 00000\n\t+1-000-000-0001\n\talice@example.edu\n\nName Servers:\n\tNS1.EXAMPLE.NET\n\tNS2.EXAMPLE.NET\n\nDomain record activated:    13-Apr-2001\nDomain record last updated: 30-Jun-2023\nDomain expires:             31-Jul-2024\n",
+    "expiration_date": "2024-07-31T00:00:00.000Z",
+    "@timestamp": "2024-05-13T19:02:35.694Z",
+    "punycode": "example.edu",
+    "zone": "edu",
+    "stats": {
+      "retries": 0,
+      "quota_retries": 0,
+      "parser": "no_error",
+      "was_queued": false,
+      "error": "no_error",
+      "total_time": 784378396
+    },
+    "status": [
+      "clientTransferProhibited",
+      "clientUpdateProhibited"
+    ],
+    "tld": "edu",
+    "id": "123456789_DOMAIN_EDU-VRSN",
+    "domain": "example.edu",
+    "name": "example",
+    "updated_date": "2001-04-13T00:00:00.000Z",
+    "created_date": "2001-04-13T00:00:00.000Z",
+    "extracted_domain": "example.edu"
+  },
+  "dns": {
+    "txt": [
+      "verification=fake-token-123456789",
+      "v=spf1 include:spf.example.com include:invalid_domain_name..com ip4:198.51.100.0/24 ip6:2001:db8::/32 ip4:198.51.100.10 ip6:2001:db8::10 ip4:999.999.999.999 a:a.example.com mx:mx.example.com exists:exists.example.com redirect=redirect.example.com -all",
+      "v=DMARC1; p=reject; rua=mailto:dmarc@example.com,mailto:invalid@email@domain.com; ruf=mailto:forensic@example.com",
+      "   "
+    ],
+    "a": [
+      "198.51.100.1",
+      "198.51.100.2"
+    ],
+    "aaaa": [
+      "2001:db8::1",
+      "2001:db8::2"
+    ],
+    "ns": [
+      "ns1.example.net",
+      "ns2.example.net"
+    ],
+    "mx": [
+      "mx1.example.com",
+      "mx2.example.com"
+    ],
+    "cname": [
+      "cname1.example.net",
+      "cname2.example.net"
+    ],
+    "@timestamp": "2026-05-29T09:37:16.007Z",
+    "zone": "edu"
+  },
+  "related_domains": [
+    "www.finance.example.edu",
+    "drive.example.edu",
+    "portal.example.edu",
+    "dep1.example.edu",
+    "dep2.example.edu"
+  ],
+  "related_domains_count": 5,
+  "related_domains_query": "(domain:*.example.edu AND NOT domain:example.edu)",
+  "domain": "example.edu",
+  "type": "domain",
+  "source": [
+    {
+      "id": 9991,
+      "availability": "public",
+      "type": "responses",
+      "scan_label": "2026-04-19",
+      "scan_started_at": "2026-04-19T00:00:00Z",
+      "scan_ended_at": "2026-05-18T18:16:18.099000Z",
+      "is_default": false,
+      "speed": "fast",
+      "state": "full",
+      "count": 749615854
+    },
+    {
+      "id": 9992,
+      "availability": "public",
+      "type": "whois_domains",
+      "scan_label": "2026-04-24",
+      "scan_started_at": "2026-04-24T00:00:00Z",
+      "scan_ended_at": "2026-05-17T21:09:03.646000Z",
+      "is_default": true,
+      "speed": "fast",
+      "state": "full",
+      "count": 700965362
+    },
+    {
+      "id": 9993,
+      "availability": "public",
+      "type": "domains",
+      "scan_label": "2026-05-08",
+      "scan_started_at": "2026-05-08T00:00:00Z",
+      "scan_ended_at": "2026-05-30T15:57:45.375000Z",
+      "is_default": true,
+      "speed": "fast",
+      "state": "full",
+      "count": 2724038542
+    }
+  ]
+}

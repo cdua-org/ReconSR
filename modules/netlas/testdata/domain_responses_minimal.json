@@ -1,0 +1,53 @@
+{
+  "dns": {
+    "a": [
+      "",
+      "198.51.100.10"
+    ],
+    "aaaa": [
+      "",
+      "2001:db8::1"
+    ],
+    "cname": [
+      "",
+      "invalid_domain",
+      "valid.example.com"
+    ],
+    "txt": [
+      "v=spf1 a mx ip4:198.51.100.10 ~all"
+    ],
+    "@timestamp": "2026-05-09T11:12:26.245Z",
+    "zone": "net",
+    "level": 2,
+    "ns": [
+      "",
+      "invalid_ns",
+      "ns1.example.net",
+      "ns2.example.net"
+    ],
+    "mx": [
+      "",
+      "invalid_mx",
+      "mail.example.net"
+    ]
+  },
+  "related_domains": [],
+  "related_domains_count": 0,
+  "related_domains_query": "(domain:*.example.net AND NOT domain:example.net)",
+  "domain": "example.net",
+  "type": "domain",
+  "source": [
+    {
+      "id": 9994,
+      "availability": "public",
+      "type": "domains",
+      "scan_label": "2026-05-08",
+      "scan_started_at": "2026-05-08T00:00:00Z",
+      "scan_ended_at": "2026-05-30T15:57:45.375000Z",
+      "is_default": true,
+      "speed": "fast",
+      "state": "full",
+      "count": 2724038542
+    }
+  ]
+}

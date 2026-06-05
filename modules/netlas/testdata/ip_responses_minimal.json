@@ -1,0 +1,34 @@
+{
+  "ip": "203.0.113.84",
+  "type": "ip",
+  "domains_count": 0,
+  "domains": [],
+  "geo": {
+    "continent": "Atlantis",
+    "country": "ZZ"
+  },
+  "organization": "Atlantis ISP Ltd",
+  "isp": "Atlantis ISP",
+  "privacy": {
+
+    "is_vpn": false,
+    "is_proxy": false,
+    "is_tor": true
+  },
+  "ptr": [""],
+  "whois": null,
+  "source": [
+    {
+      "id": 88881,
+      "availability": "public",
+      "type": "responses",
+      "scan_label": "2026-05-15",
+      "scan_started_at": "2026-05-15T00:00:00Z",
+      "scan_ended_at": "2026-05-18T12:00:00.000000Z",
+      "is_default": false,
+      "speed": "fast",
+      "state": "full",
+      "count": 1050
+    }
+  ]
+}

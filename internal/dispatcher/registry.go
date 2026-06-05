@@ -16,6 +16,7 @@ import (
 	"cdua-org/ReconSR/modules/leakix"
 	"cdua-org/ReconSR/modules/mailcrypto"
 	"cdua-org/ReconSR/modules/maxmind"
+	"cdua-org/ReconSR/modules/netlas"
 	"cdua-org/ReconSR/modules/shodan"
 	"cdua-org/ReconSR/modules/subdomain_hierarchy"
 	"cdua-org/ReconSR/modules/virustotal"
@@ -40,6 +41,7 @@ var ModuleRegistry = []schema.Module{
 	leakix.New(),
 	mailcrypto.New(),
 	maxmind.New(),
+	netlas.New(),
 	shodan.New(),
 	subdomain_hierarchy.New(),
 	virustotal.New(),
