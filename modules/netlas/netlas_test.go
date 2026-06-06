@@ -130,6 +130,11 @@ func TestNetlasDemoMode_IP(t *testing.T) {
 }
 func TestNetlasQuotaAndInvalidKey(t *testing.T) {
 	m := &netlasModule{apiKey: testAPIKey}
+	server := setupMockServer(t, []byte(`{}`))
+	defer server.Close()
+	originalURL := netlasAPIBaseURL
+	netlasAPIBaseURL = server.URL
+	defer func() { netlasAPIBaseURL = originalURL }()
 
 	m.keyInvalid.Store(true)
 	out, err := m.Exec(schema.ModuleInput{
@@ -285,6 +290,31 @@ func TestUnmarshalJSONErrors(t *testing.T) {
 	}
 }
 
+func TestUnmarshalJSONTypeErrors(t *testing.T) {
+	var resp netlasResponse
+	err := resp.UnmarshalJSON([]byte(`{"dns": {"a": 123}}`))
+	if err == nil {
+		t.Errorf("expected error on dns type mismatch")
+	}
+
+	var ipResp netlasIPResponse
+	err = ipResp.UnmarshalJSON([]byte(`{"geo": {"country": 123}}`))
+	if err == nil {
+		t.Errorf("expected error on geo type mismatch")
+	}
+
+	var tag netlasSoftwareTag
+	err = tag.UnmarshalJSON([]byte(`[]`))
+	if err == nil {
+		t.Errorf("expected error on array to map unmarshal")
+	}
+
+	err = resp.UnmarshalJSON([]byte(`{"type": "domain", "whois": {"server": 123}}`))
+	if err == nil {
+		t.Errorf("expected error on domain whois type mismatch")
+	}
+}
+
 func TestDemoJSONErrors(t *testing.T) {
 	oldDomain := demoDomainResponses
 	oldIP := demoIPResponses
@@ -406,14 +436,12 @@ func TestExtractPortFromURI(t *testing.T) {
 }
 
 func TestNetlasEmptyRootDomain(t *testing.T) {
-	m := &netlasModule{apiKey: "fake-key-test"}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		if _, err := w.Write([]byte(`{"domain": ""}`)); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}))
+	m := &netlasModule{apiKey: testAPIKey}
+	server := setupMockServer(t, []byte(`{"domain": ""}`))
 	defer server.Close()
+	originalURL := netlasAPIBaseURL
 	netlasAPIBaseURL = server.URL
+	defer func() { netlasAPIBaseURL = originalURL }()
 
 	out, err := m.Exec(schema.ModuleInput{
 		Target:    schema.Entity{Type: constants.TypeDomain, Value: "empty.com"},
@@ -430,7 +458,7 @@ func TestNetlasEmptyRootDomain(t *testing.T) {
 func TestCommonEdgeCases(t *testing.T) {
 	exec := &schema.ModuleExecution{}
 	gen := modutil.NewLocalIDGenerator()
-	pRef := &schema.EntityRef{Type: constants.TypeDomain, Value: "example.com"}
+	pRef := &schema.EntityRef{Type: constants.TypeDomain, Value: "example.net"}
 
 	sw := &netlasSoftware{
 		Tags: []netlasSoftwareTag{

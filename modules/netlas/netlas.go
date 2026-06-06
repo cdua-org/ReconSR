@@ -23,7 +23,11 @@ var dbg = debuglog.New(moduleName)
 type netlasModule struct {
 	lastReqTime     time.Time
 	apiKey          string
+	invalidMsg      string
 	mu              sync.Mutex
+	preflightSync   sync.Once
+	coins           int
+	limitPerDl      int
 	keyInvalid      atomic.Bool
 	quotaBlocked    atomic.Bool
 	demoDomainFired atomic.Bool
@@ -71,6 +75,8 @@ func (m *netlasModule) Capabilities() (schema.ModuleCapabilities, error) {
 func (m *netlasModule) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	execs := make([]schema.ModuleExecution, 0, len(data.Functions))
 	gen := modutil.NewLocalIDGenerator()
+
+	m.handlePreflightAPI()
 
 	for _, fn := range data.Functions {
 		switch fn {

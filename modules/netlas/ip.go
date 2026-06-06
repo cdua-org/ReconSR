@@ -17,7 +17,7 @@ func (m *netlasModule) getNetlasIP(target schema.Entity, fn string, gen *modutil
 	targetValue := target.Value
 	dbg.Printf("%s target=%q", fn, targetValue)
 
-	u := fmt.Sprintf("%s/%s/?source_type=include&fields=*", netlasAPIBaseURL, targetValue)
+	u := fmt.Sprintf("%s/host/%s/?source_type=include&fields=*", netlasAPIBaseURL, targetValue)
 
 	if m.apiKey == demoIndicator {
 		if !m.demoIPFired.CompareAndSwap(false, true) {
@@ -213,11 +213,11 @@ func parseWhoisASN(exec *schema.ModuleExecution, asn *netlasWhoisASN, targetRef 
 			})
 		}
 		if asn.CIDR != "" {
-			if valCIDR, err := validator.Validate(constants.TypeCIDR, asn.CIDR); err == nil {
+			if validateCIDR(asn.CIDR) {
 				exec.Results = append(exec.Results, schema.ModuleResult{
-					Type:     valCIDR.Type,
+					Type:     constants.TypeCIDR,
 					Category: constants.CategoryProperty,
-					Value:    valCIDR.Value,
+					Value:    asn.CIDR,
 					Source:   asnRef,
 					LocalID:  gen.NextID(),
 				})
@@ -289,22 +289,20 @@ func parseWhoisNet(exec *schema.ModuleExecution, net *netlasWhoisIPNet, rootOrg 
 		if cidr == "" {
 			continue
 		}
-		valCIDR, err := validator.Validate(constants.TypeCIDR, cidr)
-		if err != nil {
-			continue
+		if validateCIDR(cidr) {
+			cidrID := gen.NextID()
+			ref := &schema.EntityRef{Type: constants.TypeCIDR, Value: cidr, LocalID: cidrID}
+			if cidrRef == nil {
+				cidrRef = ref
+			}
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     constants.TypeCIDR,
+				Category: constants.CategoryProperty,
+				Value:    cidr,
+				Source:   orgRef,
+				LocalID:  cidrID,
+			})
 		}
-		cidrID := gen.NextID()
-		ref := &schema.EntityRef{Type: valCIDR.Type, Value: valCIDR.Value, LocalID: cidrID}
-		if cidrRef == nil {
-			cidrRef = ref
-		}
-		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     valCIDR.Type,
-			Category: constants.CategoryProperty,
-			Value:    valCIDR.Value,
-			Source:   orgRef,
-			LocalID:  cidrID,
-		})
 	}
 
 	propsRef := orgRef

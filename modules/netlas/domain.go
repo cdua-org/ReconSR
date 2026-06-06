@@ -18,7 +18,7 @@ func (m *netlasModule) getNetlasDomain(target schema.Entity, fn string, gen *mod
 	targetValue := target.Value
 	dbg.Printf("%s target=%q", fn, targetValue)
 
-	u := fmt.Sprintf("%s/%s/?source_type=include&fields=*", netlasAPIBaseURL, targetValue)
+	u := fmt.Sprintf("%s/host/%s/?source_type=include&fields=*", netlasAPIBaseURL, targetValue)
 
 	if m.apiKey == demoIndicator {
 		if !m.demoDomainFired.CompareAndSwap(false, true) {
@@ -177,12 +177,18 @@ func parseDomainDNSSPF(exec *schema.ModuleExecution, txt string, targetRef *sche
 			}
 		}
 
-		res, err := validator.Validate(t, entity.Value)
-		if err != nil {
-			continue
+		if t == constants.TypeCIDR {
+			if !validateCIDR(entity.Value) {
+				continue
+			}
+		} else {
+			res, err := validator.Validate(t, entity.Value)
+			if err != nil {
+				continue
+			}
+			entity.Value = res.Value
+			t = res.Type
 		}
-		entity.Value = res.Value
-		t = res.Type
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:       t,

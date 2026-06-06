@@ -76,11 +76,8 @@ func (t *netlasSoftwareTag) UnmarshalJSON(data []byte) error {
 	}
 
 	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-
-	if t.Name != "" {
+	err := json.Unmarshal(data, &raw)
+	if err == nil && t.Name != "" {
 		if b, ok := raw[t.Name]; ok {
 			var versionData struct {
 				Version string `json:"version"`
@@ -90,6 +87,7 @@ func (t *netlasSoftwareTag) UnmarshalJSON(data []byte) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -219,7 +217,14 @@ func (r *netlasResponse) UnmarshalJSON(data []byte) error {
 	type Alias netlasResponse
 	aux := &struct {
 		*Alias
-		Whois json.RawMessage `json:"whois"`
+		DNS      json.RawMessage `json:"dns"`
+		Whois    json.RawMessage `json:"whois"`
+		Geo      json.RawMessage `json:"geo"`
+		Privacy  json.RawMessage `json:"privacy"`
+		Ports    json.RawMessage `json:"ports"`
+		Software json.RawMessage `json:"software"`
+		IoC      json.RawMessage `json:"ioc"`
+		PTR      json.RawMessage `json:"ptr"`
 	}{
 		Alias: (*Alias)(r),
 	}
@@ -227,14 +232,41 @@ func (r *netlasResponse) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if len(aux.Whois) > 0 {
-		if r.Type == "domain" {
-			var w netlasWhoisDomain
-			if err := json.Unmarshal(aux.Whois, &w); err == nil {
-				r.Whois = &w
-			}
+	unmarshalIfObject := func(raw json.RawMessage, target any) error {
+		if len(raw) > 0 && raw[0] == '{' {
+			return json.Unmarshal(raw, target)
+		}
+		return nil
+	}
+	unmarshalIfArray := func(raw json.RawMessage, target any) error {
+		if len(raw) > 0 && raw[0] == '[' {
+			return json.Unmarshal(raw, target)
+		}
+		return nil
+	}
+
+	for _, err := range []error{
+		unmarshalIfObject(aux.DNS, &r.DNS),
+		unmarshalIfObject(aux.Geo, &r.Geo),
+		unmarshalIfObject(aux.Privacy, &r.Privacy),
+		unmarshalIfArray(aux.Ports, &r.Ports),
+		unmarshalIfArray(aux.Software, &r.Software),
+		unmarshalIfArray(aux.IoC, &r.IoC),
+		unmarshalIfArray(aux.PTR, &r.PTR),
+	} {
+		if err != nil {
+			return err
 		}
 	}
+
+	if len(aux.Whois) > 0 && aux.Whois[0] == '{' && r.Type == "domain" {
+		var w netlasWhoisDomain
+		if err := json.Unmarshal(aux.Whois, &w); err != nil {
+			return err
+		}
+		r.Whois = &w
+	}
+
 	return nil
 }
 
@@ -249,10 +281,15 @@ func (r *netlasIPResponse) UnmarshalJSON(data []byte) error {
 	}
 
 	var w struct {
-		Whois *netlasWhoisIP `json:"whois"`
+		Whois json.RawMessage `json:"whois"`
 	}
 	if err := json.Unmarshal(data, &w); err == nil {
-		r.Whois = w.Whois
+		if len(w.Whois) > 0 && w.Whois[0] == '{' {
+			var whoisIP netlasWhoisIP
+			if err := json.Unmarshal(w.Whois, &whoisIP); err == nil {
+				r.Whois = &whoisIP
+			}
+		}
 	}
 	return nil
 }

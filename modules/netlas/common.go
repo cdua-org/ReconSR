@@ -369,13 +369,80 @@ func extractCVEMetrics(exec *schema.ModuleExecution, cve *netlasCVE, cveRef *sch
 	}
 }
 
+var iocSystemTags = map[string]string{
+	"malware":     constants.TagMalware,
+	"malicious":   constants.TagMalicious,
+	"compromised": constants.TagCompromised,
+	"suspicious":  constants.TagSuspicious,
+	"phishing":    constants.TagPhishing,
+	"c2":          constants.TagC2,
+	"botnet":      constants.TagBotnet,
+	"ransomware":  constants.TagRansomware,
+	"miner":       constants.TagMiner,
+	"exploit_kit": constants.TagExploitKit,
+	"exploit":     constants.TagExploit,
+	"dga":         constants.TagDGA,
+	"spam":        constants.TagSpam,
+	"sinkhole":    constants.TagSinkhole,
+}
+
 func parseIoC(exec *schema.ModuleExecution, iocs []netlasIoC, targetRef *schema.EntityRef, mainASNs []string, gen *modutil.LocalIDGenerator) {
+	allowedTags := buildAllowedTags(iocs)
+
 	for i := range iocs {
-		parseIoCItem(exec, &iocs[i], targetRef, mainASNs, gen)
+		parseIoCItem(exec, &iocs[i], targetRef, mainASNs, allowedTags, gen)
 	}
 }
 
-func parseIoCItem(exec *schema.ModuleExecution, ioc *netlasIoC, targetRef *schema.EntityRef, mainASNs []string, gen *modutil.LocalIDGenerator) {
+func buildAllowedTags(iocs []netlasIoC) map[string]bool {
+	type tagInfo struct {
+		latestTS   string
+		hasFP      bool
+		isHighRisk bool
+	}
+	perTag := make(map[string]*tagInfo, len(iocSystemTags))
+
+	for i := range iocs {
+		isFP := iocs[i].FP != nil && iocs[i].FP.Alarm != "" && iocs[i].FP.Alarm != "false"
+		isHigh := true
+		if iocs[i].Score != nil {
+			isHigh = iocs[i].Score.Total >= 55.0
+		}
+
+		for _, t := range iocs[i].Tags {
+			if _, tracked := iocSystemTags[t]; !tracked {
+				continue
+			}
+			info, exists := perTag[t]
+			if !exists {
+				perTag[t] = &tagInfo{latestTS: iocs[i].Timestamp, hasFP: isFP, isHighRisk: isHigh}
+				continue
+			}
+			if iocs[i].Timestamp > info.latestTS {
+				info.latestTS = iocs[i].Timestamp
+				info.hasFP = isFP
+				info.isHighRisk = isHigh
+			} else if iocs[i].Timestamp == info.latestTS {
+				if isFP {
+					info.hasFP = true
+				}
+				if isHigh {
+					info.isHighRisk = true
+				}
+			}
+		}
+	}
+
+	allowed := make(map[string]bool, len(perTag))
+	for tag, info := range perTag {
+		if !info.hasFP && info.isHighRisk {
+			allowed[tag] = true
+		}
+	}
+	return allowed
+}
+
+func parseIoCItem(exec *schema.ModuleExecution, ioc *netlasIoC, targetRef *schema.EntityRef, mainASNs []string, allowedTags map[string]bool, gen *modutil.LocalIDGenerator) {
 	infoID := gen.NextID()
 
 	val := ioc.Timestamp
@@ -394,19 +461,34 @@ func parseIoCItem(exec *schema.ModuleExecution, ioc *netlasIoC, targetRef *schem
 	})
 	parentRef := &schema.EntityRef{Type: constants.TypeIoCRecord, Value: val, LocalID: infoID}
 
+	scoreRef := parentRef
+	if ioc.Score != nil {
+		scoreID := gen.NextID()
+		scoreStr := fmt.Sprintf("Score: %.2f (Source Trust: %.2f | Severity Weight: %.2f | Activity Recency: %.2f)",
+			ioc.Score.Total, ioc.Score.Src, ioc.Score.Tags, ioc.Score.Frequency)
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeThreatScore,
+			Category: constants.CategoryProperty,
+			Value:    scoreStr,
+			Source:   parentRef,
+			LocalID:  scoreID,
+		})
+		scoreRef = &schema.EntityRef{Type: constants.TypeThreatScore, Value: scoreStr, LocalID: scoreID}
+	}
+
 	if ioc.URL != "" {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeThreatURL,
 			Category: constants.CategoryProperty,
 			Value:    ioc.URL,
-			Source:   parentRef,
+			Source:   scoreRef,
 			LocalID:  gen.NextID(),
 		})
 	}
 
-	extractIoCMetadata(exec, ioc, parentRef, mainASNs, gen)
-	parseIoCFalsePositive(exec, ioc, parentRef, gen)
-	parseIoCTags(exec, ioc, parentRef, targetRef, gen)
+	extractIoCMetadata(exec, ioc, parentRef, scoreRef, mainASNs, gen)
+	parseIoCFalsePositive(exec, ioc, scoreRef, gen)
+	parseIoCTags(exec, ioc, scoreRef, targetRef, allowedTags, gen)
 }
 
 func parseIoCFalsePositive(exec *schema.ModuleExecution, ioc *netlasIoC, parentRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
@@ -434,19 +516,7 @@ func parseIoCFalsePositive(exec *schema.ModuleExecution, ioc *netlasIoC, parentR
 	}
 }
 
-func extractIoCMetadata(exec *schema.ModuleExecution, ioc *netlasIoC, parentRef *schema.EntityRef, mainASNs []string, gen *modutil.LocalIDGenerator) {
-	if ioc.Score != nil {
-		scoreStr := fmt.Sprintf("Score: %.2f (Source Trust: %.2f | Severity Weight: %.2f | Activity Recency: %.2f)",
-			ioc.Score.Total, ioc.Score.Src, ioc.Score.Tags, ioc.Score.Frequency)
-		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     constants.TypeThreatScore,
-			Category: constants.CategoryProperty,
-			Value:    scoreStr,
-			Source:   parentRef,
-			LocalID:  gen.NextID(),
-		})
-	}
-
+func extractIoCMetadata(exec *schema.ModuleExecution, ioc *netlasIoC, parentRef, scoreRef *schema.EntityRef, mainASNs []string, gen *modutil.LocalIDGenerator) {
 	if ioc.FirstSeen != "" {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeDate,
@@ -503,7 +573,7 @@ func extractIoCMetadata(exec *schema.ModuleExecution, ioc *netlasIoC, parentRef 
 				Type:     constants.TypePort,
 				Category: constants.CategoryProperty,
 				Value:    strconv.Itoa(port),
-				Source:   parentRef,
+				Source:   scoreRef,
 				LocalID:  gen.NextID(),
 			})
 		}
@@ -540,38 +610,21 @@ func parseNetlasDomains(exec *schema.ModuleExecution, count int, domains []strin
 	}
 }
 
-func parseIoCTags(exec *schema.ModuleExecution, ioc *netlasIoC, parentRef, targetRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
-	isFalsePositive := ioc.FP != nil && ioc.FP.Alarm != "" && ioc.FP.Alarm != "false"
-	isHighRisk := true
-	if ioc.Score != nil {
-		isHighRisk = ioc.Score.Total >= 55.0
-	}
-
+func parseIoCTags(exec *schema.ModuleExecution, ioc *netlasIoC, scoreRef, targetRef *schema.EntityRef, allowedTags map[string]bool, gen *modutil.LocalIDGenerator) {
 	for _, t := range ioc.Tags {
 		if t == "" {
 			continue
 		}
 
-		if !isFalsePositive && isHighRisk {
-			switch t {
-			case "malware":
-				addSystemTagToNode(exec, targetRef, constants.TagMalware, gen)
-			case "malicious":
-				addSystemTagToNode(exec, targetRef, constants.TagMalicious, gen)
-			case "compromised":
-				addSystemTagToNode(exec, targetRef, constants.TagCompromised, gen)
-			case "suspicious":
-				addSystemTagToNode(exec, targetRef, constants.TagSuspicious, gen)
-			case "phishing":
-				addSystemTagToNode(exec, targetRef, constants.TagPhishing, gen)
-			}
+		if sysTag, ok := iocSystemTags[t]; ok && allowedTags[t] {
+			addSystemTagToNode(exec, targetRef, sysTag, gen)
 		}
 
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeThreatType,
 			Category: constants.CategoryProperty,
 			Value:    t,
-			Source:   parentRef,
+			Source:   scoreRef,
 			LocalID:  gen.NextID(),
 		})
 	}
@@ -585,7 +638,7 @@ func parseIoCTags(exec *schema.ModuleExecution, ioc *netlasIoC, parentRef, targe
 			Type:     constants.TypeRelatedThreat,
 			Category: constants.CategoryProperty,
 			Value:    t,
-			Source:   parentRef,
+			Source:   scoreRef,
 			LocalID:  gen.NextID(),
 		})
 	}
@@ -664,4 +717,16 @@ func addSystemTagToNode(exec *schema.ModuleExecution, targetRef *schema.EntityRe
 		Tags:     []string{tag},
 		LocalID:  gen.NextID(),
 	})
+}
+
+func validateCIDR(cidr string) bool {
+	parts := strings.Split(cidr, "/")
+	if len(parts) != 2 {
+		return false
+	}
+	if _, err := validator.Validate(constants.TypeIP, parts[0]); err != nil {
+		return false
+	}
+	mask, err := strconv.Atoi(parts[1])
+	return err == nil && mask >= 0 && mask <= 128
 }

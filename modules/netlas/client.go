@@ -17,14 +17,15 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-var netlasAPIBaseURL = "https://app.netlas.io/api/host"
+var netlasAPIBaseURL = "https://app.netlas.io/api"
+var netlasRateLimitDelay = 1100 * time.Millisecond
 
 func (m *netlasModule) waitRateLimit() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	elapsed := time.Since(m.lastReqTime)
-	if elapsed < 1100*time.Millisecond {
-		time.Sleep(1100*time.Millisecond - elapsed)
+	if elapsed < netlasRateLimitDelay {
+		time.Sleep(netlasRateLimitDelay - elapsed)
 	}
 	m.lastReqTime = time.Now()
 }
@@ -32,12 +33,24 @@ func (m *netlasModule) waitRateLimit() {
 func (m *netlasModule) doAPIRequest(exec *schema.ModuleExecution, u, targetValue string, gen *modutil.LocalIDGenerator) (rawBody []byte, ok bool) {
 	if m.keyInvalid.Load() {
 		dbg.Printf("%s error target=%q state=key_invalid", exec.Function, targetValue)
-		appendInfoError(exec, "Netlas API Key is invalid or forbidden", gen)
+		m.mu.Lock()
+		msg := m.invalidMsg
+		m.mu.Unlock()
+		if msg == "" {
+			msg = "Netlas API Key is invalid or forbidden"
+		}
+		appendInfoError(exec, msg, gen)
 		return nil, false
 	}
 	if m.quotaBlocked.Load() {
 		dbg.Printf("%s error target=%q state=quota_blocked", exec.Function, targetValue)
-		appendInfoError(exec, "Netlas Quota Exhausted (Not Enough Coins)", gen)
+		m.mu.Lock()
+		msg := m.invalidMsg
+		m.mu.Unlock()
+		if msg == "" {
+			msg = "Netlas Quota Exhausted (Not Enough Coins)"
+		}
+		appendInfoError(exec, msg, gen)
 		return nil, false
 	}
 
@@ -63,6 +76,9 @@ func (m *netlasModule) doAPIRequest(exec *schema.ModuleExecution, u, targetValue
 		appendInfoError(exec, msg, gen)
 		return nil, false
 	}
+
+	msg := parseNetlasError(lastBody, fmt.Sprintf("Netlas API Error: Max retries exhausted (HTTP %d)", lastStatus))
+	appendInfoError(exec, msg, gen)
 
 	modutil.SetError(exec, "max retries exhausted", fmt.Errorf("status: %d", lastStatus))
 	return nil, false
@@ -122,6 +138,15 @@ func (m *netlasModule) executeHTTPRequest(exec *schema.ModuleExecution, u string
 	}
 
 	if resp.StatusCode == 429 {
+		var e netlasError
+		if err := json.Unmarshal(rawBody, &e); err == nil && e.Type == "daily_request_limit_exceeded" {
+			m.quotaBlocked.Store(true)
+			dbg.Printf("%s quota_error attempt=%d target=%q status=429 type=daily_request_limit", exec.Function, attempt+1, targetValue)
+			msg := parseNetlasError(rawBody, "Netlas Daily Request Limit Exceeded (HTTP 429)")
+			appendInfoError(exec, msg, gen)
+			return nil, resp.StatusCode, false, true
+		}
+
 		sleepOnRateLimitNetlas(ctx, resp, attempt)
 		dbg.Printf("%s rate_limited attempt=%d/%d target=%q", exec.Function, attempt+1, resolver.MaxRetriesNetlas, targetValue)
 		return rawBody, resp.StatusCode, true, true
@@ -150,7 +175,11 @@ func sleepOnRateLimitNetlas(ctx context.Context, resp *http.Response, attempt in
 	retryAfter := resp.Header.Get("Retry-After")
 	if retryAfter != "" {
 		if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds > 0 {
-			httputil.SleepContext(ctx, time.Duration(seconds)*time.Second)
+			if netlasRateLimitDelay == 0 {
+				httputil.SleepContext(ctx, 0)
+			} else {
+				httputil.SleepContext(ctx, time.Duration(seconds)*time.Second)
+			}
 			return
 		}
 	}
@@ -164,6 +193,127 @@ func appendInfoError(exec *schema.ModuleExecution, message string, gen *modutil.
 		Category: constants.CategoryProperty,
 		Value:    message,
 		LocalID:  gen.NextID(),
+	})
+}
+
+func (m *netlasModule) setInvalidKeyMsg(msg string) {
+	m.mu.Lock()
+	m.invalidMsg = msg
+	m.mu.Unlock()
+	m.keyInvalid.Store(true)
+}
+
+func (m *netlasModule) executePreflightRequest() (body []byte, statusCode int, success bool) {
+	u := netlasAPIBaseURL + "/users/current/"
+	for attempt := range resolver.MaxRetriesNetlas {
+		m.waitRateLimit()
+
+		ctx, cancel := context.WithTimeout(context.Background(), resolver.HTTPTimeout)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
+		if err != nil {
+			cancel()
+			dbg.Printf("preflight error stage=create_request err=%v", err)
+			m.setInvalidKeyMsg("Netlas API Error: Failed to create request")
+			return nil, 0, false
+		}
+
+		req.Header.Set("Authorization", "Bearer "+m.apiKey)
+		req.Header.Set("content-type", "application/json")
+		req.Header.Set("User-Agent", resolver.GetRandomUserAgent())
+
+		client := &http.Client{Timeout: resolver.HTTPTimeout}
+		resp, err := client.Do(req)
+		if err != nil {
+			cancel()
+			dbg.Printf("preflight error stage=do_request err=%v", err)
+			m.setInvalidKeyMsg("Netlas API Error: Failed to execute request")
+			return nil, 0, false
+		}
+
+		var readErr error
+		body, readErr = io.ReadAll(resp.Body)
+		statusCode = resp.StatusCode
+		if cerr := resp.Body.Close(); cerr != nil {
+			dbg.Printf("preflight body_close_failed err=%v", cerr)
+		}
+		if readErr != nil {
+			cancel()
+			dbg.Printf("preflight error stage=read_body err=%v", readErr)
+			m.setInvalidKeyMsg("Netlas API Error: Failed to read response")
+			return nil, 0, false
+		}
+
+		if statusCode >= 500 && statusCode <= 599 {
+			dbg.Printf("preflight server_error attempt=%d/%d status=%d", attempt+1, resolver.MaxRetriesNetlas, statusCode)
+			httputil.SleepContext(ctx, httputil.RetryDelay(httputil.RateLimit, attempt, resolver.NetlasRetryBaseDelay))
+			cancel()
+			continue
+		}
+
+		if statusCode == 429 {
+			dbg.Printf("preflight rate_limited attempt=%d/%d status=%d", attempt+1, resolver.MaxRetriesNetlas, statusCode)
+			sleepOnRateLimitNetlas(ctx, resp, attempt)
+			cancel()
+			continue
+		}
+
+		cancel()
+		success = true
+		break
+	}
+	return body, statusCode, success
+}
+
+func (m *netlasModule) handlePreflightAPI() {
+	if m.apiKey == demoIndicator || m.apiKey == "" {
+		return
+	}
+
+	m.preflightSync.Do(func() {
+		body, statusCode, success := m.executePreflightRequest()
+		if !success {
+			if !m.keyInvalid.Load() {
+				dbg.Printf("preflight exhausted retries")
+				m.setInvalidKeyMsg(parseNetlasError(body, fmt.Sprintf("Netlas API Error: Max retries exhausted (HTTP %d)", statusCode)))
+			}
+			return
+		}
+
+		switch statusCode {
+		case http.StatusOK:
+		case http.StatusPaymentRequired:
+			dbg.Printf("preflight error stage=quota status=%d", statusCode)
+			m.mu.Lock()
+			m.quotaBlocked.Store(true)
+			m.invalidMsg = parseNetlasError(body, "Netlas Quota Exhausted (HTTP 402)")
+			m.mu.Unlock()
+			return
+		case http.StatusUnauthorized, http.StatusForbidden, http.StatusBadRequest:
+			dbg.Printf("preflight error stage=auth_or_bad status=%d", statusCode)
+			m.setInvalidKeyMsg(parseNetlasError(body, fmt.Sprintf("Netlas API Error (HTTP %d)", statusCode)))
+			return
+		default:
+			dbg.Printf("preflight error stage=status status=%d", statusCode)
+			m.setInvalidKeyMsg(parseNetlasError(body, fmt.Sprintf("Netlas API Error (HTTP %d)", statusCode)))
+			return
+		}
+
+		var info struct {
+			Plan struct {
+				Coins               int `json:"coins"`
+				LimitPerOneDownload int `json:"limit_per_one_download"`
+			} `json:"plan"`
+		}
+		if err := json.Unmarshal(body, &info); err == nil {
+			m.mu.Lock()
+			m.coins = info.Plan.Coins
+			m.limitPerDl = info.Plan.LimitPerOneDownload
+			m.mu.Unlock()
+			dbg.Printf("preflight success plan_coins=%d limit=%d", info.Plan.Coins, info.Plan.LimitPerOneDownload)
+		} else {
+			dbg.Printf("preflight error stage=parse err=%v", err)
+			m.setInvalidKeyMsg("Netlas API Error: Failed to parse user profile")
+		}
 	})
 }
 

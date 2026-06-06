@@ -38,3 +38,27 @@ func TestParseNetlasDomains(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateCIDR(t *testing.T) {
+	tests := []struct {
+		name     string
+		cidr     string
+		expected bool
+	}{
+		{"ValidIPv4", "192.168.1.0/24", true},
+		{"ValidIPv6", "2001:db8::/32", true},
+		{"NoSlash", "192.168.1.1", false},
+		{"InvalidIP", "invalid/24", false},
+		{"InvalidMaskFormat", "192.168.1.0/abc", false},
+		{"NegativeMask", "192.168.1.0/-1", false},
+		{"MaskTooLarge", "192.168.1.0/129", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := validateCIDR(tt.cidr); got != tt.expected {
+				t.Errorf("validateCIDR(%q) = %v, want %v", tt.cidr, got, tt.expected)
+			}
+		})
+	}
+}

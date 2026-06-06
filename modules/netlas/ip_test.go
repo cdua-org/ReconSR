@@ -5,6 +5,7 @@ import (
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -161,7 +162,7 @@ func assertIPIoCFalsePositives(t *testing.T, results []schema.ModuleResult) {
 		t.Errorf("expected IP NOT to be tagged with Malicious due to false positive")
 	}
 	if !hasPhishingTag {
-		t.Errorf("expected Target to have system phishing tag")
+		t.Errorf("expected Target to have phishing tag (per-tag latest has no FP)")
 	}
 }
 
@@ -510,7 +511,14 @@ func TestParseWhoisNetCIDRErrors(t *testing.T) {
 	orgRef := &schema.EntityRef{Type: constants.TypeOrganization, Value: "Test Org"}
 
 	net := &netlasWhoisIPNet{
-		CIDR: []string{""},
+		CIDR: []string{
+			"",
+			"INVALID",
+			"192.168.1.1",
+			"1.2.3.4/abc",
+			"1.2.3.4/-1",
+			"1.2.3.4/130",
+		},
 	}
 
 	parseWhoisNet(exec, net, "", orgRef, false, nil, gen)
@@ -519,5 +527,105 @@ func TestParseWhoisNetCIDRErrors(t *testing.T) {
 		if res.Type == constants.TypeCIDR {
 			t.Errorf("expected no CIDR results, got %v", res.Value)
 		}
+	}
+}
+
+func TestParseIoC_Synthetic(t *testing.T) {
+	tests := []struct {
+		name          string
+		iocJSON       string
+		expectTags    []string
+		notExpectTags []string
+	}{
+		{
+			name: "PerTag_FP_Only_Cancels_Own_Tag",
+			iocJSON: `[
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":63.0}, "fp":{"alarm":"true"}, "tags":["malware"]},
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":63.0}, "fp":{"alarm":"false"}, "tags":["c2"]},
+                {"@timestamp":"2024-12-12T00:00Z", "score":{"total":56.0}, "fp":{"alarm":"false"}, "tags":["phishing"]}
+            ]`,
+			expectTags:    []string{constants.TagC2, constants.TagPhishing},
+			notExpectTags: []string{constants.TagMalware},
+		},
+		{
+			name: "PerTag_Multiple_Same_Day_No_FP",
+			iocJSON: `[
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":63.0}, "fp":{"alarm":"false"}, "url":"http://a", "tags":["malware", "suspicious"]},
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":70.0}, "fp":{"alarm":"false"}, "url":"http://b", "tags":["ransomware"]},
+                {"@timestamp":"2023-11-18T00:00Z", "score":{"total":60.0}, "fp":{"alarm":"false"}, "tags":["phishing"]}
+            ]`,
+			expectTags:    []string{constants.TagMalware, constants.TagSuspicious, constants.TagRansomware, constants.TagPhishing},
+			notExpectTags: []string{},
+		},
+		{
+			name: "PerTag_Low_Score_Blocks_Tag",
+			iocJSON: `[
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":10.0}, "fp":{"alarm":"false"}, "tags":["miner"]},
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":80.0}, "fp":{"alarm":"false"}, "tags":["botnet"]}
+            ]`,
+			expectTags:    []string{constants.TagBotnet},
+			notExpectTags: []string{constants.TagMiner},
+		},
+		{
+			name: "PerTag_Newer_FP_Overrides_Older_Confirmed",
+			iocJSON: `[
+                {"@timestamp":"2024-01-01T00:00Z", "score":{"total":80.0}, "fp":{"alarm":"false"}, "tags":["malware"]},
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":60.0}, "fp":{"alarm":"true"}, "tags":["malware"]},
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":60.0}, "fp":{"alarm":"false"}, "tags":["c2"]}
+            ]`,
+			expectTags:    []string{constants.TagC2},
+			notExpectTags: []string{constants.TagMalware},
+		},
+		{
+			name: "PerTag_Same_Day_Multiple_Records_Same_Tag",
+			iocJSON: `[
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":10.0}, "fp":{"alarm":"false"}, "tags":["c2"]},
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":80.0}, "fp":{"alarm":"false"}, "tags":["c2"]},
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":60.0}, "fp":{"alarm":"false"}, "tags":["malware"]},
+                {"@timestamp":"2026-05-16T00:00Z", "score":{"total":60.0}, "fp":{"alarm":"true"}, "tags":["malware"]}
+            ]`,
+			expectTags:    []string{constants.TagC2},
+			notExpectTags: []string{constants.TagMalware},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			respJSON := fmt.Sprintf(`{"ip":"198.51.100.42","ioc":%s}`, tt.iocJSON)
+			server := setupMockServer(t, []byte(respJSON))
+			defer server.Close()
+			originalURL := netlasAPIBaseURL
+			netlasAPIBaseURL = server.URL
+			defer func() { netlasAPIBaseURL = originalURL }()
+
+			m := &netlasModule{apiKey: testAPIKey}
+			input := schema.ModuleInput{
+				Target:    schema.Entity{Type: constants.TypeIPv4, Value: testIP198},
+				Functions: []string{constants.FuncGetNetlasIP},
+			}
+
+			out, err := m.Exec(input)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			var targetTags []string
+			for _, res := range out.Executions[0].Results {
+				if res.Type == constants.TypeIPv4 && res.Value == testIP198 {
+					targetTags = append(targetTags, res.Tags...)
+				}
+			}
+
+			for _, expectedTag := range tt.expectTags {
+				if !slices.Contains(targetTags, expectedTag) {
+					t.Errorf("expected Target to have tag %s", expectedTag)
+				}
+			}
+			for _, notExpectedTag := range tt.notExpectTags {
+				if slices.Contains(targetTags, notExpectedTag) {
+					t.Errorf("expected Target NOT to have tag %s", notExpectedTag)
+				}
+			}
+		})
 	}
 }

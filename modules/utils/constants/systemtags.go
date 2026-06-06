@@ -32,4 +32,12 @@ const (
 	TagExploit     = "exploit"
 	TagMalware     = "malware"
 	TagPhishing    = "phishing"
+	TagC2          = "c2"
+	TagBotnet      = "botnet"
+	TagRansomware  = "ransomware"
+	TagMiner       = "miner"
+	TagExploitKit  = "exploit_kit"
+	TagDGA         = "dga"
+	TagSpam        = "spam"
+	TagSinkhole    = "sinkhole"
 )

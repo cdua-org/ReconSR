@@ -375,3 +375,19 @@ func TestDomainEdgeCases(t *testing.T) {
 	}
 	parseDomainWhois(exec, w, targetRef, val, gen)
 }
+
+func TestParseDomainDNSSPF_InvalidCIDR(t *testing.T) {
+	exec := &schema.ModuleExecution{}
+	gen := modutil.NewLocalIDGenerator()
+	targetRef := &schema.EntityRef{Type: constants.TypeDomain, Value: "test.example.com"}
+
+	txt := "v=spf1 ip4:1.2.3.4/abc ip4:1.2.3.4/-1 ip4:1.2.3.4/130 ip4:invalid/24 -all"
+
+	parseDomainDNSSPF(exec, txt, targetRef, "test.example.com", gen)
+
+	for _, res := range exec.Results {
+		if res.Type == constants.TypeCIDR {
+			t.Errorf("expected no CIDR results for invalid CIDR, got %v", res.Value)
+		}
+	}
+}

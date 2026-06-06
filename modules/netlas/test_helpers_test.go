@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/schema"
@@ -20,11 +21,20 @@ const (
 
 func setupMockServer(t *testing.T, responseBody []byte) *httptest.Server {
 	t.Helper()
+	usersData := []byte(`{"plan": {"coins": 100000000, "limit_per_one_download": 10000000}}`)
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer test-api-key" {
 			t.Errorf("Expected Authorization header 'Bearer test-api-key', got '%s'", r.Header.Get("Authorization"))
 		}
 		w.WriteHeader(http.StatusOK)
+
+		if strings.Contains(r.URL.Path, "/users/current") {
+			if _, err := w.Write(usersData); err != nil {
+				t.Errorf("write err: %v", err)
+			}
+			return
+		}
+
 		if _, err := w.Write(responseBody); err != nil {
 			t.Errorf("write err: %v", err)
 		}
@@ -59,6 +69,9 @@ func readNetlasFixture(t *testing.T, filename string) []byte {
 		data, err = os.ReadFile("testdata/ip_responses_minimal.json")
 	case "ip_responses_empty_whois.json":
 		data, err = os.ReadFile("testdata/ip_responses_empty_whois.json")
+	case "ip_responses_invalid_cidr.json":
+		data, err = os.ReadFile("testdata/ip_responses_invalid_cidr.json")
+
 	default:
 		t.Fatalf("unsupported fixture %s", filename)
 	}
