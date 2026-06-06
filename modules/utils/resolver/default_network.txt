@@ -218,7 +218,7 @@ NetlasRetryBaseDelay=2
 NetlasScanSubdomains=false
 
 # Maximum number of results to download per request using the domains/download endpoint.
-# If empty or 0, the download function is disabled. If set, we download the minimum of
+# If empty or 0, the download functions are disabled. If set, we download the minimum of
 # this configured limit, the available count, and your plan's Limit per one download.
 # Note: Each download API call decreases the Request Limit by 1, and consumes 1 Search Coin
 # for each document retrieved from the Netlas database.
