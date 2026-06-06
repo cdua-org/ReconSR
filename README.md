@@ -282,6 +282,16 @@ API-backed exposure and data leak intelligence for domains and IPv4/IPv6 targets
 - `get_leakix_subdomains`: Queries LeakIX passive subdomain enumeration for domains. Extracts validated subdomains with last-seen dates, distinct IP counts, out-of-scope classification, and passive DNS tags.
 </details>
 
+### 21. Netlas Intelligence (`modules/netlas`)
+<details><summary>View details (4 functions)</summary>
+
+API-backed intelligence module for domains and IPv4 targets using the Netlas Host and Download APIs. Without a Netlas API key, no functions are advertised to the dispatcher; with a configured key, the module exposes its functions and supports explicit demo mode. *Note: The module can extract a wide range of data, from basic information to premium intelligence (such as Anonymity Labels, CVEs, exploit links, Threat Intelligence Data, etc.), depending on your Netlas pricing plan (from Free Tier up to Corporate).*
+- `get_netlas_domain`: Enriches a domain (and optionally subdomains, depending on configuration). Returns aggregated data from across Netlas collections in a single response. Extracts IP addresses, ports, software, DNS records, WHOIS data, associated tags, CVEs, exploit links, etc.
+- `get_netlas_ip`: Enriches an IPv4 address. Returns aggregated data from across Netlas collections in a single response. Extracts ports, software, WHOIS data, ASN information, geolocation, Anonymity Labels, reverse IP domains, CVEs, exploit links, Threat Intelligence Data, etc.
+- `get_netlas_domains_by_ip`: Performs bulk retrieval of domains hosted on a specific IPv4 address (Reverse IP) using the Netlas download API. Along with the domains, it extracts their resolved IPs and associated DNS records ("a", "aaaa", "ns", "mx", "txt", "cname"). Requires `NetlasLimitPerOneDownload` to be configured > 0.
+- `get_netlas_domains_by_domain`: Performs bulk retrieval of related domains (Passive DNS) for a given domain using the Netlas download API. Along with the domains, it extracts their resolved IPs and associated DNS records ("a", "aaaa", "ns", "mx", "txt", "cname"). Requires `NetlasLimitPerOneDownload` to be configured > 0.
+</details>
+
 ---
 
 ## Security by Design
@@ -331,6 +341,7 @@ While the current alpha release is focused on automating point-in-time investiga
 - ✅ Mail security: OPENPGPKEY and SMIMEA discovery with optional administrative alias enumeration and DNS preflight health checks.
 - ✅ IPv4 ambiguity resolution (Decimal vs. POSIX octal decoding).
 - ✅ Passive exposure enrichment via Shodan InternetDB and API-backed Shodan Host/DNS intelligence with demo mode.
+- ✅ Netlas intelligence module for domains and IPv4 targets, supporting reverse IP and passive DNS queries with demo mode.
 - ✅ Passive subdomain discovery via Anubis DB.
 - ✅ IP intelligence: PTR, DNSBL (Tor/Spam), RIPE WHOIS metadata (netname, description), and abuse contacts.
 - ✅ IPinfo API enrichment for IPv4/IPv6 targets, extracting Geo, ASN, Privacy, Mobile, Hosting properties, etc., with Lite/Paid endpoint toggle and demo mode.
