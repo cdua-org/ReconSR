@@ -200,7 +200,7 @@ func parseSoftwareCVEs(exec *schema.ModuleExecution, sw *netlasSoftware, service
 
 		if cve.Description != "" {
 			exec.Results = append(exec.Results, schema.ModuleResult{
-				Type:     constants.TypeDescription,
+				Type:     constants.TypeSummary,
 				Category: constants.CategoryProperty,
 				Value:    strings.Join(strings.Fields(cve.Description), " "),
 				Source:   cveRef,
@@ -387,7 +387,7 @@ func parseIoCItem(exec *schema.ModuleExecution, ioc *netlasIoC, targetRef *schem
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeIoCRecord,
-		Category: constants.CategoryNode,
+		Category: constants.CategoryProperty,
 		Value:    val,
 		Source:   targetRef,
 		LocalID:  infoID,
