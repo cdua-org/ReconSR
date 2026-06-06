@@ -1,0 +1,105 @@
+[
+  {
+    "data": {
+      "a": [
+        "192.168.10.20",
+        "10.10.0.5"
+      ],
+      "@timestamp": "2026-05-09T03:55:51.157Z",
+      "ns": [
+        "coco.ns.example.org",
+        "lamar.ns.example.org"
+      ],
+      "zone": "edu",
+      "level": 3,
+      "domain": "rtsla.example.edu",
+      "mx": [
+        "aspmx.l.example.info",
+        "alt1.aspmx.l.example.info",
+        "alt2.aspmx.l.example.info",
+        "aspmx2.mail.example.com",
+        "aspmx3.mail.example.com",
+        "aspmx4.mail.example.com",
+        "aspmx5.mail.example.com"
+      ]
+    }
+  },
+  {
+    "data": {
+      "a": [
+        "192.168.10.20",
+        "10.10.0.7"
+      ],
+      "aaaa": [
+        "2001:db8::5",
+        "2001:db8::7"
+      ],
+      "cname": [
+        "cname1.example.net",
+        "cname5.example.edu"
+      ],
+      "@timestamp": "2026-05-19T03:55:51.157Z",
+      "txt": [
+        "v=spf1 include:_spf.example.org ip4:198.51.100.0/24 ~all"
+      ],
+      "ns": [
+        "ns1.example.net",
+        "ns2.example.net"
+      ],
+      "zone": "edu",
+      "level": 3,
+      "domain": "my.example.edu",
+      "mx": [
+        "aspmx.l.example.info",
+        "alt1.aspmx.l.example.info",
+        "alt2.aspmx.l.example.info"
+      ]
+    }
+  },
+  {
+    "data": {
+      "domain": "uk.test10.example.edu",
+      "a": [
+        "198.51.100.43",
+        "192.0.2.205"
+      ],
+      "aaaa": [
+        "2001:db8::20",
+        "2001:db8::21"
+      ],
+      "ns": [
+        "ns-7.example.co.uk",
+        "ns-8.example.co.uk"
+      ],
+      "mx": [
+        "mx.route1.example.co.uk",
+        "mx.route2.example.co.uk"
+      ],
+      "txt": [
+        "v=spf1 a mx ip6:2001:db8::/33 ip4:999.999.999.995 exists:exists2.example.co.uk -all",
+        "v=DMARC1; p=reject; rua=mailto:invalid@email3@domain.example.com",
+        "google-site-verification=other-fake-hash"
+      ],
+      "cname": [
+        "cname.target1.example.co.uk",
+        "cname.target2.example.co.uk"
+      ],
+      "@timestamp": "2026-05-09T14:14:00.000Z",
+      "level": 4,
+      "zone": "edu"
+    }
+  },
+  {
+    "data": {
+      "a": ["192.168.10.21"],
+      "domain": "api.example.edu",
+      "txt": ["v=spf1 -all"]
+    }
+  },
+  {
+    "data": {
+      "cname": ["app.example.edu"],
+      "domain": "dev.example.edu"
+    }
+  }
+]

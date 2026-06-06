@@ -217,6 +217,21 @@ NetlasRetryBaseDelay=2
 # Enable routing of subdomains to the Netlas domain endpoint in addition to root domains (default: false)
 NetlasScanSubdomains=false
 
+# Maximum number of results to download per request using the domains/download endpoint.
+# If empty or 0, the download function is disabled. If set, we download the minimum of
+# this configured limit, the available count, and your plan's Limit per one download.
+# Note: Each download API call decreases the Request Limit by 1, and consumes 1 Search Coin
+# for each document retrieved from the Netlas database.
+# WARNING: Setting a very high limit will result in a prolonged wait for the API to stream 
+# the NDJSON response. If the global function timeout (timeout in config.toml) is exceeded 
+# before the download completes, the process will be canceled and data may be lost.
+NetlasLimitPerOneDownload=
+
+# Timeout specifically for Netlas data downloads (e.g., NDJSON streaming from the 
+# domains/download endpoint), in seconds. Set this high enough to allow large datasets 
+# to download without interruption, but be aware of the global function timeout. (default: 300)
+NetlasDownloadTimeout=300
+
 
 [DoH]
 https://dns.cloudflare.com/dns-query

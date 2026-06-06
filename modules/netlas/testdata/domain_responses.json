@@ -445,7 +445,8 @@
     ],
     "mx": [
       "mx1.example.com",
-      "mx2.example.com"
+      "mx2.example.com",
+      "10 mx3.example.com"
     ],
     "cname": [
       "cname1.example.net",

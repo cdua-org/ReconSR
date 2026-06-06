@@ -35,47 +35,43 @@ func setupMockServer(t *testing.T, responseBody []byte) *httptest.Server {
 			return
 		}
 
+		if strings.Contains(r.URL.Path, "/domains_count") {
+			if _, err := w.Write([]byte(`{"count": 5}`)); err != nil {
+				t.Errorf("write err: %v", err)
+			}
+			return
+		}
+
 		if _, err := w.Write(responseBody); err != nil {
 			t.Errorf("write err: %v", err)
 		}
 	}))
 }
 
+var fixtureMap = map[string]string{
+	"domain_responses.json":               "testdata/domain_responses.json",
+	"domain_responses_dead.json":          "testdata/domain_responses_dead.json",
+	"domain_responses_empty_source.json":  "testdata/domain_responses_empty_source.json",
+	"domain_responses_minimal.json":       "testdata/domain_responses_minimal.json",
+	"domain_responses_no_whois.json":      "testdata/domain_responses_no_whois.json",
+	"domain_responses_subdomain.json":     "testdata/domain_responses_subdomain.json",
+	"domain_responses_not_published.json": "testdata/domain_responses_not_published.json",
+	"ip_responses.json":                   "testdata/ip_responses.json",
+	"ip_responses_empty_source.json":      "testdata/ip_responses_empty_source.json",
+	"ip_responses_minimal.json":           "testdata/ip_responses_minimal.json",
+	"ip_responses_empty_whois.json":       "testdata/ip_responses_empty_whois.json",
+	"ip_responses_invalid_cidr.json":      "testdata/ip_responses_invalid_cidr.json",
+	"ip_download.json":                    "testdata/ip_download.json",
+	"domain_download.json":                "testdata/domain_download.json",
+}
+
 func readNetlasFixture(t *testing.T, filename string) []byte {
 	t.Helper()
-	var data []byte
-	var err error
-
-	switch filename {
-	case "domain_responses.json":
-		data, err = os.ReadFile("testdata/domain_responses.json")
-	case "domain_responses_dead.json":
-		data, err = os.ReadFile("testdata/domain_responses_dead.json")
-	case "domain_responses_empty_source.json":
-		data, err = os.ReadFile("testdata/domain_responses_empty_source.json")
-	case "domain_responses_minimal.json":
-		data, err = os.ReadFile("testdata/domain_responses_minimal.json")
-	case "domain_responses_no_whois.json":
-		data, err = os.ReadFile("testdata/domain_responses_no_whois.json")
-	case "domain_responses_subdomain.json":
-		data, err = os.ReadFile("testdata/domain_responses_subdomain.json")
-	case "domain_responses_not_published.json":
-		data, err = os.ReadFile("testdata/domain_responses_not_published.json")
-	case "ip_responses.json":
-		data, err = os.ReadFile("testdata/ip_responses.json")
-	case "ip_responses_empty_source.json":
-		data, err = os.ReadFile("testdata/ip_responses_empty_source.json")
-	case "ip_responses_minimal.json":
-		data, err = os.ReadFile("testdata/ip_responses_minimal.json")
-	case "ip_responses_empty_whois.json":
-		data, err = os.ReadFile("testdata/ip_responses_empty_whois.json")
-	case "ip_responses_invalid_cidr.json":
-		data, err = os.ReadFile("testdata/ip_responses_invalid_cidr.json")
-
-	default:
+	path, ok := fixtureMap[filename]
+	if !ok {
 		t.Fatalf("unsupported fixture %s", filename)
 	}
-
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("failed to read testdata %s: %v", filename, err)
 	}

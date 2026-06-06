@@ -102,42 +102,60 @@ func TestClientErrors(t *testing.T) {
 			runClientErrorTest(t, tt)
 		})
 	}
+}
 
-	t.Run("CreateRequestError", func(t *testing.T) {
-		m, ok := New().(*netlasModule)
-		if !ok {
-			t.Fatal("expected *netlasModule")
-		}
-		m.apiKey = "fake-key-create"
-		exec := &schema.ModuleExecution{Function: "CreateReqTest"}
-		gen := modutil.NewLocalIDGenerator()
+func TestClientCreateRequestError(t *testing.T) {
+	m, ok := New().(*netlasModule)
+	if !ok {
+		t.Fatal("expected *netlasModule")
+	}
+	m.apiKey = "fake-key-create"
+	exec := &schema.ModuleExecution{Function: "CreateReqTest"}
+	gen := modutil.NewLocalIDGenerator()
 
-		raw, ok := m.doAPIRequest(exec, "://invalid-url", "example.net", gen)
-		if ok || raw != nil {
-			t.Errorf("expected false and nil for invalid url")
-		}
-		if exec.Error == nil || !strings.Contains(*exec.Error, "create request") {
-			t.Errorf("expected create request error, got %v", exec.Error)
-		}
-	})
+	raw, ok := m.doAPIRequest(exec, "://invalid-url", "example.net", gen)
+	if ok || raw != nil {
+		t.Errorf("expected false and nil for invalid url")
+	}
+	if exec.Error == nil || !strings.Contains(*exec.Error, "create request") {
+		t.Errorf("expected create request error, got %v", exec.Error)
+	}
+}
 
-	t.Run("DoRequestError", func(t *testing.T) {
-		m, ok := New().(*netlasModule)
-		if !ok {
-			t.Fatal("expected *netlasModule")
-		}
-		m.apiKey = "fake-key-do"
-		exec := &schema.ModuleExecution{Function: "DoReqTest"}
-		gen := modutil.NewLocalIDGenerator()
+func TestClientCreatePostRequestError(t *testing.T) {
+	m, ok := New().(*netlasModule)
+	if !ok {
+		t.Fatal("expected *netlasModule")
+	}
+	m.apiKey = "fake-key-create"
+	exec := &schema.ModuleExecution{Function: "CreatePostReqTest"}
+	gen := modutil.NewLocalIDGenerator()
 
-		raw, ok := m.doAPIRequest(exec, "http://127.0.0.1:0", "example.org", gen)
-		if ok || raw != nil {
-			t.Errorf("expected false and nil for unreachable host")
-		}
-		if exec.Error == nil || !strings.Contains(*exec.Error, "do request") {
-			t.Errorf("expected do request error, got %v", exec.Error)
-		}
-	})
+	raw, ok := m.doAPIRequestPOST(exec, "://invalid-url", []byte(`{}`), "example.net", gen)
+	if ok || raw != nil {
+		t.Errorf("expected false and nil for invalid url")
+	}
+	if exec.Error == nil || !strings.Contains(*exec.Error, "create request") {
+		t.Errorf("expected create request error, got %v", exec.Error)
+	}
+}
+
+func TestClientDoRequestError(t *testing.T) {
+	m, ok := New().(*netlasModule)
+	if !ok {
+		t.Fatal("expected *netlasModule")
+	}
+	m.apiKey = "fake-key-do"
+	exec := &schema.ModuleExecution{Function: "DoReqTest"}
+	gen := modutil.NewLocalIDGenerator()
+
+	raw, ok := m.doAPIRequest(exec, "http://127.0.0.1:0", "example.org", gen)
+	if ok || raw != nil {
+		t.Errorf("expected false and nil for unreachable host")
+	}
+	if exec.Error == nil || !strings.Contains(*exec.Error, "do request") {
+		t.Errorf("expected do request error, got %v", exec.Error)
+	}
 }
 
 func assertClientErrorState(t *testing.T, exec *schema.ModuleExecution, expectError bool, expectErrMatch string) {
@@ -198,12 +216,27 @@ func runClientErrorTest(t *testing.T, tt clientErrorTestCase) {
 
 	raw, _ := m.doAPIRequest(exec, server.URL+"/test", "client.example.com", gen)
 
-	if raw != nil {
-		t.Fatalf("expected raw body to be nil")
-	}
-
 	assertClientErrorState(t, exec, tt.expectError, tt.expectErrMatch)
 	assertClientResultState(t, exec, tt.expectResult, tt.expectedResult)
+	if raw != nil {
+		t.Errorf("expected raw body to be nil")
+	}
+
+	mPost, ok := New().(*netlasModule)
+	if !ok {
+		t.Fatal("expected *netlasModule")
+	}
+	mPost.apiKey = "fake-key-errors-post"
+	mPost.lastReqTime = time.Time{}
+
+	execPost := &schema.ModuleExecution{Function: "ErrorHandling"}
+	rawPost, _ := mPost.doAPIRequestPOST(execPost, server.URL+"/test", []byte(`{}`), "client.example.com", gen)
+
+	assertClientErrorState(t, execPost, tt.expectError, tt.expectErrMatch)
+	assertClientResultState(t, execPost, tt.expectResult, tt.expectedResult)
+	if rawPost != nil {
+		t.Errorf("expected raw body to be nil")
+	}
 }
 
 func TestClientState(t *testing.T) {
@@ -426,4 +459,58 @@ func TestRateLimitDelays(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	sleepOnRateLimitNetlas(ctx, resp, 1)
+}
+
+func TestDoAPIRequestPOST(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		writeMock(t, w, []byte(`OK`))
+	}))
+	defer ts.Close()
+	netlasAPIBaseURL = ts.URL
+
+	m := newTestModule(t, testAPIKey)
+	gen := modutil.NewLocalIDGenerator()
+	exec := &schema.ModuleExecution{Function: constants.FuncGetNetlasDomainsByIP}
+
+	m.keyInvalid.Store(true)
+	_, ok := m.doAPIRequestPOST(exec, "/test", nil, "203.0.113.1", gen)
+	if ok {
+		t.Fatal("expected false on keyInvalid")
+	}
+
+	m.keyInvalid.Store(false)
+	m.quotaBlocked.Store(true)
+	_, ok = m.doAPIRequestPOST(exec, "/test", nil, "203.0.113.1", gen)
+	if ok {
+		t.Fatal("expected false on quotaBlocked")
+	}
+	m.quotaBlocked.Store(false)
+
+	_, _, retry, reqOK := m.executeHTTPPostRequest(exec, "http://\x00invalid", nil, 0, "203.0.113.1", gen)
+	if reqOK || retry {
+		t.Fatal("expected failure on invalid URL")
+	}
+
+	tsClosed := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+	tsClosed.Close()
+	_, _, _, reqOK = m.executeHTTPPostRequest(exec, tsClosed.URL, nil, 0, "203.0.113.1", gen)
+	if reqOK {
+		t.Fatal("expected reqOK=false on connection refused")
+	}
+
+	ts403 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		writeMock(t, w, []byte(`{"error": "Forbidden"}`))
+	}))
+	defer ts403.Close()
+	_, status, retry, reqOK := m.executeHTTPPostRequest(exec, ts403.URL, nil, 0, "203.0.113.1", gen)
+	if status != 403 || retry || !reqOK {
+		t.Fatalf("expected 403, retry=false, reqOK=true, got %d, %v, %v", status, retry, reqOK)
+	}
+
+	_, ok = m.doAPIRequestPOST(exec, tsClosed.URL, nil, "203.0.113.1", gen)
+	if ok {
+		t.Fatal("expected doAPIRequestPOST to return false when reqOK is false")
+	}
 }

@@ -1,0 +1,119 @@
+[
+  {
+    "data": {
+      "domain": "test1.example.com",
+      "a": [
+        "198.51.100.42"
+      ],
+      "txt": [
+        "verification=fake-token-11111",
+        "v=spf1 include:spf.example.com ip4:198.51.100.0/24 -all"
+      ],
+      "ns": [
+        "ns1.example.net",
+        "ns2.example.net"
+      ],
+      "@timestamp": "2026-05-09T14:10:29.797Z",
+      "level": 3,
+      "zone": "com"
+    }
+  },
+  {
+    "data": {
+      "domain": "test2.example.net",
+      "a": [
+        "198.51.100.42",
+        "203.0.113.10"
+      ],
+      "aaaa": [
+        "2001:db8::1",
+        "2001:db8::2"
+      ],
+      "txt": [
+        "v=DMARC1; p=reject; rua=mailto:dmarc@example.net; ruf=mailto:forensic@example.net",
+        "   "
+      ],
+      "mx": [
+        "mx1.example.net",
+        "mx2.example.net"
+      ],
+      "@timestamp": "2026-05-09T14:11:33.558Z",
+      "level": 3,
+      "zone": "net"
+    }
+  },
+  {
+    "data": {
+      "domain": "test3.example.org",
+      "a": [
+        "198.51.100.42"
+      ],
+      "ns": [
+        "ns-primary.example.org"
+      ],
+      "cname": [
+        "cname1.example.org",
+        "cname2.example.org"
+      ],
+      "txt": [
+        "v=spf1 include:invalid_domain_name..org a:a.example.org mx:mx.example.org redirect=redirect.example.org ~all"
+      ],
+      "@timestamp": "2026-05-09T14:12:15.551Z",
+      "level": 3,
+      "zone": "org"
+    }
+  },
+  {
+    "data": {
+      "domain": "test4.example.edu",
+      "a": [
+        "198.51.100.42"
+      ],
+      "aaaa": [
+        "2001:db8:85a3::8a2e:370:7334"
+      ],
+      "mx": [
+        "mail1.example.edu"
+      ],
+      "cname": [
+        "alias.example.edu"
+      ],
+      "@timestamp": "2026-05-09T14:13:00.000Z",
+      "level": 3,
+      "zone": "edu"
+    }
+  },
+  {
+    "data": {
+      "domain": "test5.example.co.uk",
+      "a": [
+        "198.51.100.42",
+        "192.0.2.200"
+      ],
+      "aaaa": [
+        "2001:db8::10",
+        "2001:db8::11"
+      ],
+      "ns": [
+        "ns-1.example.co.uk",
+        "ns-2.example.co.uk"
+      ],
+      "mx": [
+        "route1.example.co.uk",
+        "route2.example.co.uk"
+      ],
+      "txt": [
+        "v=spf1 a mx ip6:2001:db8::/32 ip4:999.999.999.999 exists:exists.example.co.uk ~all",
+        "v=DMARC1; p=none; rua=mailto:invalid@email@domain.com",
+        "google-site-verification=some-fake-hash"
+      ],
+      "cname": [
+        "target1.example.co.uk",
+        "target2.example.co.uk"
+      ],
+      "@timestamp": "2026-05-09T14:14:00.000Z",
+      "level": 4,
+      "zone": "uk"
+    }
+  }
+]

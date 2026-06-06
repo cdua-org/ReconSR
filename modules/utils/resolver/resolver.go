@@ -66,6 +66,9 @@ var (
 	MaxRetriesNetlas = 3
 	// NetlasRetryBaseDelay is the base pause between Netlas API retry attempts.
 	NetlasRetryBaseDelay = 2 * time.Second
+	// NetlasDownloadTimeout defines the timeout specifically for Netlas data downloads (e.g. NDJSON).
+	// It is separated from HTTPTimeout to allow fetching large datasets without hitting the standard timeout.
+	NetlasDownloadTimeout = 5 * time.Minute
 	// MaxRetriesIPMeta defines maximum attempts for IP metadata lookups.
 	MaxRetriesIPMeta = 3
 	// MaxRetriesASNMeta defines maximum attempts for ASN metadata lookups.
@@ -87,6 +90,8 @@ var (
 	ShodanScanSubdomains = false
 	// NetlasScanSubdomains enables processing of subdomains via the domain endpoint.
 	NetlasScanSubdomains = false
+	// NetlasLimitPerOneDownload defines the maximum number of results to download using the Netlas domains/download endpoint.
+	NetlasLimitPerOneDownload = 0
 	// ShodanIPHistory includes all historical banners for Shodan IP lookups.
 	ShodanIPHistory = false
 	// ShodanIPMinify returns only ports and general info for Shodan IP lookups.
@@ -290,17 +295,18 @@ var stringOptions map[string]*string
 
 func initOptionMaps() {
 	durationOptions = map[string]*time.Duration{
-		"Timeout":              &Timeout,
-		"KeepAlive":            &KeepAlive,
-		"TimeoutASNMeta":       &TimeoutASNMeta,
-		"DNSQueryTimeout":      &DNSQueryTimeout,
-		"DNSFallbackTimeout":   &DNSFallbackTimeout,
-		"DNSBruteTimeout":      &DNSBruteTimeout,
-		"CrtshPGTimeout":       &CrtshPGTimeout,
-		"RetryBaseDelay":       &RetryBaseDelay,
-		"NetlasRetryBaseDelay": &NetlasRetryBaseDelay,
-		"HTTPTimeout":          &HTTPTimeout,
-		"CirclRetryBaseDelay":  &CirclRetryBaseDelay,
+		"Timeout":               &Timeout,
+		"KeepAlive":             &KeepAlive,
+		"TimeoutASNMeta":        &TimeoutASNMeta,
+		"DNSQueryTimeout":       &DNSQueryTimeout,
+		"DNSFallbackTimeout":    &DNSFallbackTimeout,
+		"DNSBruteTimeout":       &DNSBruteTimeout,
+		"CrtshPGTimeout":        &CrtshPGTimeout,
+		"RetryBaseDelay":        &RetryBaseDelay,
+		"NetlasRetryBaseDelay":  &NetlasRetryBaseDelay,
+		"NetlasDownloadTimeout": &NetlasDownloadTimeout,
+		"HTTPTimeout":           &HTTPTimeout,
+		"CirclRetryBaseDelay":   &CirclRetryBaseDelay,
 	}
 	boolOptions = map[string]*bool{
 		"DisableMailcryptoBruteForce": &DisableMailcryptoBruteForce,
@@ -319,28 +325,29 @@ func initOptionMaps() {
 		"NetlasScanSubdomains":        &NetlasScanSubdomains,
 	}
 	intOptions = map[string]*int{
-		"MaxRetriesCert":           &MaxRetriesCert,
-		"MaxRetriesWhois":          &MaxRetriesWhois,
-		"MaxRetriesDNS":            &MaxRetriesDNS,
-		"MaxRetriesHT":             &MaxRetriesHT,
-		"MaxRetriesLeakIX":         &MaxRetriesLeakIX,
-		"MaxRetriesNetlas":         &MaxRetriesNetlas,
-		"MaxRetriesIPMeta":         &MaxRetriesIPMeta,
-		"MaxRetriesASNMeta":        &MaxRetriesASNMeta,
-		"MaxRecursionDepth":        &MaxRecursionDepth,
-		"AnubisLimit":              &AnubisLimit,
-		"VirustotalDelayMs":        &VirustotalDelayMs,
-		"VirustotalMaxRetries":     &VirustotalMaxRetries,
-		"VirustotalMaxPages":       &VirustotalMaxPages,
-		"ShodanMaxDomainPages":     &ShodanMaxDomainPages,
-		"DNSConcurrency":           &DNSConcurrency,
-		"MaxRetriesCircl":          &MaxRetriesCircl,
-		"AbuseIPDBmaxAgeInDays":    &AbuseIPDBmaxAgeInDays,
-		"HunterioLimit":            &HunterioLimit,
-		"HunterioMaxPages":         &HunterioMaxPages,
-		"HunterioMaxRetries":       &HunterioMaxRetries,
-		"HaveIBeenPwnedDelayMs":    &HaveIBeenPwnedDelayMs,
-		"HaveIBeenPwnedMaxRetries": &HaveIBeenPwnedMaxRetries,
+		"MaxRetriesCert":            &MaxRetriesCert,
+		"MaxRetriesWhois":           &MaxRetriesWhois,
+		"MaxRetriesDNS":             &MaxRetriesDNS,
+		"MaxRetriesHT":              &MaxRetriesHT,
+		"MaxRetriesLeakIX":          &MaxRetriesLeakIX,
+		"MaxRetriesNetlas":          &MaxRetriesNetlas,
+		"NetlasLimitPerOneDownload": &NetlasLimitPerOneDownload,
+		"MaxRetriesIPMeta":          &MaxRetriesIPMeta,
+		"MaxRetriesASNMeta":         &MaxRetriesASNMeta,
+		"MaxRecursionDepth":         &MaxRecursionDepth,
+		"AnubisLimit":               &AnubisLimit,
+		"VirustotalDelayMs":         &VirustotalDelayMs,
+		"VirustotalMaxRetries":      &VirustotalMaxRetries,
+		"VirustotalMaxPages":        &VirustotalMaxPages,
+		"ShodanMaxDomainPages":      &ShodanMaxDomainPages,
+		"DNSConcurrency":            &DNSConcurrency,
+		"MaxRetriesCircl":           &MaxRetriesCircl,
+		"AbuseIPDBmaxAgeInDays":     &AbuseIPDBmaxAgeInDays,
+		"HunterioLimit":             &HunterioLimit,
+		"HunterioMaxPages":          &HunterioMaxPages,
+		"HunterioMaxRetries":        &HunterioMaxRetries,
+		"HaveIBeenPwnedDelayMs":     &HaveIBeenPwnedDelayMs,
+		"HaveIBeenPwnedMaxRetries":  &HaveIBeenPwnedMaxRetries,
 	}
 	stringOptions = map[string]*string{
 		"ShodanDomainType":   &ShodanDomainType,

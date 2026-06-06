@@ -80,10 +80,10 @@ func TestNetlasGetDomain(t *testing.T) {
 				t.Run("DNS_TXT_SPF", func(t *testing.T) { assertDomainDNS(t, exec.Results) })
 				t.Run("Software_Deduplication", func(t *testing.T) { assertDomainSoftwareDeduplication(t, exec.Results) })
 				t.Run("CVE_Hierarchy", func(t *testing.T) { verifyDomainCVEHierarchy(t, exec.Results) })
-				t.Run("Parsed_Domains", func(t *testing.T) { assertParsedDomains(t, exec.Results, 5, false) })
+				t.Run("Parsed_Domains", func(t *testing.T) { assertParsedDomains(t, exec.Results, 5, "example.edu") })
 				t.Run("Target_Applied", func(t *testing.T) { assertTargetApplied(t, exec.Results, "example.edu") })
 			case testNameMinimal, "NoWhois":
-				assertParsedDomains(t, exec.Results, 0, false)
+				assertParsedDomains(t, exec.Results, 0, "example.edu")
 			}
 		})
 	}
@@ -308,10 +308,10 @@ func isValidPureDomain(res *schema.ModuleResult) bool {
 	return true
 }
 
-func assertParsedDomains(t *testing.T, results []schema.ModuleResult, expectedCount int, expectExampleCom bool) {
+func assertParsedDomains(t *testing.T, results []schema.ModuleResult, expectedCount int, targetDomain string) {
 	t.Helper()
 	domainCount := 0
-	foundExampleCom := false
+	foundTarget := false
 	foundDep1 := false
 
 	for i := range results {
@@ -321,8 +321,8 @@ func assertParsedDomains(t *testing.T, results []schema.ModuleResult, expectedCo
 		}
 
 		domainCount++
-		if res.Value == "example.com" {
-			foundExampleCom = true
+		if res.Value == targetDomain {
+			foundTarget = true
 		}
 		if res.Value == "dep1.example.edu" {
 			foundDep1 = true
@@ -336,10 +336,8 @@ func assertParsedDomains(t *testing.T, results []schema.ModuleResult, expectedCo
 	if domainCount != expectedCount {
 		t.Errorf("expected exactly %d pure domains, got %d", expectedCount, domainCount)
 	}
-	if expectExampleCom && !foundExampleCom {
-		t.Errorf("expected to find domain example.com")
-	} else if !expectExampleCom && foundExampleCom {
-		t.Errorf("expected NOT to find domain example.com")
+	if foundTarget {
+		t.Errorf("expected NOT to find the primary target domain (%s) in parsed domains", targetDomain)
 	}
 	if expectedCount == 5 && !foundDep1 {
 		t.Errorf("expected to find domain dep1.example.edu")
@@ -364,7 +362,7 @@ func TestDomainEdgeCases(t *testing.T) {
 	_ = t
 	exec := &schema.ModuleExecution{}
 	gen := modutil.NewLocalIDGenerator()
-	val := "example.org"
+	val := "pure.example.org"
 	targetRef := &schema.EntityRef{Type: constants.TypeDomain, Value: val}
 
 	addContact(exec, &netlasWhoisContact{Name: "", Organization: "", Email: ""}, constants.TypeWhoisRegistrant, targetRef, val, gen)
@@ -381,7 +379,7 @@ func TestParseDomainDNSSPF_InvalidCIDR(t *testing.T) {
 	gen := modutil.NewLocalIDGenerator()
 	targetRef := &schema.EntityRef{Type: constants.TypeDomain, Value: "test.example.com"}
 
-	txt := "v=spf1 ip4:1.2.3.4/abc ip4:1.2.3.4/-1 ip4:1.2.3.4/130 ip4:invalid/24 -all"
+	txt := "v=spf1 ip4:203.0.113.50/abc ip4:203.0.113.50/-1 ip4:203.0.113.50/130 ip4:invalid/24 -all"
 
 	parseDomainDNSSPF(exec, txt, targetRef, "test.example.com", gen)
 

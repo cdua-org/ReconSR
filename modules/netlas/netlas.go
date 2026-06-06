@@ -65,6 +65,19 @@ func (m *netlasModule) Capabilities() (schema.ModuleCapabilities, error) {
 			DelayMs:    0,
 			InputTypes: ipTypes,
 		}
+
+		if resolver.NetlasLimitPerOneDownload > 0 {
+			customFns[constants.FuncGetNetlasDomainsByIP] = schema.FunctionCapabilities{
+				Limit:      1,
+				DelayMs:    0,
+				InputTypes: []string{constants.TypeIPv4},
+			}
+			customFns[constants.FuncGetNetlasDomainsByDomain] = schema.FunctionCapabilities{
+				Limit:      1,
+				DelayMs:    0,
+				InputTypes: []string{constants.TypeDomain},
+			}
+		}
 	}
 
 	return schema.ModuleCapabilities{
@@ -88,6 +101,11 @@ func (m *netlasModule) Exec(data schema.ModuleInput) (schema.ModuleOutput, error
 		case constants.FuncGetNetlasIP:
 			if m.apiKey != "" {
 				execs = append(execs, m.getNetlasIP(data.Target, fn, gen))
+				continue
+			}
+		case constants.FuncGetNetlasDomainsByIP, constants.FuncGetNetlasDomainsByDomain:
+			if m.apiKey != "" && resolver.NetlasLimitPerOneDownload > 0 {
+				execs = append(execs, m.getNetlasDomainsByQuery(data.Target, fn, gen))
 				continue
 			}
 		}

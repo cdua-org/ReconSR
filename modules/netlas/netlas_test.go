@@ -161,7 +161,7 @@ func TestNetlasQuotaAndInvalidKey(t *testing.T) {
 
 	m.quotaBlocked.Store(true)
 	out, err = m.Exec(schema.ModuleInput{
-		Target:    schema.Entity{Type: constants.TypeDomain, Value: "example.org"},
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "t1.example.org"},
 		Functions: []string{constants.FuncGetNetlasDomain},
 	})
 	if err != nil {
@@ -318,13 +318,19 @@ func TestUnmarshalJSONTypeErrors(t *testing.T) {
 func TestDemoJSONErrors(t *testing.T) {
 	oldDomain := demoDomainResponses
 	oldIP := demoIPResponses
+	oldDownload := demoIPDownload
+	oldDomainDownload := demoDomainDownload
 	defer func() {
 		demoDomainResponses = oldDomain
 		demoIPResponses = oldIP
+		demoIPDownload = oldDownload
+		demoDomainDownload = oldDomainDownload
 	}()
 
 	demoDomainResponses = []byte(`{invalid`)
 	demoIPResponses = []byte(`{invalid`)
+	demoIPDownload = []byte(`{invalid`)
+	demoDomainDownload = []byte(`{invalid`)
 
 	m := &netlasModule{apiKey: demoIndicator}
 	out, err := m.Exec(schema.ModuleInput{
@@ -342,6 +348,30 @@ func TestDemoJSONErrors(t *testing.T) {
 	out, err = m.Exec(schema.ModuleInput{
 		Target:    schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.13"},
 		Functions: []string{constants.FuncGetNetlasIP},
+	})
+	if err != nil {
+		t.Fatalf("unexpected global error: %v", err)
+	}
+	exec = out.Executions[0]
+	if exec.Error == nil || !strings.Contains(*exec.Error, "demo parse json") {
+		t.Errorf("expected demo parse json error, got %v", exec.Error)
+	}
+
+	out, err = m.Exec(schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.14"},
+		Functions: []string{constants.FuncGetNetlasDomainsByIP},
+	})
+	if err != nil {
+		t.Fatalf("unexpected global error: %v", err)
+	}
+	exec = out.Executions[0]
+	if exec.Error == nil || !strings.Contains(*exec.Error, "demo parse json") {
+		t.Errorf("expected demo parse json error, got %v", exec.Error)
+	}
+
+	out, err = m.Exec(schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "t2.example.net"},
+		Functions: []string{constants.FuncGetNetlasDomainsByDomain},
 	})
 	if err != nil {
 		t.Fatalf("unexpected global error: %v", err)

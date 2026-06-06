@@ -93,19 +93,40 @@ func parseDomainDNS(exec *schema.ModuleExecution, dns *netlasDNS, targetRef *sch
 		if mx == "" {
 			continue
 		}
-		host := strings.TrimSuffix(mx, ".")
+		host, err := dnsutils.ParseMXHost(mx)
+		hasPriority := err == nil
+		if err != nil {
+			host = strings.TrimSuffix(strings.TrimSpace(mx), ".")
+		}
+
 		res, err := validator.Validate(constants.TypeDomain, host)
 		if err != nil {
 			continue
 		}
+
+		var sourceRef *schema.EntityRef
+		if hasPriority {
+			mxLocalID := gen.NextID()
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     constants.TypeMX,
+				Category: constants.CategoryProperty,
+				Value:    mx,
+				Source:   targetRef,
+				LocalID:  mxLocalID,
+			})
+			sourceRef = &schema.EntityRef{Type: constants.TypeMX, Value: mx, LocalID: mxLocalID}
+		} else {
+			sourceRef = targetRef
+		}
+
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:       res.Type,
 			Category:   constants.CategoryNode,
 			Value:      res.Value,
 			Tags:       []string{constants.TagMX},
-			Source:     targetRef,
+			Source:     sourceRef,
 			LocalID:    gen.NextID(),
-			OutOfScope: orgdomain.IsOutOfScope(host, targetValue),
+			OutOfScope: orgdomain.IsOutOfScope(res.Value, targetValue),
 		})
 	}
 	for _, ns := range dns.NS {
