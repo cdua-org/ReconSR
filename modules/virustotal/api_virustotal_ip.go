@@ -6,6 +6,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dateutil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
@@ -55,7 +56,10 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 
 	if lastUpdateRaw, ok := attr["last_modification_date"].(float64); ok {
 		formattedDate := time.Unix(int64(lastUpdateRaw), 0).UTC().Format(time.RFC3339)
-		appendVTProperty(exec, constants.TypeDate, "Last Update: "+formattedDate, "Last Update for "+target, nil, gen)
+		if day, ok := dateutil.NormalizeDay(formattedDate); ok {
+			formattedDate = day
+		}
+		appendVTProperty(exec, constants.TypeDate, "Last Update: "+formattedDate, "", nil, gen)
 	}
 
 	m.extractThreatScore(attr, constants.TypeIP, target, nil, exec, gen)

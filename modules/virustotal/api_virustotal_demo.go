@@ -16,7 +16,7 @@ import (
 //go:embed testdata/domain_page1.json testdata/subdomains_page1.json testdata/subdomains_page2.json testdata/ip_page1.json testdata/resolutions_page1.json testdata/resolutions_page2.json
 var demoData embed.FS
 
-func (m *module) processDomainDemo(_ context.Context, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
+func (m *module) processDomainDemo(_ context.Context, targetType, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	if !m.demoDomainFired.CompareAndSwap(false, true) {
 		dbg.Printf("%s skipped stage=demo_already_fired target=%q", constants.FuncGetVTApiDomain, target)
 		return
@@ -46,7 +46,7 @@ func (m *module) processDomainDemo(_ context.Context, target string, exec *schem
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
 		if attr, ok := dataMap["attributes"].(map[string]any); ok {
-			m.extractDomainMetadata(attr, target, exec, gen)
+			m.extractDomainMetadata(attr, targetType, target, exec, gen)
 		}
 	}
 
@@ -74,12 +74,10 @@ func (m *module) processDomainDemo(_ context.Context, target string, exec *schem
 		}
 
 		for _, item := range items {
-			itemMap, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			if expired := m.extractSubdomain(itemMap, target, disableCertExpired, exec, gen); expired != "" {
-				expiredDomains = append(expiredDomains, expired)
+			if itemMap, itemOK := item.(map[string]any); itemOK {
+				if expired := m.extractSubdomain(itemMap, targetType, target, disableCertExpired, exec, gen); expired != "" {
+					expiredDomains = append(expiredDomains, expired)
+				}
 			}
 		}
 	}

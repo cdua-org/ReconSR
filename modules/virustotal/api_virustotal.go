@@ -26,6 +26,7 @@ import (
 const (
 	moduleName     = "virustotal"
 	apiServiceName = "VirusTotal"
+	demoIndicator  = "demo-api-key"
 )
 
 var baseURL = "https://www.virustotal.com/api/v3"
@@ -148,6 +149,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 
 		ctx := context.Background()
 		target := data.Target.Value
+		targetType := data.Target.Type
 
 		gen := modutil.NewLocalIDGenerator()
 		switch f {
@@ -156,7 +158,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 			m.processIP(ctx, target, &execution, gen)
 		case constants.FuncGetVTApiDomain:
 			execution = modutil.NewExecution(constants.FuncGetVTApiDomain)
-			m.processDomain(ctx, target, &execution, gen)
+			m.processDomain(ctx, targetType, target, &execution, gen)
 		default:
 			execution = modutil.NewExecution(f)
 			modutil.SetError(&execution, "unsupported function: %v", fmt.Errorf("%s", f))
@@ -167,9 +169,9 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	return schema.ModuleOutput{Executions: executions}, nil
 }
 
-func (m *module) processDomain(ctx context.Context, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
-	if m.apiKey == "demo-api-key" {
-		m.processDomainDemo(ctx, target, exec, gen)
+func (m *module) processDomain(ctx context.Context, targetType, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
+	if m.apiKey == demoIndicator {
+		m.processDomainDemo(ctx, targetType, target, exec, gen)
 		return
 	}
 
@@ -189,7 +191,7 @@ func (m *module) processDomain(ctx context.Context, target string, exec *schema.
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
 		if attr, ok := dataMap["attributes"].(map[string]any); ok {
-			m.extractDomainMetadata(attr, target, exec, gen)
+			m.extractDomainMetadata(attr, targetType, target, exec, gen)
 		}
 	}
 
@@ -201,7 +203,7 @@ func (m *module) processDomain(ctx context.Context, target string, exec *schema.
 	var expiredDomains []string
 	subURL := fmt.Sprintf("%s/domains/%s/subdomains?limit=40", baseURL, target)
 	m.processPaginated(ctx, subURL, exec, func(item map[string]any) {
-		if expired := m.extractSubdomain(item, target, disableCertExpired, exec, gen); expired != "" {
+		if expired := m.extractSubdomain(item, targetType, target, disableCertExpired, exec, gen); expired != "" {
 			expiredDomains = append(expiredDomains, expired)
 		}
 	})
@@ -221,7 +223,7 @@ func (m *module) processDomain(ctx context.Context, target string, exec *schema.
 }
 
 func (m *module) processIP(ctx context.Context, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
-	if m.apiKey == "demo-api-key" {
+	if m.apiKey == demoIndicator {
 		m.processIPDemo(ctx, target, exec, gen)
 		return
 	}

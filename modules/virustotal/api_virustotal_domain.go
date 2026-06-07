@@ -8,6 +8,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dateutil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/schema"
@@ -15,7 +16,7 @@ import (
 
 const vtTimeFormat = "2006-01-02 15:04:05"
 
-func (m *module) extractDomainMetadata(attr map[string]any, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
+func (m *module) extractDomainMetadata(attr map[string]any, targetType, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	tags := extractVTTags(attr)
 	for _, tag := range tags {
 		exec.Results = append(exec.Results, schema.ModuleResult{
@@ -34,14 +35,14 @@ func (m *module) extractDomainMetadata(attr map[string]any, target string, exec 
 		}
 	}
 
-	m.extractThreatScore(attr, constants.TypeDomain, target, nil, exec, gen)
+	m.extractThreatScore(attr, targetType, target, nil, exec, gen)
 	appendDomainCategories(exec, attr, gen)
 	appendDomainReputation(exec, attr, gen)
 	appendDomainPopularityRanks(exec, attr, gen)
 	appendDomainJARM(exec, attr, target, gen)
 	appendDomainCrowdsourcedContext(exec, attr, gen)
 	appendDomainLastUpdate(exec, attr, target, gen)
-	appendDomainCertificateSummary(exec, attr, target, gen)
+	appendDomainCertificateSummary(exec, attr, targetType, target, gen)
 
 	if _, ok := attr["whois"]; ok {
 		dbg.Printf("%s ignored_field=whois target=%q", constants.FuncGetVTApiDomain, target)
@@ -158,23 +159,26 @@ func appendDomainCrowdsourcedContext(exec *schema.ModuleExecution, attr map[stri
 	}
 }
 
-func appendDomainLastUpdate(exec *schema.ModuleExecution, attr map[string]any, target string, gen *modutil.LocalIDGenerator) {
+func appendDomainLastUpdate(exec *schema.ModuleExecution, attr map[string]any, _ string, gen *modutil.LocalIDGenerator) {
 	lastUpdateRaw, ok := attr["last_modification_date"].(float64)
 	if !ok {
 		return
 	}
 
 	formattedDate := time.Unix(int64(lastUpdateRaw), 0).UTC().Format(time.RFC3339)
-	appendVTProperty(exec, constants.TypeDate, "Last Update: "+formattedDate, "Last Update for "+target, nil, gen)
+	if day, ok := dateutil.NormalizeDay(formattedDate); ok {
+		formattedDate = day
+	}
+	appendVTProperty(exec, constants.TypeDate, "Last Update: "+formattedDate, "", nil, gen)
 }
 
-func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[string]any, target string, gen *modutil.LocalIDGenerator) {
+func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[string]any, targetType, target string, gen *modutil.LocalIDGenerator) {
 	certificate, ok := attr["last_https_certificate"].(map[string]any)
 	if !ok {
 		return
 	}
 
-	sources := appendVTCertificateSANs(exec, certificate, target, gen)
+	sources := appendVTCertificateSANs(exec, certificate, targetType, target, gen)
 	issuer := formatVTCertificateIssuer(certificate)
 	notAfter := extractVTCertificateNotAfter(certificate)
 
@@ -203,7 +207,7 @@ func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[strin
 	}
 }
 
-func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[string]any, target string, gen *modutil.LocalIDGenerator) []*schema.EntityRef {
+func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[string]any, targetType, target string, gen *modutil.LocalIDGenerator) []*schema.EntityRef {
 	extensions, ok := certificate["extensions"].(map[string]any)
 	if !ok {
 		return nil
@@ -244,7 +248,7 @@ func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[strin
 			}
 			if resultValue != target {
 				result.Source = &schema.EntityRef{
-					Type:  constants.TypeDomain,
+					Type:  targetType,
 					Value: target,
 				}
 			}
@@ -347,7 +351,7 @@ func parseVTCertificateExpiration(attr map[string]any) (string, bool) {
 	return notAfterStr, isExpired
 }
 
-func (m *module) extractSubdomain(item map[string]any, parent string, disableCertExpired bool, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) string {
+func (m *module) extractSubdomain(item map[string]any, parentType, parent string, disableCertExpired bool, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) string {
 	sub, ok := item["id"].(string)
 	if !ok {
 		return ""
@@ -379,7 +383,7 @@ func (m *module) extractSubdomain(item map[string]any, parent string, disableCer
 		Tags:       []string{constants.TagPDNS},
 		OutOfScope: isOOS,
 		Source: &schema.EntityRef{
-			Type:  constants.TypeDomain,
+			Type:  parentType,
 			Value: parent,
 		},
 		LocalID: gen.NextID(),
@@ -413,13 +417,21 @@ func (m *module) extractSubdomain(item map[string]any, parent string, disableCer
 		}
 	}
 
-	m.appendSubdomainDeepResults(attr, parent, subRef, exec, gen)
+	if lastUpdateRaw, ok := attr["last_modification_date"].(float64); ok {
+		formattedDate := time.Unix(int64(lastUpdateRaw), 0).UTC().Format(time.RFC3339)
+		if day, ok := dateutil.NormalizeDay(formattedDate); ok {
+			formattedDate = day
+		}
+		appendVTProperty(exec, constants.TypeDate, "Last Update: "+formattedDate, "", subRef, gen)
+	}
+
+	m.appendSubdomainDeepResults(attr, parentType, parent, subRef, exec, gen)
 	m.logIgnoredSubdomainFields(attr, validatedSubdomain.Value)
 
 	return ""
 }
 
-func (m *module) appendSubdomainDeepResults(attr map[string]any, scopeTarget string, subRef *schema.EntityRef, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
+func (m *module) appendSubdomainDeepResults(attr map[string]any, _, scopeTarget string, subRef *schema.EntityRef, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	if records, ok := attr["last_dns_records"].([]any); ok {
 		for _, r := range records {
 			if rec, ok := r.(map[string]any); ok {

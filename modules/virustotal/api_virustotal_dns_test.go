@@ -269,3 +269,16 @@ func TestParseDNSRecordSelfReferentialSkipped(t *testing.T) {
 		})
 	}
 }
+
+func TestParseDNSRecordAInvalidIP(t *testing.T) {
+	rec := map[string]any{
+		"type":  "A",
+		"value": "999.999.999.999",
+	}
+	target := "example.com"
+	results := parseDNSRecordFromFixture(t, target, nil, rec)
+
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results for invalid IP, got %d", len(results))
+	}
+}

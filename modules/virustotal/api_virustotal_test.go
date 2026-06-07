@@ -3,10 +3,12 @@ package virustotal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -284,6 +286,18 @@ func TestModuleCapabilities(t *testing.T) {
 	if len(fnCaps.InputTypes) == 0 || len(ipCaps.InputTypes) == 0 {
 		t.Fatalf("expected input types on functions")
 	}
+
+	originalScan := resolver.VirustotalScanSubdomains
+	resolver.VirustotalScanSubdomains = true
+	defer func() { resolver.VirustotalScanSubdomains = originalScan }()
+
+	caps, err = mod.Capabilities()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !slices.Contains(caps.CustomFunctions[constants.FuncGetVTApiDomain].InputTypes, constants.TypeSubdomain) {
+		t.Fatalf("expected TypeSubdomain in InputTypes when VirustotalScanSubdomains is true")
+	}
 }
 
 func TestNewUsesAPIConfigEnvOverride(t *testing.T) {
@@ -488,5 +502,69 @@ func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
 			t.Errorf("duplicate LocalID %d found for type %s value %s", res.LocalID, res.Type, res.Value)
 		}
 		seen[res.LocalID] = true
+	}
+}
+
+func TestVTRequestError_Unwrap(t *testing.T) {
+	err := errors.New("underlying error")
+	reqErr := &vtRequestError{
+		err:    err,
+		action: httputil.Abort,
+	}
+
+	if reqErr.Error() != "underlying error" {
+		t.Errorf("expected Error() to return %q, got %q", "underlying error", reqErr.Error())
+	}
+
+	if unwrapped := reqErr.Unwrap(); !errors.Is(unwrapped, err) {
+		t.Errorf("expected Unwrap() to return %v, got %v", err, unwrapped)
+	}
+
+	var target *vtRequestError
+	wrapped := fmt.Errorf("wrapped: %w", reqErr)
+	if !errors.As(wrapped, &target) {
+		t.Error("errors.As failed to unwrap vtRequestError")
+	}
+}
+
+func TestRequestAction_Fallback(t *testing.T) {
+	err := errors.New("arbitrary generic error")
+	action := requestAction(err)
+	if action != httputil.Abort {
+		t.Errorf("expected httputil.Abort for non-vtRequestError, got %v", action)
+	}
+}
+
+func TestModuleDemoModeAndName(t *testing.T) {
+	mod := &module{apiKey: demoIndicator}
+
+	if mod.Name() != "virustotal" {
+		t.Errorf("expected Name() to be 'virustotal', got %q", mod.Name())
+	}
+
+	execDomain := execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: fixtureDomainTarget})
+	if execDomain.Error != nil {
+		t.Fatalf("demo mode domain exec error: %s", *execDomain.Error)
+	}
+	if len(execDomain.Results) == 0 {
+		t.Fatal("expected results in demo mode for domain, got 0")
+	}
+
+	execIP := execVT(t, mod, schema.Entity{Type: constants.TypeIPv4, Value: fixtureIPTarget})
+	if execIP.Error != nil {
+		t.Fatalf("demo mode ip exec error: %s", *execIP.Error)
+	}
+	if len(execIP.Results) == 0 {
+		t.Fatal("expected results in demo mode for IP, got 0")
+	}
+
+	execDomain2 := execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: fixtureDomainTarget})
+	if len(execDomain2.Results) != 0 {
+		t.Fatalf("expected 0 results on second demo domain call, got %d", len(execDomain2.Results))
+	}
+
+	execIP2 := execVT(t, mod, schema.Entity{Type: constants.TypeIPv4, Value: fixtureIPTarget})
+	if len(execIP2.Results) != 0 {
+		t.Fatalf("expected 0 results on second demo ip call, got %d", len(execIP2.Results))
 	}
 }
