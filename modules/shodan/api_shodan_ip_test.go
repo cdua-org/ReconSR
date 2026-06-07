@@ -151,7 +151,7 @@ func assertShodanIPCoreResults(t *testing.T, results []schema.ModuleResult) {
 	requireModuleResult(t, results, constants.TypeOrganization, "Fake Org")
 	requireModuleResult(t, results, constants.TypeOS, "FakeOS")
 	requireModuleResult(t, results, constants.TypePort, "443/tcp")
-	requireModuleResult(t, results, constants.TypeDate, "Last Update: 2027-05-05T16:15:08Z")
+	requireModuleResult(t, results, constants.TypeDate, "Last Update: 2027-05-05")
 
 	geoResult := requireModuleResult(t, results, constants.TypeGeo, "City: FakeCity | Country: Fakeland (FC) | Lat/Lon: 10.123400, 20.567800")
 	if geoResult.Category != constants.CategoryProperty {
@@ -322,6 +322,16 @@ func TestGetShodanAPIIP(t *testing.T) {
 	requireModuleResult(t, exec.Results, constants.TypeASN, "99999")
 	requireModuleResult(t, exec.Results, constants.TypeService, service)
 	requireModuleResult(t, exec.Results, constants.TypeHash, "2222222")
+}
+
+func TestExtractIPLastUpdateKeepsRawWhenNormalizationFails(t *testing.T) {
+	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIIP}
+	extractIPLastUpdate(&exec, "not-a-date", modutil.NewLocalIDGenerator())
+
+	result := requireModuleResult(t, exec.Results, constants.TypeDate, "Last Update: not-a-date")
+	if result.Category != constants.CategoryProperty {
+		t.Fatalf("expected date property, got %+v", result)
+	}
 }
 
 func TestParseShodanAPIIPInvalidJSON(t *testing.T) {

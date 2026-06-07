@@ -422,29 +422,74 @@ func assertShodanDomainInvalidSubdomains(t *testing.T, results []schema.ModuleRe
 func assertShodanDomainLastSeen(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
+	expectedDay := "Last Seen: 2026-05-02"
+
 	wwwIPLastSeen := findModuleResultBySource(results, constants.TypeDate, constants.TypeIPv4, "198.51.100.25")
 	if wwwIPLastSeen == nil {
 		t.Fatal("expected last_seen for www A record")
 	}
-	if wwwIPLastSeen.Value != "Last Seen: 2026-05-02T12:30:00.000000" {
-		t.Fatalf("expected www IP last_seen 2026-05-02T12:30:00.000000, got %q", wwwIPLastSeen.Value)
+	if wwwIPLastSeen.Value != expectedDay {
+		t.Fatalf("expected www IP last_seen 2026-05-02, got %q", wwwIPLastSeen.Value)
 	}
 
 	mxLastSeen := findModuleResultBySource(results, constants.TypeDate, constants.TypeMX, "10 mx.example.com")
 	if mxLastSeen == nil {
 		t.Fatal("expected last_seen for MX record")
 	}
-	if mxLastSeen.Value != "Last Seen: 2026-05-02T12:32:00.000000" {
-		t.Fatalf("expected MX last_seen 2026-05-02T12:32:00.000000, got %q", mxLastSeen.Value)
+	if mxLastSeen.Value != expectedDay {
+		t.Fatalf("expected MX last_seen 2026-05-02, got %q", mxLastSeen.Value)
 	}
 
 	soaLastSeen := findModuleResultBySource(results, constants.TypeDate, constants.TypeSOA, "ns1.example.com. dns.example.net. 1234567890 10000 2400 604800 1800")
 	if soaLastSeen == nil {
 		t.Fatal("expected last_seen for SOA record")
 	}
-	if soaLastSeen.Value != "Last Seen: 2026-05-02T12:38:00.000000" {
-		t.Fatalf("expected SOA last_seen 2026-05-02T12:38:00.000000, got %q", soaLastSeen.Value)
+	if soaLastSeen.Value != expectedDay {
+		t.Fatalf("expected SOA last_seen 2026-05-02, got %q", soaLastSeen.Value)
 	}
+}
+
+func TestParseShodanAPIDomainDeduplicatesLatestLastSeen(t *testing.T) {
+	rawBody := []byte(`{"data":[{"subdomain":"www","type":"A","value":"198.51.100.44","last_seen":"2026-05-01T01:02:03.000000"},{"subdomain":"api","type":"A","value":"198.51.100.44","last_seen":"2026-06-06T05:10:57.536000"},{"subdomain":"mail","type":"MX","value":"mx.example.net","last_seen":"2026-05-04T10:00:00.000000"},{"subdomain":"mail","type":"MX","value":"mx.example.net","last_seen":"2026-06-07T10:00:00.000000"}]}`)
+
+	exec := schema.ModuleExecution{Function: constants.FuncGetShodanAPIDomain}
+	parseShodanAPIDomain(&exec, rawBody, "example.org")
+	if exec.Error != nil {
+		t.Fatalf("unexpected parser error: %v", *exec.Error)
+	}
+
+	if countModuleResultsBySource(exec.Results, constants.TypeDate, constants.TypeIPv4, "198.51.100.44") != 1 {
+		t.Fatalf("expected one deduplicated A last_seen, got %+v", exec.Results)
+	}
+	if countModuleResultsBySource(exec.Results, constants.TypeDate, constants.TypeMX, "mx.example.net") != 1 {
+		t.Fatalf("expected one deduplicated MX last_seen, got %+v", exec.Results)
+	}
+
+	ipLastSeen := findModuleResultBySource(exec.Results, constants.TypeDate, constants.TypeIPv4, "198.51.100.44")
+	if ipLastSeen == nil || ipLastSeen.Value != "Last Seen: 2026-06-06" {
+		t.Fatalf("expected latest A last_seen 2026-06-06, got %+v", ipLastSeen)
+	}
+
+	mxLastSeen := findModuleResultBySource(exec.Results, constants.TypeDate, constants.TypeMX, "mx.example.net")
+	if mxLastSeen == nil || mxLastSeen.Value != "Last Seen: 2026-06-07" {
+		t.Fatalf("expected latest MX last_seen 2026-06-07, got %+v", mxLastSeen)
+	}
+}
+
+func countModuleResultsBySource(results []schema.ModuleResult, resultType, sourceType, sourceValue string) int {
+	count := 0
+	for _, result := range results {
+		if result.Type != resultType {
+			continue
+		}
+		if result.Source == nil {
+			continue
+		}
+		if result.Source.Type == sourceType && result.Source.Value == sourceValue {
+			count++
+		}
+	}
+	return count
 }
 
 func TestGetShodanAPIDomain(t *testing.T) {

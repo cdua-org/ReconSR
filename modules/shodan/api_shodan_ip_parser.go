@@ -6,6 +6,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dateutil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
@@ -102,10 +103,15 @@ func extractIPLastUpdate(exec *schema.ModuleExecution, lastUpdate string, gen *m
 		return
 	}
 
+	formatted := lastUpdate
+	if day, ok := dateutil.NormalizeDay(lastUpdate); ok {
+		formatted = day
+	}
+
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeDate,
 		Category: constants.CategoryProperty,
-		Value:    "Last Update: " + lastUpdate,
+		Value:    "Last Update: " + formatted,
 		LocalID:  gen.NextID(),
 	})
 }

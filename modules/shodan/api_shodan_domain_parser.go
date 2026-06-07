@@ -8,6 +8,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dateutil"
 	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
@@ -23,14 +24,17 @@ func parseShodanAPIDomain(exec *schema.ModuleExecution, rawBody []byte, target s
 	}
 
 	gen := modutil.NewLocalIDGenerator()
+	lastSeenCollector := dateutil.NewCollector()
 	appendShodanTagResults(exec, payload.Tags, gen)
 
 	for _, record := range payload.Data {
-		processShodanDomainRecord(exec, record, target, gen)
+		processShodanDomainRecord(exec, record, target, gen, lastSeenCollector)
 	}
+
+	appendShodanLastSeenResults(exec, lastSeenCollector, gen)
 }
 
-func processShodanDomainRecord(exec *schema.ModuleExecution, record shodanDomainRecord, target string, gen *modutil.LocalIDGenerator) {
+func processShodanDomainRecord(exec *schema.ModuleExecution, record shodanDomainRecord, target string, gen *modutil.LocalIDGenerator, lastSeenCollector *dateutil.Collector) {
 	fqdn, entityType, wildcardContext, isValidNode, ok := buildShodanFQDN(target, record.Subdomain)
 	if !ok {
 		return
@@ -48,7 +52,7 @@ func processShodanDomainRecord(exec *schema.ModuleExecution, record shodanDomain
 	}
 
 	lastSeenSource := processShodanDNSRecord(exec, record, value, target, source, gen)
-	appendShodanLastSeen(exec, record.LastSeen, lastSeenSource, gen)
+	collectShodanLastSeen(lastSeenCollector, record, lastSeenSource)
 }
 
 func buildShodanFQDN(target, subdomain string) (resultValue, resultType, wildcardContext string, isValidNode, ok bool) {
@@ -455,21 +459,34 @@ func appendShodanGenericDNSResult(exec *schema.ModuleExecution, recordType, valu
 	return &schema.EntityRef{Type: resultType, Value: value, LocalID: localID}
 }
 
-func appendShodanLastSeen(exec *schema.ModuleExecution, lastSeen string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
-	lastSeen = strings.TrimSpace(lastSeen)
-	if lastSeen == "" {
+func collectShodanLastSeen(collector *dateutil.Collector, record shodanDomainRecord, source *schema.EntityRef) {
+	if collector == nil {
 		return
 	}
 
-	localID := gen.NextID()
+	if source != nil {
+		collector.Add(source.Type+"\x00"+source.Value, source, record.LastSeen)
+		return
+	}
 
-	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     constants.TypeDate,
-		Category: constants.CategoryProperty,
-		Value:    "Last Seen: " + lastSeen,
-		Source:   source,
-		LocalID:  localID,
-	})
+	value := strings.TrimSpace(record.Value)
+	if value == "" {
+		return
+	}
+
+	collector.Add(strings.TrimSpace(record.Type)+"\x00"+strings.TrimSpace(record.Subdomain)+"\x00"+value, nil, record.LastSeen)
+}
+
+func appendShodanLastSeenResults(exec *schema.ModuleExecution, collector *dateutil.Collector, gen *modutil.LocalIDGenerator) {
+	for _, item := range collector.Items() {
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeDate,
+			Category: constants.CategoryProperty,
+			Value:    "Last Seen: " + item.Day,
+			Source:   item.Source,
+			LocalID:  gen.NextID(),
+		})
+	}
 }
 
 func appendShodanSRVResult(exec *schema.ModuleExecution, value, target string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) *schema.EntityRef {
