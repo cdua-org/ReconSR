@@ -134,6 +134,12 @@ func parseRawFile(ctx context.Context, root *os.Root, name, defaultSection strin
 	}()
 
 	currentSection := defaultSection
+	isSectionAllowed := false
+	if strings.HasPrefix(currentSection, "!") {
+		isSectionAllowed = true
+		currentSection = strings.TrimPrefix(currentSection, "!")
+	}
+
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		if err := ctx.Err(); err != nil {
@@ -150,6 +156,11 @@ func parseRawFile(ctx context.Context, root *os.Root, name, defaultSection strin
 
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
 			currentSection = line[1 : len(line)-1]
+			isSectionAllowed = false
+			if strings.HasPrefix(currentSection, "!") {
+				isSectionAllowed = true
+				currentSection = strings.TrimPrefix(currentSection, "!")
+			}
 			continue
 		}
 
@@ -160,8 +171,7 @@ func parseRawFile(ctx context.Context, root *os.Root, name, defaultSection strin
 		normalizedLine := strings.ReplaceAll(line, ",", " ")
 		for _, el := range strings.Fields(normalizedLine) {
 			val := el
-
-			isAllowed := false
+			isAllowed := isSectionAllowed
 			if strings.HasPrefix(val, "!") {
 				isAllowed = true
 				val = strings.TrimPrefix(val, "!")
