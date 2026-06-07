@@ -29,9 +29,10 @@ func ShowResultsMenu(ctx context.Context) {
 	for {
 		fmt.Println("\n" + colorCyan + colorBold + "--- " + i18n.T["OPT_SHOW_RESULTS"] + " ---" + colorReset)
 		fmt.Println("1. " + i18n.T["OPT_TREE_CONSOLE"])
-		fmt.Println("2. " + i18n.T["OPT_GRAPH_HTML"])
-		fmt.Println("3. " + i18n.T["OPT_BACK"])
-		fmt.Println("4. " + i18n.T["OPT_EXIT"])
+		fmt.Println("2. " + i18n.T["OPT_TREE_HTML"])
+		fmt.Println("3. " + i18n.T["OPT_GRAPH_HTML"])
+		fmt.Println("4. " + i18n.T["OPT_BACK"])
+		fmt.Println("5. " + i18n.T["OPT_EXIT"])
 		fmt.Print("\n" + colorGreen + i18n.T["LBL_CHOICE_PROMPT"] + ": " + colorReset)
 
 		choice := readUserInput()
@@ -44,8 +45,20 @@ func ShowResultsMenu(ctx context.Context) {
 				fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
 				continue
 			}
-			report.RenderResultsTree(graph)
+			report.RenderResultsTree(os.Stdout, graph, &report.ConsoleTreeFormatter{})
 		case "2":
+			graph, err := controller.GetActiveGraph(ctx, false)
+			if err != nil {
+				fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
+				continue
+			}
+			filename, err := report.GenerateTreeHTML(graph)
+			if err != nil {
+				fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
+			} else {
+				fmt.Printf("\n%s: %s\n", i18n.T["MSG_REPORT_SAVED"], filename)
+			}
+		case "3":
 			graph, err := controller.GetActiveGraph(ctx, true)
 			if err != nil {
 				fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
@@ -57,9 +70,9 @@ func ShowResultsMenu(ctx context.Context) {
 			} else {
 				fmt.Printf("\n%s: %s\n", i18n.T["MSG_REPORT_SAVED"], filename)
 			}
-		case "3":
-			return
 		case "4":
+			return
+		case "5":
 			os.Exit(0)
 		default:
 			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
@@ -83,17 +96,17 @@ func ShowBanner(ctx context.Context) {
 
 	fmt.Println(colorCyan + colorBold + "[ " + i18n.T["LBL_SYS_INFO"] + " ]" + colorReset)
 
-	fmt.Printf("  + %-18s %s\n", i18n.T["MSG_INIT_CORE"]+":", colorGreen+i18n.T["MSG_STATUS_READY"]+colorReset)
+	fmt.Printf("  + %-20s %s\n", i18n.T["MSG_INIT_CORE"]+":", colorGreen+i18n.T["MSG_STATUS_READY"]+colorReset)
 
 	totalMods, _, totalFuncs, _, _ := controller.GetSystemStatus(ctx)
-	modInfo := fmt.Sprintf("%d/%d", totalMods, totalFuncs)
-	fmt.Printf("  + %-18s %s\n", i18n.T["LBL_MODS"]+"/"+i18n.T["LBL_FUNCS"]+":", modInfo)
+	modInfo := fmt.Sprintf("%d | %d", totalMods, totalFuncs)
+	fmt.Printf("  + %-20s %s\n", i18n.T["LBL_MODS"]+" | "+i18n.T["LBL_FUNCS"]+":", modInfo)
 
-	fmt.Printf("  + %-18s %s\n", i18n.T["MSG_CONN_DB"]+":", colorGreen+i18n.T["MSG_STATUS_CONN"]+colorReset)
+	fmt.Printf("  + %-20s %s\n", i18n.T["MSG_CONN_DB"]+":", colorGreen+i18n.T["MSG_STATUS_CONN"]+colorReset)
 	fmt.Println()
 	fmt.Println(colorYellow + "  [!] " + i18n.T["MSG_API_KEYS_NOTE"] + colorReset)
 	fmt.Println(colorYellow + "      " + i18n.T["MSG_EMPTY_RESULTS_NOTE"] + colorReset)
-	fmt.Println(colorYellow + "      " + i18n.T["MSG_API_KEYS_SETUP"] + " " + WikiURL + colorReset)
+	fmt.Println(colorYellow + "      " + i18n.T["MSG_API_KEYS_SETUP"] + ": " + WikiURL + colorReset)
 	fmt.Println(colorCyan + "--------------------------------------------------" + colorReset)
 }
 
@@ -155,7 +168,7 @@ func ShowReconCompleteBanner(ctx context.Context) {
 // GetRawTarget extracts the target from args.
 func GetRawTarget(args []string) string {
 	if len(args) < 2 {
-		fmt.Printf("\n%s%s %s", colorGreen, i18n.T["LBL_INPUT_TARGET_PROMPT"], colorReset)
+		fmt.Printf("\n%s%s %s", colorGreen, i18n.T["LBL_INPUT_TARGET_PROMPT"]+":", colorReset)
 		target := readUserInput()
 		if target == "" {
 			fmt.Println(i18n.T["LBL_USAGE"] + ": " + args[0] + " <" + i18n.T["LBL_TARGET_HINT"] + ">")
@@ -185,7 +198,7 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 		if projectID := controller.GetActiveProjectID(); projectID != "" {
 			if run := handleProjectActions(ctx, projectID, targetType, targetValue); run != nil {
 				if *run {
-					fmt.Println("\n" + colorCyan + colorBold + i18n.T["MSG_RECON_STARTED"] + colorReset)
+					printReconStatus(false)
 				}
 				return *run
 			}
@@ -193,10 +206,10 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 			continue
 		}
 
-		fmt.Printf("\n%s%s:%s %s%s%s (%s)\n", colorCyan, i18n.T["LBL_TARGET"], colorReset, colorBold, targetValue, colorReset, targetType)
+		fmt.Printf("\n%s%s: %s%s%s%s (%s)\n", colorCyan, i18n.T["LBL_TARGET"], colorReset, colorBold, targetValue, colorReset, targetType)
 
 		tM, aM, tF, aF, _ := controller.GetSystemStatus(ctx)
-		fmt.Printf("%s%s:%s  %d/%d %s, %d/%d %s\n", colorCyan, i18n.T["LBL_ACTIVE_TOOLS"], colorReset, aM, tM, i18n.T["LBL_MODS"], aF, tF, i18n.T["LBL_FUNCS"])
+		fmt.Printf("%s%s:%s %d/%d %s, %d/%d %s\n", colorCyan, i18n.T["MSG_ACTIVE_TOOLS"], colorReset, aM, tM, i18n.T["LBL_MODS"], aF, tF, i18n.T["LBL_FUNCS"])
 		projects, hasModules, hasActiveFuncs, err := controller.GetProjects(ctx, targetType, targetValue)
 		if err != nil {
 			fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
@@ -204,7 +217,7 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 		}
 
 		if !hasModules {
-			fmt.Println(colorRed + i18n.T["ERR_NO_MODULES"] + "'" + targetType + "'" + colorReset)
+			fmt.Println(colorRed + i18n.T["ERR_NO_MODULES"] + ": '" + targetType + "'" + colorReset)
 			os.Exit(0)
 		}
 
@@ -281,7 +294,7 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 				continue
 			}
 			controller.SetActiveProject(newID)
-			fmt.Println("\n" + colorCyan + colorBold + i18n.T["MSG_RECON_STARTED"] + colorReset)
+			printReconStatus(false)
 			return true
 		} else if idx >= 2 && idx <= len(projects)+1 {
 			controller.SetActiveProject(projects[idx-2].DBIdentifier)
@@ -413,13 +426,13 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 			fmt.Println(colorGreen + colorBold + "[+] " + i18n.T["MSG_PROJ_COMPLETE"] + colorReset)
 		} else {
 			if len(pending) > 0 {
-				fmt.Printf("%s[%s]:%s\n", colorYellow, i18n.T["MSG_PENDING_FOUND"], colorReset)
+				fmt.Printf("%s[%s]%s\n", colorYellow, i18n.T["MSG_PENDING_FOUND"], colorReset)
 				for _, p := range pending {
 					fmt.Println(colorYellow + "  - " + p + colorReset)
 				}
 			}
 			if len(errs) > 0 {
-				fmt.Printf("%s[%s]:%s\n", colorRed, i18n.T["MSG_ERRORS_FOUND"], colorReset)
+				fmt.Printf("%s[%s]%s\n", colorRed, i18n.T["MSG_ERRORS_FOUND"], colorReset)
 				for _, e := range errs {
 					fmt.Println(colorRed + "  - " + e + colorReset)
 				}

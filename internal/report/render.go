@@ -1,9 +1,9 @@
 package report
 
 import (
-	"cdua-org/ReconSR/internal/i18n"
 	"cdua-org/ReconSR/schema"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 )
@@ -16,123 +16,32 @@ type propertyInfo struct {
 	OutOfScope bool
 }
 
+type contextGroup struct {
+	context   string
+	firstSeen string
+	lastSeen  string
+}
+
 // RenderResultsTree draws an ASCII representation of the project findings.
-func RenderResultsTree(graph *schema.ProjectGraph) {
+func RenderResultsTree(out io.Writer, graph *schema.ProjectGraph, f TreeFormatter) {
 	if len(graph.Edges) == 0 {
-		fmt.Println(colorYellow + "No relations found." + colorReset)
+		fmt.Fprintln(out, f.FormatNoRelations())
 		return
 	}
 
-	type contextGroup struct {
-		context   string
-		firstSeen string
-		lastSeen  string
-	}
-
-	type propKey struct {
+	type edgeKey struct {
 		parentID string
-		propID   string
+		childID  string
 	}
-	type propEdgeKey struct {
+	type edgeGroupKey struct {
 		parentID string
-		propID   string
+		childID  string
 		fn       string
 	}
-	propEdgeGroups := make(map[propEdgeKey][]contextGroup)
-	propDetails := make(map[propKey][]string)
 
-	for _, edge := range graph.Edges {
-		targetNode := graph.Nodes[edge.TargetID]
-		if targetNode.Category == "property" {
-			srcID := edge.SourceID
-			dstID := edge.TargetID
-
-			key := propEdgeKey{
-				parentID: srcID,
-				propID:   dstID,
-				fn:       edge.FunctionName,
-			}
-			dateStr := edge.CreatedAt
-			if len(dateStr) >= 10 {
-				dateStr = dateStr[:10]
-			}
-
-			groups := propEdgeGroups[key]
-			if len(groups) > 0 && groups[len(groups)-1].context == edge.Context {
-				groups[len(groups)-1].lastSeen = dateStr
-			} else {
-				groups = append(groups, contextGroup{
-					context:   edge.Context,
-					firstSeen: dateStr,
-					lastSeen:  dateStr,
-				})
-			}
-			propEdgeGroups[key] = groups
-		}
-	}
-
-	for key, groups := range propEdgeGroups {
-		timeGroups := make(map[string][]string)
-		var timeOrder []string
-
-		for _, g := range groups {
-			timeStr := fmt.Sprintf("[%s]", g.firstSeen)
-			if g.firstSeen != g.lastSeen {
-				timeStr = fmt.Sprintf("[%s - %s]", g.firstSeen, g.lastSeen)
-			}
-			if _, exists := timeGroups[timeStr]; !exists {
-				timeOrder = append(timeOrder, timeStr)
-			}
-			if g.context != "" {
-				ctxExists := false
-				for _, existingCtx := range timeGroups[timeStr] {
-					if existingCtx == g.context {
-						ctxExists = true
-						break
-					}
-				}
-				if !ctxExists {
-					timeGroups[timeStr] = append(timeGroups[timeStr], g.context)
-				}
-			}
-		}
-
-		var formattedContexts []string
-		for _, tStr := range timeOrder {
-			ctxs := timeGroups[tStr]
-			if len(ctxs) > 0 {
-				formattedContexts = append(formattedContexts, fmt.Sprintf("%s %s, %s", tStr, strings.Join(ctxs, " | "), key.fn))
-			} else {
-				formattedContexts = append(formattedContexts, fmt.Sprintf("%s %s", tStr, key.fn))
-			}
-		}
-
-		pk := propKey{parentID: key.parentID, propID: key.propID}
-		propDetails[pk] = append(propDetails[pk], formattedContexts...)
-	}
-
-	nodeProperties := make(map[string][]propertyInfo)
-	addedProps := make(map[propKey]bool)
-
-	for _, edge := range graph.Edges {
-		targetNode := graph.Nodes[edge.TargetID]
-		if targetNode.Category == "property" {
-			srcID := edge.SourceID
-			dstID := edge.TargetID
-			pk := propKey{parentID: srcID, propID: dstID}
-			if !addedProps[pk] {
-				addedProps[pk] = true
-				details := propDetails[pk]
-				nodeProperties[srcID] = append(nodeProperties[srcID], propertyInfo{
-					ID:         dstID,
-					Type:       targetNode.Type,
-					Value:      targetNode.Value,
-					Context:    strings.Join(details, " | "),
-					OutOfScope: targetNode.OutOfScope,
-				})
-			}
-		}
-	}
+	propEdgeGroups := make(map[edgeGroupKey][]contextGroup)
+	nodeEdgeGroups := make(map[edgeGroupKey][]contextGroup)
+	edgeBase := make(map[edgeKey]schema.EdgeData)
 
 	nodes := make(map[string]bool)
 	statsByCat := make(map[string]map[string]int)
@@ -149,14 +58,48 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 		}
 	}
 
-	for _, edge := range graph.Edges {
-		src := edge.SourceID
-		dst := edge.TargetID
+	addGroup := func(groups map[edgeGroupKey][]contextGroup, key edgeGroupKey, edge schema.EdgeData) {
+		dateStr := edge.CreatedAt
+		if len(dateStr) >= 10 {
+			dateStr = dateStr[:10]
+		}
+		list := groups[key]
+		if len(list) > 0 && list[len(list)-1].context == edge.Context {
+			list[len(list)-1].lastSeen = dateStr
+		} else {
+			list = append(list, contextGroup{
+				context:   edge.Context,
+				firstSeen: dateStr,
+				lastSeen:  dateStr,
+			})
+		}
+		groups[key] = list
+	}
 
-		srcNode := graph.Nodes[src]
-		dstNode := graph.Nodes[dst]
-		processEntity(src, srcNode.Type, srcNode.Category)
-		processEntity(dst, dstNode.Type, dstNode.Category)
+	for _, edge := range graph.Edges {
+		srcID := edge.SourceID
+		dstID := edge.TargetID
+		targetNode := graph.Nodes[dstID]
+		srcNode := graph.Nodes[srcID]
+
+		processEntity(srcID, srcNode.Type, srcNode.Category)
+		processEntity(dstID, targetNode.Type, targetNode.Category)
+
+		key := edgeGroupKey{
+			parentID: srcID,
+			childID:  dstID,
+			fn:       edge.FunctionName,
+		}
+
+		if targetNode.Category == "property" {
+			addGroup(propEdgeGroups, key, edge)
+		} else {
+			addGroup(nodeEdgeGroups, key, edge)
+			nk := edgeKey{parentID: srcID, childID: dstID}
+			if _, exists := edgeBase[nk]; !exists {
+				edgeBase[nk] = edge
+			}
+		}
 	}
 
 	for id, n := range graph.Nodes {
@@ -165,9 +108,59 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 		}
 	}
 
-	fmt.Printf("\n"+colorCyan+colorBold+"--- %s: %s ---"+colorReset+"\n", i18n.T["LBL_RESULTS_FOR"], graph.ProjectName)
+	propDetails := make(map[edgeKey][]string)
+	for key, groups := range propEdgeGroups {
+		pk := edgeKey{parentID: key.parentID, childID: key.childID}
+		propDetails[pk] = append(propDetails[pk], formatContextGroups(groups, key.fn)...)
+	}
+
+	nodeEdgeDetails := make(map[edgeKey][]string)
+	for key, groups := range nodeEdgeGroups {
+		nk := edgeKey{parentID: key.parentID, childID: key.childID}
+		nodeEdgeDetails[nk] = append(nodeEdgeDetails[nk], formatContextGroups(groups, key.fn)...)
+	}
+
+	nodeProperties := make(map[string][]propertyInfo)
+	addedProps := make(map[edgeKey]bool)
+	adj := make(map[string][]schema.EdgeData)
+	addedEdges := make(map[edgeKey]bool)
+
+	for _, edge := range graph.Edges {
+		srcID := edge.SourceID
+		dstID := edge.TargetID
+		targetNode := graph.Nodes[dstID]
+		ek := edgeKey{parentID: srcID, childID: dstID}
+
+		if targetNode.Category == "property" {
+			if !addedProps[ek] {
+				addedProps[ek] = true
+				details := propDetails[ek]
+				nodeProperties[srcID] = append(nodeProperties[srcID], propertyInfo{
+					ID:         dstID,
+					Type:       targetNode.Type,
+					Value:      targetNode.Value,
+					Context:    strings.Join(details, " | "),
+					OutOfScope: targetNode.OutOfScope,
+				})
+			}
+		} else {
+			if !addedEdges[ek] {
+				addedEdges[ek] = true
+				baseEdge := edgeBase[ek]
+				baseEdge.Context = strings.Join(nodeEdgeDetails[ek], " | ")
+				adj[srcID] = append(adj[srcID], baseEdge)
+			}
+		}
+	}
+
+	if header := f.FormatHeader(graph.ProjectName); header != "" {
+		fmt.Fprintln(out, header)
+	}
+
 	if len(nodes) > 0 {
-		fmt.Printf(colorCyan+"Total entities: %d"+colorReset+"\n", len(nodes))
+		if total := f.FormatTotalEntities(len(nodes)); total != "" {
+			fmt.Fprintln(out, total)
+		}
 
 		var catKeys []string
 		for cat := range statsByCat {
@@ -197,124 +190,22 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 			}
 
 			displayCat := strings.ToUpper(cat)
-			fmt.Printf("\n"+colorCyan+"%s: %d"+colorReset+"\n", displayCat, catTotal)
+			if catHeader := f.FormatCategoryHeader(displayCat, catTotal); catHeader != "" {
+				fmt.Fprintln(out, catHeader)
+			}
 			for _, t := range keys {
-				fmt.Printf("  - %s: %d\n", t, stats[t])
-			}
-		}
-	}
-	fmt.Println()
-	adj := make(map[string][]schema.EdgeData)
-
-	type nodeEdgeKey struct {
-		srcID string
-		dstID string
-	}
-	type nodeEdgeGroupKey struct {
-		srcID string
-		dstID string
-		fn    string
-	}
-	nodeEdgeGroups := make(map[nodeEdgeGroupKey][]contextGroup)
-	edgeBase := make(map[nodeEdgeKey]schema.EdgeData)
-
-	for _, edge := range graph.Edges {
-		targetNode := graph.Nodes[edge.TargetID]
-		if targetNode.Category == "property" {
-			continue
-		}
-
-		srcID := edge.SourceID
-		dstID := edge.TargetID
-
-		key := nodeEdgeGroupKey{
-			srcID: srcID,
-			dstID: dstID,
-			fn:    edge.FunctionName,
-		}
-
-		nk := nodeEdgeKey{srcID: key.srcID, dstID: key.dstID}
-		if _, exists := edgeBase[nk]; !exists {
-			edgeBase[nk] = edge
-		}
-
-		dateStr := edge.CreatedAt
-		if len(dateStr) >= 10 {
-			dateStr = dateStr[:10]
-		}
-
-		groups := nodeEdgeGroups[key]
-		if len(groups) > 0 && groups[len(groups)-1].context == edge.Context {
-			groups[len(groups)-1].lastSeen = dateStr
-		} else {
-			groups = append(groups, contextGroup{
-				context:   edge.Context,
-				firstSeen: dateStr,
-				lastSeen:  dateStr,
-			})
-		}
-		nodeEdgeGroups[key] = groups
-	}
-
-	nodeEdgeDetails := make(map[nodeEdgeKey][]string)
-
-	for key, groups := range nodeEdgeGroups {
-		timeGroups := make(map[string][]string)
-		var timeOrder []string
-
-		for _, g := range groups {
-			timeStr := fmt.Sprintf("[%s]", g.firstSeen)
-			if g.firstSeen != g.lastSeen {
-				timeStr = fmt.Sprintf("[%s - %s]", g.firstSeen, g.lastSeen)
-			}
-			if _, exists := timeGroups[timeStr]; !exists {
-				timeOrder = append(timeOrder, timeStr)
-			}
-			if g.context != "" {
-				ctxExists := false
-				for _, existingCtx := range timeGroups[timeStr] {
-					if existingCtx == g.context {
-						ctxExists = true
-						break
-					}
-				}
-				if !ctxExists {
-					timeGroups[timeStr] = append(timeGroups[timeStr], g.context)
+				if statLine := f.FormatCategoryStat(t, stats[t]); statLine != "" {
+					fmt.Fprintln(out, statLine)
 				}
 			}
-		}
-
-		var formattedContexts []string
-		for _, tStr := range timeOrder {
-			ctxs := timeGroups[tStr]
-			if len(ctxs) > 0 {
-				formattedContexts = append(formattedContexts, fmt.Sprintf("%s %s, %s", tStr, strings.Join(ctxs, " | "), key.fn))
-			} else {
-				formattedContexts = append(formattedContexts, fmt.Sprintf("%s %s", tStr, key.fn))
+			if catFooter := f.FormatCategoryFooter(); catFooter != "" {
+				fmt.Fprintln(out, catFooter)
 			}
 		}
-
-		nk := nodeEdgeKey{srcID: key.srcID, dstID: key.dstID}
-		nodeEdgeDetails[nk] = append(nodeEdgeDetails[nk], formattedContexts...)
 	}
 
-	addedEdges := make(map[nodeEdgeKey]bool)
-	for _, edge := range graph.Edges {
-		targetNode := graph.Nodes[edge.TargetID]
-		if targetNode.Category == "property" {
-			continue
-		}
-
-		srcID := edge.SourceID
-		dstID := edge.TargetID
-
-		nk := nodeEdgeKey{srcID: srcID, dstID: dstID}
-		if !addedEdges[nk] {
-			addedEdges[nk] = true
-			baseEdge := edgeBase[nk]
-			baseEdge.Context = strings.Join(nodeEdgeDetails[nk], " | ")
-			adj[nk.srcID] = append(adj[nk.srcID], baseEdge)
-		}
+	if f.FormatTotalEntities(1) != "" {
+		fmt.Fprintln(out)
 	}
 
 	var initialTargetID, initialTargetType string
@@ -338,7 +229,7 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 	}
 
 	visited := make(map[string]bool)
-	printNode(initialTargetID, graph.InitialTarget, initialTargetType, initialOutOfScope, initialLimitReached, "", "", "", true, adj, visited, nodeProperties, graph)
+	printNode(out, f, initialTargetID, graph.InitialTarget, initialTargetType, initialOutOfScope, initialLimitReached, "", "", "", true, adj, visited, nodeProperties, graph)
 
 	inDegree := make(map[string]int)
 	for _, edges := range adj {
@@ -374,50 +265,57 @@ func RenderResultsTree(graph *schema.ProjectGraph) {
 			d = n.DepthStrict
 		}
 
-		fmt.Println()
-		printNode(rootID, n.Value, n.Type, n.OutOfScope, d > graph.MaxDepth, "", "", "", true, adj, visited, nodeProperties, graph)
+		fmt.Fprintln(out)
+		printNode(out, f, rootID, n.Value, n.Type, n.OutOfScope, d > graph.MaxDepth, "", "", "", true, adj, visited, nodeProperties, graph)
 	}
 }
 
-func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, isLimitReached bool, prefix string, marker string, connInfo string, isLast bool, adj map[string][]schema.EdgeData, visited map[string]bool, nodeProperties map[string][]propertyInfo, graph *schema.ProjectGraph) {
-	nodeColor := colorGreen + colorBold
-	suffix := ""
-	if isOutOfScope {
-		nodeColor = colorBlue
-		suffix = " " + colorBlue + i18n.T["LBL_OUT_OF_SCOPE"] + colorReset
-	} else if isLimitReached {
-		nodeColor = colorYellow + colorBold
-		suffix = " " + colorYellow + i18n.T["LBL_LIMIT_REACHED"] + colorReset
-	}
+func formatContextGroups(groups []contextGroup, fn string) []string {
+	timeGroups := make(map[string][]string)
+	var timeOrder []string
 
-	formattedConn := ""
-	if connInfo != "" {
-		formattedConn = fmt.Sprintf(" (%s%s%s)", colorMagenta, connInfo, colorReset)
-	}
-
-	typeStr := ""
-	if nodeType != "" {
-		if nodeType == "invalid" {
-			typeStr = fmt.Sprintf("[%s%s%s] ", colorRed, strings.ToUpper(nodeType), colorReset)
-		} else {
-			typeStr = fmt.Sprintf("[%s%s%s]", colorCyan, strings.ToUpper(nodeType), colorReset)
-
-			if n, ok := graph.Nodes[nodeID]; ok && len(n.Subtypes) > 0 {
-				var subtypeStrs []string
-				for _, st := range n.Subtypes {
-					subtypeStrs = append(subtypeStrs, fmt.Sprintf("[%s%s%s]", colorCyan, strings.ToUpper(st), colorReset))
+	for _, g := range groups {
+		timeStr := fmt.Sprintf("[%s]", g.firstSeen)
+		if g.firstSeen != g.lastSeen {
+			timeStr = fmt.Sprintf("[%s - %s]", g.firstSeen, g.lastSeen)
+		}
+		if _, exists := timeGroups[timeStr]; !exists {
+			timeOrder = append(timeOrder, timeStr)
+		}
+		if g.context != "" {
+			ctxExists := false
+			for _, existingCtx := range timeGroups[timeStr] {
+				if existingCtx == g.context {
+					ctxExists = true
+					break
 				}
-				typeStr += strings.Join(subtypeStrs, "")
 			}
-			typeStr += " "
+			if !ctxExists {
+				timeGroups[timeStr] = append(timeGroups[timeStr], g.context)
+			}
 		}
 	}
 
-	if marker != "" {
-		fmt.Printf("%s%s %s%s%s%s\n", prefix, marker, typeStr, nodeColor+value+colorReset, formattedConn, suffix)
-	} else {
-		fmt.Printf("%s%s%s%s%s\n", prefix, typeStr, nodeColor+value+colorReset, formattedConn, suffix)
+	var formattedContexts []string
+	for _, tStr := range timeOrder {
+		ctxs := timeGroups[tStr]
+		if len(ctxs) > 0 {
+			formattedContexts = append(formattedContexts, fmt.Sprintf("%s %s, %s", tStr, strings.Join(ctxs, " | "), fn))
+		} else {
+			formattedContexts = append(formattedContexts, fmt.Sprintf("%s %s", tStr, fn))
+		}
 	}
+	return formattedContexts
+}
+
+func printNode(out io.Writer, f TreeFormatter, nodeID string, value string, nodeType string, isOutOfScope bool, isLimitReached bool, prefix string, marker string, connInfo string, isLast bool, adj map[string][]schema.EdgeData, visited map[string]bool, nodeProperties map[string][]propertyInfo, graph *schema.ProjectGraph) {
+	var subtypes []string
+	if n, ok := graph.Nodes[nodeID]; ok {
+		subtypes = n.Subtypes
+	}
+
+	formatted := f.FormatNode(prefix, marker, nodeType, subtypes, value, connInfo, isOutOfScope, isLimitReached, false)
+	fmt.Fprintln(out, formatted)
 
 	childPrefix := prefix
 	if marker != "" {
@@ -431,18 +329,18 @@ func printNode(nodeID string, value string, nodeType string, isOutOfScope bool, 
 	children := adj[nodeID]
 	hasChildren := len(children) > 0
 
-	printProperties(nodeID, childPrefix, hasChildren, "", nodeProperties, adj, visited, graph)
+	printProperties(out, f, nodeID, childPrefix, hasChildren, "", nodeProperties, adj, visited, graph)
 
 	visited[nodeID] = true
 
-	printChildren(children, childPrefix, adj, visited, nodeProperties, graph)
+	printChildren(out, f, children, childPrefix, adj, visited, nodeProperties, graph)
 
 	if prefix == "" && marker == "" {
-		fmt.Println()
+		fmt.Fprintln(out)
 	}
 }
 
-func printProperties(nodeID string, basePrefix string, hasChildren bool, propIndent string, nodeProperties map[string][]propertyInfo, adj map[string][]schema.EdgeData, visited map[string]bool, graph *schema.ProjectGraph) {
+func printProperties(out io.Writer, f TreeFormatter, nodeID string, basePrefix string, hasChildren bool, propIndent string, nodeProperties map[string][]propertyInfo, adj map[string][]schema.EdgeData, visited map[string]bool, graph *schema.ProjectGraph) {
 	props := nodeProperties[nodeID]
 	if len(props) > 1 {
 		sort.Slice(props, func(i, j int) bool {
@@ -457,35 +355,20 @@ func printProperties(nodeID string, basePrefix string, hasChildren bool, propInd
 	}
 
 	for _, prop := range props {
-		contextStr := ""
-		if prop.Context != "" {
-			contextStr = fmt.Sprintf(" (%s%s%s)", colorMagenta, prop.Context, colorReset)
-		}
-
 		startChar := "  "
 		if hasChildren {
 			startChar = "│ "
 		}
 
-		valColor := ""
-		suffix := ""
-		if prop.OutOfScope {
-			valColor = colorBlue
-			suffix = " " + colorBlue + i18n.T["LBL_OUT_OF_SCOPE"] + colorReset
-		}
-
-		typeColor := colorYellow
-		if prop.Type == "invalid" {
-			typeColor = colorRed
-		}
-
-		if visited[prop.ID] {
-			fmt.Printf("%s%s%s• [%s%s%s] [%s%s%s]%s%s %s(seen)%s\n", basePrefix, startChar, propIndent, typeColor, strings.ToUpper(prop.Type), colorReset, valColor, prop.Value, colorReset, contextStr, suffix, colorCyan, colorReset)
-			continue
-		}
+		isSeen := visited[prop.ID]
 		visited[prop.ID] = true
 
-		fmt.Printf("%s%s%s• [%s%s%s] [%s%s%s]%s%s\n", basePrefix, startChar, propIndent, typeColor, strings.ToUpper(prop.Type), colorReset, valColor, prop.Value, colorReset, contextStr, suffix)
+		formatted := f.FormatProperty(basePrefix, startChar, propIndent, prop.Type, prop.Value, prop.Context, prop.OutOfScope, isSeen)
+		fmt.Fprintln(out, formatted)
+
+		if isSeen {
+			continue
+		}
 
 		propChildren := adj[prop.ID]
 		nextPropIndent := propIndent + "  "
@@ -493,16 +376,16 @@ func printProperties(nodeID string, basePrefix string, hasChildren bool, propInd
 			nextPropIndent = propIndent + "  │ "
 		}
 
-		printProperties(prop.ID, basePrefix, hasChildren, nextPropIndent, nodeProperties, adj, visited, graph)
+		printProperties(out, f, prop.ID, basePrefix, hasChildren, nextPropIndent, nodeProperties, adj, visited, graph)
 
 		if len(propChildren) > 0 {
 			propChildPrefix := basePrefix + startChar + propIndent + "  "
-			printChildren(propChildren, propChildPrefix, adj, visited, nodeProperties, graph)
+			printChildren(out, f, propChildren, propChildPrefix, adj, visited, nodeProperties, graph)
 		}
 	}
 }
 
-func printChildren(children []schema.EdgeData, childPrefix string, adj map[string][]schema.EdgeData, visited map[string]bool, nodeProperties map[string][]propertyInfo, graph *schema.ProjectGraph) {
+func printChildren(out io.Writer, f TreeFormatter, children []schema.EdgeData, childPrefix string, adj map[string][]schema.EdgeData, visited map[string]bool, nodeProperties map[string][]propertyInfo, graph *schema.ProjectGraph) {
 	if len(children) == 0 {
 		return
 	}
@@ -555,43 +438,11 @@ func printChildren(children []schema.EdgeData, childPrefix string, adj map[strin
 		targetType := targetNode.Type
 		targetID := child.TargetID
 
-		targetTypeStr := ""
-		if targetType != "" {
-			if targetType == "invalid" {
-				targetTypeStr = fmt.Sprintf("[%s%s%s] ", colorRed, strings.ToUpper(targetType), colorReset)
-			} else {
-				targetTypeStr = fmt.Sprintf("[%s%s%s]", colorCyan, strings.ToUpper(targetType), colorReset)
-
-				if len(targetNode.Subtypes) > 0 {
-					var subtypeStrs []string
-					for _, st := range targetNode.Subtypes {
-						subtypeStrs = append(subtypeStrs, fmt.Sprintf("[%s%s%s]", colorCyan, strings.ToUpper(st), colorReset))
-					}
-					targetTypeStr += strings.Join(subtypeStrs, "")
-				}
-				targetTypeStr += " "
-			}
-		}
-
 		if visited[targetID] {
-			childConn := child.Context
-			formattedChildConn := ""
-			if childConn != "" {
-				formattedChildConn = fmt.Sprintf(" (%s%s%s)", colorMagenta, childConn, colorReset)
-			}
-			nodeColor := colorYellow
-			suffix := ""
-			if targetNode.OutOfScope {
-				nodeColor = colorBlue
-				suffix = " " + colorBlue + i18n.T["LBL_OUT_OF_SCOPE"] + colorReset
-			} else if isLimitReached(targetID) {
-				nodeColor = colorYellow + colorBold
-				suffix = " " + colorYellow + i18n.T["LBL_LIMIT_REACHED"] + colorReset
-			}
-			suffix += " " + colorCyan + "(seen)" + colorReset
-			fmt.Printf("%s%s %s%s%s%s\n", childPrefix, childMarker, targetTypeStr, nodeColor+targetValue+colorReset, formattedChildConn, suffix)
+			formatted := f.FormatNode(childPrefix, childMarker, targetType, targetNode.Subtypes, targetValue, child.Context, targetNode.OutOfScope, isLimitReached(targetID), true)
+			fmt.Fprintln(out, formatted)
 		} else {
-			printNode(targetID, targetValue, targetType, targetNode.OutOfScope, isLimitReached(targetID), childPrefix, childMarker, child.Context, isChildLast, adj, visited, nodeProperties, graph)
+			printNode(out, f, targetID, targetValue, targetType, targetNode.OutOfScope, isLimitReached(targetID), childPrefix, childMarker, child.Context, isChildLast, adj, visited, nodeProperties, graph)
 		}
 	}
 }
