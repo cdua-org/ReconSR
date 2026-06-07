@@ -8,6 +8,7 @@ import (
 	"embed"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -17,9 +18,10 @@ import (
 //go:embed default_scope.txt
 var defaultScope embed.FS
 
-const configDir = "configs"
-const configFile = "configs/scope.txt"
-const asnConfigFile = "configs/scope_asn.txt"
+const (
+	scopeDir  = "configs/scope"
+	mainScope = "configs/scope/scope.txt"
+)
 
 var (
 	// blockedDotDomains stores domains with a leading dot (e.g., ".example.com")
@@ -39,7 +41,7 @@ var (
 	mu sync.RWMutex
 )
 
-// Setup ensures that the scope configuration file exists.
+// Setup ensures that the scope configuration directory and default file exist.
 func Setup(ctx context.Context) error {
 	root, err := os.OpenRoot(".")
 	if err != nil {
@@ -47,22 +49,22 @@ func Setup(ctx context.Context) error {
 	}
 	defer root.Close()
 
-	if err := root.MkdirAll(configDir, 0700); err != nil {
+	if err := root.MkdirAll(scopeDir, 0700); err != nil {
 		return err
 	}
-	if _, err := root.Stat(configFile); os.IsNotExist(err) {
+	if _, err := root.Stat(mainScope); os.IsNotExist(err) {
 		content, err := defaultScope.ReadFile("default_scope.txt")
 		if err != nil {
 			return err
 		}
-		if err := root.WriteFile(configFile, content, 0600); err != nil {
+		if err := root.WriteFile(mainScope, content, 0600); err != nil {
 			return err
 		}
 	}
 	return Load(ctx)
 }
 
-// Load reads the scope configuration from the file into memory.
+// Load reads all scope configuration files from the scope directory into memory.
 func Load(ctx context.Context) error {
 	newBlockedDotDomains := make(map[string]struct{})
 	newBlockedNets := make([]*net.IPNet, 0)
@@ -78,22 +80,28 @@ func Load(ctx context.Context) error {
 	}
 	defer root.Close()
 
-	allowedMain, blockedMain, err := parseRawFile(ctx, root, configFile, "")
+	entries, err := os.ReadDir(scopeDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 
-	allowedAsn, blockedAsn, err := parseRawFile(ctx, root, asnConfigFile, "asn")
-	if err != nil {
-		if !os.IsNotExist(err) {
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".txt") {
+			continue
+		}
+
+		path := filepath.Join(scopeDir, entry.Name())
+		allowed, blocked, err := parseRawFile(ctx, root, path, "")
+		if err != nil {
 			return err
 		}
-	}
 
-	processRaw(allowedMain, newAllowedDotDomains, &newAllowedNets, newAllowedGeneric)
-	processRaw(blockedMain, newBlockedDotDomains, &newBlockedNets, newBlockedGeneric)
-	processRaw(allowedAsn, newAllowedDotDomains, &newAllowedNets, newAllowedGeneric)
-	processRaw(blockedAsn, newBlockedDotDomains, &newBlockedNets, newBlockedGeneric)
+		processRaw(allowed, newAllowedDotDomains, &newAllowedNets, newAllowedGeneric)
+		processRaw(blocked, newBlockedDotDomains, &newBlockedNets, newBlockedGeneric)
+	}
 
 	mu.Lock()
 	defer mu.Unlock()

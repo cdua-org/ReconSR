@@ -98,7 +98,7 @@ MSG_NO_RELATIONS_FOUND=No relations found.
 # ERRORS
 # ==========================================
 ERR_INVALID_FORMAT=Error: invalid format.
-ERR_OUT_OF_SCOPE=Error: target is out of scope (check scope.txt).
+ERR_OUT_OF_SCOPE=Error: target is out of scope (check configs/scope/).
 ERR_INVALID_CHOICE=Invalid choice.
 ERR_UNSUPPORTED_TYPE=Error: unsupported entity type.
 ERR_EXAMPLE_DOMAIN=Expected format: example.com
