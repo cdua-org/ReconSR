@@ -19,7 +19,7 @@ import (
 func (m *shodanModule) getShodanAPIDomain(target schema.Entity) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetShodanAPIDomain)
 
-	if m.apiKey == "demo-api-key" {
+	if m.apiKey == demoIndicator {
 		return m.getShodanAPIDomainDemo(&exec, target)
 	}
 

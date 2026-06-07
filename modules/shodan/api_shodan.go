@@ -15,6 +15,10 @@ import (
 	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
+const (
+	demoIndicator = "demo-api-key"
+)
+
 var (
 	shodanAPIBaseURL  = "https://api.shodan.io"
 	shodanAPIKeyRegex = regexp.MustCompile(`([?&]key=)[^&"\s]+`)

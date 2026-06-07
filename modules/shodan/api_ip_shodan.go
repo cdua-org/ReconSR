@@ -16,7 +16,7 @@ import (
 func (m *shodanModule) getShodanAPIIP(target schema.Entity) schema.ModuleExecution {
 	exec := modutil.NewExecution(constants.FuncGetShodanAPIIP)
 
-	if m.apiKey == "demo-api-key" {
+	if m.apiKey == demoIndicator {
 		return m.getShodanAPIIPDemo(&exec, target)
 	}
 

@@ -12,7 +12,7 @@ import (
 var demoData embed.FS
 
 // getShodanAPIIPDemo is a demo function that loads a local JSON fixture
-// instead of querying the Shodan API when the "demo-api-key" is used.
+// instead of querying the Shodan API when the demo API key is used.
 func (m *shodanModule) getShodanAPIIPDemo(exec *schema.ModuleExecution, target schema.Entity) schema.ModuleExecution {
 	if !m.demoIPFired.CompareAndSwap(false, true) {
 		dbg.Printf("%s skipped stage=demo_already_fired target=%q", constants.FuncGetShodanAPIIP, target.Value)
@@ -24,7 +24,7 @@ func (m *shodanModule) getShodanAPIIPDemo(exec *schema.ModuleExecution, target s
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeInfo,
 		Category: constants.CategoryProperty,
-		Value:    "⚠️ DEMO MODE: Showing sample data for Shodan (API key not configured)",
+		Value:    "⚠️ DEMO MODE: Showing sample data for Shodan IP (API key not configured)",
 	})
 
 	data, err := demoData.ReadFile("testdata/ip_full.json")
@@ -42,7 +42,7 @@ func (m *shodanModule) getShodanAPIIPDemo(exec *schema.ModuleExecution, target s
 }
 
 // getShodanAPIDomainDemo is a demo function that loads a local JSON fixture
-// instead of querying the Shodan API when the "demo-api-key" is used.
+// instead of querying the Shodan API when the demo API key is used.
 func (m *shodanModule) getShodanAPIDomainDemo(exec *schema.ModuleExecution, target schema.Entity) schema.ModuleExecution {
 	if !m.demoDomainFired.CompareAndSwap(false, true) {
 		dbg.Printf("%s skipped stage=demo_already_fired target=%q", constants.FuncGetShodanAPIDomain, target.Value)
@@ -54,7 +54,7 @@ func (m *shodanModule) getShodanAPIDomainDemo(exec *schema.ModuleExecution, targ
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeInfo,
 		Category: constants.CategoryProperty,
-		Value:    "⚠️ DEMO MODE: Showing sample data for Shodan (API key not configured)",
+		Value:    "⚠️ DEMO MODE: Showing sample data for Shodan Domain (API key not configured)",
 	})
 
 	data, err := demoData.ReadFile("testdata/domain.json")
