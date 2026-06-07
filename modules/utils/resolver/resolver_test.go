@@ -1,6 +1,51 @@
 package resolver
 
-import "testing"
+import (
+	"strconv"
+	"testing"
+)
+
+func TestDebugConsoleOption(t *testing.T) {
+	oldDebug, hadDebug := Options["Debug"]
+	oldDebugConsole, hadDebugConsole := Options["DebugConsole"]
+	defer func() {
+		if hadDebug {
+			Options["Debug"] = oldDebug
+		} else {
+			delete(Options, "Debug")
+		}
+		if hadDebugConsole {
+			Options["DebugConsole"] = oldDebugConsole
+		} else {
+			delete(Options, "DebugConsole")
+		}
+	}()
+
+	tests := []struct {
+		name         string
+		debug        string
+		debugConsole string
+		want         bool
+	}{
+		{name: "unset console", debug: strconv.FormatBool(true), debugConsole: "", want: false},
+		{name: "console enabled", debug: strconv.FormatBool(true), debugConsole: strconv.FormatBool(true), want: true},
+		{name: "master disabled", debug: strconv.FormatBool(false), debugConsole: strconv.FormatBool(true), want: false},
+		{name: "console false", debug: strconv.FormatBool(true), debugConsole: strconv.FormatBool(false), want: false},
+	}
+
+	for _, tt := range tests {
+		Options["Debug"] = tt.debug
+		if tt.debugConsole == "" {
+			delete(Options, "DebugConsole")
+		} else {
+			Options["DebugConsole"] = tt.debugConsole
+		}
+
+		if got := isDebugConsole(); got != tt.want {
+			t.Errorf("%s: expected %v, got %v", tt.name, tt.want, got)
+		}
+	}
+}
 
 func TestReverseIP(t *testing.T) {
 	tests := []struct {

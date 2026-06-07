@@ -3,17 +3,22 @@ package shodan
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
-var shodanAPIBaseURL = "https://api.shodan.io"
+var (
+	shodanAPIBaseURL  = "https://api.shodan.io"
+	shodanAPIKeyRegex = regexp.MustCompile(`([?&]key=)[^&"\s]+`)
+)
 
 func (m *shodanModule) waitRateLimit() {
 	m.mu.Lock()
@@ -25,13 +30,30 @@ func (m *shodanModule) waitRateLimit() {
 	m.lastReqTime = time.Now()
 }
 
+func sanitizeShodanLogValue(value string) string {
+	return shodanAPIKeyRegex.ReplaceAllString(value, `${1}[redacted]`)
+}
+
+func sanitizeShodanError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	sanitized := sanitizeShodanLogValue(err.Error())
+	if sanitized == err.Error() {
+		return err
+	}
+
+	return errors.New(sanitized)
+}
+
 func (m *shodanModule) handlePreflightAPI() {
 	m.waitRateLimit()
 	u := fmt.Sprintf("%s/api-info?key=%s", shodanAPIBaseURL, url.QueryEscape(m.apiKey))
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u, http.NoBody)
 	if err != nil {
-		dbg.Printf("%s|%s error stage=preflight_create_request err=%v", constants.FuncGetShodanAPIIP, constants.FuncGetShodanAPIDomain, err)
+		dbg.Printf("%s|%s error stage=preflight_create_request err=%v", constants.FuncGetShodanAPIIP, constants.FuncGetShodanAPIDomain, sanitizeShodanError(err))
 		m.mu.Lock()
 		m.keyInvalid = true
 		m.mu.Unlock()
@@ -42,7 +64,7 @@ func (m *shodanModule) handlePreflightAPI() {
 	client := &http.Client{Timeout: resolver.HTTPTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
-		dbg.Printf("%s|%s error stage=preflight_do_request err=%v", constants.FuncGetShodanAPIIP, constants.FuncGetShodanAPIDomain, err)
+		dbg.Printf("%s|%s error stage=preflight_do_request err=%v", constants.FuncGetShodanAPIIP, constants.FuncGetShodanAPIDomain, sanitizeShodanError(err))
 		m.mu.Lock()
 		m.keyInvalid = true
 		m.mu.Unlock()

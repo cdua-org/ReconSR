@@ -217,7 +217,7 @@ func loadConfig() {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if writeErr := os.WriteFile(configPath, defaultNetworkConfig, 0o600); writeErr != nil && isDebug() {
+			if writeErr := os.WriteFile(configPath, defaultNetworkConfig, 0o600); writeErr != nil && isDebugConsole() {
 				fmt.Fprintf(os.Stderr, "[resolver-debug] failed to write default config: %v\n", writeErr)
 			}
 		}
@@ -492,7 +492,7 @@ func resolveDoH(ctx context.Context, endpoint, target string, qtype int) (ips []
 		return nil, nil, fmt.Errorf("doh request failed: %w", err)
 	}
 	defer func() {
-		if cerr := resp.Body.Close(); cerr != nil && isDebug() {
+		if cerr := resp.Body.Close(); cerr != nil && isDebugConsole() {
 			fmt.Fprintf(os.Stderr, "[resolver-debug] warning: failed to close cache fetch body: %v\n", cerr)
 		}
 	}()
@@ -561,7 +561,7 @@ func QueryDoHDns(ctx context.Context, target string, qtype int) (*DoHResponse, [
 		}
 
 		body, err := io.ReadAll(resp.Body)
-		if cerr := resp.Body.Close(); cerr != nil && isDebug() {
+		if cerr := resp.Body.Close(); cerr != nil && isDebugConsole() {
 			fmt.Fprintf(os.Stderr, "[resolver-debug] warning: failed to close DoH body: %v\n", cerr)
 		}
 		if err != nil {
@@ -801,7 +801,15 @@ func ReverseIP(target string) (rev string, isIPv4 bool, err error) {
 	return strings.TrimSuffix(sb.String(), "."), false, nil
 }
 
+func isOptionEnabled(key string) bool {
+	val, ok := GetOption(key)
+	return ok && val == strconv.FormatBool(true)
+}
+
 func isDebug() bool {
-	val, ok := GetOption("Debug")
-	return ok && val == "true"
+	return isOptionEnabled("Debug")
+}
+
+func isDebugConsole() bool {
+	return isDebug() && isOptionEnabled("DebugConsole")
 }

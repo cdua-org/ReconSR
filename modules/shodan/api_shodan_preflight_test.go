@@ -1,11 +1,43 @@
 package shodan
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestSanitizeShodanLogValue(t *testing.T) {
+	sanitized := sanitizeShodanLogValue("https://api.shodan.io/dns/domain/example.com?key=super-secret&page=2")
+	if strings.Contains(sanitized, "super-secret") {
+		t.Fatalf("expected key to be redacted, got %q", sanitized)
+	}
+	if !strings.Contains(sanitized, "key=[redacted]") {
+		t.Fatalf("expected redacted marker in sanitized url, got %q", sanitized)
+	}
+	if !strings.Contains(sanitized, "page=2") {
+		t.Fatalf("expected non-secret query params to be preserved, got %q", sanitized)
+	}
+}
+
+func TestSanitizeShodanError(t *testing.T) {
+	err := errors.New("Get \"https://api.shodan.io/api-info?key=super-secret&history=true\": EOF")
+	sanitized := sanitizeShodanError(err)
+	if sanitized == nil {
+		t.Fatal("expected sanitized error")
+	}
+	if strings.Contains(sanitized.Error(), "super-secret") {
+		t.Fatalf("expected key to be redacted, got %q", sanitized.Error())
+	}
+	if !strings.Contains(sanitized.Error(), "key=[redacted]") {
+		t.Fatalf("expected redacted marker in sanitized error, got %q", sanitized.Error())
+	}
+	if !strings.Contains(sanitized.Error(), "history=true") {
+		t.Fatalf("expected non-secret query params to be preserved, got %q", sanitized.Error())
+	}
+}
 
 func TestWaitRateLimit(t *testing.T) {
 	module := &shodanModule{}

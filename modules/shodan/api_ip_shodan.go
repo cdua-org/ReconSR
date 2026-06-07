@@ -67,7 +67,7 @@ func (m *shodanModule) getShodanAPIIP(target schema.Entity) schema.ModuleExecuti
 	client := &http.Client{Timeout: resolver.HTTPTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
-		modutil.SetError(&exec, "do request: %v", err)
+		modutil.SetError(&exec, "do request: %v", sanitizeShodanError(err))
 		return exec
 	}
 	defer func() {
