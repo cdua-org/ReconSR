@@ -944,9 +944,37 @@
             {{define "middle"}}] ; const initialEdges = [{{end}}
 
             {{define "footer"}}] ;
+                    const edgePairs = {};
                     initialEdges.forEach(e => {
                         e.font = { size: 0, strokeWidth: 0 };
+
+                        const pairId = [e.from, e.to].sort().join('-');
+                        if (!edgePairs[pairId]) edgePairs[pairId] = [];
+                        edgePairs[pairId].push(e);
                     });
+
+                    for (const pairId in edgePairs) {
+                        const parallelEdges = edgePairs[pairId];
+                        if (parallelEdges.length > 1) {
+                            const collapsedWidth = Math.min(1.5 + (parallelEdges.length * 0.4), 3.5);
+
+                            parallelEdges.forEach((edge, index) => {
+                                edge.width = collapsedWidth;
+                                edge._collapsedWidth = collapsedWidth;
+
+                                const step = 0.15;
+                                const direction = edge.from < edge.to ? 1 : -1;
+                                let roundness = Math.ceil((index + 1) / 2) * step * direction;
+                                if (index % 2 === 1) roundness *= -1;
+
+                                edge._expandedSmooth = {
+                                    enabled: true,
+                                    type: 'curvedCW',
+                                    roundness: roundness
+                                };
+                            });
+                        }
+                    }
 
                     let uniqueTimesSet = new Set();
                     initialEdges.forEach(e => {
@@ -1266,7 +1294,10 @@
                                 strokeWidth: 2,
                                 strokeColor: '#0f172a'
                             },
-                            hoverWidth: 1.5, smooth: { type: 'continuous' }
+                            hoverWidth: 1.5,
+                            smooth: {
+                                enabled: false
+                            }
                         },
                         groups: {
                             root: { mass: 8, color: { background: '#d97706', border: '#fbbf24', highlight: { background: '#f59e0b', border: '#fbbf24' } }, shape: 'diamond', size: 35 }
@@ -1813,6 +1844,7 @@
 
                     let currentModalId = null;
                     let currentlySelectedNodeId = null;
+                    let currentlyExpandedEdges = [];
 
                     function closeModal() {
                         document.getElementById('modal').style.display = 'none';
@@ -1820,6 +1852,18 @@
                         if (currentlySelectedNodeId) {
                             nodes.update({ id: currentlySelectedNodeId, color: originalColors[currentlySelectedNodeId] || null });
                             currentlySelectedNodeId = null;
+                        }
+                        if (currentlyExpandedEdges.length > 0) {
+                            const collapseUpdates = currentlyExpandedEdges.map(edgeId => {
+                                const eData = edges.get(edgeId);
+                                return {
+                                    id: edgeId,
+                                    width: (eData && eData._collapsedWidth) ? eData._collapsedWidth : 1.5,
+                                    smooth: { enabled: false }
+                                };
+                            });
+                            edges.update(collapseUpdates);
+                            currentlyExpandedEdges = [];
                         }
                     }
 
@@ -2761,17 +2805,54 @@
 
                         const modal = document.getElementById('modal');
                         if (!clickedId) {
+                            if (currentlyExpandedEdges.length > 0) {
+                                const collapseUpdates = currentlyExpandedEdges.map(edgeId => {
+                                    const eData = edges.get(edgeId);
+                                    return {
+                                        id: edgeId,
+                                        width: (eData && eData._collapsedWidth) ? eData._collapsedWidth : 1.5,
+                                        smooth: { enabled: false }
+                                    };
+                                });
+                                edges.update(collapseUpdates);
+                                currentlyExpandedEdges = [];
+                            }
                             closeModal();
                             return;
                         }
 
                         if (clickedId === currentModalId && modal.style.display === 'block') {
+                            if (currentlyExpandedEdges.length > 0) {
+                                const collapseUpdates = currentlyExpandedEdges.map(edgeId => {
+                                    const eData = edges.get(edgeId);
+                                    return {
+                                        id: edgeId,
+                                        width: (eData && eData._collapsedWidth) ? eData._collapsedWidth : 1.5,
+                                        smooth: { enabled: false }
+                                    };
+                                });
+                                edges.update(collapseUpdates);
+                                currentlyExpandedEdges = [];
+                            }
                             closeModal();
                             return;
                         }
 
                         currentModalId = clickedId;
                         let content = '';
+
+                        if (currentlyExpandedEdges.length > 0) {
+                            const collapseUpdates = currentlyExpandedEdges.map(edgeId => {
+                                const eData = edges.get(edgeId);
+                                return {
+                                    id: edgeId,
+                                    width: (eData && eData._collapsedWidth) ? eData._collapsedWidth : 1.5,
+                                    smooth: { enabled: false }
+                                };
+                            });
+                            edges.update(collapseUpdates);
+                            currentlyExpandedEdges = [];
+                        }
 
                         if (currentlySelectedNodeId && currentlySelectedNodeId !== (params.nodes.length > 0 ? params.nodes[0] : null)) {
                             nodes.update({ id: currentlySelectedNodeId, color: originalColors[currentlySelectedNodeId] || null });
@@ -2904,6 +2985,25 @@
                             const edgeId = params.edges[0];
                             const edge = edges.get(edgeId);
                             if (edge) {
+                                const relatedEdges = edges.get({
+                                    filter: item => (item.from === edge.from && item.to === edge.to) || (item.from === edge.to && item.to === edge.from)
+                                });
+
+                                const expandUpdates = [];
+                                relatedEdges.forEach(re => {
+                                    if (re._expandedSmooth) {
+                                        expandUpdates.push({
+                                            id: re.id,
+                                            width: 1.5,
+                                            smooth: re._expandedSmooth
+                                        });
+                                        currentlyExpandedEdges.push(re.id);
+                                    }
+                                });
+                                if (expandUpdates.length > 0) {
+                                    edges.update(expandUpdates);
+                                }
+
                                 if (edge.isVirtual && edge.chain) {
                                     content += '<h3 style="color: #f59e0b; margin-bottom: 20px; font-size: 1.2rem;">DISCOVERY CHAIN</h3>';
 
