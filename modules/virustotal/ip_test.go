@@ -106,8 +106,8 @@ func assertIPMetadataExtractionCore(t *testing.T, results []schema.ModuleResult)
 	assertTagResult(t, results, "synthetic")
 	assertTagResult(t, results, "network")
 
-	threat := requireResult(t, results, "ip threat score", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeVTThreatScore
+	threat := requireResult(t, results, "threat score property", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeThreatScore
 	})
 	if !strings.Contains(threat.Context, "SyntheticIPEngineA") || !strings.Contains(threat.Context, "SyntheticIPEngineB") || !strings.Contains(threat.Context, "SyntheticIPEngineC") {
 		t.Fatalf("expected ip threat context to contain malicious and suspicious engines, got %+v", threat)

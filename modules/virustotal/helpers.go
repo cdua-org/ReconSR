@@ -93,20 +93,20 @@ func (m *module) extractThreatScore(attr map[string]any, entityType, entityValue
 	engines := extractEngines(attr)
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:     constants.TypeVTThreatScore,
+		Type:     constants.TypeThreatScore,
 		Category: constants.CategoryProperty,
 		Value:    fmt.Sprintf("Malicious: %d, Suspicious: %d", malicious, suspicious),
-		Context:  strings.Join(engines, ", "),
+		Context:  engines,
 		Source:   src,
 		LocalID:  gen.NextID(),
 	})
 }
 
-func extractEngines(attr map[string]any) []string {
-	var engines []string
+func extractEngines(attr map[string]any) string {
+	var malicious, suspicious []string
 	results, ok := attr["last_analysis_results"].(map[string]any)
 	if !ok {
-		return engines
+		return ""
 	}
 
 	for _, v := range results {
@@ -115,17 +115,31 @@ func extractEngines(attr map[string]any) []string {
 			continue
 		}
 		cat, ok := res["category"].(string)
-		if !ok || (cat != "malicious" && cat != "suspicious") {
+		if !ok {
 			continue
 		}
 		eng, ok := res["engine_name"].(string)
 		if ok && eng != "" {
-			engines = append(engines, eng)
+			switch cat {
+			case "malicious":
+				malicious = append(malicious, eng)
+			case "suspicious":
+				suspicious = append(suspicious, eng)
+			}
 		}
 	}
 
-	sort.Strings(engines)
-	return engines
+	var parts []string
+	if len(malicious) > 0 {
+		sort.Strings(malicious)
+		parts = append(parts, "Malicious: "+strings.Join(malicious, ", "))
+	}
+	if len(suspicious) > 0 {
+		sort.Strings(suspicious)
+		parts = append(parts, "Suspicious: "+strings.Join(suspicious, ", "))
+	}
+
+	return strings.Join(parts, "; ")
 }
 
 func normalizeVTText(value string) string {

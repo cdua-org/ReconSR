@@ -32,11 +32,11 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 	}
 
 	if network, ok := attr["network"].(string); ok {
-		appendVTProperty(exec, constants.TypeCIDR, network, "Network CIDR for "+target, nil, gen)
+		appendVTProperty(exec, constants.TypeCIDR, network, "", nil, gen)
 	}
 
 	if asOwner, ok := attr["as_owner"].(string); ok {
-		appendVTProperty(exec, constants.TypeOrganization, asOwner, "AS Owner for "+target, nil, gen)
+		appendVTProperty(exec, constants.TypeOrganization, asOwner, "", nil, gen)
 	}
 
 	var geoParts []string
@@ -47,11 +47,11 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 		geoParts = append(geoParts, "Continent: "+continent)
 	}
 	if len(geoParts) > 0 {
-		appendVTProperty(exec, constants.TypeGeo, strings.Join(geoParts, " | "), "Geo Location for "+target, nil, gen)
+		appendVTProperty(exec, constants.TypeGeo, strings.Join(geoParts, " | "), "", nil, gen)
 	}
 
 	if jarm, ok := attr["jarm"].(string); ok {
-		appendVTProperty(exec, constants.TypeJARM, jarm, "JARM for "+target, nil, gen)
+		appendVTProperty(exec, constants.TypeJARM, jarm, "", nil, gen)
 	}
 
 	if lastUpdateRaw, ok := attr["last_modification_date"].(float64); ok {
@@ -85,7 +85,7 @@ func (m *module) extractIPResolution(item map[string]any, _ string, exec *schema
 		Type:     validated.Type,
 		Category: constants.CategoryNode,
 		Value:    validated.Value,
-		Context:  "VirusTotal Passive DNS",
+		Context:  "",
 		Tags:     []string{constants.TagPDNS},
 		LocalID:  gen.NextID(),
 	})

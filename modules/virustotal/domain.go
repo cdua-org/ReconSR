@@ -39,7 +39,7 @@ func (m *module) extractDomainMetadata(attr map[string]any, targetType, target s
 	appendDomainCategories(exec, attr, gen)
 	appendDomainReputation(exec, attr, gen)
 	appendDomainPopularityRanks(exec, attr, gen)
-	appendDomainJARM(exec, attr, target, gen)
+	appendDomainJARM(exec, attr, gen)
 	appendDomainCrowdsourcedContext(exec, attr, gen)
 	appendDomainLastUpdate(exec, attr, target, gen)
 	appendDomainCertificateSummary(exec, attr, targetType, target, gen)
@@ -75,7 +75,7 @@ func appendDomainCategories(exec *schema.ModuleExecution, attr map[string]any, g
 		if !ok {
 			continue
 		}
-		appendVTProperty(exec, constants.TypeInfo, category, "VirusTotal Category by "+provider, nil, gen)
+		appendVTProperty(exec, constants.TypeCategory, category, provider, nil, gen)
 	}
 }
 
@@ -91,7 +91,7 @@ func appendDomainReputation(exec *schema.ModuleExecution, attr map[string]any, g
 	}
 
 	value := fmt.Sprintf("%d (Malicious/Suspicious)", reputation)
-	appendVTProperty(exec, constants.TypeVTReputation, value, "VirusTotal Community Reputation", nil, gen)
+	appendVTProperty(exec, constants.TypeReputation, value, "Community Reputation", nil, gen)
 }
 
 func appendDomainPopularityRanks(exec *schema.ModuleExecution, attr map[string]any, gen *modutil.LocalIDGenerator) {
@@ -115,17 +115,18 @@ func appendDomainPopularityRanks(exec *schema.ModuleExecution, attr map[string]a
 		if !ok {
 			continue
 		}
-		appendVTProperty(exec, constants.TypeInfo, rank, "VirusTotal Popularity Rank by "+provider, nil, gen)
+		val := fmt.Sprintf("%s (%s)", rank, provider)
+		appendVTProperty(exec, constants.TypeRank, val, "Popularity Rank", nil, gen)
 	}
 }
 
-func appendDomainJARM(exec *schema.ModuleExecution, attr map[string]any, target string, gen *modutil.LocalIDGenerator) {
+func appendDomainJARM(exec *schema.ModuleExecution, attr map[string]any, gen *modutil.LocalIDGenerator) {
 	jarm, ok := attr["jarm"].(string)
 	if !ok {
 		return
 	}
 
-	appendVTProperty(exec, constants.TypeJARM, jarm, "JARM for "+target, nil, gen)
+	appendVTProperty(exec, constants.TypeJARM, jarm, "", nil, gen)
 }
 
 func appendDomainCrowdsourcedContext(exec *schema.ModuleExecution, attr map[string]any, gen *modutil.LocalIDGenerator) {
@@ -183,12 +184,12 @@ func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[strin
 	notAfter := extractVTCertificateNotAfter(certificate)
 
 	if len(sources) == 0 {
-		appendVTProperty(exec, constants.TypeCertIssuer, issuer, "Cert Issuer for "+target, nil, gen)
-		appendVTProperty(exec, constants.TypeCertNotAfter, notAfter, "Cert Expiration for "+target, nil, gen)
+		appendVTProperty(exec, constants.TypeCertIssuer, issuer, "", nil, gen)
+		appendVTProperty(exec, constants.TypeCertNotAfter, notAfter, "", nil, gen)
 	} else {
 		for _, source := range sources {
-			appendVTProperty(exec, constants.TypeCertIssuer, issuer, "Cert Issuer for "+target, source, gen)
-			appendVTProperty(exec, constants.TypeCertNotAfter, notAfter, "Cert Expiration for "+target, source, gen)
+			appendVTProperty(exec, constants.TypeCertIssuer, issuer, "SAN", source, gen)
+			appendVTProperty(exec, constants.TypeCertNotAfter, notAfter, "SAN", source, gen)
 		}
 	}
 
@@ -203,7 +204,7 @@ func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[strin
 			algo = suffix
 		}
 
-		appendVTProperty(exec, constants.TypeCertFingerprint, algo+":"+strVal, "Cert Fingerprint for "+target, nil, gen)
+		appendVTProperty(exec, constants.TypeCertFingerprint, algo+":"+strVal, "", nil, gen)
 	}
 }
 
@@ -254,7 +255,6 @@ func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[strin
 			}
 			if wildcardContext != "" {
 				result.Tags = append(result.Tags, constants.TagWildcard)
-				result.Context = wildcardContext
 			}
 			exec.Results = append(exec.Results, result)
 			src = &schema.EntityRef{Type: resultType, Value: resultValue, LocalID: result.LocalID}
@@ -340,12 +340,12 @@ func parseVTCertificateExpiration(attr map[string]any) (string, bool) {
 		if !t.IsZero() && !t.After(time.Now()) {
 			isExpired = true
 		}
-		notAfterStr = t.UTC().Format(time.RFC3339)
+		notAfterStr = t.UTC().Format(time.DateTime)
 	} else if t, err := time.Parse(time.RFC3339, notAfter); err == nil {
 		if !t.IsZero() && !t.After(time.Now()) {
 			isExpired = true
 		}
-		notAfterStr = t.UTC().Format(time.RFC3339)
+		notAfterStr = t.UTC().Format(time.DateTime)
 	}
 
 	return notAfterStr, isExpired
@@ -379,7 +379,6 @@ func (m *module) extractSubdomain(item map[string]any, parentType, parent string
 		Type:       validatedSubdomain.Type,
 		Category:   constants.CategoryNode,
 		Value:      validatedSubdomain.Value,
-		Context:    "VirusTotal Subdomain Enumeration",
 		Tags:       []string{constants.TagPDNS},
 		OutOfScope: isOOS,
 		Source: &schema.EntityRef{
@@ -402,7 +401,7 @@ func (m *module) extractSubdomain(item map[string]any, parentType, parent string
 				LocalID:  gen.NextID(),
 			})
 		}
-		appendVTProperty(exec, constants.TypeCertNotAfter, notAfterStr, "Cert Expiration for "+validatedSubdomain.Value, subRef, gen)
+		appendVTProperty(exec, constants.TypeCertNotAfter, notAfterStr, "", subRef, gen)
 		if isExpired {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeStatus,

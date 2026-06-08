@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -114,8 +115,8 @@ func assertDomainWildcardSAN(t *testing.T, results []schema.ModuleResult) {
 	if !slices.Contains(wildcardSAN.Tags, constants.TagSan) || !slices.Contains(wildcardSAN.Tags, constants.TagWildcard) {
 		t.Fatalf("expected SAN and wildcard tags, got %+v", wildcardSAN.Tags)
 	}
-	if wildcardSAN.Context != "*.partners.target-example.com" {
-		t.Fatalf("expected wildcard SAN context, got %q", wildcardSAN.Context)
+	if wildcardSAN.Context != "" {
+		t.Fatalf("expected empty wildcard SAN context, got %q", wildcardSAN.Context)
 	}
 }
 
@@ -189,7 +190,7 @@ func assertDomainThreatExtraction(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
 
 	deepThreat := requireResult(t, results, "deep threat score linked to vpn subdomain", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeVTThreatScore && result.Source != nil && result.Source.Value == fixtureVPNSubdomain
+		return result.Type == constants.TypeThreatScore && result.Source != nil && result.Source.Value == fixtureVPNSubdomain
 	})
 	if !strings.Contains(deepThreat.Context, "SyntheticEngineVPNA") || !strings.Contains(deepThreat.Context, "SyntheticEngineVPNB") {
 		t.Fatalf("expected malicious and suspicious engine names in threat context, got %+v", deepThreat)
@@ -214,15 +215,15 @@ func assertDomainStableMetadataExtraction(t *testing.T, results []schema.ModuleR
 	})
 
 	requireResult(t, results, "category property", func(result schema.ModuleResult) bool {
-		return result.Category == constants.CategoryProperty && resultTextContains(&result, "BitDefender", "technology")
+		return result.Type == constants.TypeCategory && result.Category == constants.CategoryProperty && resultTextContains(&result, "BitDefender", "technology")
 	})
 
 	requireResult(t, results, "popularity rank property", func(result schema.ModuleResult) bool {
-		return result.Category == constants.CategoryProperty && resultTextContains(&result, "Cloudflare Radar", "6")
+		return result.Type == constants.TypeRank && result.Category == constants.CategoryProperty && resultTextContains(&result, "Cloudflare Radar", "6")
 	})
 
 	requireResult(t, results, "reputation property", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeVTReputation && strings.Contains(result.Value, "-12") && strings.Contains(result.Value, "Malicious/Suspicious")
+		return result.Type == constants.TypeReputation && strings.Contains(result.Value, "-12") && strings.Contains(result.Value, "Malicious/Suspicious")
 	})
 }
 
@@ -282,4 +283,139 @@ func assertSubdomainCertificateScope(t *testing.T, results []schema.ModuleResult
 	assertNoResult(t, results, "subdomain certificate issuer leakage", func(result schema.ModuleResult) bool {
 		return strings.Contains(result.Value, "Example E8") || strings.Contains(result.Value, "Example Certificate Authority")
 	})
+}
+
+func TestParseVTCertificateExpiration(t *testing.T) {
+	futureTime := time.Now().UTC().Add(24 * time.Hour)
+	pastTime := time.Now().UTC().Add(-24 * time.Hour)
+
+	const keyCert = "last_https_certificate"
+	const keyVal = "validity"
+	const keyAfter = "not_after"
+
+	tests := []struct {
+		name        string
+		attr        map[string]any
+		wantDateStr string
+		wantExpired bool
+	}{
+		{
+			name:        "missing last_https_certificate",
+			attr:        map[string]any{"other_field": "dummy_data"},
+			wantDateStr: "",
+			wantExpired: false,
+		},
+		{
+			name:        "invalid last_https_certificate type",
+			attr:        map[string]any{keyCert: "not a map"},
+			wantDateStr: "",
+			wantExpired: false,
+		},
+		{
+			name: "missing validity field",
+			attr: map[string]any{
+				keyCert: map[string]any{
+					"issuer": "some_issuer",
+				},
+			},
+			wantDateStr: "",
+			wantExpired: false,
+		},
+		{
+			name: "missing not_after field",
+			attr: map[string]any{
+				keyCert: map[string]any{
+					keyVal: map[string]any{
+						"not_before": "2020-01-01 00:00:00",
+					},
+				},
+			},
+			wantDateStr: "",
+			wantExpired: false,
+		},
+		{
+			name: "invalid not_after type",
+			attr: map[string]any{
+				keyCert: map[string]any{
+					keyVal: map[string]any{
+						keyAfter: 12345,
+					},
+				},
+			},
+			wantDateStr: "",
+			wantExpired: false,
+		},
+		{
+			name: "valid future vt time format",
+			attr: map[string]any{
+				keyCert: map[string]any{
+					keyVal: map[string]any{
+						keyAfter: futureTime.Format(vtTimeFormat),
+					},
+				},
+			},
+			wantDateStr: futureTime.UTC().Format(time.DateTime),
+			wantExpired: false,
+		},
+		{
+			name: "valid past vt time format",
+			attr: map[string]any{
+				keyCert: map[string]any{
+					keyVal: map[string]any{
+						keyAfter: pastTime.Format(vtTimeFormat),
+					},
+				},
+			},
+			wantDateStr: pastTime.UTC().Format(time.DateTime),
+			wantExpired: true,
+		},
+		{
+			name: "valid future rfc3339 format",
+			attr: map[string]any{
+				keyCert: map[string]any{
+					keyVal: map[string]any{
+						keyAfter: futureTime.Format(time.RFC3339),
+					},
+				},
+			},
+			wantDateStr: futureTime.UTC().Format(time.DateTime),
+			wantExpired: false,
+		},
+		{
+			name: "valid past rfc3339 format",
+			attr: map[string]any{
+				keyCert: map[string]any{
+					keyVal: map[string]any{
+						keyAfter: pastTime.Format(time.RFC3339),
+					},
+				},
+			},
+			wantDateStr: pastTime.UTC().Format(time.DateTime),
+			wantExpired: true,
+		},
+		{
+			name: "unparseable date fallback",
+			attr: map[string]any{
+				keyCert: map[string]any{
+					keyVal: map[string]any{
+						keyAfter: "Some Weird Date Format 2026",
+					},
+				},
+			},
+			wantDateStr: "Some Weird Date Format 2026",
+			wantExpired: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotDateStr, gotExpired := parseVTCertificateExpiration(tt.attr)
+			if gotDateStr != tt.wantDateStr {
+				t.Errorf("parseVTCertificateExpiration() gotDateStr = %v, want %v", gotDateStr, tt.wantDateStr)
+			}
+			if gotExpired != tt.wantExpired {
+				t.Errorf("parseVTCertificateExpiration() gotExpired = %v, want %v", gotExpired, tt.wantExpired)
+			}
+		})
+	}
 }

@@ -27,7 +27,7 @@ func (m *module) processDomainDemo(_ context.Context, targetType, target string,
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeInfo,
 		Category: constants.CategoryProperty,
-		Value:    "⚠️ DEMO MODE: Showing sample data for VirusTotal (API key not configured)",
+		Value:    "⚠️ DEMO MODE: Showing sample data for VirusTotal Domain (API key not configured)",
 		LocalID:  gen.NextID(),
 	})
 
@@ -107,7 +107,7 @@ func (m *module) processIPDemo(_ context.Context, target string, exec *schema.Mo
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     constants.TypeInfo,
 		Category: constants.CategoryProperty,
-		Value:    "⚠️ DEMO MODE: Showing sample data for VirusTotal (API key not configured)",
+		Value:    "⚠️ DEMO MODE: Showing sample data for VirusTotal IP (API key not configured)",
 		LocalID:  gen.NextID(),
 	})
 

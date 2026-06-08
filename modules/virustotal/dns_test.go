@@ -144,7 +144,7 @@ func loadFixtureDNSRecord(t *testing.T, fileName, itemID, recordType string, pre
 
 func TestParseDNSRecordMXAddsPropertyAndSkipsSelfReferentialHost(t *testing.T) {
 	rec := loadFixtureDNSRecord(t, "subdomains_page1.json", fixtureMailSubdomain, "MX", func(record map[string]any) bool {
-		value, ok := record["value"].(string)
+		value, ok := record[constants.KeyValue].(string)
 		return ok && value == fixtureMailSubdomain
 	})
 	source := &schema.EntityRef{Type: constants.TypeSubdomain, Value: fixtureMailSubdomain}
@@ -200,11 +200,15 @@ func TestParseDNSRecordSOAAddsPropertyAndPrimaryNSNode(t *testing.T) {
 
 func TestParseDNSRecordCAAAddsAuthorityNode(t *testing.T) {
 	rec := loadFixtureDNSRecord(t, "subdomains_page1.json", fixtureMailSubdomain, "CAA", func(record map[string]any) bool {
-		value, ok := record["value"].(string)
+		value, ok := record[constants.KeyValue].(string)
 		return ok && value == "mail-ca.example.org"
 	})
 	source := &schema.EntityRef{Type: constants.TypeSubdomain, Value: fixtureMailSubdomain}
 	results := parseDNSRecordFromFixture(t, fixtureMailSubdomain, source, rec)
+
+	for _, r := range results {
+		t.Logf("Result: %+v", r)
+	}
 
 	caaProp := requireResult(t, results, "caa property", func(result schema.ModuleResult) bool {
 		return result.Type == constants.TypeCAA && result.Category == constants.CategoryProperty && result.Value == `0 issue "mail-ca.example.org"`
@@ -250,14 +254,14 @@ func TestParseDNSRecordSelfReferentialSkipped(t *testing.T) {
 		{"CNAME", "cname.vt.example.com", map[string]any{}, "test_CNAME", "cname.vt.example.com"},
 		{"NS", "ns.vt.example.com", map[string]any{}, "test_NS", "ns.vt.example.com"},
 		{"SOA", "soa.vt.example.com", map[string]any{"rname": "admin.vt.example.com", "serial": 123}, "test_SOA", "soa.vt.example.com"},
-		{"CAA", "caa.vt.example.com", map[string]any{"tag": "issue"}, "test_CAA", "caa.vt.example.com"},
+		{"CAA", "caa.vt.example.com", map[string]any{constants.TypeTag: constants.DNSIssue}, "test_CAA", "caa.vt.example.com"},
 		{"SRV", "10 5060 srv.vt.example.com", map[string]any{"priority": 10}, "test_SRV", "srv.vt.example.com"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.rec["type"] = tt.typ
-			tt.rec["value"] = tt.val
+			tt.rec[constants.KeyType] = tt.typ
+			tt.rec[constants.KeyValue] = tt.val
 			gen := modutil.NewLocalIDGenerator()
 			mod.parseDNSRecord(tt.rec, tt.target, nil, &exec, gen)
 			for _, res := range exec.Results {
@@ -272,13 +276,132 @@ func TestParseDNSRecordSelfReferentialSkipped(t *testing.T) {
 
 func TestParseDNSRecordAInvalidIP(t *testing.T) {
 	rec := map[string]any{
-		"type":  "A",
-		"value": "999.999.999.999",
+		constants.KeyType:  "A",
+		constants.KeyValue: "999.999.999.999",
 	}
-	target := "example.com"
+	target := "invalid-ip.target.example.net"
 	results := parseDNSRecordFromFixture(t, target, nil, rec)
 
 	if len(results) != 0 {
 		t.Fatalf("expected 0 results for invalid IP, got %d", len(results))
+	}
+}
+
+func TestAppendVTCAAResults(t *testing.T) {
+	m := &module{}
+	src := &schema.EntityRef{Type: constants.TypeSubdomain, Value: "gamma.delta.epsilon.example.org", LocalID: 1}
+
+	tests := []struct {
+		rec           map[string]any
+		name          string
+		expectedValue string
+		expectedCount int
+	}{
+		{
+			rec:           map[string]any{},
+			name:          "empty map",
+			expectedValue: "",
+			expectedCount: 0,
+		},
+		{
+			rec:           map[string]any{constants.TypeTag: constants.DNSIssue, constants.KeyValue: "issuer.example.net"},
+			name:          "missing flag, valid tag and value",
+			expectedValue: "0 issue \"issuer.example.net\"",
+			expectedCount: 2,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: 128, constants.TypeTag: constants.DNSIssueWild, constants.KeyValue: "wildcard.example.com"},
+			name:          "valid flag, tag and value",
+			expectedValue: "128 issuewild \"wildcard.example.com\"",
+			expectedCount: 2,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: float64(0), constants.KeyValue: "raw-certificate-value.example.org"},
+			name:          "valid flag and value, missing tag",
+			expectedValue: "raw-certificate-value.example.org",
+			expectedCount: 1,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: 0, constants.TypeTag: constants.DNSIodef, constants.KeyValue: "   \t   "},
+			name:          "value is only spaces",
+			expectedValue: "",
+			expectedCount: 0,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: 0, constants.TypeTag: 123, constants.KeyValue: "fallback.example.net"},
+			name:          "invalid tag type",
+			expectedValue: "fallback.example.net",
+			expectedCount: 1,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: 0, constants.TypeTag: constants.DNSIssue, constants.KeyValue: 12345},
+			name:          "invalid value type",
+			expectedValue: "",
+			expectedCount: 0,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: 0, constants.TypeTag: constants.DNSIssue, constants.KeyValue: "target.caa.example.org"},
+			name:          "issue with same domain as target",
+			expectedValue: "0 issue \"target.caa.example.org\"",
+			expectedCount: 1,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: 0, constants.TypeTag: constants.DNSIssue, constants.KeyValue: "not_a_valid_domain_!@#$"},
+			name:          "issue with invalid authority domain",
+			expectedValue: "0 issue \"not_a_valid_domain_!@#$\"",
+			expectedCount: 1,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: 0, constants.TypeTag: constants.DNSIodef, constants.KeyValue: "mailto:abuse@example.org"},
+			name:          "iodef with valid mailto",
+			expectedValue: "0 iodef \"mailto:abuse@example.org\"",
+			expectedCount: 2,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: 0, constants.TypeTag: constants.DNSIodef, constants.KeyValue: "mailto:"},
+			name:          "iodef with empty mailto",
+			expectedValue: "0 iodef \"mailto:\"",
+			expectedCount: 1,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: 0, constants.TypeTag: constants.DNSIodef, constants.KeyValue: "http://example.org/caa"},
+			name:          "iodef with missing email (http)",
+			expectedValue: "0 iodef \"http://example.org/caa\"",
+			expectedCount: 1,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: 0, constants.TypeTag: constants.DNSIodef, constants.KeyValue: "mailto:not-an-email"},
+			name:          "iodef with invalid email",
+			expectedValue: "0 iodef \"mailto:not-an-email\"",
+			expectedCount: 1,
+		},
+		{
+			rec:           map[string]any{constants.KeyFlag: 0, constants.TypeTag: constants.DNSIssue, constants.KeyValue: ";"},
+			name:          "issue with empty authority",
+			expectedValue: "0 issue \";\"",
+			expectedCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := modutil.NewLocalIDGenerator()
+			exec := &schema.ModuleExecution{}
+			m.appendVTCAAResults(exec, "target.caa.example.org", src, tt.rec, gen)
+
+			if len(exec.Results) != tt.expectedCount {
+				t.Fatalf("expected %d results, got %d", tt.expectedCount, len(exec.Results))
+			}
+
+			if tt.expectedCount > 0 {
+				res := exec.Results[0]
+				if res.Type != constants.TypeCAA {
+					t.Errorf("expected Type %q, got %q", constants.TypeCAA, res.Type)
+				}
+				if res.Value != tt.expectedValue {
+					t.Errorf("expected Value %q, got %q", tt.expectedValue, res.Value)
+				}
+			}
+		})
 	}
 }

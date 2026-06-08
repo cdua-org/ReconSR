@@ -85,8 +85,7 @@ const (
 	TypeDNSSEC                = "dnssec"
 	TypePhone                 = "phone"
 	TypeHandle                = "handle"
-	TypeVTThreatScore         = "vt_threat_score"
-	TypeVTReputation          = "vt_reputation"
+	TypeReputation            = "reputation"
 	TypeCVSS                  = "cvss"
 	TypeEPSS                  = "epss"
 	TypeRankEPSS              = "ranking_epss"
@@ -123,4 +122,5 @@ const (
 	TypeIntegrityImpact       = "integrity_impact"
 	TypeAvailabilityImpact    = "availability_impact"
 	TypeCategory              = "category"
+	TypeRank                  = "rank"
 )

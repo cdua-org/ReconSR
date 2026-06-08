@@ -13,8 +13,8 @@ import (
 )
 
 func (m *module) parseDNSRecord(rec map[string]any, target string, src *schema.EntityRef, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
-	recordType, typeOK := rec["type"].(string)
-	recordValue, valueOK := rec["value"].(string)
+	recordType, typeOK := rec[constants.KeyType].(string)
+	recordValue, valueOK := rec[constants.KeyValue].(string)
 	if !typeOK || !valueOK {
 		return
 	}
@@ -88,7 +88,6 @@ func (m *module) appendVTCNAMEResult(exec *schema.ModuleExecution, target string
 		Category:   constants.CategoryNode,
 		Value:      validated.Value,
 		Tags:       []string{constants.TagCNAME},
-		Context:    "CNAME Record",
 		OutOfScope: isOOS,
 		Source:     src,
 		LocalID:    gen.NextID(),
@@ -159,7 +158,7 @@ func (m *module) appendVTSOAResults(exec *schema.ModuleExecution, target string,
 	parts := make([]string, 0, 7)
 	var rawNS, rawRname string
 
-	if primaryNS, ok := rec["value"].(string); ok && strings.TrimSpace(primaryNS) != "" {
+	if primaryNS, ok := rec[constants.KeyValue].(string); ok && strings.TrimSpace(primaryNS) != "" {
 		rawNS = ensureFQDN(primaryNS)
 		parts = append(parts, rawNS)
 	}
@@ -286,7 +285,7 @@ func buildVTSPFEntityResult(source *schema.EntityRef, ent dnsutils.SPFEntity, ta
 
 func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any, gen *modutil.LocalIDGenerator) {
 	flagValue := "0"
-	if flag, ok := formatVTInt(rec["flag"]); ok {
+	if flag, ok := formatVTInt(rec[constants.KeyFlag]); ok {
 		flagValue = flag
 	}
 
@@ -296,7 +295,7 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string,
 	}
 
 	value := ""
-	if rawValue, ok := rec["value"].(string); ok {
+	if rawValue, ok := rec[constants.KeyValue].(string); ok {
 		value = strings.TrimSpace(rawValue)
 	}
 	if value == "" {
@@ -345,7 +344,7 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string,
 			Source:     caaRef,
 			LocalID:    gen.NextID(),
 		})
-	case "iodef":
+	case constants.DNSIodef:
 		email := dnsutils.ExtractCAAIodefEmail(value)
 		if email == "" {
 			return
