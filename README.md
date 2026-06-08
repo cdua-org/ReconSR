@@ -355,6 +355,7 @@ While the current alpha release is focused on automating point-in-time investiga
 </details>
 
 ### Upcoming
+- Local web server.
 - Additional API-backed passive intelligence modules.
 - Active reconnaissance capabilities.
 
