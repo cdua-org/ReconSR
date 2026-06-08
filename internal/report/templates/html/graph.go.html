@@ -597,7 +597,9 @@
                         >
                     </div>
                     <div class="meta-item-controls">
-                        <span class="stat-badge">{{ .EdgesCount }}</span>
+                        <span class="stat-badge" id="edges-stat-badge"
+                            >{{ .EdgesCount }}</span
+                        >
                         <div
                             class="icon-btn"
                             id="toggle-edge-labels-btn"
@@ -1747,11 +1749,13 @@
                             return targets;
                         }
 
+                        let visibleEdgesCount = 0;
                         activeEdges.forEach(e => {
                             const fromVis = visibleNodes.has(e.from);
                             const toVis = visibleNodes.has(e.to);
                             if (fromVis && toVis) {
                                 edgeUpdates.push({ id: e.id, hidden: false });
+                                visibleEdgesCount++;
                             } else if (fromVis && !toVis) {
                                 edgeUpdates.push({ id: e.id, hidden: true });
                                 findTargets(e.to).forEach(t => {
@@ -1790,6 +1794,9 @@
                         if (virtualEdges.size > 0) {
                             edges.add(Array.from(virtualEdges.values()));
                         }
+
+                        visibleEdgesCount += virtualEdges.size;
+                        updateBadge('edges-stat-badge', visibleEdgesCount, activeEdges.length);
                     }
                     resizeCanvas();
                     setTime(maxTime);
