@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
@@ -417,5 +418,75 @@ func TestParseVTCertificateExpiration(t *testing.T) {
 				t.Errorf("parseVTCertificateExpiration() gotExpired = %v, want %v", gotExpired, tt.wantExpired)
 			}
 		})
+	}
+}
+
+func TestDomain_EdgeCases(t *testing.T) {
+	const (
+		keyPopularityRanks = "popularity_ranks"
+		keyCrowdsourcedCtx = "crowdsourced_context"
+		keyExtensions      = "extensions"
+		keyData            = "data"
+	)
+
+	m := &module{}
+	exec := &schema.ModuleExecution{}
+	gen := modutil.NewLocalIDGenerator()
+
+	appendDomainCategories(exec, map[string]any{}, gen)
+	appendDomainCategories(exec, map[string]any{"categories": map[string]any{}}, gen)
+	appendDomainCategories(exec, map[string]any{"categories": map[string]any{"prov1": 111}}, gen)
+
+	appendDomainReputation(exec, map[string]any{}, gen)
+	appendDomainReputation(exec, map[string]any{"reputation": float64(10)}, gen)
+
+	appendDomainPopularityRanks(exec, map[string]any{}, gen)
+	appendDomainPopularityRanks(exec, map[string]any{keyPopularityRanks: map[string]any{}}, gen)
+	appendDomainPopularityRanks(exec, map[string]any{keyPopularityRanks: map[string]any{"prov2": 222}}, gen)
+	appendDomainPopularityRanks(exec, map[string]any{keyPopularityRanks: map[string]any{"prov3": map[string]any{}}}, gen)
+
+	appendDomainJARM(exec, map[string]any{}, gen)
+
+	appendDomainCrowdsourcedContext(exec, map[string]any{}, gen)
+	appendDomainCrowdsourcedContext(exec, map[string]any{keyCrowdsourcedCtx: []any{}}, gen)
+	appendDomainCrowdsourcedContext(exec, map[string]any{keyCrowdsourcedCtx: []any{333}}, gen)
+	appendDomainCrowdsourcedContext(exec, map[string]any{keyCrowdsourcedCtx: []any{map[string]any{}}}, gen)
+
+	appendDomainLastUpdate(exec, map[string]any{}, "u1.example.net", gen)
+
+	appendDomainCertificateSummary(exec, map[string]any{}, constants.TypeSubdomain, "u2.example.net", gen)
+	appendDomainCertificateSummary(exec, map[string]any{"last_https_certificate": map[string]any{"thumbprint_invalid": 444, "other": "val"}}, constants.TypeSubdomain, "u3.example.net", gen)
+
+	appendVTCertificateSANs(exec, map[string]any{}, constants.TypeSubdomain, "u4.example.net", gen)
+	appendVTCertificateSANs(exec, map[string]any{keyExtensions: map[string]any{}}, constants.TypeSubdomain, "u5.example.net", gen)
+	appendVTCertificateSANs(exec, map[string]any{keyExtensions: map[string]any{"subject_alternative_name": []any{}}}, constants.TypeSubdomain, "u6.example.net", gen)
+	appendVTCertificateSANs(exec, map[string]any{keyExtensions: map[string]any{"subject_alternative_name": []any{555, "invalid u7 !", "dup8.example.net", "dup8.example.net"}}}, constants.TypeSubdomain, "u9.example.net", gen)
+
+	classifyVTCertificateSAN("*.")
+	classifyVTCertificateSAN("invalid u10 !")
+
+	if formatVTCertificateIssuer(map[string]any{}) != "" {
+		t.Error("expected empty string")
+	}
+
+	m.extractSubdomain(map[string]any{}, constants.TypeSubdomain, "u11.example.net", false, exec, gen)
+	m.extractSubdomain(map[string]any{"id": "invalid u12 !"}, constants.TypeSubdomain, "u13.example.net", false, exec, gen)
+	m.extractSubdomain(map[string]any{"id": "u14.example.net"}, constants.TypeSubdomain, "u15.example.net", false, exec, gen)
+	m.extractSubdomain(map[string]any{
+		"id": "u16.example.net",
+		"attributes": map[string]any{
+			"tags": []any{"tag1", "tag2"},
+			"last_https_certificate": map[string]any{
+				"validity": map[string]any{
+					"not_after": "2000-01-01 00:00:00",
+				},
+			},
+		},
+	}, constants.TypeSubdomain, "u17.example.net", true, exec, gen)
+
+	m.logIgnoredSubdomainFields(map[string]any{"whois": keyData, "rdap": keyData, "registrar": keyData}, "u18.example.net")
+
+	if len(exec.Results) == 0 {
+		t.Error("expected results from edge cases")
 	}
 }

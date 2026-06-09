@@ -63,10 +63,10 @@ func (m *module) extractThreatScore(attr map[string]any, entityType, entityValue
 	}
 
 	var malicious, suspicious int
-	if mVal, ok := stats["malicious"].(float64); ok {
+	if mVal, ok := stats[constants.TagMalicious].(float64); ok {
 		malicious = int(mVal)
 	}
-	if sVal, ok := stats["suspicious"].(float64); ok {
+	if sVal, ok := stats[constants.TagSuspicious].(float64); ok {
 		suspicious = int(sVal)
 	}
 

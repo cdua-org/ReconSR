@@ -1,7 +1,11 @@
 package virustotal
 
 import (
+	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
+	"cdua-org/ReconSR/schema"
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -60,5 +64,52 @@ func TestFormatVTInt(t *testing.T) {
 				t.Errorf("formatVTInt() got = %v, want %v", got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestHelpers_EdgeCases(t *testing.T) {
+	tags := extractVTTags(map[string]any{
+		"tags": []any{
+			444,
+			"    ",
+			"dup_tag_555",
+			"dup_tag_555",
+			"valid_tag_666",
+		},
+	})
+	if len(tags) != 2 {
+		t.Errorf("expected 2 tags, got %d", len(tags))
+	}
+
+	m := &module{}
+	exec := &schema.ModuleExecution{}
+	gen := modutil.NewLocalIDGenerator()
+	m.extractThreatScore(map[string]any{
+		"last_analysis_stats": map[string]any{
+			constants.TagMalicious:  float64(0),
+			constants.TagSuspicious: float64(5),
+		},
+	}, constants.TypeDomain, "test777.example.net", nil, exec, gen)
+	if len(exec.Results) == 0 {
+		t.Error("expected threat score result for suspicious")
+	}
+
+	eng1 := extractEngines(map[string]any{})
+	if eng1 != "" {
+		t.Errorf("expected empty engines string, got %q", eng1)
+	}
+
+	eng2 := extractEngines(map[string]any{
+		"last_analysis_results": map[string]any{
+			"engine_alpha": 888,
+			"engine_beta":  map[string]any{},
+			"engine_gamma": map[string]any{
+				"category":    constants.TagMalicious,
+				"engine_name": "test_engine_999",
+			},
+		},
+	})
+	if !strings.Contains(eng2, "test_engine_999") {
+		t.Errorf("expected test_engine_999 in output, got %q", eng2)
 	}
 }
