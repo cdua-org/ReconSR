@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
@@ -253,9 +254,9 @@ func TestParseDNSRecordSelfReferentialSkipped(t *testing.T) {
 	}{
 		{"CNAME", "cname.vt.example.com", map[string]any{}, "test_CNAME", "cname.vt.example.com"},
 		{"NS", "ns.vt.example.com", map[string]any{}, "test_NS", "ns.vt.example.com"},
-		{"SOA", "soa.vt.example.com", map[string]any{"rname": "admin.vt.example.com", "serial": 123}, "test_SOA", "soa.vt.example.com"},
+		{"SOA", "soa.vt.example.com", map[string]any{"rname": "admin.vt.example.com", constants.KeySerial: 123}, "test_SOA", "soa.vt.example.com"},
 		{"CAA", "caa.vt.example.com", map[string]any{constants.TypeTag: constants.DNSIssue}, "test_CAA", "caa.vt.example.com"},
-		{"SRV", "10 5060 srv.vt.example.com", map[string]any{"priority": 10}, "test_SRV", "srv.vt.example.com"},
+		{"SRV", "10 5060 srv.vt.example.com", map[string]any{constants.KeyPriority: 10}, "test_SRV", "srv.vt.example.com"},
 	}
 
 	for _, tt := range tests {
@@ -403,5 +404,141 @@ func TestAppendVTCAAResults(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestParseDNSRecord_EdgeCases(t *testing.T) {
+	m := &module{}
+	gen := modutil.NewLocalIDGenerator()
+	exec := &schema.ModuleExecution{}
+	src := &schema.EntityRef{Type: constants.TypeSubdomain, Value: "sub0.example.net", LocalID: gen.NextID()}
+
+	m.parseDNSRecord(map[string]any{constants.KeyValue: "127.0.0.100"}, "sub0.example.net", src, exec, gen)
+	m.parseDNSRecord(map[string]any{constants.KeyType: "A"}, "sub0.example.net", src, exec, gen)
+	m.parseDNSRecord(map[string]any{constants.KeyType: "   ", constants.KeyValue: "127.0.0.101"}, "sub0.example.net", src, exec, gen)
+	m.parseDNSRecord(map[string]any{constants.KeyType: "A", constants.KeyValue: "   "}, "sub0.example.net", src, exec, gen)
+
+	if len(exec.Results) != 0 {
+		t.Errorf("expected 0 results for missing/empty fields, got %d", len(exec.Results))
+	}
+
+	m.parseDNSRecord(map[string]any{constants.KeyType: "UNKNOWN_TYPE_XYZ", constants.KeyValue: "fallback_value_123"}, "sub0.example.net", src, exec, gen)
+	if len(exec.Results) != 1 {
+		t.Fatalf("expected 1 result for unknown type, got %d", len(exec.Results))
+	}
+	if exec.Results[0].Type != "unknown_type_xyz" || exec.Results[0].Value != "fallback_value_123" {
+		t.Errorf("unexpected fallback result: %+v", exec.Results[0])
+	}
+}
+
+func TestAppendVT_EdgeCases(t *testing.T) {
+	m := &module{}
+	gen := modutil.NewLocalIDGenerator()
+
+	exec1 := &schema.ModuleExecution{}
+	m.appendVTCNAMEResult(exec1, "sub1.example.net", nil, "invalid cname 1!", gen)
+	if len(exec1.Results) != 0 {
+		t.Errorf("expected 0 results for invalid CNAME, got %d", len(exec1.Results))
+	}
+
+	exec2 := &schema.ModuleExecution{}
+	m.appendVTMXResults(exec2, "sub2.example.net", nil, map[string]any{constants.KeyPriority: 10}, "invalid mx 2!", gen)
+	foundMXNode := false
+	for _, res := range exec2.Results {
+		if res.Category == constants.CategoryNode {
+			foundMXNode = true
+		}
+	}
+	if foundMXNode {
+		t.Error("expected no node result for invalid MX")
+	}
+
+	exec3 := &schema.ModuleExecution{}
+	m.appendVTNSResult(exec3, "sub3.example.net", nil, "invalid ns 3!", gen)
+	if len(exec3.Results) != 0 {
+		t.Errorf("expected 0 results for invalid NS, got %d", len(exec3.Results))
+	}
+
+	exec4 := &schema.ModuleExecution{}
+	m.appendVTSRVResults(exec4, "sub6.example.net", nil, map[string]any{constants.KeyPriority: 10}, "0 0 80 invalid srv 6!", gen)
+	foundSRVNode := false
+	for _, res := range exec4.Results {
+		if res.Category == constants.CategoryNode {
+			foundSRVNode = true
+		}
+	}
+	if foundSRVNode {
+		t.Error("expected no node result for invalid SRV")
+	}
+
+	exec5 := &schema.ModuleExecution{}
+	m.appendVTSRVResults(exec5, "example.net", nil, map[string]any{constants.KeyPriority: 10}, "0 80 example.net", gen)
+	foundSRVNode2 := false
+	for _, res := range exec5.Results {
+		if res.Category == constants.CategoryNode {
+			foundSRVNode2 = true
+		}
+	}
+	if foundSRVNode2 {
+		t.Error("expected no node result for self-referential SRV")
+	}
+}
+
+func TestAppendVTSOAResults_EdgeCases(t *testing.T) {
+	m := &module{}
+	gen := modutil.NewLocalIDGenerator()
+
+	exec1 := &schema.ModuleExecution{}
+	m.appendVTSOAResults(exec1, "sub4.example.net", nil, map[string]any{}, gen)
+	if len(exec1.Results) != 0 {
+		t.Errorf("expected 0 results for empty SOA, got %d", len(exec1.Results))
+	}
+
+	exec2 := &schema.ModuleExecution{}
+	m.appendVTSOAResults(exec2, "admin@sub4.example.net", nil, map[string]any{
+		"rname":             "admin.sub4.example.net",
+		constants.KeySerial: 12345,
+	}, gen)
+	foundEmailNode := false
+	for _, res := range exec2.Results {
+		if res.Category == constants.CategoryNode && res.Type == constants.TypeEmail {
+			foundEmailNode = true
+		}
+	}
+	if foundEmailNode {
+		t.Error("expected no email node result for self-referential SOA email")
+	}
+}
+
+func TestEnsureFQDN_EdgeCases(t *testing.T) {
+	if res := ensureFQDN(""); res != "" {
+		t.Errorf("expected empty string, got %q", res)
+	}
+	if res := ensureFQDN("fqdn.example.net."); res != "fqdn.example.net." {
+		t.Errorf("expected fqdn.example.net., got %q", res)
+	}
+}
+
+func TestBuildVTSPFEntityResult_EdgeCases(t *testing.T) {
+	gen := modutil.NewLocalIDGenerator()
+
+	_, ok1 := buildVTSPFEntityResult(nil, dnsutils.SPFEntity{Kind: dnsutils.SPFEntityIP4, Value: "300.400.500.600"}, "sub5.example.net", gen)
+	if ok1 {
+		t.Error("expected false for invalid IP")
+	}
+
+	_, ok2 := buildVTSPFEntityResult(nil, dnsutils.SPFEntity{Kind: dnsutils.SPFEntityDomain, Value: "invalid spf 5!"}, "sub5.example.net", gen)
+	if ok2 {
+		t.Error("expected false for invalid Domain")
+	}
+
+	_, ok3 := buildVTSPFEntityResult(nil, dnsutils.SPFEntity{Kind: dnsutils.SPFEntityDomain, Value: "sub5.example.net"}, "sub5.example.net", gen)
+	if ok3 {
+		t.Error("expected false for self-referential Domain")
+	}
+
+	_, ok4 := buildVTSPFEntityResult(nil, dnsutils.SPFEntity{Kind: 1337, Value: "something"}, "sub5.example.net", gen)
+	if ok4 {
+		t.Error("expected false for unknown Kind")
 	}
 }

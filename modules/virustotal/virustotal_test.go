@@ -1,10 +1,12 @@
 package virustotal
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,6 +18,7 @@ import (
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/httputil"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
@@ -567,4 +570,325 @@ func TestModuleDemoModeAndName(t *testing.T) {
 	if len(execIP2.Results) != 0 {
 		t.Fatalf("expected 0 results on second demo ip call, got %d", len(execIP2.Results))
 	}
+}
+
+type errReader struct{}
+
+func (errReader) Read(_ []byte) (n int, err error) {
+	return 0, errors.New("mock read error")
+}
+
+func (errReader) Close() error {
+	return nil
+}
+
+func TestProcessResponse_ReadError(t *testing.T) {
+	m := &module{}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       errReader{},
+	}
+	data, body, err := m.processResponse(resp, 1)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if data != nil {
+		t.Errorf("expected nil data, got %v", data)
+	}
+	if body != "" {
+		t.Errorf("expected empty body, got %q", body)
+	}
+	var reqErrWrap *vtRequestError
+	if !errors.As(err, &reqErrWrap) {
+		t.Fatalf("expected vtRequestError, got %T: %v", err, err)
+	}
+	if reqErrWrap.action != httputil.Retry {
+		t.Errorf("expected action Retry, got %d", reqErrWrap.action)
+	}
+}
+
+func TestProcessResponse_UnmarshalError(t *testing.T) {
+	m := &module{}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewBufferString("invalid json")),
+	}
+	data, body, err := m.processResponse(resp, 1)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if data != nil {
+		t.Errorf("expected nil data, got %v", data)
+	}
+	if body != "invalid json" {
+		t.Errorf("expected body 'invalid json', got %q", body)
+	}
+	var reqErrWrap *vtRequestError
+	if !errors.As(err, &reqErrWrap) {
+		t.Fatalf("expected vtRequestError, got %T: %v", err, err)
+	}
+	if reqErrWrap.action != httputil.Abort {
+		t.Errorf("expected action Abort, got %d", reqErrWrap.action)
+	}
+}
+
+func TestDoVTRequest_RateLimitContextCancelled(t *testing.T) {
+	originalDelay := resolver.VirustotalDelayMs
+	resolver.VirustotalDelayMs = 10000
+	defer func() { resolver.VirustotalDelayMs = originalDelay }()
+
+	m := &module{
+		lastReqTime: time.Now(),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	data, body, err := m.doVTRequest(ctx, "http://example.com")
+
+	if data != nil || body != "" || err == nil {
+		t.Fatalf("expected error from context cancellation, got data=%v, body=%q, err=%v", data, body, err)
+	}
+	var reqErrWrap *vtRequestError
+	if !errors.As(err, &reqErrWrap) {
+		t.Fatalf("expected vtRequestError, got %T", err)
+	}
+	if reqErrWrap.action != httputil.Abort {
+		t.Errorf("expected Abort, got %d", reqErrWrap.action)
+	}
+}
+
+func TestDoVTRequest_CreateRequestError(t *testing.T) {
+	m := &module{}
+	ctx := context.Background()
+	data, body, err := m.doVTRequest(ctx, ":\x00")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if data != nil || body != "" {
+		t.Errorf("expected nil data and empty body")
+	}
+}
+
+func TestDoVTRequest_DoRequestError(t *testing.T) {
+	originalRetries := resolver.VirustotalMaxRetries
+	resolver.VirustotalMaxRetries = 0
+	defer func() { resolver.VirustotalMaxRetries = originalRetries }()
+
+	m := &module{}
+	ctx := context.Background()
+
+	data, body, err := m.doVTRequest(ctx, "http://127.0.0.1:0")
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if data != nil || body != "" {
+		t.Errorf("expected nil data and empty body")
+	}
+	var reqErrWrap *vtRequestError
+	if !errors.As(err, &reqErrWrap) {
+		t.Fatalf("expected vtRequestError, got %T", err)
+	}
+	if reqErrWrap.action != httputil.Retry {
+		t.Errorf("expected action Retry, got %d", reqErrWrap.action)
+	}
+}
+
+func TestDoVTRequest_RetrySleepContextCancelled(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	m := &module{}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	data, body, err := m.doVTRequest(ctx, srv.URL)
+	if err == nil {
+		t.Fatal("expected error from context cancellation during sleep")
+	}
+	if data != nil {
+		t.Errorf("expected nil data")
+	}
+	if body != "" {
+		t.Errorf("expected empty body")
+	}
+	var reqErrWrap *vtRequestError
+	if !errors.As(err, &reqErrWrap) {
+		t.Fatalf("expected vtRequestError, got %T: %v", err, err)
+	}
+	if reqErrWrap.action != httputil.Abort {
+		t.Errorf("expected Abort, got %d", reqErrWrap.action)
+	}
+	if !strings.Contains(err.Error(), "context cancelled during retry wait") {
+		t.Errorf("expected 'context cancelled during retry wait', got %v", err)
+	}
+}
+
+func TestProcessDomainDemo_ErrorsAndEdgeCases(t *testing.T) {
+	originalReadFile := readDemoFile
+	defer func() { readDemoFile = originalReadFile }()
+
+	m := &module{}
+	ctx := context.Background()
+	gen := modutil.NewLocalIDGenerator()
+
+	readDemoFile = func(_ string) ([]byte, error) {
+		return nil, errors.New("mock read error")
+	}
+	exec := &schema.ModuleExecution{}
+	m.processDomainDemo(ctx, constants.TypeDomain, "d1.example.com", exec, gen)
+	if exec.Error == nil || !strings.Contains(*exec.Error, "mock read error") {
+		t.Errorf("expected mock read error, got %v", exec.Error)
+	}
+
+	m.demoDomainFired.Store(false)
+	readDemoFile = func(_ string) ([]byte, error) {
+		return []byte("invalid json"), nil
+	}
+	exec = &schema.ModuleExecution{}
+	m.processDomainDemo(ctx, constants.TypeDomain, "d2.example.com", exec, gen)
+	if exec.Error == nil || !strings.Contains(*exec.Error, "unmarshal fixture err") {
+		t.Errorf("expected unmarshal error, got %v", exec.Error)
+	}
+
+	m.demoDomainFired.Store(false)
+	readDemoFile = func(name string) ([]byte, error) {
+		if strings.Contains(name, "subdomains_page") {
+			return nil, errors.New("mock read error for subdomains")
+		}
+		return originalReadFile(name)
+	}
+	exec = &schema.ModuleExecution{}
+	m.processDomainDemo(ctx, constants.TypeDomain, "d3.example.com", exec, gen)
+
+	m.demoDomainFired.Store(false)
+	readDemoFile = func(name string) ([]byte, error) {
+		if strings.Contains(name, "subdomains_page") {
+			return []byte("invalid json"), nil
+		}
+		return originalReadFile(name)
+	}
+	exec = &schema.ModuleExecution{}
+	m.processDomainDemo(ctx, constants.TypeDomain, "d4.example.com", exec, gen)
+
+	m.demoDomainFired.Store(false)
+	readDemoFile = func(name string) ([]byte, error) {
+		if strings.Contains(name, "subdomains_page") {
+			return []byte(`{"data": {}}`), nil
+		}
+		return originalReadFile(name)
+	}
+	exec = &schema.ModuleExecution{}
+	m.processDomainDemo(ctx, constants.TypeDomain, "d5.example.com", exec, gen)
+
+	m.demoDomainFired.Store(false)
+	readDemoFile = func(name string) ([]byte, error) {
+		if strings.Contains(name, "subdomains_page1") {
+			mockExpired := `{
+				"data": [
+					{
+						"type": "domain",
+						"id": "expired.example.org",
+						"attributes": {
+							"last_https_certificate": {
+								"validity": {
+									"not_after": "2000-01-01 00:00:00"
+								}
+							}
+						}
+					}
+				]
+			}`
+			return []byte(mockExpired), nil
+		} else if strings.Contains(name, "subdomains_page") {
+			return []byte(`{"data":[]}`), nil
+		}
+		return originalReadFile(name)
+	}
+	exec = &schema.ModuleExecution{}
+	m.processDomainDemo(ctx, constants.TypeDomain, "d6.example.com", exec, gen)
+	foundExpired := false
+	for _, res := range exec.Results {
+		if res.Type == constants.TypeCertExpiredSubdomains {
+			foundExpired = true
+			if !strings.Contains(res.Value, "expired.example.org") {
+				t.Errorf("expected value to contain expired.example.org, got %v", res.Value)
+			}
+			break
+		}
+	}
+	if !foundExpired {
+		t.Error("expected to find expired domain result")
+	}
+}
+
+func TestProcessIPDemo_ErrorsAndEdgeCases(t *testing.T) {
+	originalReadFile := readDemoFile
+	defer func() { readDemoFile = originalReadFile }()
+
+	m := &module{}
+	ctx := context.Background()
+	gen := modutil.NewLocalIDGenerator()
+
+	readDemoFile = func(_ string) ([]byte, error) {
+		return nil, errors.New("mock read error")
+	}
+	exec := &schema.ModuleExecution{}
+	m.processIPDemo(ctx, "127.0.0.1", exec, gen)
+	if exec.Error == nil || !strings.Contains(*exec.Error, "mock read error") {
+		t.Errorf("expected mock read error, got %v", exec.Error)
+	}
+
+	m.demoIPFired.Store(false)
+	readDemoFile = func(_ string) ([]byte, error) {
+		return []byte("invalid json"), nil
+	}
+	exec = &schema.ModuleExecution{}
+	m.processIPDemo(ctx, "127.0.0.2", exec, gen)
+	if exec.Error == nil || !strings.Contains(*exec.Error, "unmarshal fixture err") {
+		t.Errorf("expected unmarshal error, got %v", exec.Error)
+	}
+
+	m.demoIPFired.Store(false)
+	readDemoFile = func(name string) ([]byte, error) {
+		if strings.Contains(name, "resolutions_page") {
+			return nil, errors.New("mock read error for resolutions")
+		}
+		return originalReadFile(name)
+	}
+	exec = &schema.ModuleExecution{}
+	m.processIPDemo(ctx, "127.0.0.3", exec, gen)
+
+	m.demoIPFired.Store(false)
+	readDemoFile = func(name string) ([]byte, error) {
+		if strings.Contains(name, "resolutions_page") {
+			return []byte("invalid json"), nil
+		}
+		return originalReadFile(name)
+	}
+	exec = &schema.ModuleExecution{}
+	m.processIPDemo(ctx, "127.0.0.4", exec, gen)
+
+	m.demoIPFired.Store(false)
+	readDemoFile = func(name string) ([]byte, error) {
+		if strings.Contains(name, "resolutions_page") {
+			return []byte(`{"data": {}}`), nil
+		}
+		return originalReadFile(name)
+	}
+	exec = &schema.ModuleExecution{}
+	m.processIPDemo(ctx, "127.0.0.5", exec, gen)
+
+	m.demoIPFired.Store(false)
+	readDemoFile = func(name string) ([]byte, error) {
+		if strings.Contains(name, "resolutions_page") {
+			return []byte(`{"data": ["string_instead_of_map"]}`), nil
+		}
+		return originalReadFile(name)
+	}
+	exec = &schema.ModuleExecution{}
+	m.processIPDemo(ctx, "127.0.0.6", exec, gen)
 }

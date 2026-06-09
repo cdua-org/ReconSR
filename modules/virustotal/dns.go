@@ -96,7 +96,7 @@ func (m *module) appendVTCNAMEResult(exec *schema.ModuleExecution, target string
 
 func (m *module) appendVTMXResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any, value string, gen *modutil.LocalIDGenerator) {
 	mxValue := value
-	if priority, ok := formatVTInt(rec["priority"]); ok {
+	if priority, ok := formatVTInt(rec[constants.KeyPriority]); ok {
 		mxValue = priority + " " + value
 	}
 
@@ -166,7 +166,7 @@ func (m *module) appendVTSOAResults(exec *schema.ModuleExecution, target string,
 		rawRname = ensureFQDN(rname)
 		parts = append(parts, rawRname)
 	}
-	for _, field := range []string{"serial", "refresh", "retry", "expire", "minimum"} {
+	for _, field := range []string{constants.KeySerial, "refresh", "retry", "expire", "minimum"} {
 		if fieldValue, ok := formatVTInt(rec[field]); ok {
 			parts = append(parts, fieldValue)
 		}
@@ -369,7 +369,7 @@ func (m *module) appendVTCAAResults(exec *schema.ModuleExecution, target string,
 
 func (m *module) appendVTSRVResults(exec *schema.ModuleExecution, target string, src *schema.EntityRef, rec map[string]any, value string, gen *modutil.LocalIDGenerator) {
 	srvValue := value
-	if priority, ok := formatVTInt(rec["priority"]); ok {
+	if priority, ok := formatVTInt(rec[constants.KeyPriority]); ok {
 		if !strings.HasPrefix(value, priority+" ") {
 			srvValue = priority + " " + value
 		}

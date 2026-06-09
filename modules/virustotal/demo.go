@@ -16,6 +16,8 @@ import (
 //go:embed testdata/domain_page1.json testdata/subdomains_page1.json testdata/subdomains_page2.json testdata/ip_page1.json testdata/resolutions_page1.json testdata/resolutions_page2.json
 var demoData embed.FS
 
+var readDemoFile = demoData.ReadFile
+
 func (m *module) processDomainDemo(_ context.Context, targetType, target string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
 	if !m.demoDomainFired.CompareAndSwap(false, true) {
 		dbg.Printf("%s skipped stage=demo_already_fired target=%q", constants.FuncGetVTApiDomain, target)
@@ -31,7 +33,7 @@ func (m *module) processDomainDemo(_ context.Context, targetType, target string,
 		LocalID:  gen.NextID(),
 	})
 
-	dataBytes, err := demoData.ReadFile("testdata/domain_page1.json")
+	dataBytes, err := readDemoFile("testdata/domain_page1.json")
 	if err != nil {
 		modutil.SetError(exec, "read fixture err: %v", err)
 		return
@@ -57,7 +59,7 @@ func (m *module) processDomainDemo(_ context.Context, targetType, target string,
 	for _, i := range []int{1, 2} {
 		fixture := fmt.Sprintf("subdomains_page%d.json", i)
 		fixturePath := "testdata/" + fixture
-		subDataBytes, err := demoData.ReadFile(fixturePath)
+		subDataBytes, err := readDemoFile(fixturePath)
 		if err != nil {
 			continue
 		}
@@ -111,7 +113,7 @@ func (m *module) processIPDemo(_ context.Context, target string, exec *schema.Mo
 		LocalID:  gen.NextID(),
 	})
 
-	dataBytes, err := demoData.ReadFile("testdata/ip_page1.json")
+	dataBytes, err := readDemoFile("testdata/ip_page1.json")
 	if err != nil {
 		modutil.SetError(exec, "read fixture err: %v", err)
 		return
@@ -133,7 +135,7 @@ func (m *module) processIPDemo(_ context.Context, target string, exec *schema.Mo
 	for _, i := range []int{1, 2} {
 		fixture := fmt.Sprintf("resolutions_page%d.json", i)
 		fixturePath := "testdata/" + fixture
-		resDataBytes, err := demoData.ReadFile(fixturePath)
+		resDataBytes, err := readDemoFile(fixturePath)
 		if err != nil {
 			continue
 		}
