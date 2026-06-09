@@ -27,6 +27,7 @@ const (
 	moduleName     = "virustotal"
 	apiServiceName = "VirusTotal"
 	demoIndicator  = "demo-api-key"
+	keyAttributes  = "attributes"
 )
 
 var baseURL = "https://www.virustotal.com/api/v3"
@@ -190,7 +191,7 @@ func (m *module) processDomain(ctx context.Context, targetType, target string, e
 	dbg.Printf("%s root_metadata_loaded target=%q raw_bytes=%d", constants.FuncGetVTApiDomain, target, len(raw))
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
-		if attr, ok := dataMap["attributes"].(map[string]any); ok {
+		if attr, ok := dataMap[keyAttributes].(map[string]any); ok {
 			m.extractDomainMetadata(attr, targetType, target, exec, gen)
 		}
 	}
@@ -243,7 +244,7 @@ func (m *module) processIP(ctx context.Context, target string, exec *schema.Modu
 	dbg.Printf("%s ip_metadata_loaded target=%q raw_bytes=%d", constants.FuncGetVTApiIP, target, len(raw))
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
-		if attr, ok := dataMap["attributes"].(map[string]any); ok {
+		if attr, ok := dataMap[keyAttributes].(map[string]any); ok {
 			m.extractIPMetadata(attr, target, exec, gen)
 		}
 	}

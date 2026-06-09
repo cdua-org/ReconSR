@@ -47,7 +47,7 @@ func (m *module) processDomainDemo(_ context.Context, targetType, target string,
 	}
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
-		if attr, ok := dataMap["attributes"].(map[string]any); ok {
+		if attr, ok := dataMap[keyAttributes].(map[string]any); ok {
 			m.extractDomainMetadata(attr, targetType, target, exec, gen)
 		}
 	}
@@ -127,7 +127,7 @@ func (m *module) processIPDemo(_ context.Context, target string, exec *schema.Mo
 	}
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
-		if attr, ok := dataMap["attributes"].(map[string]any); ok {
+		if attr, ok := dataMap[keyAttributes].(map[string]any); ok {
 			m.extractIPMetadata(attr, target, exec, gen)
 		}
 	}

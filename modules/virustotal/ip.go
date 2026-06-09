@@ -66,7 +66,7 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 }
 
 func (m *module) extractIPResolution(item map[string]any, _ string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
-	attr, ok := item["attributes"].(map[string]any)
+	attr, ok := item[keyAttributes].(map[string]any)
 	if !ok {
 		return
 	}

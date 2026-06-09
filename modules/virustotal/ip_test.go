@@ -1,11 +1,13 @@
 package virustotal
 
 import (
+	"net/http"
 	"slices"
 	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
@@ -167,4 +169,78 @@ func assertIPIgnoredWhoisAndRDAP(t *testing.T, results []schema.ModuleResult) {
 	assertNoResult(t, results, "raw rdap text leakage", func(result schema.ModuleResult) bool {
 		return strings.Contains(result.Value, "ip network") || strings.Contains(result.Value, "rdap_level_0")
 	})
+}
+
+func TestExtractIPResolution_EdgeCases(t *testing.T) {
+	mod := &module{}
+	gen := modutil.NewLocalIDGenerator()
+
+	tests := []struct {
+		item map[string]any
+		name string
+	}{
+		{
+			name: "missing_attributes",
+			item: map[string]any{},
+		},
+		{
+			name: "invalid_attributes_type",
+			item: map[string]any{
+				keyAttributes: "not_a_map",
+			},
+		},
+		{
+			name: "missing_host_name",
+			item: map[string]any{
+				keyAttributes: map[string]any{},
+			},
+		},
+		{
+			name: "invalid_host_name_type",
+			item: map[string]any{
+				keyAttributes: map[string]any{
+					"host_name": 12345,
+				},
+			},
+		},
+		{
+			name: "invalid_domain_validation",
+			item: map[string]any{
+				keyAttributes: map[string]any{
+					"host_name": "invalid-domain-[].example",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exec := &schema.ModuleExecution{}
+			mod.extractIPResolution(tt.item, "", exec, gen)
+			if len(exec.Results) > 0 {
+				t.Fatalf("expected no results, got %d", len(exec.Results))
+			}
+		})
+	}
+}
+
+func TestProcessIP_Error(t *testing.T) {
+	statuses := map[string]int{
+		"/api/v3/ip_addresses/127.0.0.1": http.StatusInternalServerError,
+	}
+	_, server := newVTMockServer(t, nil, statuses)
+	defer server.Close()
+
+	setVTBaseURL(t, server.URL+"/api/v3")
+
+	mod := &module{apiKey: "valid-key"}
+
+	originalRetries := resolver.VirustotalMaxRetries
+	resolver.VirustotalMaxRetries = 0
+	defer func() { resolver.VirustotalMaxRetries = originalRetries }()
+
+	exec := execVT(t, mod, schema.Entity{Type: constants.TypeIPv4, Value: "127.0.0.1"})
+	if exec.Error == nil || !strings.Contains(*exec.Error, "IP metadata failed") {
+		t.Errorf("expected IP metadata failed error, got %v", exec.Error)
+	}
 }

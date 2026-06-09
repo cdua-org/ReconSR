@@ -363,7 +363,7 @@ func (m *module) extractSubdomain(item map[string]any, parentType, parent string
 		return ""
 	}
 
-	attr, ok := item["attributes"].(map[string]any)
+	attr, ok := item[keyAttributes].(map[string]any)
 	if !ok {
 		attr = map[string]any{}
 	}

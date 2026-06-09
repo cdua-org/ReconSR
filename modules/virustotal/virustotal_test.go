@@ -892,3 +892,87 @@ func TestProcessIPDemo_ErrorsAndEdgeCases(t *testing.T) {
 	exec = &schema.ModuleExecution{}
 	m.processIPDemo(ctx, "127.0.0.6", exec, gen)
 }
+
+func TestExec_UnsupportedFunction(t *testing.T) {
+	mod := &module{apiKey: "test"}
+	output, err := mod.Exec(schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeIPv4, Value: "127.0.0.1"},
+		Functions: []string{"unsupported_function"},
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(output.Executions) != 1 {
+		t.Fatalf("expected 1 execution")
+	}
+	exec := output.Executions[0]
+	if exec.Error == nil || !strings.Contains(*exec.Error, "unsupported function") {
+		t.Errorf("expected unsupported function error, got %v", exec.Error)
+	}
+}
+
+func TestProcessPaginated_EdgeCases(t *testing.T) {
+	mod := &module{apiKey: "test-key"}
+	ctx := context.Background()
+
+	originalDelay := resolver.VirustotalDelayMs
+	resolver.VirustotalDelayMs = 0
+	defer func() { resolver.VirustotalDelayMs = originalDelay }()
+
+	originalRetries := resolver.VirustotalMaxRetries
+	resolver.VirustotalMaxRetries = 0
+	defer func() { resolver.VirustotalMaxRetries = originalRetries }()
+
+	t.Run("error_request", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer srv.Close()
+
+		exec := &schema.ModuleExecution{}
+		mod.processPaginated(ctx, srv.URL, exec, func(_ map[string]any) {})
+		if exec.Error == nil || !strings.Contains(*exec.Error, "pagination failed") {
+			t.Errorf("expected pagination error, got %v", exec.Error)
+		}
+	})
+
+	t.Run("missing_links", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			if _, err := w.Write([]byte(`{"data": [{"id": "1"}]}`)); err != nil {
+				panic(err)
+			}
+		}))
+		defer srv.Close()
+
+		exec := &schema.ModuleExecution{}
+		count := 0
+		mod.processPaginated(ctx, srv.URL, exec, func(_ map[string]any) { count++ })
+		if count != 1 {
+			t.Errorf("expected 1 item, got %d", count)
+		}
+		if exec.Error != nil {
+			t.Errorf("unexpected error: %v", *exec.Error)
+		}
+	})
+
+	t.Run("empty_raw_no_data", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			if _, err := w.Write([]byte(`{"data": [], "links": {"next": ""}}`)); err != nil {
+				panic(err)
+			}
+		}))
+		defer srv.Close()
+
+		ctxCancel, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		exec := &schema.ModuleExecution{}
+		mod.processPaginated(ctxCancel, srv.URL, exec, func(_ map[string]any) {})
+		if exec.Error == nil {
+			t.Error("expected error due to cancelled context")
+		}
+		if strings.Contains(exec.RawData, "\n---\n") {
+			t.Errorf("did not expect raw data to be saved, got %q", exec.RawData)
+		}
+	})
+}

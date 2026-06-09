@@ -474,7 +474,7 @@ func TestDomain_EdgeCases(t *testing.T) {
 	m.extractSubdomain(map[string]any{"id": "u14.example.net"}, constants.TypeSubdomain, "u15.example.net", false, exec, gen)
 	m.extractSubdomain(map[string]any{
 		"id": "u16.example.net",
-		"attributes": map[string]any{
+		keyAttributes: map[string]any{
 			"tags": []any{"tag1", "tag2"},
 			"last_https_certificate": map[string]any{
 				"validity": map[string]any{
