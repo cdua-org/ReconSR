@@ -968,6 +968,7 @@
             let isPrivacyMode = false;
             let originalNodesData = new Map();
             let originalProjectName = document.getElementById("project-title") ? document.getElementById("project-title").innerHTML : "";
+            let originalDocumentTitle = document.title;
 
             function togglePrivacyMode() {
                 const trControls = document.getElementById('top-right-controls');
@@ -983,22 +984,11 @@
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                         <path d="M9 12l2 2 4-4"/>
                     </svg> Privacy Mode (ON)`;
-                    if (projectTitle) {
-                        const parts = originalProjectName.split(': ');
-                        if (parts.length > 1) {
-                            projectTitle.innerHTML = parts[0] + ': ****************';
-                        } else {
-                            projectTitle.innerHTML = '****************';
-                        }
-                    }
                 } else {
                     btn.classList.remove("active");
                     btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                     </svg> Privacy Mode`;
-                    if (projectTitle) {
-                        projectTitle.innerHTML = originalProjectName;
-                    }
                 }
 
                 const updates = [];
@@ -1006,20 +996,22 @@
                     if (!originalNodesData.has(n.id)) {
                         originalNodesData.set(n.id, { label: n.label, title: n.title });
                     }
+                    const orig = originalNodesData.get(n.id);
+                    const mLabel = isPrivacyMode ? maskValueByType(n.group, orig.label) : orig.label;
+                    const mTitle = isPrivacyMode ? maskValueByType(n.group, orig.title) : orig.title;
 
-                    if (isPrivacyMode) {
-                        updates.push({
-                            id: n.id,
-                            label: maskValueByType(n.group, originalNodesData.get(n.id).label),
-                            title: maskValueByType(n.group, originalNodesData.get(n.id).title)
-                        });
-                    } else {
-                        updates.push({
-                            id: n.id,
-                            label: originalNodesData.get(n.id).label,
-                            title: originalNodesData.get(n.id).title
-                        });
+                    if (n.group === 'root') {
+                        if (isPrivacyMode) {
+                            const parts = originalProjectName.split(': ');
+                            if (projectTitle) projectTitle.innerHTML = (parts.length > 1 ? parts[0] + ': ' : '') + mLabel;
+                            document.title = originalDocumentTitle.split(' - ')[0] + ' - ' + mLabel;
+                        } else {
+                            if (projectTitle) projectTitle.innerHTML = originalProjectName;
+                            document.title = originalDocumentTitle;
+                        }
                     }
+
+                    updates.push({ id: n.id, label: mLabel, title: mTitle });
                 });
                 if(updates.length > 0) {
                     nodes.update(updates);
@@ -1046,10 +1038,13 @@
                     case 'txt':
                     case 'openpgpkey':
                     case 'smimea':
-                        masked = masked.split(' ').map(word => {
-                            if (word.length <= 2) return word[0] + '*';
-                            return word[0] + '*'.repeat(word.length - 2) + word[word.length - 1];
-                        }).join(' ');
+                        masked = masked.split('\n').map(line => {
+                            const maskWord = w => w.length <= 2 ? w[0] + (w.length > 1 ? '*' : '') : w[0] + '*'.repeat(w.length - 2) + w[w.length - 1];
+                            if (line.startsWith('Value: ')) {
+                                return 'Value: ' + line.substring(7).split(' ').map(maskWord).join(' ');
+                            }
+                            return line.includes(': ') ? line : line.split(' ').map(maskWord).join(' ');
+                        }).join('\n');
                         break;
                     case 'geo':
                         if (masked.includes('|') || masked.includes(':')) {
@@ -1074,33 +1069,25 @@
                         }
                         break;
                     case 'phone':
-                        if (masked.length > 6) {
-                            masked = masked.substring(0, 5) + '*'.repeat(masked.length - 6) + masked.slice(-1);
-                        } else {
-                            masked = masked[0] + '*'.repeat(masked.length - 1);
-                        }
+                        masked = masked.replace(/\+?\d{7,15}/g, function(m) {
+                            if (m.length > 6) return m.substring(0, 5) + '*'.repeat(m.length - 6) + m.slice(-1);
+                            return m[0] + '*'.repeat(m.length - 1);
+                        });
                         break;
                     case 'asn':
-                        masked = masked.replace(/^(AS)(\d+)/i, function(match, prefix, digits) {
+                        masked = masked.replace(/(AS)(\d+)/gi, function(match, prefix, digits) {
                             if (digits.length <= 1) return prefix + '*';
                             return prefix + '*'.repeat(digits.length - 1) + digits.slice(-1);
                         });
                         break;
                     case 'whois_registrar':
                     case 'whois_abuse':
-                        // Last word is always a domain name - mask it
-                        const partsArr = masked.split(' ');
-                        const lastPart = partsArr[partsArr.length - 1];
-                        if (/\b([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b/.test(lastPart)) {
-                            partsArr[partsArr.length - 1] = maskDomain(lastPart);
-                            masked = partsArr.join(' ');
-                        } else {
-                            // Fallback for names if no domain found
-                            masked = masked.split(' ').map(word => {
-                                if (word.length <= 2) return word[0] + '*';
-                                return word[0] + '*'.repeat(word.length - 2) + word[word.length - 1];
-                            }).join(' ');
-                        }
+                    case 'whois_admin':
+                    case 'whois_tech':
+                    case 'whois_billing':
+                    case 'whois_registrant':
+                        // Mask domain name
+                        masked = masked.replace(/\b([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b/g, maskDomain);
                         break;
                     case 'ip':
                     case 'ipv4':
@@ -1130,11 +1117,6 @@
                         break;
                     case 'email':
                     case 'email-extra':
-                    case 'whois_admin':
-                    case 'whois_tech':
-                    case 'whois_billing':
-                    case 'whois_registrant':
-                    case 'whois_abuse':
                         masked = masked.replace(/\b([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/g, function(match, user, domain) {
                             let mUser = user;
                             if(user.length > 2) {
