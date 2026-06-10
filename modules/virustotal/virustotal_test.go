@@ -29,7 +29,7 @@ const (
 	fixtureAPISubdomain  = "api.target-example.com"
 	fixtureVPNSubdomain  = "vpn.target-example.com"
 	fixtureMailSubdomain = "mail.target-example.com"
-	fixtureFixtureAPIKey = "fixture-key"
+	fixtureTestAPIKey    = "fixture-key"
 )
 
 type vtMockRequest struct {
@@ -268,7 +268,7 @@ func TestModuleCapabilities(t *testing.T) {
 		t.Fatalf("expected empty custom functions without key, got %+v", caps.CustomFunctions)
 	}
 
-	mod.apiKey = "valid-key"
+	mod.apiKey = fixtureTestAPIKey
 	caps, err = mod.Capabilities()
 	if err != nil {
 		t.Fatalf("Capabilities error: %v", err)
@@ -326,7 +326,7 @@ func TestDoVTRequestClassifiesRateLimit(t *testing.T) {
 	resolver.VirustotalDelayMs = 0
 	defer func() { resolver.VirustotalDelayMs = originalDelay }()
 
-	mod := &module{apiKey: fixtureFixtureAPIKey}
+	mod := &module{apiKey: fixtureTestAPIKey}
 	_, _, err := mod.doVTRequest(context.Background(), server.URL+"/api/v3/domains/"+fixtureDomainTarget)
 	if err == nil {
 		t.Fatal("expected rate-limit error")
@@ -446,7 +446,7 @@ func TestProcessPaginatedLimits(t *testing.T) {
 	resolver.VirustotalMaxPages = 1
 	defer func() { resolver.VirustotalMaxPages = originalMaxPages }()
 
-	mod := &module{apiKey: fixtureFixtureAPIKey}
+	mod := &module{apiKey: fixtureTestAPIKey}
 	execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: fixtureDomainTarget})
 
 	requests := mock.requestsForPath("/api/v3/domains/" + fixtureDomainTarget + "/subdomains?limit=40&cursor=synthetic-subdomains-cursor-page-2")
@@ -474,7 +474,7 @@ func TestModule_LocalIDChaining(t *testing.T) {
 
 	setVTBaseURL(t, server.URL+"/api/v3")
 
-	mod := &module{apiKey: fixtureFixtureAPIKey}
+	mod := &module{apiKey: fixtureTestAPIKey}
 	exec := execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: fixtureDomainTarget})
 
 	if exec.Error != nil {

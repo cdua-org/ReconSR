@@ -1,6 +1,8 @@
 package virustotal
 
 import (
+	"fmt"
+	"net/http"
 	"slices"
 	"strings"
 	"testing"
@@ -69,7 +71,7 @@ func executeDomainFixture(t *testing.T) domainFixtureRun {
 
 	setVTBaseURL(t, server.URL+"/api/v3")
 
-	mod := &module{apiKey: fixtureFixtureAPIKey}
+	mod := &module{apiKey: fixtureTestAPIKey}
 	exec := execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: fixtureDomainTarget})
 	if exec.Error != nil {
 		t.Fatalf("unexpected execution error: %q", *exec.Error)
@@ -84,7 +86,7 @@ func assertDomainRequestFlow(t *testing.T, mock *vtMockServer) {
 	rootReq := assertSinglePathHit(t, mock, "/api/v3/domains/"+fixtureDomainTarget)
 	page1Req := assertSinglePathHit(t, mock, "/api/v3/domains/"+fixtureDomainTarget+"/subdomains?limit=40")
 	page2Req := assertSinglePathHit(t, mock, "/api/v3/domains/"+fixtureDomainTarget+"/subdomains?limit=40&cursor=synthetic-subdomains-cursor-page-2")
-	assertRequestAPIKey(t, mock.allRequests(), fixtureFixtureAPIKey)
+	assertRequestAPIKey(t, mock.allRequests(), fixtureTestAPIKey)
 	assertMinimumGap(t, rootReq, page1Req, "domain phase transition")
 	assertMinimumGap(t, page1Req, page2Req, "domain pagination")
 }
@@ -489,4 +491,124 @@ func TestDomain_EdgeCases(t *testing.T) {
 	if len(exec.Results) == 0 {
 		t.Error("expected results from edge cases")
 	}
+}
+
+func TestProcessDomain_Error(t *testing.T) {
+	statuses := map[string]int{
+		"/api/v3/domains/error.example.com": http.StatusInternalServerError,
+	}
+	_, server := newVTMockServer(t, nil, statuses)
+	defer server.Close()
+
+	setVTBaseURL(t, server.URL+"/api/v3")
+
+	mod := &module{apiKey: fixtureTestAPIKey}
+
+	originalRetries := resolver.VirustotalMaxRetries
+	resolver.VirustotalMaxRetries = 0
+	defer func() { resolver.VirustotalMaxRetries = originalRetries }()
+
+	exec := execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: "error.example.com"})
+	if exec.Error == nil || !strings.Contains(*exec.Error, "domain metadata failed") {
+		t.Errorf("expected domain metadata failed error, got %v", exec.Error)
+	}
+}
+
+func TestProcessDomain_ExpiredCerts(t *testing.T) {
+	originalRetries := resolver.VirustotalDelayMs
+	resolver.VirustotalDelayMs = 0
+	defer func() { resolver.VirustotalDelayMs = originalRetries }()
+
+	expiredTime := time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339)
+	subdomainResp := fmt.Sprintf(`{
+		"data": [
+			{
+				"id": "expired.example.com",
+				"attributes": {
+					"last_https_certificate": {
+						"validity": {
+							"not_after": "%s"
+						}
+					}
+				}
+			}
+		]
+	}`, expiredTime)
+
+	statuses := map[string]string{
+		"/api/v3/domains/test.example.com":                     `{"data":{"id":"test.example.com","attributes":{}}}`,
+		"/api/v3/domains/test.example.com/subdomains?limit=40": subdomainResp,
+	}
+
+	mock, server := newVTMockServer(t, statuses, nil)
+	defer server.Close()
+	setVTBaseURL(t, server.URL+"/api/v3")
+
+	mod := &module{apiKey: fixtureTestAPIKey}
+
+	exec := execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: "test.example.com"})
+
+	found := false
+	for _, res := range exec.Results {
+		if res.Type == constants.TypeCertExpiredSubdomains && strings.Contains(res.Value, "expired.example.com") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected TypeCertExpiredSubdomains with expired.example.com, results: %+v", exec.Results)
+	}
+	_ = mock
+}
+
+func TestProcessDomain_DisableCertExpiredSubdomains(t *testing.T) {
+	originalRetries := resolver.VirustotalDelayMs
+	resolver.VirustotalDelayMs = 0
+	defer func() { resolver.VirustotalDelayMs = originalRetries }()
+
+	oldVal, hasVal := resolver.Options["DisableCertExpiredSubdomains"]
+	resolver.Options["DisableCertExpiredSubdomains"] = "true"
+	defer func() {
+		if hasVal {
+			resolver.Options["DisableCertExpiredSubdomains"] = oldVal
+		} else {
+			delete(resolver.Options, "DisableCertExpiredSubdomains")
+		}
+	}()
+
+	expiredTime := time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339)
+	subdomainResp := fmt.Sprintf(`{
+		"data": [
+			{
+				"id": "expired.example.com",
+				"attributes": {
+					"last_https_certificate": {
+						"validity": {
+							"not_after": "%s"
+						}
+					}
+				}
+			}
+		]
+	}`, expiredTime)
+
+	statuses := map[string]string{
+		"/api/v3/domains/test2.example.com":                     `{"data":{"id":"test2.example.com","attributes":{}}}`,
+		"/api/v3/domains/test2.example.com/subdomains?limit=40": subdomainResp,
+	}
+
+	mock, server := newVTMockServer(t, statuses, nil)
+	defer server.Close()
+	setVTBaseURL(t, server.URL+"/api/v3")
+
+	mod := &module{apiKey: fixtureTestAPIKey}
+
+	exec := execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: "test2.example.com"})
+
+	for _, res := range exec.Results {
+		if res.Type == constants.TypeCertExpiredSubdomains {
+			t.Errorf("unexpected TypeCertExpiredSubdomains result when disabled: %+v", res)
+		}
+	}
+	_ = mock
 }

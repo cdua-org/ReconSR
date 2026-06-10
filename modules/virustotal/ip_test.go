@@ -57,7 +57,7 @@ func executeIPFixture(t *testing.T) ipFixtureRun {
 
 	setVTBaseURL(t, server.URL+"/api/v3")
 
-	mod := &module{apiKey: fixtureFixtureAPIKey}
+	mod := &module{apiKey: fixtureTestAPIKey}
 	exec := execVT(t, mod, schema.Entity{Type: constants.TypeIPv4, Value: fixtureIPTarget})
 	if exec.Error != nil {
 		t.Fatalf("unexpected execution error: %q", *exec.Error)
@@ -72,7 +72,7 @@ func assertIPRequestFlow(t *testing.T, mock *vtMockServer) {
 	metaReq := assertSinglePathHit(t, mock, "/api/v3/ip_addresses/"+fixtureIPTarget)
 	page1Req := assertSinglePathHit(t, mock, "/api/v3/ip_addresses/"+fixtureIPTarget+"/resolutions?limit=40")
 	page2Req := assertSinglePathHit(t, mock, "/api/v3/ip_addresses/"+fixtureIPTarget+"/resolutions?limit=40&cursor=synthetic-resolutions-cursor-page-2")
-	assertRequestAPIKey(t, mock.allRequests(), fixtureFixtureAPIKey)
+	assertRequestAPIKey(t, mock.allRequests(), fixtureTestAPIKey)
 	assertMinimumGap(t, metaReq, page1Req, "ip phase transition")
 	assertMinimumGap(t, page1Req, page2Req, "ip pagination")
 }
@@ -233,7 +233,7 @@ func TestProcessIP_Error(t *testing.T) {
 
 	setVTBaseURL(t, server.URL+"/api/v3")
 
-	mod := &module{apiKey: "valid-key"}
+	mod := &module{apiKey: fixtureTestAPIKey}
 
 	originalRetries := resolver.VirustotalMaxRetries
 	resolver.VirustotalMaxRetries = 0

@@ -263,8 +263,8 @@ Shodan enrichment uses two capability modes: without an API key, only the public
 <details><summary>View details (2 functions)</summary>
 
 API-backed enrichment for domains, optionally subdomains, and IPv4/IPv6 targets through VirusTotal API v3. Without a VirusTotal API key, no functions are advertised to the dispatcher; with a configured key, the module exposes both functions and supports explicit demo mode:
-- `get_vt_api_domain`: Queries VirusTotal domain metadata and, when enabled, related subdomains. Extracts tags, reputation and threat scores, categories, popularity ranks, JARM, crowdsourced context, certificate identities and fingerprints, DNS-derived entities, expired-certificate subdomain summaries, out-of-scope classifications, etc.
-- `get_vt_api_ip`: Queries VirusTotal IP metadata and passive DNS resolutions. Extracts ASN, network CIDR, AS owner, geo metadata, JARM, tags, threat scores, last update, passive DNS hostnames, etc.
+- `get_virustotal_domain`: Queries VirusTotal domain metadata and, when enabled, related subdomains. Extracts tags, reputation and threat scores, categories, popularity ranks, JARM, crowdsourced context, certificate identities and fingerprints, DNS-derived entities, expired-certificate subdomain summaries, out-of-scope classifications, etc.
+- `get_virustotal_ip`: Queries VirusTotal IP metadata and passive DNS resolutions. Extracts ASN, network CIDR, AS owner, geo metadata, JARM, tags, threat scores, last update, passive DNS hostnames, etc.
 </details>
 
 ### 19. Vulnerability Lookup (`modules/vuln_lookup`)
