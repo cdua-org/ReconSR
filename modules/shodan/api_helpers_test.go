@@ -13,6 +13,8 @@ func shodanTestAPIKey() string {
 	return "test-key"
 }
 
+const testRedactedAPIKey = "test-redaction-key-12345"
+
 func shodanTestPreflightPath() string {
 	return "/api-info"
 }

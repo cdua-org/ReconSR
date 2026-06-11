@@ -374,6 +374,39 @@ func TestGetShodanAPIDomainBranches(t *testing.T) {
 		}
 	})
 
+	t.Run("do_request_error_is_sanitized", func(t *testing.T) {
+		withShodanBaseURL(t, "http://shodan.test")
+		withDefaultTransport(t, roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return nil, fmt.Errorf("Get %q: EOF", req.URL.String())
+		}))
+
+		module := &shodanModule{apiKey: testRedactedAPIKey, queryCredits: 1}
+		markPreflightDone(module)
+
+		exec := module.getShodanAPIDomain(target)
+		if exec.Error == nil || !strings.Contains(*exec.Error, "key=[redacted]") {
+			t.Fatalf("expected sanitized do request error, got %+v", exec.Error)
+		}
+	})
+
+	t.Run("read_body_error", func(t *testing.T) {
+		withShodanBaseURL(t, "http://shodan.test")
+		withDefaultTransport(t, roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+			return okBodyResponse(failingReadCloser{
+				readErr:  errors.New("domain body failed"),
+				closeErr: errors.New("domain close failed"),
+			}), nil
+		}))
+
+		module := &shodanModule{apiKey: shodanTestAPIKey(), queryCredits: 1}
+		markPreflightDone(module)
+
+		exec := module.getShodanAPIDomain(target)
+		if exec.Error == nil || !strings.Contains(*exec.Error, "read body") {
+			t.Fatalf("expected read body error, got %+v", exec.Error)
+		}
+	})
+
 	t.Run("not_found", func(t *testing.T) {
 		withShodanBaseURL(t, "http://shodan.test")
 		withDefaultTransport(t, roundTripFunc(func(_ *http.Request) (*http.Response, error) {

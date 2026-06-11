@@ -87,15 +87,36 @@ func TestAppendShodanTXTResultBranches(t *testing.T) {
 		exec := schema.ModuleExecution{}
 		gen := modutil.NewLocalIDGenerator()
 
-		appendShodanTXTResult(&exec, shodanDomainRecord{Subdomain: "_dmarc"}, "v=DMARC1; p=reject; rua=mailto:not-an-email; ruf=mailto:ops@example.net", "dmark.example.org", nil, gen)
+		const subdomainDMARC = "_dmarc"
+		appendShodanTXTResult(&exec, shodanDomainRecord{Subdomain: subdomainDMARC}, "v=DMARC1; p=reject; rua=mailto:not-an-email; ruf=mailto:ops@example.net", "dmark.example.org", nil, gen)
 
-		requireModuleResultWithContext(t, exec.Results, constants.TypeDMARC, "v=DMARC1; p=reject; rua=mailto:not-an-email; ruf=mailto:ops@example.net", "_dmarc")
+		requireModuleResultWithContext(t, exec.Results, constants.TypeDMARC, "v=DMARC1; p=reject; rua=mailto:not-an-email; ruf=mailto:ops@example.net", subdomainDMARC)
 		ruf := requireModuleResultWithContext(t, exec.Results, constants.TypeEmail, "ops@example.net", "DMARC RUF")
 		if !ruf.OutOfScope {
 			t.Fatal("expected DMARC RUF email to be out of scope")
 		}
 		if _, ok := findModuleResult(exec.Results, constants.TypeEmail, "not-an-email"); ok {
 			t.Fatalf("expected invalid DMARC email to be skipped, got %+v", exec.Results)
+		}
+	})
+
+	t.Run("dmarc_missing_tags", func(t *testing.T) {
+		exec := schema.ModuleExecution{}
+		gen := modutil.NewLocalIDGenerator()
+
+		const subdomainDMARC = "_dmarc"
+		appendShodanTXTResult(&exec, shodanDomainRecord{Subdomain: subdomainDMARC}, "v=DMARC1; p=reject; rua=mailto:dev@sandbox.example.org", "sandbox.example.org", nil, gen)
+		requireModuleResultWithContext(t, exec.Results, constants.TypeEmail, "dev@sandbox.example.org", "DMARC RUA")
+	})
+
+	t.Run("dmarc_validation_failure_is_skipped", func(t *testing.T) {
+		exec := schema.ModuleExecution{}
+		gen := modutil.NewLocalIDGenerator()
+
+		const subdomainDMARC = "_dmarc"
+		appendShodanTXTResult(&exec, shodanDomainRecord{Subdomain: subdomainDMARC}, "v=DMARC1; p=reject; rua=mailto:admin@invalid..domain", "mailbox.example.net", nil, gen)
+		if _, ok := findModuleResult(exec.Results, constants.TypeEmail, "admin@invalid..domain"); ok {
+			t.Fatal("expected DMARC email failing ReconSR validation to be skipped")
 		}
 	})
 
@@ -130,7 +151,11 @@ func TestBuildShodanSPFEntityResultBranches(t *testing.T) {
 		t.Fatal("expected self-referential SPF domain entity to be rejected")
 	}
 
-	if _, ok := buildShodanSPFEntityResult(source, dnsutils.SPFEntity{Kind: dnsutils.SPFEntityType(99), Value: "e.example.net", Mechanism: "include"}, "example.com", gen); ok {
+	if _, ok := buildShodanSPFEntityResult(source, dnsutils.SPFEntity{Kind: dnsutils.SPFEntityDomain, Value: "invalid..domain", Mechanism: "a"}, "mail-relay.example.com", gen); ok {
+		t.Fatal("expected invalid SPF domain entity to be rejected")
+	}
+
+	if _, ok := buildShodanSPFEntityResult(source, dnsutils.SPFEntity{Kind: dnsutils.SPFEntityType(99), Value: "e.example.net", Mechanism: "mx"}, "backup-mx.example.com", gen); ok {
 		t.Fatal("expected unknown SPF entity kind to be rejected")
 	}
 }
@@ -142,10 +167,16 @@ func TestShodanDomainHelperEdgeBranches(t *testing.T) {
 
 	exec := schema.ModuleExecution{}
 	gen := modutil.NewLocalIDGenerator()
-	source := &schema.EntityRef{Type: constants.TypeDomain, Value: "lid.example.com", LocalID: 1}
+	source := &schema.EntityRef{Type: constants.TypeSubdomain, Value: "lid.example.com", LocalID: 1}
 
 	if ref := appendShodanIPResult(&exec, "not-an-ip", source, gen); ref != nil {
 		t.Fatalf("expected invalid ip to be ignored, got %+v", ref)
+	}
+
+	dummySource := &schema.EntityRef{Type: constants.TypeSubdomain, Value: "legacy-record.example.com"}
+	unknownRef := processShodanDNSRecord(&exec, shodanDomainRecord{Type: "UNKNOWN_TYPE"}, "some data", "unknown-node.example.net", dummySource, gen)
+	if unknownRef == nil || unknownRef.Type != "unknown_type" {
+		t.Fatalf("expected generic DNS result fallback for unknown type, got %+v", unknownRef)
 	}
 	if ref := appendShodanCNAMEResult(&exec, "bad target", "lid.example.com", source, gen); ref != nil {
 		t.Fatalf("expected invalid cname to be ignored, got %+v", ref)
@@ -159,8 +190,8 @@ func TestShodanDomainHelperEdgeBranches(t *testing.T) {
 	if ref := appendShodanNSResult(&exec, "lid4.example.com", "lid4.example.com", source, gen); ref != nil {
 		t.Fatalf("expected self ns to be ignored, got %+v", ref)
 	}
-	if len(exec.Results) != 0 {
-		t.Fatalf("expected helper edge cases to add no results, got %+v", exec.Results)
+	if len(exec.Results) != 1 {
+		t.Fatalf("expected helper edge cases to add 1 result for unknown type, got %+v", exec.Results)
 	}
 }
 
@@ -335,7 +366,7 @@ func TestSSLHelperBranches(t *testing.T) {
 		exec := schema.ModuleExecution{}
 		gen := modutil.NewLocalIDGenerator()
 
-		sources := parseSubjectAltName(&exec, "DNS:*."+"example.net"+`\tDNS:*.`+"example.net"+`\tbad value`, gen)
+		sources := parseSubjectAltName(&exec, "DNS:*."+"example.net"+`\tDNS:*.`+"example.net"+`\tDNS:-invalid-domain-.com`, gen)
 		if len(sources) != 1 {
 			t.Fatalf("expected one SAN source, got %+v", sources)
 		}

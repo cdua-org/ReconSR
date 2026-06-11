@@ -339,6 +339,16 @@ func TestShodanNAPTRSelfReferentialSkip(t *testing.T) {
 	}
 }
 
+func TestShodanNAPTRFallback(t *testing.T) {
+	exec := &schema.ModuleExecution{}
+	sourceDomain := &schema.EntityRef{Type: constants.TypeSubdomain, Value: "invalid-naptr.example.org"}
+	gen := modutil.NewLocalIDGenerator()
+
+	appendShodanNAPTRResult(exec, "invalid naptr data", "sip-fallback.example.org", sourceDomain, gen)
+
+	requireModuleResult(t, exec.Results, constants.TypeNAPTR, "invalid naptr data")
+}
+
 func TestAppendShodanNAPTRResultRegexp(t *testing.T) {
 	exec := &schema.ModuleExecution{}
 	sourceDomain := &schema.EntityRef{Type: constants.TypeDomain, Value: "example.edu"}

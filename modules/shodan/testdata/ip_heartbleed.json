@@ -21,7 +21,7 @@
       "cpe": [],
       "cpe23": [],
       "location": {},
-      "vulns": {},
+      "vulns": {"": {}},
       "_shodan": {"module": "https"}
     }
   ]

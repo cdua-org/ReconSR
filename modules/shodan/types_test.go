@@ -31,14 +31,23 @@ func TestShodanIPBannerUnmarshalBranches(t *testing.T) {
 	if err := json.Unmarshal([]byte(`[]`), &banner); err == nil {
 		t.Fatal("expected invalid banner payload to fail")
 	}
+	if err := json.Unmarshal([]byte(`{"hash":1,"port":53,"timestamp":1}`), &banner); err == nil {
+		t.Fatal("expected invalid meta payload to fail")
+	}
+	if err := json.Unmarshal([]byte(`{"hash":1,"port":53,"timestamp":"x","product":1}`), &banner); err == nil {
+		t.Fatal("expected invalid service payload to fail")
+	}
+	if err := json.Unmarshal([]byte(`{"hash":1,"port":53,"timestamp":"x","http":"err"}`), &banner); err == nil {
+		t.Fatal("expected invalid details payload to fail")
+	}
 }
 
 func TestShodanIPBannerUnmarshalWithArtifactsAndDetails(t *testing.T) {
 	var banner shodanIPBanner
-	if err := json.Unmarshal([]byte(`{"hash":11,"port":443,"transport":"UDP","timestamp":"2026-06-07T00:00:00Z","cpe":["cpe:/a:example:test"],"cpe23":["cpe:2.3:a:example:test"],"vulns":{"CVE-2026-0001":{"verified":true}},"http":{"server":"ExampleHTTP"},"ssl":{"jarm":"artifact-jarm","versions":["TLSv1.3"],"cert":{"expires":"20270720194415Z","issuer":{"CN":"Issuer CN"},"fingerprint":{"sha1":"aa"},"extensions":[{"name":"subjectAltName","data":"DNS:*.example.net"}]}},"location":{"country_code":"EX"}}`), &banner); err != nil {
+	if err := json.Unmarshal([]byte(`{"hash":11,"port":443,"transport":"UDP","timestamp":"2026-06-07T00:00:00Z","cpe":["cpe:/a:example:test"],"cpe23":["cpe:2.3:a:example:test"],"vulns":{"CVE-2026-0001":{"verified":true},"CVE-1999-1234":{"verified":false},"":{"verified":false}},"http":{"server":"ExampleHTTP"},"ssl":{"jarm":"artifact-jarm","versions":["TLSv1.3"],"cert":{"expires":"20270720194415Z","issuer":{"CN":"Issuer CN"},"fingerprint":{"sha1":"aa"},"extensions":[{"name":"subjectAltName","data":"DNS:*.example.net"}]}},"location":{"country_code":"EX"}}`), &banner); err != nil {
 		t.Fatalf("unexpected banner unmarshal error: %v", err)
 	}
-	if banner.Artifacts == nil || len(banner.Artifacts.CPE) != 1 || len(banner.Artifacts.CPE23) != 1 || len(banner.Artifacts.Vulns) != 1 {
+	if banner.Artifacts == nil || len(banner.Artifacts.CPE) != 1 || len(banner.Artifacts.CPE23) != 1 || len(banner.Artifacts.Vulns) != 3 {
 		t.Fatalf("expected artifacts to be populated, got %+v", banner.Artifacts)
 	}
 	if banner.Details == nil || banner.Details.HTTP == nil || banner.Details.SSL == nil || banner.Details.Location == nil {
@@ -46,7 +55,7 @@ func TestShodanIPBannerUnmarshalWithArtifactsAndDetails(t *testing.T) {
 	}
 }
 
-func TestShodanRawBannerCoreBranches(t *testing.T) {
+func TestShodanRawBannerCoreSuccessBranches(t *testing.T) {
 	artifacts, hash, port, transport, err := parseShodanRawBannerCore([]byte(`{"hash":2,"port":443}`))
 	if err != nil {
 		t.Fatalf("unexpected core parse error: %v", err)
@@ -62,9 +71,26 @@ func TestShodanRawBannerCoreBranches(t *testing.T) {
 	if artifacts == nil || len(artifacts.CPE) != 1 || len(artifacts.CPE23) != 1 || len(artifacts.Vulns) != 1 || transport != shodanTransportUDP {
 		t.Fatalf("unexpected populated core result: artifacts=%+v transport=%d", artifacts, transport)
 	}
+}
 
+func TestShodanRawBannerCoreErrorBranches(t *testing.T) {
 	if _, _, _, _, err := parseShodanRawBannerCore([]byte(`{"cpe":1,"hash":2,"port":443}`)); err == nil {
 		t.Fatal("expected invalid cpe field to fail")
+	}
+	if _, _, _, _, err := parseShodanRawBannerCore([]byte(`{"cpe23":1,"hash":2,"port":443}`)); err == nil {
+		t.Fatal("expected invalid cpe23 field to fail")
+	}
+	if _, _, _, _, err := parseShodanRawBannerCore([]byte(`{"vulns":1,"hash":2,"port":443}`)); err == nil {
+		t.Fatal("expected invalid vulns field to fail")
+	}
+	if _, _, _, _, err := parseShodanRawBannerCore([]byte(`{"hash":"err","port":443}`)); err == nil {
+		t.Fatal("expected invalid hash field to fail")
+	}
+	if _, _, _, _, err := parseShodanRawBannerCore([]byte(`{"hash":2,"port":"err"}`)); err == nil {
+		t.Fatal("expected invalid port field to fail")
+	}
+	if _, _, _, _, err := parseShodanRawBannerCore([]byte(`{"hash":2,"port":443,"transport":1}`)); err == nil {
+		t.Fatal("expected invalid transport field to fail")
 	}
 }
 
@@ -82,6 +108,9 @@ func TestShodanRawBannerMetaBranches(t *testing.T) {
 	}
 	if _, _, err := parseShodanRawBannerMeta([]byte(`{"opts":1}`)); err == nil {
 		t.Fatal("expected invalid opts field to fail")
+	}
+	if _, _, err := parseShodanRawBannerMeta([]byte(`[1,2,3]`)); err == nil {
+		t.Fatal("expected invalid json to fail")
 	}
 }
 
