@@ -33,14 +33,15 @@ type statItem struct {
 }
 
 type reportTemplateData struct {
-	ProjectName       string
-	Timestamp         string
-	NodesCount        int
-	OutOfScopeCount   int
-	LimitReachedCount int
-	PropertiesCount   int
-	EdgesCount        int
-	Stats             []statItem
+	ProjectName         string
+	Timestamp           string
+	NodesCount          int
+	OutOfScopeCount     int
+	LimitReachedCount   int
+	PropertiesCount     int
+	EdgesCount          int
+	Stats               []statItem
+	RawDataRegistryJSON string
 }
 
 func sanitizePath(name string) string {
@@ -138,6 +139,10 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 	nodeProperties := make(map[string][]*visProperty)
 	nodeExecutions := make(map[string]map[string]string)
 
+	rawDataRegistry := make(map[string]string)
+	rawDataToID := make(map[string]string)
+	rawDataCounter := 0
+
 	parseTime := func(timeStr string) (int64, error) {
 		layouts := []string{"2006-01-02 15:04:05", "2006-01-02T15:04:05Z", time.RFC3339}
 		for _, layout := range layouts {
@@ -197,10 +202,18 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		}
 
 		if edge.RawData != "" {
+			dataID, ok := rawDataToID[edge.RawData]
+			if !ok {
+				dataID = fmt.Sprintf("r%d", rawDataCounter)
+				rawDataCounter++
+				rawDataToID[edge.RawData] = dataID
+				rawDataRegistry[dataID] = edge.RawData
+			}
+
 			if nodeExecutions[rootID] == nil {
 				nodeExecutions[rootID] = make(map[string]string)
 			}
-			nodeExecutions[rootID][edge.FunctionName] = edge.RawData
+			nodeExecutions[rootID][edge.FunctionName] = dataID
 		}
 
 		if targetNode.Category == "property" {
@@ -497,15 +510,21 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		return strings.Compare(a.Type, b.Type)
 	})
 
+	rawDataJSON, err := json.Marshal(rawDataRegistry)
+	if err != nil {
+		return "", err
+	}
+
 	data := reportTemplateData{
-		ProjectName:       html.EscapeString(graph.ProjectName),
-		Timestamp:         timestamp,
-		NodesCount:        len(visNodes),
-		OutOfScopeCount:   outOfScopeCount,
-		LimitReachedCount: limitReachedCount,
-		PropertiesCount:   len(allProps),
-		EdgesCount:        len(visEdges),
-		Stats:             stats,
+		ProjectName:         html.EscapeString(graph.ProjectName),
+		Timestamp:           timestamp,
+		NodesCount:          len(visNodes),
+		OutOfScopeCount:     outOfScopeCount,
+		LimitReachedCount:   limitReachedCount,
+		PropertiesCount:     len(allProps),
+		EdgesCount:          len(visEdges),
+		Stats:               stats,
+		RawDataRegistryJSON: string(rawDataJSON),
 	}
 
 	f, err := root.Create(relPath)
@@ -548,7 +567,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		}
 	}
 
-	if err := graphTemplate.ExecuteTemplate(buf, "footer", nil); err != nil {
+	if err := graphTemplate.ExecuteTemplate(buf, "footer", data); err != nil {
 		return "", err
 	}
 
