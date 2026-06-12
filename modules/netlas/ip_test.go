@@ -303,24 +303,27 @@ func assertIPSoftwareDeduplication(t *testing.T, results []schema.ModuleResult) 
 
 func verifyIPCVEHierarchy(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
-	sshService, cveResult := findBaseCVE(results)
+	sshService, sshCPE, cveResult := findBaseCVE(results)
 	cvssResult, exploitResult := findCVSSAndExploit(results, cveResult)
 	attackComplexityResult := findAttackComplexity(results, cvssResult)
 
-	validateIPCVEHierarchy(t, sshService, cveResult, cvssResult, attackComplexityResult, exploitResult)
+	validateIPCVEHierarchy(t, sshService, sshCPE, cveResult, cvssResult, attackComplexityResult, exploitResult)
 }
 
-func findBaseCVE(results []schema.ModuleResult) (sshService, cveResult *schema.ModuleResult) {
+func findBaseCVE(results []schema.ModuleResult) (sshService, sshCPE, cveResult *schema.ModuleResult) {
 	for i := range results {
 		res := &results[i]
 		if res.Type == constants.TypeService && strings.Contains(res.Value, "OpenSSH") {
 			sshService = res
 		}
+		if res.Type == constants.TypeCPE && strings.Contains(res.Value, "openssh") {
+			sshCPE = res
+		}
 		if res.Type == constants.TypeCVE && res.Value == "CVE-2018-15473" {
 			cveResult = res
 		}
 	}
-	return sshService, cveResult
+	return sshService, sshCPE, cveResult
 }
 
 func findCVSSAndExploit(results []schema.ModuleResult, cveResult *schema.ModuleResult) (cvssResult, exploitResult *schema.ModuleResult) {
@@ -347,13 +350,16 @@ func findAttackComplexity(results []schema.ModuleResult, cvssResult *schema.Modu
 	return attackComplexityResult
 }
 
-func validateIPCVEHierarchy(t *testing.T, sshService, cveResult, cvssResult, attackComplexityResult, exploitResult *schema.ModuleResult) {
+func validateIPCVEHierarchy(t *testing.T, service, cpe, cveResult, cvssResult, attackComplexityResult, exploitResult *schema.ModuleResult) {
 	t.Helper()
-	if cveResult == nil || sshService == nil {
-		t.Fatalf("CVE or Service not found")
+	if cveResult == nil || cpe == nil || service == nil {
+		t.Fatalf("Service, CPE, or CVE not found")
 	}
-	if cveResult.Source.LocalID != sshService.LocalID {
-		t.Errorf("CVE source mismatch: got %v, want %v", cveResult.Source.LocalID, sshService.LocalID)
+	if cpe.Source.LocalID != service.LocalID {
+		t.Errorf("CPE source mismatch: got %v, want %v (Service)", cpe.Source.LocalID, service.LocalID)
+	}
+	if cveResult.Source.LocalID != cpe.LocalID {
+		t.Errorf("CVE source mismatch: got %v, want %v (CPE)", cveResult.Source.LocalID, cpe.LocalID)
 	}
 
 	if cvssResult == nil {

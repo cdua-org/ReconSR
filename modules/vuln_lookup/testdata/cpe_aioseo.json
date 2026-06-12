@@ -1,0 +1,1881 @@
+{
+  "cvelistv5": [
+    {
+      "dataType": "CVE_RECORD",
+      "dataVersion": "5.2",
+      "cveMetadata": {
+        "cveId": "CVE-2025-2892",
+        "assignerOrgId": "b15e7b5b-3da4-40ae-a43c-f7aa60e62599",
+        "state": "PUBLISHED",
+        "assignerShortName": "Wordfence",
+        "dateReserved": "2025-03-27T23:17:48.798Z",
+        "datePublished": "2025-05-19T04:21:41.468Z",
+        "dateUpdated": "2026-04-08T17:03:26.113Z"
+      },
+      "containers": {
+        "cna": {
+          "providerMetadata": {
+            "orgId": "b15e7b5b-3da4-40ae-a43c-f7aa60e62599",
+            "shortName": "Wordfence",
+            "dateUpdated": "2026-04-08T17:03:26.113Z"
+          },
+          "affected": [
+            {
+              "vendor": "smub",
+              "product": "All in One SEO – Powerful SEO Plugin to Boost SEO Rankings & Increase Traffic",
+              "versions": [
+                {
+                  "version": "0",
+                  "status": "affected",
+                  "lessThanOrEqual": "4.8.1.1",
+                  "versionType": "semver"
+                }
+              ],
+              "defaultStatus": "unaffected"
+            }
+          ],
+          "descriptions": [
+            {
+              "lang": "en",
+              "value": "The All in One SEO – Powerful SEO Plugin to Boost SEO Rankings & Increase Traffic plugin for WordPress is vulnerable to Stored Cross-Site Scripting via the post Meta Description and Canonical URL parameters in all versions up to, and including, 4.8.1.1 due to insufficient input sanitization and output escaping. This makes it possible for authenticated attackers, with Contributor-level access and above, to inject arbitrary web scripts in pages that will execute whenever a user accesses an injected page."
+            }
+          ],
+          "title": "All in One SEO Pack <= 4.8.1.1 - Authenticated (Contributor+) Stored Cross-Site Scripting via Post Meta Description and Canonical URL",
+          "references": [
+            {
+              "url": "https://www.wordfence.com/threat-intel/vulnerabilities/id/7fd5d31d-a4f3-458a-b457-f20aeaa71749?source=cve"
+            },
+            {
+              "url": "https://plugins.trac.wordpress.org/changeset/3289874/"
+            }
+          ],
+          "problemTypes": [
+            {
+              "descriptions": [
+                {
+                  "lang": "en",
+                  "description": "CWE-79 Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",
+                  "cweId": "CWE-79",
+                  "type": "CWE"
+                }
+              ]
+            }
+          ],
+          "metrics": [
+            {
+              "cvssV3_1": {
+                "version": "3.1",
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:L/I:L/A:N",
+                "baseScore": 6.4,
+                "baseSeverity": "MEDIUM"
+              }
+            }
+          ],
+          "credits": [
+            {
+              "lang": "en",
+              "type": "finder",
+              "value": "Ivan Kuzymchak"
+            }
+          ],
+          "timeline": [
+            {
+              "time": "2025-03-27T00:00:00.000Z",
+              "lang": "en",
+              "value": "Discovered"
+            },
+            {
+              "time": "2025-05-18T16:21:32.000Z",
+              "lang": "en",
+              "value": "Disclosed"
+            }
+          ]
+        },
+        "adp": [
+          {
+            "metrics": [
+              {
+                "other": {
+                  "type": "ssvc",
+                  "content": {
+                    "timestamp": "2025-05-19T13:45:42.382265Z",
+                    "id": "CVE-2025-2892",
+                    "options": [
+                      {
+                        "Exploitation": "none"
+                      },
+                      {
+                        "Automatable": "no"
+                      },
+                      {
+                        "Technical Impact": "partial"
+                      }
+                    ],
+                    "role": "CISA Coordinator",
+                    "version": "2.0.3"
+                  }
+                }
+              }
+            ],
+            "title": "CISA ADP Vulnrichment",
+            "providerMetadata": {
+              "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+              "shortName": "CISA-ADP",
+              "dateUpdated": "2025-05-19T13:45:45.461Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "dataType": "CVE_RECORD",
+      "dataVersion": "5.1",
+      "cveMetadata": {
+        "cveId": "CVE-2024-3368",
+        "assignerOrgId": "1bfdd5d7-9bf6-4a53-96ea-42e2716d7a81",
+        "state": "PUBLISHED",
+        "assignerShortName": "WPScan",
+        "dateReserved": "2024-04-05T08:51:06.596Z",
+        "datePublished": "2024-05-20T06:00:01.083Z",
+        "dateUpdated": "2025-03-14T17:20:36.410Z"
+      },
+      "containers": {
+        "cna": {
+          "providerMetadata": {
+            "orgId": "1bfdd5d7-9bf6-4a53-96ea-42e2716d7a81",
+            "shortName": "WPScan",
+            "dateUpdated": "2024-05-20T06:00:01.083Z"
+          },
+          "title": "All in One SEO < 4.6.1.1 - Contributor+ Stored XSS",
+          "problemTypes": [
+            {
+              "descriptions": [
+                {
+                  "description": "CWE-79 Cross-Site Scripting (XSS)",
+                  "lang": "en",
+                  "type": "CWE"
+                }
+              ]
+            }
+          ],
+          "affected": [
+            {
+              "vendor": "Unknown",
+              "product": "All in One SEO ",
+              "versions": [
+                {
+                  "status": "affected",
+                  "versionType": "semver",
+                  "version": "0",
+                  "lessThan": "4.6.1.1"
+                }
+              ],
+              "defaultStatus": "unaffected"
+            }
+          ],
+          "descriptions": [
+            {
+              "lang": "en",
+              "value": "The All in One SEO  WordPress plugin before 4.6.1.1 does not validate and escape some of its Post fields before outputting them back, which could allow users with the contributor role and above to perform Stored Cross-Site Scripting attacks"
+            }
+          ],
+          "references": [
+            {
+              "url": "https://wpscan.com/vulnerability/ab78b1a5-e28c-406b-baaf-6d53017f9328/",
+              "tags": [
+                "exploit",
+                "vdb-entry",
+                "technical-description"
+              ]
+            }
+          ],
+          "credits": [
+            {
+              "lang": "en",
+              "value": "Dmtirii Ignatyev",
+              "type": "finder"
+            },
+            {
+              "lang": "en",
+              "value": "WPScan",
+              "type": "coordinator"
+            }
+          ],
+          "source": {
+            "discovery": "EXTERNAL"
+          },
+          "x_generator": {
+            "engine": "WPScan CVE Generator"
+          }
+        },
+        "adp": [
+          {
+            "affected": [
+              {
+                "vendor": "aioseo",
+                "product": "all_in_one_seo",
+                "cpes": [
+                  "cpe:2.3:a:aioseo:all_in_one_seo:*:*:*:*:*:wordpress:*:*"
+                ],
+                "defaultStatus": "unknown",
+                "versions": [
+                  {
+                    "version": "0",
+                    "status": "affected",
+                    "lessThan": "4.6.1.1",
+                    "versionType": "custom"
+                  }
+                ]
+              }
+            ],
+            "metrics": [
+              {
+                "cvssV3_1": {
+                  "scope": "CHANGED",
+                  "version": "3.1",
+                  "baseScore": 6.1,
+                  "attackVector": "NETWORK",
+                  "baseSeverity": "MEDIUM",
+                  "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+                  "integrityImpact": "LOW",
+                  "userInteraction": "REQUIRED",
+                  "attackComplexity": "LOW",
+                  "availabilityImpact": "NONE",
+                  "privilegesRequired": "NONE",
+                  "confidentialityImpact": "LOW"
+                }
+              },
+              {
+                "other": {
+                  "type": "ssvc",
+                  "content": {
+                    "timestamp": "2024-05-20T11:43:43.506112Z",
+                    "id": "CVE-2024-3368",
+                    "options": [
+                      {
+                        "Exploitation": "poc"
+                      },
+                      {
+                        "Automatable": "no"
+                      },
+                      {
+                        "Technical Impact": "partial"
+                      }
+                    ],
+                    "role": "CISA Coordinator",
+                    "version": "2.0.3"
+                  }
+                }
+              }
+            ],
+            "title": "CISA ADP Vulnrichment",
+            "providerMetadata": {
+              "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+              "shortName": "CISA-ADP",
+              "dateUpdated": "2025-03-14T17:20:36.410Z"
+            }
+          },
+          {
+            "providerMetadata": {
+              "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+              "shortName": "CVE",
+              "dateUpdated": "2024-08-01T20:05:08.481Z"
+            },
+            "title": "CVE Program Container",
+            "references": [
+              {
+                "url": "https://wpscan.com/vulnerability/ab78b1a5-e28c-406b-baaf-6d53017f9328/",
+                "tags": [
+                  "exploit",
+                  "vdb-entry",
+                  "technical-description",
+                  "x_transferred"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "containers": {
+        "cna": {
+          "affected": [
+            {
+              "collectionURL": "https://wordpress.org/plugins",
+              "defaultStatus": "unaffected",
+              "packageName": "all-in-one-seo-pack",
+              "product": "All in One SEO (WordPress plugin)",
+              "vendor": "All in One SEO Team",
+              "versions": [
+                {
+                  "changes": [
+                    {
+                      "at": "4.2.4",
+                      "status": "unaffected"
+                    }
+                  ],
+                  "lessThanOrEqual": "4.2.3.1",
+                  "status": "affected",
+                  "version": "n/a",
+                  "versionType": "custom"
+                }
+              ]
+            }
+          ],
+          "credits": [
+            {
+              "lang": "en",
+              "type": "finder",
+              "user": "00000000-0000-4000-9000-000000000000",
+              "value": "Rafie Muhammad (Patchstack Alliance)"
+            }
+          ],
+          "datePublic": "2022-09-04T17:00:00.000Z",
+          "descriptions": [
+            {
+              "lang": "en",
+              "supportingMedia": [
+                {
+                  "base64": false,
+                  "type": "text/html",
+                  "value": "<p>Multiple Cross-Site Request Forgery (CSRF) vulnerabilities in All in One SEO plugin <= 4.2.3.1 at WordPress.</p>"
+                }
+              ],
+              "value": "Multiple Cross-Site Request Forgery (CSRF) vulnerabilities in All in One SEO plugin <= 4.2.3.1 at WordPress."
+            }
+          ],
+          "impacts": [
+            {
+              "capecId": "CAPEC-62",
+              "descriptions": [
+                {
+                  "lang": "en",
+                  "value": "CAPEC-62 Cross Site Request Forgery"
+                }
+              ]
+            }
+          ],
+          "metrics": [
+            {
+              "cvssV3_1": {
+                "attackComplexity": "LOW",
+                "attackVector": "NETWORK",
+                "availabilityImpact": "LOW",
+                "baseScore": 5.4,
+                "baseSeverity": "MEDIUM",
+                "confidentialityImpact": "NONE",
+                "integrityImpact": "LOW",
+                "privilegesRequired": "NONE",
+                "scope": "UNCHANGED",
+                "userInteraction": "REQUIRED",
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:L",
+                "version": "3.1"
+              },
+              "format": "CVSS",
+              "scenarios": [
+                {
+                  "lang": "en",
+                  "value": "GENERAL"
+                }
+              ]
+            }
+          ],
+          "problemTypes": [
+            {
+              "descriptions": [
+                {
+                  "cweId": "CWE-352",
+                  "description": "CWE-352 Cross-Site Request Forgery (CSRF)",
+                  "lang": "en",
+                  "type": "CWE"
+                }
+              ]
+            }
+          ],
+          "providerMetadata": {
+            "orgId": "21595511-bba5-4825-b968-b78d1f9984a3",
+            "shortName": "Patchstack",
+            "dateUpdated": "2026-04-28T16:07:47.135Z"
+          },
+          "references": [
+            {
+              "tags": [
+                "vdb-entry"
+              ],
+              "url": "https://patchstack.com/database/vulnerability/all-in-one-seo-pack/wordpress-all-in-one-seo-plugin-4-2-3-1-multiple-cross-site-request-forgery-csrf-vulnerabilities?_s_id=cve"
+            }
+          ],
+          "solutions": [
+            {
+              "lang": "en",
+              "supportingMedia": [
+                {
+                  "base64": false,
+                  "type": "text/html",
+                  "value": "<p>Update to 4.2.4 or higher version.</p>"
+                }
+              ],
+              "value": "Update to 4.2.4 or higher version."
+            }
+          ],
+          "source": {
+            "discovery": "EXTERNAL"
+          },
+          "title": "WordPress All in One SEO plugin <= 4.2.3.1 - Multiple Cross-Site Request Forgery (CSRF) vulnerabilities",
+          "x_generator": {
+            "engine": "Vulnogram 0.0.9"
+          },
+          "x_legacyV4Record": {
+            "CVE_data_meta": {
+              "ASSIGNER": "audit@patchstack.com",
+              "DATE_PUBLIC": "2022-09-05T11:23:00.000Z",
+              "ID": "CVE-2022-38093",
+              "STATE": "PUBLIC",
+              "TITLE": "WordPress All in One SEO plugin <= 4.2.3.1 - Multiple Cross-Site Request Forgery (CSRF) vulnerabilities"
+            },
+            "affects": {
+              "vendor": {
+                "vendor_data": [
+                  {
+                    "product": {
+                      "product_data": [
+                        {
+                          "product_name": "All in One SEO (WordPress plugin)",
+                          "version": {
+                            "version_data": [
+                              {
+                                "version_affected": "<=",
+                                "version_name": "<= 4.2.3.1",
+                                "version_value": "4.2.3.1"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "vendor_name": "All in One SEO Team"
+                  }
+                ]
+              }
+            },
+            "credit": [
+              {
+                "lang": "eng",
+                "value": "Vulnerability discovered by Rafie Muhammad aka Yeraisci (Patchstack Alliance)"
+              }
+            ],
+            "data_format": "MITRE",
+            "data_type": "CVE",
+            "data_version": "4.0",
+            "description": {
+              "description_data": [
+                {
+                  "lang": "eng",
+                  "value": "Multiple Cross-Site Request Forgery (CSRF) vulnerabilities in All in One SEO plugin <= 4.2.3.1 at WordPress."
+                }
+              ]
+            },
+            "generator": {
+              "engine": "Vulnogram 0.0.9"
+            },
+            "impact": {
+              "cvss": {
+                "attackComplexity": "LOW",
+                "attackVector": "NETWORK",
+                "availabilityImpact": "LOW",
+                "baseScore": 5.4,
+                "baseSeverity": "MEDIUM",
+                "confidentialityImpact": "NONE",
+                "integrityImpact": "LOW",
+                "privilegesRequired": "NONE",
+                "scope": "UNCHANGED",
+                "userInteraction": "REQUIRED",
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:L",
+                "version": "3.1"
+              }
+            },
+            "problemtype": {
+              "problemtype_data": [
+                {
+                  "description": [
+                    {
+                      "lang": "eng",
+                      "value": "CWE-352 Cross-Site Request Forgery (CSRF)"
+                    }
+                  ]
+                }
+              ]
+            },
+            "references": {
+              "reference_data": [
+                {
+                  "name": "https://patchstack.com/database/vulnerability/all-in-one-seo-pack/wordpress-all-in-one-seo-plugin-4-2-3-1-multiple-cross-site-request-forgery-csrf-vulnerabilities/_s_id=cve",
+                  "refsource": "CONFIRM",
+                  "url": "https://patchstack.com/database/vulnerability/all-in-one-seo-pack/wordpress-all-in-one-seo-plugin-4-2-3-1-multiple-cross-site-request-forgery-csrf-vulnerabilities/_s_id=cve"
+                },
+                {
+                  "name": "https://wordpress.org/plugins/all-in-one-seo-pack/#developers",
+                  "refsource": "CONFIRM",
+                  "url": "https://wordpress.org/plugins/all-in-one-seo-pack/#developers"
+                }
+              ]
+            },
+            "solution": [
+              {
+                "lang": "en",
+                "value": "Update to 4.2.4 or higher version."
+              }
+            ],
+            "source": {
+              "discovery": "EXTERNAL"
+            }
+          }
+        },
+        "adp": [
+          {
+            "providerMetadata": {
+              "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+              "shortName": "CVE",
+              "dateUpdated": "2024-08-03T10:45:52.450Z"
+            },
+            "title": "CVE Program Container",
+            "references": [
+              {
+                "tags": [
+                  "vdb-entry",
+                  "x_transferred"
+                ],
+                "url": "https://patchstack.com/database/vulnerability/all-in-one-seo-pack/wordpress-all-in-one-seo-plugin-4-2-3-1-multiple-cross-site-request-forgery-csrf-vulnerabilities?_s_id=cve"
+              }
+            ]
+          },
+          {
+            "metrics": [
+              {
+                "other": {
+                  "type": "ssvc",
+                  "content": {
+                    "timestamp": "2025-02-20T19:25:21.571672Z",
+                    "id": "CVE-2022-38093",
+                    "options": [
+                      {
+                        "Exploitation": "none"
+                      },
+                      {
+                        "Automatable": "no"
+                      },
+                      {
+                        "Technical Impact": "partial"
+                      }
+                    ],
+                    "role": "CISA Coordinator",
+                    "version": "2.0.3"
+                  }
+                }
+              }
+            ],
+            "title": "CISA ADP Vulnrichment",
+            "providerMetadata": {
+              "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+              "shortName": "CISA-ADP",
+              "dateUpdated": "2025-02-20T20:07:34.855Z"
+            }
+          }
+        ]
+      },
+      "cveMetadata": {
+        "assignerOrgId": "21595511-bba5-4825-b968-b78d1f9984a3",
+        "assignerShortName": "Patchstack",
+        "cveId": "CVE-2022-38093",
+        "datePublished": "2022-09-09T14:39:53.769Z",
+        "dateReserved": "2022-08-09T00:00:00.000Z",
+        "dateUpdated": "2026-04-28T16:07:47.135Z",
+        "state": "PUBLISHED"
+      },
+      "dataType": "CVE_RECORD",
+      "dataVersion": "5.2"
+    },
+    {
+      "dataType": "CVE_RECORD",
+      "dataVersion": "5.2",
+      "cveMetadata": {
+        "state": "PUBLISHED",
+        "cveId": "CVE-2022-42494",
+        "assignerOrgId": "21595511-bba5-4825-b968-b78d1f9984a3",
+        "assignerShortName": "Patchstack",
+        "datePublished": "2022-11-08T18:33:32.499Z",
+        "dateUpdated": "2026-04-28T16:07:50.059Z",
+        "dateReserved": "2022-10-19T00:00:00.000Z"
+      },
+      "containers": {
+        "cna": {
+          "affected": [
+            {
+              "product": "All in One SEO Pro (WordPress plugin)",
+              "vendor": "Semper Plugins, LLC",
+              "versions": [
+                {
+                  "lessThanOrEqual": "4.2.5.1",
+                  "status": "affected",
+                  "version": "<= 4.2.5.1",
+                  "versionType": "custom"
+                }
+              ]
+            }
+          ],
+          "credits": [
+            {
+              "lang": "en",
+              "value": "Vulnerability discovered by Rafie Muhammad aka Yeraisci (Patchstack Alliance)"
+            }
+          ],
+          "datePublic": "2022-10-27T00:00:00.000Z",
+          "descriptions": [
+            {
+              "lang": "en",
+              "value": "Server Side Request Forgery (SSRF) vulnerability in All in One SEO Pro plugin <= 4.2.5.1 on WordPress."
+            }
+          ],
+          "metrics": [
+            {
+              "cvssV3_1": {
+                "attackComplexity": "HIGH",
+                "attackVector": "NETWORK",
+                "availabilityImpact": "NONE",
+                "baseScore": 3,
+                "baseSeverity": "LOW",
+                "confidentialityImpact": "LOW",
+                "integrityImpact": "NONE",
+                "privilegesRequired": "HIGH",
+                "scope": "CHANGED",
+                "userInteraction": "NONE",
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:C/C:L/I:N/A:N",
+                "version": "3.1"
+              },
+              "format": "CVSS",
+              "scenarios": [
+                {
+                  "lang": "en",
+                  "value": "GENERAL"
+                }
+              ]
+            }
+          ],
+          "problemTypes": [
+            {
+              "descriptions": [
+                {
+                  "cweId": "CWE-918",
+                  "description": "CWE-918 Server-Side Request Forgery (SSRF)",
+                  "lang": "en",
+                  "type": "CWE"
+                }
+              ]
+            }
+          ],
+          "providerMetadata": {
+            "orgId": "21595511-bba5-4825-b968-b78d1f9984a3",
+            "shortName": "Patchstack",
+            "dateUpdated": "2026-04-28T16:07:50.059Z"
+          },
+          "references": [
+            {
+              "url": "https://patchstack.com/database/vulnerability/all-in-one-seo-pack-pro/wordpress-all-in-one-seo-pro-plugin-4-2-5-1-server-side-request-forgery-ssrf-vulnerability?_s_id=cve"
+            },
+            {
+              "url": "https://aioseo.com/changelog/"
+            }
+          ],
+          "solutions": [
+            {
+              "lang": "en",
+              "value": "Update to 4.2.6 or higher version."
+            }
+          ],
+          "source": {
+            "discovery": "EXTERNAL"
+          },
+          "title": "WordPress All in One SEO Pro plugin <= 4.2.5.1 - Server Side Request Forgery (SSRF) vulnerability",
+          "x_generator": {
+            "engine": "Vulnogram 0.0.9"
+          }
+        },
+        "adp": [
+          {
+            "providerMetadata": {
+              "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+              "shortName": "CVE",
+              "dateUpdated": "2024-08-03T13:10:40.997Z"
+            },
+            "title": "CVE Program Container",
+            "references": [
+              {
+                "url": "https://patchstack.com/database/vulnerability/all-in-one-seo-pack-pro/wordpress-all-in-one-seo-pro-plugin-4-2-5-1-server-side-request-forgery-ssrf-vulnerability?_s_id=cve",
+                "tags": [
+                  "x_transferred"
+                ]
+              },
+              {
+                "url": "https://aioseo.com/changelog/",
+                "tags": [
+                  "x_transferred"
+                ]
+              }
+            ]
+          },
+          {
+            "metrics": [
+              {
+                "other": {
+                  "type": "ssvc",
+                  "content": {
+                    "timestamp": "2025-02-20T19:21:14.090093Z",
+                    "id": "CVE-2022-42494",
+                    "options": [
+                      {
+                        "Exploitation": "none"
+                      },
+                      {
+                        "Automatable": "no"
+                      },
+                      {
+                        "Technical Impact": "partial"
+                      }
+                    ],
+                    "role": "CISA Coordinator",
+                    "version": "2.0.3"
+                  }
+                }
+              }
+            ],
+            "title": "CISA ADP Vulnrichment",
+            "providerMetadata": {
+              "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+              "shortName": "CISA-ADP",
+              "dateUpdated": "2025-02-20T19:54:59.026Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "dataType": "CVE_RECORD",
+      "dataVersion": "5.2",
+      "cveMetadata": {
+        "cveId": "CVE-2023-0585",
+        "assignerOrgId": "b15e7b5b-3da4-40ae-a43c-f7aa60e62599",
+        "state": "PUBLISHED",
+        "assignerShortName": "Wordfence",
+        "dateReserved": "2023-01-30T20:52:26.675Z",
+        "datePublished": "2023-02-24T14:46:43.084Z",
+        "dateUpdated": "2026-04-08T16:47:44.493Z"
+      },
+      "containers": {
+        "cna": {
+          "providerMetadata": {
+            "orgId": "b15e7b5b-3da4-40ae-a43c-f7aa60e62599",
+            "shortName": "Wordfence",
+            "dateUpdated": "2026-04-08T16:47:44.493Z"
+          },
+          "affected": [
+            {
+              "vendor": "smub",
+              "product": "All in One SEO – Powerful SEO Plugin to Boost SEO Rankings & Increase Traffic",
+              "versions": [
+                {
+                  "version": "0",
+                  "status": "affected",
+                  "lessThanOrEqual": "4.2.9",
+                  "versionType": "semver"
+                }
+              ],
+              "defaultStatus": "unaffected"
+            }
+          ],
+          "descriptions": [
+            {
+              "lang": "en",
+              "value": "The All in One SEO Pack plugin for WordPress is vulnerable to Stored Cross-Site Scripting via multiple parameters in versions up to, and including, 4.2.9 due to insufficient input sanitization and output escaping. This makes it possible for authenticated attackers with Administrator role or above to inject arbitrary web scripts in pages that will execute whenever a user accesses an injected page."
+            }
+          ],
+          "title": "All in One SEO Pack <= 4.2.9 - Authenticated (Administrator+) Stored Cross-Site Scripting",
+          "references": [
+            {
+              "url": "https://www.wordfence.com/threat-intel/vulnerabilities/id/3db97180-9308-4891-9de9-acefe31d088f?source=cve"
+            },
+            {
+              "url": "https://plugins.trac.wordpress.org/browser/all-in-one-seo-pack/tags/4.2.9/app/Common/Main/Updates.php?v=2829340#L624"
+            },
+            {
+              "url": "https://plugins.trac.wordpress.org/browser/all-in-one-seo-pack/tags/4.2.9/app/Common/Main/Updates.php?v=2829340#L625"
+            },
+            {
+              "url": "https://plugins.trac.wordpress.org/browser/all-in-one-seo-pack/tags/4.2.9/app/Common/Main/Updates.php?v=2829340#L665"
+            },
+            {
+              "url": "https://plugins.trac.wordpress.org/browser/all-in-one-seo-pack/tags/4.2.9/app/Common/Main/Updates.php?v=2829340#L666"
+            },
+            {
+              "url": "https://plugins.trac.wordpress.org/changeset?sfp_email=&sfph_mail=&reponame=&new=2859011%40all-in-one-seo-pack%2Ftrunk&old=2847431%40all-in-one-seo-pack%2Ftrunk&sfp_email=&sfph_mail="
+            }
+          ],
+          "problemTypes": [
+            {
+              "descriptions": [
+                {
+                  "lang": "en",
+                  "description": "CWE-79 Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",
+                  "cweId": "CWE-79",
+                  "type": "CWE"
+                }
+              ]
+            }
+          ],
+          "metrics": [
+            {
+              "cvssV3_1": {
+                "version": "3.1",
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:C/C:L/I:L/A:N",
+                "baseScore": 4.4,
+                "baseSeverity": "MEDIUM"
+              }
+            }
+          ],
+          "credits": [
+            {
+              "lang": "en",
+              "type": "finder",
+              "value": "Marco Wotschka"
+            },
+            {
+              "lang": "en",
+              "type": "finder",
+              "value": "Ivan Kuzymchak"
+            }
+          ],
+          "timeline": [
+            {
+              "time": "2023-01-20T00:00:00.000Z",
+              "lang": "en",
+              "value": "Discovered"
+            },
+            {
+              "time": "2023-01-26T00:00:00.000Z",
+              "lang": "en",
+              "value": "Vendor Notified"
+            },
+            {
+              "time": "2023-02-24T00:00:00.000Z",
+              "lang": "en",
+              "value": "Disclosed"
+            }
+          ]
+        },
+        "adp": [
+          {
+            "providerMetadata": {
+              "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+              "shortName": "CVE",
+              "dateUpdated": "2024-08-02T05:17:50.165Z"
+            },
+            "title": "CVE Program Container",
+            "references": [
+              {
+                "url": "https://www.wordfence.com/threat-intel/vulnerabilities/id/3db97180-9308-4891-9de9-acefe31d088f",
+                "tags": [
+                  "x_transferred"
+                ]
+              },
+              {
+                "url": "https://plugins.trac.wordpress.org/browser/all-in-one-seo-pack/tags/4.2.9/app/Common/Main/Updates.php?v=2829340#L624",
+                "tags": [
+                  "x_transferred"
+                ]
+              },
+              {
+                "url": "https://plugins.trac.wordpress.org/browser/all-in-one-seo-pack/tags/4.2.9/app/Common/Main/Updates.php?v=2829340#L625",
+                "tags": [
+                  "x_transferred"
+                ]
+              },
+              {
+                "url": "https://plugins.trac.wordpress.org/browser/all-in-one-seo-pack/tags/4.2.9/app/Common/Main/Updates.php?v=2829340#L665",
+                "tags": [
+                  "x_transferred"
+                ]
+              },
+              {
+                "url": "https://plugins.trac.wordpress.org/browser/all-in-one-seo-pack/tags/4.2.9/app/Common/Main/Updates.php?v=2829340#L666",
+                "tags": [
+                  "x_transferred"
+                ]
+              },
+              {
+                "url": "https://plugins.trac.wordpress.org/changeset?sfp_email=&sfph_mail=&reponame=&new=2859011%40all-in-one-seo-pack%2Ftrunk&old=2847431%40all-in-one-seo-pack%2Ftrunk&sfp_email=&sfph_mail=",
+                "tags": [
+                  "x_transferred"
+                ]
+              }
+            ]
+          },
+          {
+            "metrics": [
+              {
+                "other": {
+                  "type": "ssvc",
+                  "content": {
+                    "timestamp": "2025-01-13T16:26:16.539121Z",
+                    "id": "CVE-2023-0585",
+                    "options": [
+                      {
+                        "Exploitation": "none"
+                      },
+                      {
+                        "Automatable": "no"
+                      },
+                      {
+                        "Technical Impact": "partial"
+                      }
+                    ],
+                    "role": "CISA Coordinator",
+                    "version": "2.0.3"
+                  }
+                }
+              }
+            ],
+            "title": "CISA ADP Vulnrichment",
+            "providerMetadata": {
+              "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+              "shortName": "CISA-ADP",
+              "dateUpdated": "2025-01-13T17:04:51.985Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "dataType": "CVE_RECORD",
+      "dataVersion": "5.2",
+      "cveMetadata": {
+        "cveId": "CVE-2023-0586",
+        "assignerOrgId": "b15e7b5b-3da4-40ae-a43c-f7aa60e62599",
+        "state": "PUBLISHED",
+        "assignerShortName": "Wordfence",
+        "dateReserved": "2023-01-30T20:54:27.872Z",
+        "datePublished": "2023-02-24T14:47:02.730Z",
+        "dateUpdated": "2026-04-08T16:38:26.630Z"
+      },
+      "containers": {
+        "cna": {
+          "providerMetadata": {
+            "orgId": "b15e7b5b-3da4-40ae-a43c-f7aa60e62599",
+            "shortName": "Wordfence",
+            "dateUpdated": "2026-04-08T16:38:26.630Z"
+          },
+          "affected": [
+            {
+              "vendor": "smub",
+              "product": "All in One SEO – Powerful SEO Plugin to Boost SEO Rankings & Increase Traffic",
+              "versions": [
+                {
+                  "version": "0",
+                  "status": "affected",
+                  "lessThanOrEqual": "4.2.9",
+                  "versionType": "semver"
+                }
+              ],
+              "defaultStatus": "unaffected"
+            }
+          ],
+          "descriptions": [
+            {
+              "lang": "en",
+              "value": "The All in One SEO Pack plugin for WordPress is vulnerable to Stored Cross-Site Scripting via multiple parameters in versions up to, and including, 4.2.9 due to insufficient input sanitization and output escaping. This makes it possible for authenticated attackers with Contributor+ role to inject arbitrary web scripts in pages that will execute whenever a user accesses an injected page."
+            }
+          ],
+          "title": "All in One SEO Pack  <= 4.2.9 - Authenticated (Contributor+) Stored Cross-Site Scripting",
+          "references": [
+            {
+              "url": "https://www.wordfence.com/threat-intel/vulnerabilities/id/1c13f00e-3048-44cf-8979-2b0b0c508f3a?source=cve"
+            },
+            {
+              "url": "https://plugins.trac.wordpress.org/browser/all-in-one-seo-pack/tags/4.2.9/app/Common/Admin/PostSettings.php?v=2829340#L202"
+            },
+            {
+              "url": "https://plugins.trac.wordpress.org/changeset?sfp_email=&sfph_mail=&reponame=&new=2859011%40all-in-one-seo-pack%2Ftrunk&old=2847431%40all-in-one-seo-pack%2Ftrunk&sfp_email=&sfph_mail="
+            },
+            {
+              "url": "https://www.wordfence.com/blog/2023/02/all-in-one-seo-pack-vulnerabilities-impacting-3-million-sites-patched/"
+            }
+          ],
+          "problemTypes": [
+            {
+              "descriptions": [
+                {
+                  "lang": "en",
+                  "description": "CWE-79 Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",
+                  "cweId": "CWE-79",
+                  "type": "CWE"
+                }
+              ]
+            }
+          ],
+          "metrics": [
+            {
+              "cvssV3_1": {
+                "version": "3.1",
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:L/I:L/A:N",
+                "baseScore": 6.4,
+                "baseSeverity": "MEDIUM"
+              }
+            }
+          ],
+          "credits": [
+            {
+              "lang": "en",
+              "type": "finder",
+              "value": "Ivan Kuzymchak"
+            }
+          ],
+          "timeline": [
+            {
+              "time": "2023-01-20T00:00:00.000Z",
+              "lang": "en",
+              "value": "Discovered"
+            },
+            {
+              "time": "2023-01-26T00:00:00.000Z",
+              "lang": "en",
+              "value": "Vendor Notified"
+            },
+            {
+              "time": "2023-02-24T00:00:00.000Z",
+              "lang": "en",
+              "value": "Disclosed"
+            }
+          ]
+        },
+        "adp": [
+          {
+            "providerMetadata": {
+              "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+              "shortName": "CVE",
+              "dateUpdated": "2024-08-02T05:17:49.929Z"
+            },
+            "title": "CVE Program Container",
+            "references": [
+              {
+                "url": "https://www.wordfence.com/threat-intel/vulnerabilities/id/1c13f00e-3048-44cf-8979-2b0b0c508f3a",
+                "tags": [
+                  "x_transferred"
+                ]
+              },
+              {
+                "url": "https://plugins.trac.wordpress.org/browser/all-in-one-seo-pack/tags/4.2.9/app/Common/Admin/PostSettings.php?v=2829340#L202",
+                "tags": [
+                  "x_transferred"
+                ]
+              },
+              {
+                "url": "https://plugins.trac.wordpress.org/changeset?sfp_email=&sfph_mail=&reponame=&new=2859011%40all-in-one-seo-pack%2Ftrunk&old=2847431%40all-in-one-seo-pack%2Ftrunk&sfp_email=&sfph_mail=",
+                "tags": [
+                  "x_transferred"
+                ]
+              }
+            ]
+          },
+          {
+            "metrics": [
+              {
+                "other": {
+                  "type": "ssvc",
+                  "content": {
+                    "timestamp": "2025-01-13T16:26:13.564407Z",
+                    "id": "CVE-2023-0586",
+                    "options": [
+                      {
+                        "Exploitation": "none"
+                      },
+                      {
+                        "Automatable": "no"
+                      },
+                      {
+                        "Technical Impact": "partial"
+                      }
+                    ],
+                    "role": "CISA Coordinator",
+                    "version": "2.0.3"
+                  }
+                }
+              }
+            ],
+            "title": "CISA ADP Vulnrichment",
+            "providerMetadata": {
+              "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+              "shortName": "CISA-ADP",
+              "dateUpdated": "2025-01-13T17:04:39.715Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "containers": {
+        "cna": {
+          "affected": [
+            {
+              "product": "All in One SEO – Best WordPress SEO Plugin – Easily Improve SEO Rankings & Increase Traffic",
+              "vendor": "Unknown",
+              "versions": [
+                {
+                  "lessThan": "4.1.3.1*",
+                  "status": "affected",
+                  "version": "4.1.3.1",
+                  "versionType": "custom"
+                },
+                {
+                  "lessThan": "4.1.5.3",
+                  "status": "affected",
+                  "version": "4.1.5.3",
+                  "versionType": "custom"
+                }
+              ]
+            }
+          ],
+          "credits": [
+            {
+              "lang": "en",
+              "value": "Marc Montpas (Jetpack Scan)"
+            }
+          ],
+          "descriptions": [
+            {
+              "lang": "en",
+              "value": "The All in One SEO WordPress plugin before 4.1.5.3 is affected by a Privilege Escalation issue, which was discovered during an internal audit by the Jetpack Scan team, and may grant bad actors access to protected REST API endpoints they shouldn’t have access to. This could ultimately enable users with low-privileged accounts, like subscribers, to perform remote code execution on affected sites."
+            }
+          ],
+          "problemTypes": [
+            {
+              "descriptions": [
+                {
+                  "cweId": "CWE-287",
+                  "description": "CWE-287 Improper Authentication",
+                  "lang": "en",
+                  "type": "CWE"
+                }
+              ]
+            }
+          ],
+          "providerMetadata": {
+            "dateUpdated": "2022-01-17T13:00:34.000Z",
+            "orgId": "1bfdd5d7-9bf6-4a53-96ea-42e2716d7a81",
+            "shortName": "WPScan"
+          },
+          "references": [
+            {
+              "tags": [
+                "x_refsource_MISC"
+              ],
+              "url": "https://wpscan.com/vulnerability/6de4a7de-6b71-4349-8e52-04c89c5e6d6c"
+            },
+            {
+              "tags": [
+                "x_refsource_MISC"
+              ],
+              "url": "https://jetpack.com/2021/12/14/severe-vulnerabilities-fixed-in-all-in-one-seo-plugin-version-4-1-5-3/"
+            },
+            {
+              "tags": [
+                "x_refsource_CONFIRM"
+              ],
+              "url": "https://plugins.trac.wordpress.org/changeset/2640944/all-in-one-seo-pack/trunk/app/Common/Api/Api.php"
+            }
+          ],
+          "source": {
+            "discovery": "EXTERNAL"
+          },
+          "title": "All In One SEO < 4.1.5.3 - Authenticated Privilege Escalation",
+          "x_generator": "WPScan CVE Generator",
+          "x_legacyV4Record": {
+            "CVE_data_meta": {
+              "ASSIGNER": "contact@wpscan.com",
+              "ID": "CVE-2021-25036",
+              "STATE": "PUBLIC",
+              "TITLE": "All In One SEO < 4.1.5.3 - Authenticated Privilege Escalation"
+            },
+            "affects": {
+              "vendor": {
+                "vendor_data": [
+                  {
+                    "product": {
+                      "product_data": [
+                        {
+                          "product_name": "All in One SEO – Best WordPress SEO Plugin – Easily Improve SEO Rankings & Increase Traffic",
+                          "version": {
+                            "version_data": [
+                              {
+                                "version_affected": ">=",
+                                "version_name": "4.1.3.1",
+                                "version_value": "4.1.3.1"
+                              },
+                              {
+                                "version_affected": "<",
+                                "version_name": "4.1.5.3",
+                                "version_value": "4.1.5.3"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "vendor_name": "Unknown"
+                  }
+                ]
+              }
+            },
+            "credit": [
+              {
+                "lang": "eng",
+                "value": "Marc Montpas (Jetpack Scan)"
+              }
+            ],
+            "data_format": "MITRE",
+            "data_type": "CVE",
+            "data_version": "4.0",
+            "description": {
+              "description_data": [
+                {
+                  "lang": "eng",
+                  "value": "The All in One SEO WordPress plugin before 4.1.5.3 is affected by a Privilege Escalation issue, which was discovered during an internal audit by the Jetpack Scan team, and may grant bad actors access to protected REST API endpoints they shouldn’t have access to. This could ultimately enable users with low-privileged accounts, like subscribers, to perform remote code execution on affected sites."
+                }
+              ]
+            },
+            "generator": "WPScan CVE Generator",
+            "problemtype": {
+              "problemtype_data": [
+                {
+                  "description": [
+                    {
+                      "lang": "eng",
+                      "value": "CWE-287 Improper Authentication"
+                    }
+                  ]
+                }
+              ]
+            },
+            "references": {
+              "reference_data": [
+                {
+                  "name": "https://wpscan.com/vulnerability/6de4a7de-6b71-4349-8e52-04c89c5e6d6c",
+                  "refsource": "MISC",
+                  "url": "https://wpscan.com/vulnerability/6de4a7de-6b71-4349-8e52-04c89c5e6d6c"
+                },
+                {
+                  "name": "https://jetpack.com/2021/12/14/severe-vulnerabilities-fixed-in-all-in-one-seo-plugin-version-4-1-5-3/",
+                  "refsource": "MISC",
+                  "url": "https://jetpack.com/2021/12/14/severe-vulnerabilities-fixed-in-all-in-one-seo-plugin-version-4-1-5-3/"
+                },
+                {
+                  "name": "https://plugins.trac.wordpress.org/changeset/2640944/all-in-one-seo-pack/trunk/app/Common/Api/Api.php",
+                  "refsource": "CONFIRM",
+                  "url": "https://plugins.trac.wordpress.org/changeset/2640944/all-in-one-seo-pack/trunk/app/Common/Api/Api.php"
+                }
+              ]
+            },
+            "source": {
+              "discovery": "EXTERNAL"
+            }
+          }
+        },
+        "adp": [
+          {
+            "providerMetadata": {
+              "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+              "shortName": "CVE",
+              "dateUpdated": "2024-08-03T19:49:14.632Z"
+            },
+            "title": "CVE Program Container",
+            "references": [
+              {
+                "tags": [
+                  "x_refsource_MISC",
+                  "x_transferred"
+                ],
+                "url": "https://wpscan.com/vulnerability/6de4a7de-6b71-4349-8e52-04c89c5e6d6c"
+              },
+              {
+                "tags": [
+                  "x_refsource_MISC",
+                  "x_transferred"
+                ],
+                "url": "https://jetpack.com/2021/12/14/severe-vulnerabilities-fixed-in-all-in-one-seo-plugin-version-4-1-5-3/"
+              },
+              {
+                "tags": [
+                  "x_refsource_CONFIRM",
+                  "x_transferred"
+                ],
+                "url": "https://plugins.trac.wordpress.org/changeset/2640944/all-in-one-seo-pack/trunk/app/Common/Api/Api.php"
+              }
+            ]
+          }
+        ]
+      },
+      "cveMetadata": {
+        "assignerOrgId": "1bfdd5d7-9bf6-4a53-96ea-42e2716d7a81",
+        "assignerShortName": "WPScan",
+        "cveId": "CVE-2021-25036",
+        "datePublished": "2022-01-17T13:00:34.000Z",
+        "dateReserved": "2021-01-14T00:00:00.000Z",
+        "dateUpdated": "2024-08-03T19:49:14.632Z",
+        "state": "PUBLISHED"
+      },
+      "dataType": "CVE_RECORD",
+      "dataVersion": "5.1"
+    },
+    {
+      "containers": {
+        "cna": {
+          "affected": [
+            {
+              "product": "All in One SEO – Best WordPress SEO Plugin – Easily Improve SEO Rankings & Increase Traffic",
+              "vendor": "Unknown",
+              "versions": [
+                {
+                  "lessThan": "4.1.3.1*",
+                  "status": "affected",
+                  "version": "4.1.3.1",
+                  "versionType": "custom"
+                },
+                {
+                  "lessThan": "4.1.5.3",
+                  "status": "affected",
+                  "version": "4.1.5.3",
+                  "versionType": "custom"
+                }
+              ]
+            }
+          ],
+          "credits": [
+            {
+              "lang": "en",
+              "value": "Marc Montpas (Jetpack Scan)"
+            }
+          ],
+          "descriptions": [
+            {
+              "lang": "en",
+              "value": "The All in One SEO WordPress plugin before 4.1.5.3 is affected by an authenticated SQL injection issue, which was discovered during an internal audit by the Jetpack Scan team, and could grant attackers access to privileged information from the affected site’s database (e.g., usernames and hashed passwords)."
+            }
+          ],
+          "problemTypes": [
+            {
+              "descriptions": [
+                {
+                  "cweId": "CWE-89",
+                  "description": "CWE-89 SQL Injection",
+                  "lang": "en",
+                  "type": "CWE"
+                }
+              ]
+            }
+          ],
+          "providerMetadata": {
+            "dateUpdated": "2022-01-17T13:00:36.000Z",
+            "orgId": "1bfdd5d7-9bf6-4a53-96ea-42e2716d7a81",
+            "shortName": "WPScan"
+          },
+          "references": [
+            {
+              "tags": [
+                "x_refsource_MISC"
+              ],
+              "url": "https://jetpack.com/2021/12/14/severe-vulnerabilities-fixed-in-all-in-one-seo-plugin-version-4-1-5-3/"
+            },
+            {
+              "tags": [
+                "x_refsource_MISC"
+              ],
+              "url": "https://wpscan.com/vulnerability/4cd2a57b-3e1a-4acf-aecb-201ed9f4ee6d"
+            },
+            {
+              "tags": [
+                "x_refsource_CONFIRM"
+              ],
+              "url": "https://plugins.trac.wordpress.org/changeset/2640944/all-in-one-seo-pack/trunk/app/Common/Api/PostsTerms.php"
+            }
+          ],
+          "source": {
+            "discovery": "EXTERNAL"
+          },
+          "title": "All In One SEO < 4.1.5.3 - Authenticated SQL Injection",
+          "x_generator": "WPScan CVE Generator",
+          "x_legacyV4Record": {
+            "CVE_data_meta": {
+              "ASSIGNER": "contact@wpscan.com",
+              "ID": "CVE-2021-25037",
+              "STATE": "PUBLIC",
+              "TITLE": "All In One SEO < 4.1.5.3 - Authenticated SQL Injection"
+            },
+            "affects": {
+              "vendor": {
+                "vendor_data": [
+                  {
+                    "product": {
+                      "product_data": [
+                        {
+                          "product_name": "All in One SEO – Best WordPress SEO Plugin – Easily Improve SEO Rankings & Increase Traffic",
+                          "version": {
+                            "version_data": [
+                              {
+                                "version_affected": ">=",
+                                "version_name": "4.1.3.1",
+                                "version_value": "4.1.3.1"
+                              },
+                              {
+                                "version_affected": "<",
+                                "version_name": "4.1.5.3",
+                                "version_value": "4.1.5.3"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "vendor_name": "Unknown"
+                  }
+                ]
+              }
+            },
+            "credit": [
+              {
+                "lang": "eng",
+                "value": "Marc Montpas (Jetpack Scan)"
+              }
+            ],
+            "data_format": "MITRE",
+            "data_type": "CVE",
+            "data_version": "4.0",
+            "description": {
+              "description_data": [
+                {
+                  "lang": "eng",
+                  "value": "The All in One SEO WordPress plugin before 4.1.5.3 is affected by an authenticated SQL injection issue, which was discovered during an internal audit by the Jetpack Scan team, and could grant attackers access to privileged information from the affected site’s database (e.g., usernames and hashed passwords)."
+                }
+              ]
+            },
+            "generator": "WPScan CVE Generator",
+            "problemtype": {
+              "problemtype_data": [
+                {
+                  "description": [
+                    {
+                      "lang": "eng",
+                      "value": "CWE-89 SQL Injection"
+                    }
+                  ]
+                }
+              ]
+            },
+            "references": {
+              "reference_data": [
+                {
+                  "name": "https://jetpack.com/2021/12/14/severe-vulnerabilities-fixed-in-all-in-one-seo-plugin-version-4-1-5-3/",
+                  "refsource": "MISC",
+                  "url": "https://jetpack.com/2021/12/14/severe-vulnerabilities-fixed-in-all-in-one-seo-plugin-version-4-1-5-3/"
+                },
+                {
+                  "name": "https://wpscan.com/vulnerability/4cd2a57b-3e1a-4acf-aecb-201ed9f4ee6d",
+                  "refsource": "MISC",
+                  "url": "https://wpscan.com/vulnerability/4cd2a57b-3e1a-4acf-aecb-201ed9f4ee6d"
+                },
+                {
+                  "name": "https://plugins.trac.wordpress.org/changeset/2640944/all-in-one-seo-pack/trunk/app/Common/Api/PostsTerms.php",
+                  "refsource": "CONFIRM",
+                  "url": "https://plugins.trac.wordpress.org/changeset/2640944/all-in-one-seo-pack/trunk/app/Common/Api/PostsTerms.php"
+                }
+              ]
+            },
+            "source": {
+              "discovery": "EXTERNAL"
+            }
+          }
+        },
+        "adp": [
+          {
+            "providerMetadata": {
+              "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+              "shortName": "CVE",
+              "dateUpdated": "2024-08-03T19:49:14.558Z"
+            },
+            "title": "CVE Program Container",
+            "references": [
+              {
+                "tags": [
+                  "x_refsource_MISC",
+                  "x_transferred"
+                ],
+                "url": "https://jetpack.com/2021/12/14/severe-vulnerabilities-fixed-in-all-in-one-seo-plugin-version-4-1-5-3/"
+              },
+              {
+                "tags": [
+                  "x_refsource_MISC",
+                  "x_transferred"
+                ],
+                "url": "https://wpscan.com/vulnerability/4cd2a57b-3e1a-4acf-aecb-201ed9f4ee6d"
+              },
+              {
+                "tags": [
+                  "x_refsource_CONFIRM",
+                  "x_transferred"
+                ],
+                "url": "https://plugins.trac.wordpress.org/changeset/2640944/all-in-one-seo-pack/trunk/app/Common/Api/PostsTerms.php"
+              }
+            ]
+          }
+        ]
+      },
+      "cveMetadata": {
+        "assignerOrgId": "1bfdd5d7-9bf6-4a53-96ea-42e2716d7a81",
+        "assignerShortName": "WPScan",
+        "cveId": "CVE-2021-25037",
+        "datePublished": "2022-01-17T13:00:36.000Z",
+        "dateReserved": "2021-01-14T00:00:00.000Z",
+        "dateUpdated": "2024-08-03T19:49:14.558Z",
+        "state": "PUBLISHED"
+      },
+      "dataType": "CVE_RECORD",
+      "dataVersion": "5.1"
+    },
+    {
+      "containers": {
+        "cna": {
+          "affected": [
+            {
+              "product": "All in One SEO – Best WordPress SEO Plugin – Easily Improve Your SEO Rankings",
+              "vendor": "All in One SEO Team",
+              "versions": [
+                {
+                  "lessThan": "4.1.0.2",
+                  "status": "affected",
+                  "version": "4.1.0.2",
+                  "versionType": "custom"
+                }
+              ]
+            }
+          ],
+          "credits": [
+            {
+              "lang": "en",
+              "value": "Vincent MICHEL"
+            }
+          ],
+          "descriptions": [
+            {
+              "lang": "en",
+              "value": "The All in One SEO – Best WordPress SEO Plugin – Easily Improve Your SEO Rankings before 4.1.0.2 enables authenticated users with \"aioseo_tools_settings\" privilege (most of the time admin) to execute arbitrary code on the underlying host. Users can restore plugin's configuration by uploading a backup .ini file in the section \"Tool > Import/Export\". However, the plugin attempts to unserialize values of the .ini file. Moreover, the plugin embeds Monolog library which can be used to craft a gadget chain and thus trigger system command execution."
+            }
+          ],
+          "problemTypes": [
+            {
+              "descriptions": [
+                {
+                  "cweId": "CWE-502",
+                  "description": "CWE-502 Deserialization of Untrusted Data",
+                  "lang": "en",
+                  "type": "CWE"
+                }
+              ]
+            }
+          ],
+          "providerMetadata": {
+            "dateUpdated": "2021-05-24T10:58:05.000Z",
+            "orgId": "1bfdd5d7-9bf6-4a53-96ea-42e2716d7a81",
+            "shortName": "WPScan"
+          },
+          "references": [
+            {
+              "tags": [
+                "x_refsource_CONFIRM"
+              ],
+              "url": "https://wpscan.com/vulnerability/ab2c94d2-f6c4-418b-bd14-711ed164bcf1"
+            },
+            {
+              "tags": [
+                "x_refsource_MISC"
+              ],
+              "url": "https://aioseo.com/changelog/"
+            }
+          ],
+          "source": {
+            "discovery": "UNKNOWN"
+          },
+          "title": "All in One SEO Pack <  4.1.0.2 - Admin RCE via unserialize",
+          "x_generator": "WPScan CVE Generator",
+          "x_legacyV4Record": {
+            "CVE_data_meta": {
+              "ASSIGNER": "contact@wpscan.com",
+              "ID": "CVE-2021-24307",
+              "STATE": "PUBLIC",
+              "TITLE": "All in One SEO Pack <  4.1.0.2 - Admin RCE via unserialize"
+            },
+            "affects": {
+              "vendor": {
+                "vendor_data": [
+                  {
+                    "product": {
+                      "product_data": [
+                        {
+                          "product_name": "All in One SEO – Best WordPress SEO Plugin – Easily Improve Your SEO Rankings",
+                          "version": {
+                            "version_data": [
+                              {
+                                "version_affected": "<",
+                                "version_name": "4.1.0.2",
+                                "version_value": "4.1.0.2"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "vendor_name": "All in One SEO Team"
+                  }
+                ]
+              }
+            },
+            "credit": [
+              {
+                "lang": "eng",
+                "value": "Vincent MICHEL"
+              }
+            ],
+            "data_format": "MITRE",
+            "data_type": "CVE",
+            "data_version": "4.0",
+            "description": {
+              "description_data": [
+                {
+                  "lang": "eng",
+                  "value": "The All in One SEO – Best WordPress SEO Plugin – Easily Improve Your SEO Rankings before 4.1.0.2 enables authenticated users with \"aioseo_tools_settings\" privilege (most of the time admin) to execute arbitrary code on the underlying host. Users can restore plugin's configuration by uploading a backup .ini file in the section \"Tool > Import/Export\". However, the plugin attempts to unserialize values of the .ini file. Moreover, the plugin embeds Monolog library which can be used to craft a gadget chain and thus trigger system command execution."
+                }
+              ]
+            },
+            "generator": "WPScan CVE Generator",
+            "problemtype": {
+              "problemtype_data": [
+                {
+                  "description": [
+                    {
+                      "lang": "eng",
+                      "value": "CWE-502 Deserialization of Untrusted Data"
+                    }
+                  ]
+                }
+              ]
+            },
+            "references": {
+              "reference_data": [
+                {
+                  "name": "https://wpscan.com/vulnerability/ab2c94d2-f6c4-418b-bd14-711ed164bcf1",
+                  "refsource": "CONFIRM",
+                  "url": "https://wpscan.com/vulnerability/ab2c94d2-f6c4-418b-bd14-711ed164bcf1"
+                },
+                {
+                  "name": "https://aioseo.com/changelog/",
+                  "refsource": "MISC",
+                  "url": "https://aioseo.com/changelog/"
+                }
+              ]
+            },
+            "source": {
+              "discovery": "UNKNOWN"
+            }
+          }
+        },
+        "adp": [
+          {
+            "providerMetadata": {
+              "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+              "shortName": "CVE",
+              "dateUpdated": "2024-08-03T19:28:23.581Z"
+            },
+            "title": "CVE Program Container",
+            "references": [
+              {
+                "tags": [
+                  "x_refsource_CONFIRM",
+                  "x_transferred"
+                ],
+                "url": "https://wpscan.com/vulnerability/ab2c94d2-f6c4-418b-bd14-711ed164bcf1"
+              },
+              {
+                "tags": [
+                  "x_refsource_MISC",
+                  "x_transferred"
+                ],
+                "url": "https://aioseo.com/changelog/"
+              }
+            ]
+          }
+        ]
+      },
+      "cveMetadata": {
+        "assignerOrgId": "1bfdd5d7-9bf6-4a53-96ea-42e2716d7a81",
+        "assignerShortName": "WPScan",
+        "cveId": "CVE-2021-24307",
+        "datePublished": "2021-05-24T10:58:05.000Z",
+        "dateReserved": "2021-01-14T00:00:00.000Z",
+        "dateUpdated": "2024-08-03T19:28:23.581Z",
+        "state": "PUBLISHED"
+      },
+      "dataType": "CVE_RECORD",
+      "dataVersion": "5.1"
+    },
+    {
+      "dataType": "CVE_RECORD",
+      "dataVersion": "5.2",
+      "cveMetadata": {
+        "cveId": "CVE-2024-3554",
+        "assignerOrgId": "b15e7b5b-3da4-40ae-a43c-f7aa60e62599",
+        "state": "PUBLISHED",
+        "assignerShortName": "Wordfence",
+        "dateReserved": "2024-04-09T21:03:12.126Z",
+        "datePublished": "2024-05-02T16:51:54.079Z",
+        "dateUpdated": "2026-04-08T16:43:07.450Z"
+      },
+      "containers": {
+        "cna": {
+          "providerMetadata": {
+            "orgId": "b15e7b5b-3da4-40ae-a43c-f7aa60e62599",
+            "shortName": "Wordfence",
+            "dateUpdated": "2026-04-08T16:43:07.450Z"
+          },
+          "affected": [
+            {
+              "vendor": "smub",
+              "product": "All in One SEO – Powerful SEO Plugin to Boost SEO Rankings & Increase Traffic",
+              "versions": [
+                {
+                  "version": "0",
+                  "status": "affected",
+                  "lessThanOrEqual": "4.6.0",
+                  "versionType": "semver"
+                }
+              ],
+              "defaultStatus": "unaffected"
+            }
+          ],
+          "descriptions": [
+            {
+              "lang": "en",
+              "value": "The All in One SEO – Best WordPress SEO Plugin – Easily Improve SEO Rankings & Increase Traffic plugin for WordPress is vulnerable to Stored Cross-Site Scripting via the plugin's shortcode(s) in all versions up to, and including, 4.6.0 due to insufficient input sanitization and output escaping on user supplied attributes. This makes it possible for authenticated attackers, with contributor-level access and above, to inject arbitrary web scripts in pages that will execute whenever a user accesses an injected page."
+            }
+          ],
+          "title": "All in One SEO – Best WordPress SEO Plugin – Easily Improve SEO Rankings & Increase Traffic <= 4.6.0 - Authenticated (Contributor+) Stored Cross-Site Scripting via Shortcode",
+          "references": [
+            {
+              "url": "https://www.wordfence.com/threat-intel/vulnerabilities/id/28741ffc-4ff5-4e67-a183-bb5064b6752e?source=cve"
+            },
+            {
+              "url": "https://plugins.trac.wordpress.org/changeset?sfp_email=&sfph_mail=&reponame=&new=3073370%40all-in-one-seo-pack%2Ftrunk&old=3064696%40all-in-one-seo-pack%2Ftrunk&sfp_email=&sfph_mail="
+            }
+          ],
+          "problemTypes": [
+            {
+              "descriptions": [
+                {
+                  "lang": "en",
+                  "description": "CWE-79 Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",
+                  "cweId": "CWE-79",
+                  "type": "CWE"
+                }
+              ]
+            }
+          ],
+          "metrics": [
+            {
+              "cvssV3_1": {
+                "version": "3.1",
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:L/I:L/A:N",
+                "baseScore": 6.4,
+                "baseSeverity": "MEDIUM"
+              }
+            }
+          ],
+          "credits": [
+            {
+              "lang": "en",
+              "type": "finder",
+              "value": "Krzysztof Zając"
+            }
+          ],
+          "timeline": [
+            {
+              "time": "2024-04-29T00:00:00.000Z",
+              "lang": "en",
+              "value": "Disclosed"
+            }
+          ]
+        },
+        "adp": [
+          {
+            "metrics": [
+              {
+                "other": {
+                  "type": "ssvc",
+                  "content": {
+                    "timestamp": "2024-07-29T18:42:25.343579Z",
+                    "id": "CVE-2024-3554",
+                    "options": [
+                      {
+                        "Exploitation": "none"
+                      },
+                      {
+                        "Automatable": "no"
+                      },
+                      {
+                        "Technical Impact": "partial"
+                      }
+                    ],
+                    "role": "CISA Coordinator",
+                    "version": "2.0.3"
+                  }
+                }
+              }
+            ],
+            "title": "CISA ADP Vulnrichment",
+            "providerMetadata": {
+              "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+              "shortName": "CISA-ADP",
+              "dateUpdated": "2024-07-29T18:42:36.043Z"
+            }
+          },
+          {
+            "providerMetadata": {
+              "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+              "shortName": "CVE",
+              "dateUpdated": "2024-08-01T20:12:07.683Z"
+            },
+            "title": "CVE Program Container",
+            "references": [
+              {
+                "url": "https://www.wordfence.com/threat-intel/vulnerabilities/id/28741ffc-4ff5-4e67-a183-bb5064b6752e?source=cve",
+                "tags": [
+                  "x_transferred"
+                ]
+              },
+              {
+                "url": "https://plugins.trac.wordpress.org/changeset?sfp_email=&sfph_mail=&reponame=&new=3073370%40all-in-one-seo-pack%2Ftrunk&old=3064696%40all-in-one-seo-pack%2Ftrunk&sfp_email=&sfph_mail=",
+                "tags": [
+                  "x_transferred"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

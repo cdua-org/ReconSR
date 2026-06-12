@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+// CIRCLCPEListResponse models the response for a CPE search in the CIRCL Vulnerability API.
+type CIRCLCPEListResponse struct {
+	CVEListV5 []CIRCLCVEResponse `json:"cvelistv5"`
+	NVDList   []CIRCLCVEResponse `json:"nvd"`
+}
+
 // CIRCLCVEResponse models the root structure of the CIRCL Vulnerability API
 // response for a single CVE record conforming to the cvelistV5 standard.
 type CIRCLCVEResponse struct {
@@ -34,12 +40,54 @@ type Containers struct {
 
 // CNA encapsulates the core vulnerability details provided by the
 // CVE Numbering Authority, serving as the primary source of truth.
+const (
+	StatusAffected   = "affected"
+	StatusUnaffected = "unaffected"
+	ValueNA          = "n/a"
+	ValueUnknown     = "unknown"
+)
+
+// CNA encapsulates the core vulnerability details provided by the
+// CVE Numbering Authority, serving as the primary source of truth.
 type CNA struct {
 	Title            string             `json:"title"`
 	Descriptions     []Description      `json:"descriptions"`
 	Metrics          []Metric           `json:"metrics"`
 	ProblemTypes     []ProblemType      `json:"problemTypes"`
+	Affected         []Affected         `json:"affected"`
 	CpeApplicability []CpeApplicability `json:"cpeApplicability"`
+	References       []Reference        `json:"references"`
+}
+
+// Reference holds external URLs such as advisories and patches.
+type Reference struct {
+	URL  string   `json:"url"`
+	Name string   `json:"name"`
+	Tags []string `json:"tags"`
+}
+
+// Affected holds the CVE JSON 5.0 affected array specifying vulnerable products and version ranges.
+type Affected struct {
+	Vendor        string    `json:"vendor"`
+	Product       string    `json:"product"`
+	DefaultStatus string    `json:"defaultStatus"`
+	Versions      []Version `json:"versions"`
+}
+
+// Version represents a specific version or version range.
+type Version struct {
+	Version         string   `json:"version"`
+	Status          string   `json:"status"`
+	VersionType     string   `json:"versionType"`
+	LessThan        string   `json:"lessThan"`
+	LessThanOrEqual string   `json:"lessThanOrEqual"`
+	Changes         []Change `json:"changes"`
+}
+
+// Change represents a status change within a version range (e.g. unaffected at patch version).
+type Change struct {
+	At     string `json:"at"`
+	Status string `json:"status"`
 }
 
 // CpeApplicability holds lists of nodes matching CPE criteria.

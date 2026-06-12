@@ -6,6 +6,9 @@ package vuln_lookup
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"cdua-org/ReconSR/modules/utils/apiconfig"
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -14,10 +17,20 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
+const (
+	demoIndicator = "demo-api-key"
+)
+
 var dlog = debuglog.New("vuln_lookup")
 
 type module struct {
-	apiKey string
+	lastReqTime  time.Time
+	cveCache     sync.Map
+	cpeCache     sync.Map
+	apiKey       string
+	mu           sync.Mutex
+	demoCPEFired atomic.Bool
+	demoCVEFired atomic.Bool
 }
 
 // New instantiates the module for registration.
@@ -31,24 +44,33 @@ func (m *module) Name() string { return "vuln_lookup" }
 
 func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 	return schema.ModuleCapabilities{
-		ModuleConfig: &schema.FunctionCapabilities{
-			Limit:      1,
-			DelayMs:    3000,
-			InputTypes: []string{constants.TypeCVE},
+		CustomFunctions: map[string]schema.FunctionCapabilities{
+			constants.FuncEnrichCirclCVE: {
+				Limit:      1,
+				DelayMs:    0,
+				InputTypes: []string{constants.TypeCVE},
+			},
+			constants.FuncSearchCirclCPE: {
+				Limit:      1,
+				DelayMs:    0,
+				InputTypes: []string{constants.TypeCPE, constants.TypeCPE23},
+			},
 		},
-		Functions: []string{constants.FuncGetCirclVuln},
+		Functions: []string{constants.FuncEnrichCirclCVE, constants.FuncSearchCirclCPE},
 	}, nil
 }
 
 func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 	executions := make([]schema.ModuleExecution, 0, len(data.Functions))
 	ctx := context.Background()
+	gen := modutil.NewLocalIDGenerator()
 
 	for _, f := range data.Functions {
 		switch f {
-		case constants.FuncGetCirclVuln:
-			gen := modutil.NewLocalIDGenerator()
-			executions = append(executions, getCirclVuln(ctx, data.Target.Type, data.Target.Value, m.apiKey, gen))
+		case constants.FuncEnrichCirclCVE:
+			executions = append(executions, m.enrichCirclCVE(ctx, data.Target.Type, data.Target.Value, gen))
+		case constants.FuncSearchCirclCPE:
+			executions = append(executions, m.searchCirclCPE(ctx, data.Target.Type, data.Target.Value, gen))
 		default:
 			exec := modutil.NewExecution(f)
 			modutil.SetError(&exec, "unsupported function: %v", fmt.Errorf("%s", f))

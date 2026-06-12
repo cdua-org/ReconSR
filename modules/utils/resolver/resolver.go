@@ -145,6 +145,24 @@ var (
 
 	// CirclRetryBaseDelay is the base pause between CIRCL API retry attempts.
 	CirclRetryBaseDelay = 5 * time.Second
+	// CirclMutexDelayMs is the base pause in milliseconds between consecutive CIRCL API requests.
+	CirclMutexDelayMs = 3000
+
+	// CirclCPESortOrder specifies the sort order for CIRCL CPE search ('asc' or 'desc').
+	CirclCPESortOrder = "desc"
+
+	// CirclCPEDateSort specifies the date sort parameter for CIRCL CPE search ('', 'published', 'updated', 'reserved').
+	CirclCPEDateSort = "updated"
+
+	// CirclCPEPerPage specifies the maximum number of results per page for CIRCL CPE search.
+	CirclCPEPerPage = 100
+
+	// CirclCPESource specifies the source to filter vulnerabilities for CIRCL CPE search.
+	// Options: 'cvelistv5' (native CIRCL/CNA data) or 'nvd' (NVD/NIST data).
+	CirclCPESource = "cvelistv5"
+
+	// CirclCPEMaxPages specifies the maximum number of pages to fetch for CIRCL CPE search.
+	CirclCPEMaxPages = 1
 
 	// AbuseIPDBmaxAgeInDays defines how far back in time we go to fetch reports (default 30, max 365).
 	AbuseIPDBmaxAgeInDays = 30
@@ -342,18 +360,24 @@ func initOptionMaps() {
 		"ShodanMaxDomainPages":      &ShodanMaxDomainPages,
 		"DNSConcurrency":            &DNSConcurrency,
 		"MaxRetriesCircl":           &MaxRetriesCircl,
+		"CirclMutexDelayMs":         &CirclMutexDelayMs,
 		"AbuseIPDBmaxAgeInDays":     &AbuseIPDBmaxAgeInDays,
 		"HunterioLimit":             &HunterioLimit,
 		"HunterioMaxPages":          &HunterioMaxPages,
 		"HunterioMaxRetries":        &HunterioMaxRetries,
 		"HaveIBeenPwnedDelayMs":     &HaveIBeenPwnedDelayMs,
 		"HaveIBeenPwnedMaxRetries":  &HaveIBeenPwnedMaxRetries,
+		"CirclCPEPerPage":           &CirclCPEPerPage,
+		"CirclCPEMaxPages":          &CirclCPEMaxPages,
 	}
 	stringOptions = map[string]*string{
 		"ShodanDomainType":   &ShodanDomainType,
 		"HunterioType":       &HunterioType,
 		"HunterioSeniority":  &HunterioSeniority,
 		"HunterioDepartment": &HunterioDepartment,
+		"CirclCPESortOrder":  &CirclCPESortOrder,
+		"CirclCPEDateSort":   &CirclCPEDateSort,
+		"CirclCPESource":     &CirclCPESource,
 	}
 }
 

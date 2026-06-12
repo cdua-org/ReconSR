@@ -74,8 +74,9 @@ func parseSoftware(exec *schema.ModuleExecution, software []netlasSoftware, port
 }
 
 func parseSoftwareTags(exec *schema.ModuleExecution, sw *netlasSoftware, pRef *schema.EntityRef, gen *modutil.LocalIDGenerator) map[string]*schema.EntityRef {
-	serviceRefs := make(map[string]*schema.EntityRef)
-	cpeRefs := make(map[string]*schema.EntityRef)
+	cveParentRefs := make(map[string]*schema.EntityRef)
+	cpeSvcRefs := make(map[string]*schema.EntityRef)
+	cpeEntityRefs := make(map[string]*schema.EntityRef)
 
 	for _, tag := range sw.Tags {
 		if tag.FullName == "" && tag.Name == "" {
@@ -89,36 +90,54 @@ func parseSoftwareTags(exec *schema.ModuleExecution, sw *netlasSoftware, pRef *s
 			val += " " + tag.Version
 		}
 
-		sRef := findExistingServiceByCPE(tag.CPE, cpeRefs)
+		sRef := findExistingServiceByCPE(tag.CPE, cpeSvcRefs)
 		if sRef == nil {
 			sRef = emitNewService(exec, &tag, val, pRef, gen)
 		}
 
+		var firstCpeRef *schema.EntityRef
 		for _, cpe := range tag.CPE {
-			if _, exists := cpeRefs[cpe]; !exists {
+			if existingRef, exists := cpeEntityRefs[cpe]; exists {
+				if firstCpeRef == nil {
+					firstCpeRef = existingRef
+				}
+			} else {
+				cpeID := gen.NextID()
 				exec.Results = append(exec.Results, schema.ModuleResult{
 					Type:     constants.TypeCPE,
 					Category: constants.CategoryProperty,
 					Value:    cpe,
 					Source:   sRef,
-					LocalID:  gen.NextID(),
+					LocalID:  cpeID,
 				})
-				cpeRefs[cpe] = sRef
+				cpeSvcRefs[cpe] = sRef
+
+				ref := &schema.EntityRef{Type: constants.TypeCPE, Value: cpe, LocalID: cpeID}
+				cpeEntityRefs[cpe] = ref
+
+				if firstCpeRef == nil {
+					firstCpeRef = ref
+				}
 			}
 		}
 
+		parentRef := sRef
+		if firstCpeRef != nil {
+			parentRef = firstCpeRef
+		}
+
 		if tag.Version != "" {
-			serviceRefs[strings.ToLower(val)] = sRef
+			cveParentRefs[strings.ToLower(val)] = parentRef
 			if tag.Name != "" {
-				serviceRefs[strings.ToLower(tag.Name+" "+tag.Version)] = sRef
+				cveParentRefs[strings.ToLower(tag.Name+" "+tag.Version)] = parentRef
 			}
 			if tag.FullName != "" {
-				serviceRefs[strings.ToLower(tag.FullName+" "+tag.Version)] = sRef
+				cveParentRefs[strings.ToLower(tag.FullName+" "+tag.Version)] = parentRef
 			}
 		}
 	}
 
-	return serviceRefs
+	return cveParentRefs
 }
 
 func findExistingServiceByCPE(cpes []string, cpeRefs map[string]*schema.EntityRef) *schema.EntityRef {
@@ -169,7 +188,7 @@ func emitNewService(exec *schema.ModuleExecution, tag *netlasSoftwareTag, val st
 	return sRef
 }
 
-func parseSoftwareCVEs(exec *schema.ModuleExecution, sw *netlasSoftware, serviceRefs map[string]*schema.EntityRef, pRef, targetRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
+func parseSoftwareCVEs(exec *schema.ModuleExecution, sw *netlasSoftware, cveParentRefs map[string]*schema.EntityRef, pRef, targetRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	hasVulns := false
 	for i := range sw.CVE {
 		cve := &sw.CVE[i]
@@ -184,7 +203,7 @@ func parseSoftwareCVEs(exec *schema.ModuleExecution, sw *netlasSoftware, service
 		cveParent := pRef
 		if cve.MatchProduct != "" {
 			lookup := strings.ToLower(cve.MatchProduct)
-			if ref, ok := serviceRefs[lookup]; ok {
+			if ref, ok := cveParentRefs[lookup]; ok {
 				cveParent = ref
 			} else {
 				continue
@@ -212,10 +231,14 @@ func parseSoftwareCVEs(exec *schema.ModuleExecution, sw *netlasSoftware, service
 		cvssRef := extractCVSS(exec, cve, cveRef, gen)
 
 		if cve.Published != "" {
+			published := cve.Published
+			if day, ok := dateutil.NormalizeDay(published); ok {
+				published = day
+			}
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeDate,
 				Category: constants.CategoryProperty,
-				Value:    "Published: " + cve.Published,
+				Value:    "Published: " + published,
 				Source:   cveRef,
 				LocalID:  gen.NextID(),
 			})
@@ -519,10 +542,14 @@ func parseIoCFalsePositive(exec *schema.ModuleExecution, ioc *netlasIoC, parentR
 
 func extractIoCMetadata(exec *schema.ModuleExecution, ioc *netlasIoC, parentRef, scoreRef *schema.EntityRef, mainASNs []string, gen *modutil.LocalIDGenerator) {
 	if ioc.FirstSeen != "" {
+		firstSeen := ioc.FirstSeen
+		if day, ok := dateutil.NormalizeDay(firstSeen); ok {
+			firstSeen = day
+		}
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeDate,
 			Category: constants.CategoryProperty,
-			Value:    "First Seen: " + ioc.FirstSeen,
+			Value:    "First Seen: " + firstSeen,
 			Source:   parentRef,
 			LocalID:  gen.NextID(),
 		})

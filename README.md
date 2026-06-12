@@ -268,9 +268,10 @@ API-backed enrichment for domains, optionally subdomains, and IPv4/IPv6 targets 
 </details>
 
 ### 19. Vulnerability Lookup (`modules/vuln_lookup`)
-<details><summary>View details (1 function)</summary>
+<details><summary>View details (2 functions)</summary>
 
-- `get_circl_vuln`: Queries the CIRCL Vulnerability API for CVE entities. Supports an optional API key; without one, requests use the public keyless endpoint and remain subject to strict rate limits. Extracts vulnerability summaries, CWE classifications with local descriptions, best available CVSS metrics, affected CPE criteria, EPSS probability and percentile, SSVC/KEV indicators, additional metadata included in CIRCL responses, etc.
+- `enrich_circl_cve`: Queries the CIRCL Vulnerability API for CVE entities. Supports an optional API key; without one, requests use the public keyless endpoint and remain subject to strict rate limits. Extracts vulnerability summaries, CWE classifications with local descriptions, best available CVSS metrics, affected CPE criteria, EPSS probability and percentile, SSVC/KEV indicators, additional metadata included in CIRCL responses, etc.
+- `search_circl_cpe`: Queries the CIRCL Vulnerability API for CPE entities. Searches for products by name and extracts associated CVEs, vendor details, and related metadata.
 </details>
 
 ### 20. LeakIX Intelligence (`modules/leakix`)
@@ -350,7 +351,7 @@ While the current alpha release is focused on automating point-in-time investiga
 - ✅ Offline MaxMind enrichment via locally installed MMDB databases for geolocation, ASN, proxy/VPN indicators, and comprehensive Enterprise data aggregation.
 - ✅ ASN intelligence: Transit peers hierarchy, BGP prefixes (CIDR), legal holder, and abuse contacts via RIPEstat.
 - ✅ VirusTotal API enrichment for domain/IP reputation, passive DNS, certificate, DNS-derived, and threat-intelligence findings with demo mode.
-- ✅ CIRCL vulnerability lookup for CVE enrichment with CVSS, CWE, EPSS, SSVC/KEV, CPE, and related vulnerability metadata.
+- ✅ CIRCL vulnerability lookup for CVE enrichment and CPE search with CVSS, CWE, EPSS, SSVC/KEV, CPE, and related vulnerability metadata.
 - ✅ LeakIX exposure and data leak intelligence for domains and IPs, including service discovery, leaked credentials, SSL/SSH metadata, subdomain enumeration, and demo mode.
 </details>
 

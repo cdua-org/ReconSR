@@ -2,7 +2,6 @@ package vuln_lookup
 
 import "strings"
 
-// cweDictionary contains a full mapping of CWE IDs to their names
 var cweDictionary = map[string]string{
 	"CWE-5":    "J2EE Misconfiguration: Data Transmission Without Encryption",
 	"CWE-6":    "J2EE Misconfiguration: Insufficient Session-ID Length",
@@ -950,7 +949,6 @@ var cweDictionary = map[string]string{
 	"CWE-1434": "Insecure Setting of Generative AI/ML Model Inference Parameters",
 }
 
-// getCWEDescription returns the description of a CWE ID if available.
 func getCWEDescription(cweID string) string {
 	if desc, ok := cweDictionary[strings.ToUpper(cweID)]; ok {
 		return desc

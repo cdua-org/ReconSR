@@ -1,7 +1,9 @@
 package vuln_lookup
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -23,17 +25,21 @@ func TestModule_Capabilities(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(caps.Functions) != 1 || caps.Functions[0] != constants.FuncGetCirclVuln {
-		t.Errorf("expected function %s, got %v", constants.FuncGetCirclVuln, caps.Functions)
+	if len(caps.Functions) != 2 {
+		t.Errorf("expected 2 functions, got %v", caps.Functions)
 	}
 
-	if caps.ModuleConfig == nil {
-		t.Fatal("expected ModuleConfig to be set")
+	if caps.CustomFunctions == nil {
+		t.Fatal("expected CustomFunctions to be set")
 	}
 
+	cveConfig, ok := caps.CustomFunctions[constants.FuncEnrichCirclCVE]
+	if !ok {
+		t.Fatalf("expected custom function config for %s", constants.FuncEnrichCirclCVE)
+	}
 	expectedTypes := []string{constants.TypeCVE}
-	if len(caps.ModuleConfig.InputTypes) != len(expectedTypes) {
-		t.Errorf("expected %d input types, got %v", len(expectedTypes), caps.ModuleConfig.InputTypes)
+	if len(cveConfig.InputTypes) != len(expectedTypes) {
+		t.Errorf("expected %d input types, got %v", len(expectedTypes), cveConfig.InputTypes)
 	}
 }
 
@@ -44,7 +50,7 @@ func TestModule_Exec_UnsupportedType(t *testing.T) {
 			Type:  constants.TypeDomain,
 			Value: "example.com",
 		},
-		Functions: []string{constants.FuncGetCirclVuln},
+		Functions: []string{constants.FuncEnrichCirclCVE},
 	}
 
 	out, err := m.Exec(input)
@@ -86,28 +92,75 @@ func TestModule_Exec_UnsupportedFunction(t *testing.T) {
 		t.Errorf("expected unsupported function error, got %v", exec.Error)
 	}
 }
+func getMockFixture(w http.ResponseWriter, r *http.Request) string {
+	if strings.Contains(r.URL.Path, "cpe:2.3:a:") {
+		return getCPEMockFixture(w, r)
+	}
+	return getCVEMockFixture(w, r)
+}
 
+func getCVEMockFixture(w http.ResponseWriter, r *http.Request) string {
+	switch {
+	case strings.Contains(r.URL.Path, "CVE-2024-38063"):
+		return "cve-2024-38063.json"
+	case strings.Contains(r.URL.Path, "CVE-2021-44228"):
+		return "cve-2021-44228.json"
+	case strings.Contains(r.URL.Path, "CVE-2014-0160"):
+		return "cve-2014-0160.json"
+	case strings.Contains(r.URL.Path, "CVE-2012-3526"):
+		return "cve-2012-3526.json"
+	case strings.Contains(r.URL.Path, "CVE-2026-41872"):
+		return "cve-2026-41872.json"
+	case strings.Contains(r.URL.Path, "CVE-ERROR"):
+		w.WriteHeader(http.StatusInternalServerError)
+		return ""
+	default:
+		w.WriteHeader(http.StatusNotFound)
+		return ""
+	}
+}
+
+func getCPEMockFixture(w http.ResponseWriter, r *http.Request) string {
+	switch {
+	case strings.Contains(r.URL.Path, "cpe:2.3:a:apache:http_server"):
+		return "cpe_apache.json"
+	case strings.Contains(r.URL.Path, "cpe:2.3:a:aioseo:all_in_one_seo"):
+		if r.URL.Query().Get("source") == "nvd" {
+			return "cpe_nvd.json"
+		}
+		return "cpe_aioseo.json"
+	case strings.Contains(r.URL.Path, "cpe:2.3:a:nginx:nginx:1.24.0"):
+		return "cpe_nginx.json"
+	case strings.Contains(r.URL.Path, "cpe:2.3:a:empty:empty"):
+		return "cpe_empty.json"
+	case strings.Contains(r.URL.Path, "cpe:2.3:a:error:error"):
+		w.WriteHeader(http.StatusInternalServerError)
+		return ""
+	case strings.Contains(r.URL.Path, "cpe:2.3:a:invalid_json:invalid_json"):
+		if _, err := w.Write([]byte(`{invalid json}`)); err != nil {
+			return ""
+		}
+		return ""
+	case strings.Contains(r.URL.Path, "cpe:2.3:a:empty_raw:empty_raw"):
+		if _, err := w.Write([]byte(``)); err != nil {
+			return ""
+		}
+		return ""
+	case strings.Contains(r.URL.Path, "cpe:2.3:a:empty_cveid:empty_cveid"):
+		if _, err := w.Write([]byte(`{"cvelistv5":[{"cveMetadata":{"cveId":""}}]}`)); err != nil {
+			return ""
+		}
+		return ""
+	default:
+		w.WriteHeader(http.StatusNotFound)
+		return ""
+	}
+}
 func setupMockServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var fixture string
-
-		switch {
-		case strings.Contains(r.URL.Path, "CVE-2024-38063"):
-			fixture = "cve-2024-38063.json"
-		case strings.Contains(r.URL.Path, "CVE-2021-44228"):
-			fixture = "cve-2021-44228.json"
-		case strings.Contains(r.URL.Path, "CVE-2014-0160"):
-			fixture = "cve-2014-0160.json"
-		case strings.Contains(r.URL.Path, "CVE-2012-3526"):
-			fixture = "cve-2012-3526.json"
-		case strings.Contains(r.URL.Path, "CVE-2026-41872"):
-			fixture = "cve-2026-41872.json"
-		case strings.Contains(r.URL.Path, "CVE-ERROR"):
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		default:
-			w.WriteHeader(http.StatusNotFound)
+		fixture := getMockFixture(w, r)
+		if fixture == "" {
 			return
 		}
 
@@ -116,8 +169,8 @@ func setupMockServer(t *testing.T) *httptest.Server {
 			t.Fatalf("failed to read fixture: %v", err)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if _, werr := w.Write(data); werr != nil {
-			t.Logf("failed to write response: %v", werr)
+		if _, werr := io.Copy(w, bytes.NewReader(data)); werr != nil {
+			t.Fatalf("failed to write response: %v", werr)
 		}
 	}))
 }
@@ -154,7 +207,8 @@ func TestGetCirclVuln_CVE_WithCNAMetrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.cve, func(t *testing.T) {
-			exec := getCirclVuln(context.Background(), constants.TypeCVE, tt.cve, "", modutil.NewLocalIDGenerator())
+			m := &module{}
+			exec := m.enrichCirclCVE(context.Background(), constants.TypeCVE, tt.cve, modutil.NewLocalIDGenerator())
 
 			if exec.Error != nil {
 				t.Fatalf("unexpected error: %s", *exec.Error)
@@ -199,7 +253,8 @@ func TestGetCirclVuln_CVE_NVDFallback(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			exec := getCirclVuln(context.Background(), constants.TypeCVE, tt.cve, "", modutil.NewLocalIDGenerator())
+			m := &module{}
+			exec := m.enrichCirclCVE(context.Background(), constants.TypeCVE, tt.cve, modutil.NewLocalIDGenerator())
 
 			if exec.Error != nil {
 				t.Fatalf("unexpected error: %s", *exec.Error)
@@ -218,7 +273,8 @@ func TestGetCirclVuln_CVE2026_MultipleMetricVersions(t *testing.T) {
 	defer server.Close()
 	overrideBaseURL(t, server.URL)
 
-	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-2026-41872", "", modutil.NewLocalIDGenerator())
+	m := &module{}
+	exec := m.enrichCirclCVE(context.Background(), constants.TypeCVE, "CVE-2026-41872", modutil.NewLocalIDGenerator())
 	if exec.Error != nil {
 		t.Fatalf("unexpected error: %s", *exec.Error)
 	}
@@ -244,9 +300,12 @@ func collectTypesAndVerify(t *testing.T, results []schema.ModuleResult) map[stri
 	found := make(map[string]bool)
 	for _, res := range results {
 		found[res.Type] = true
-		if res.Type == constants.TypeDescription {
-			if res.Source == nil || res.Source.LocalID == 0 {
-				t.Error("Description result must have a valid Source.LocalID linking to parent")
+		if res.Type == constants.TypeDescription && res.Source != nil {
+			if res.Source.LocalID == 0 {
+				t.Error("Description result with a Source must have a valid LocalID")
+			}
+			if res.Source.Type != constants.TypeCWE && res.Source.Type != constants.TypeCVE {
+				t.Errorf("Description result has unexpected Source.Type: %s", res.Source.Type)
 			}
 		}
 		if res.Type == constants.TypeCPE {
@@ -308,7 +367,8 @@ func TestGetCirclVuln_NotFound(t *testing.T) {
 	defer server.Close()
 	overrideBaseURL(t, server.URL)
 
-	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-UNKNOWN", "", modutil.NewLocalIDGenerator())
+	m := &module{}
+	exec := m.enrichCirclCVE(context.Background(), constants.TypeCVE, "CVE-UNKNOWN", modutil.NewLocalIDGenerator())
 
 	if exec.Error != nil {
 		t.Errorf("did not expect error for 404, got: %s", *exec.Error)
@@ -329,7 +389,8 @@ func TestGetCirclVuln_ServerError(t *testing.T) {
 	overrideBaseURL(t, server.URL)
 	overrideRetryDelay(t)
 
-	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-ERROR", "", modutil.NewLocalIDGenerator())
+	m := &module{}
+	exec := m.enrichCirclCVE(context.Background(), constants.TypeCVE, "CVE-ERROR", modutil.NewLocalIDGenerator())
 
 	if exec.Error == nil {
 		t.Fatal("expected error for 500 status code")
@@ -371,7 +432,8 @@ func TestModule_LocalIDChaining(t *testing.T) {
 	overrideBaseURL(t, server.URL)
 
 	gen := modutil.NewLocalIDGenerator()
-	exec := getCirclVuln(context.Background(), constants.TypeCVE, "CVE-2024-38063", "", gen)
+	m := &module{}
+	exec := m.enrichCirclCVE(context.Background(), constants.TypeCVE, "CVE-2024-38063", gen)
 
 	if exec.Error != nil {
 		t.Fatalf("unexpected error: %s", *exec.Error)

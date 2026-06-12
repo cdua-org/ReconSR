@@ -211,42 +211,45 @@ func assertDomainSoftwareDeduplication(t *testing.T, results []schema.ModuleResu
 
 func verifyDomainCVEHierarchy(t *testing.T, results []schema.ModuleResult) {
 	t.Helper()
-	apacheService, cveResult := findDomainBaseCVE(results, "CVE-2026-24072")
+	apacheService, apacheCPE, cveResult := findDomainBaseCVE(results, "CVE-2026-24072")
 	cvssResult, exploitResult := findDomainCVSSAndExploit(results, cveResult)
 	attackComplexityResult := findDomainAttackComplexity(results, cvssResult)
 
-	validateDomainCVEHierarchy(t, apacheService, cveResult, cvssResult, attackComplexityResult, exploitResult)
+	validateDomainCVEHierarchy(t, apacheService, apacheCPE, cveResult, cvssResult, attackComplexityResult, exploitResult)
 
-	_, cvePartial := findDomainBaseCVE(results, "CVE-2023-12345")
+	_, _, cvePartial := findDomainBaseCVE(results, "CVE-2023-12345")
 	cvssPartial, _ := findDomainCVSSAndExploit(results, cvePartial)
 	if cvssPartial == nil || cvssPartial.Value != "MEDIUM / 5.3" {
 		t.Errorf("expected CVSS score MEDIUM / 5.3, got %v", cvssPartial)
 	}
 
-	_, cveOnlySeverity := findDomainBaseCVE(results, "CVE-2023-12346")
+	_, _, cveOnlySeverity := findDomainBaseCVE(results, "CVE-2023-12346")
 	cvssSeverity, _ := findDomainCVSSAndExploit(results, cveOnlySeverity)
 	if cvssSeverity == nil || cvssSeverity.Value != "LOW" {
 		t.Errorf("expected CVSS score LOW, got %v", cvssSeverity)
 	}
 
-	_, cveOnlyBase := findDomainBaseCVE(results, "CVE-2023-12347")
+	_, _, cveOnlyBase := findDomainBaseCVE(results, "CVE-2023-12347")
 	cvssBase, _ := findDomainCVSSAndExploit(results, cveOnlyBase)
 	if cvssBase == nil || cvssBase.Value != "3.1" {
 		t.Errorf("expected CVSS score 3.1, got %v", cvssBase)
 	}
 }
 
-func findDomainBaseCVE(results []schema.ModuleResult, cveName string) (apacheService, cveResult *schema.ModuleResult) {
+func findDomainBaseCVE(results []schema.ModuleResult, cveName string) (apacheService, apacheCPE, cveResult *schema.ModuleResult) {
 	for i := range results {
 		res := &results[i]
 		if res.Type == constants.TypeService && strings.Contains(res.Value, "Apache HTTP Server") {
 			apacheService = res
 		}
+		if res.Type == constants.TypeCPE && strings.Contains(res.Value, "apache") {
+			apacheCPE = res
+		}
 		if res.Type == constants.TypeCVE && res.Value == cveName {
 			cveResult = res
 		}
 	}
-	return apacheService, cveResult
+	return apacheService, apacheCPE, cveResult
 }
 
 func findDomainCVSSAndExploit(results []schema.ModuleResult, cveResult *schema.ModuleResult) (cvssResult, exploitResult *schema.ModuleResult) {
@@ -272,13 +275,16 @@ func findDomainAttackComplexity(results []schema.ModuleResult, cvssResult *schem
 	return nil
 }
 
-func validateDomainCVEHierarchy(t *testing.T, service, cveResult, cvssResult, attackComplexityResult, exploitResult *schema.ModuleResult) {
+func validateDomainCVEHierarchy(t *testing.T, service, cpe, cveResult, cvssResult, attackComplexityResult, exploitResult *schema.ModuleResult) {
 	t.Helper()
-	if cveResult == nil || service == nil {
-		t.Fatalf("CVE or Service not found")
+	if cveResult == nil || cpe == nil || service == nil {
+		t.Fatalf("Service, CPE, or CVE not found")
 	}
-	if cveResult.Source.LocalID != service.LocalID {
-		t.Errorf("CVE source mismatch: got %v, want %v", cveResult.Source.LocalID, service.LocalID)
+	if cpe.Source.LocalID != service.LocalID {
+		t.Errorf("CPE source mismatch: got %v, want %v (Service)", cpe.Source.LocalID, service.LocalID)
+	}
+	if cveResult.Source.LocalID != cpe.LocalID {
+		t.Errorf("CVE source mismatch: got %v, want %v (CPE)", cveResult.Source.LocalID, cpe.LocalID)
 	}
 
 	if cvssResult == nil {
