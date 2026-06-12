@@ -9,6 +9,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dateutil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/schema"
@@ -99,10 +100,14 @@ func formatLeakixSubdomains(exec *schema.ModuleExecution, resp []SubdomainRespon
 		})
 
 		if sub.LastSeen != "" {
+			lastSeen := sub.LastSeen
+			if day, ok := dateutil.NormalizeDay(lastSeen); ok {
+				lastSeen = day
+			}
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeDate,
 				Category: constants.CategoryProperty,
-				Value:    "Last Seen: " + sub.LastSeen,
+				Value:    "Last Seen: " + lastSeen,
 				Source: &schema.EntityRef{
 					Type:    nodeType,
 					Value:   sub.Subdomain,

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dateutil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
@@ -95,10 +96,14 @@ func getProxyCheck(target, dbPath string) schema.ModuleExecution {
 	}
 
 	if res.NetworkLastSeen != "" {
+		lastSeen := res.NetworkLastSeen
+		if day, ok := dateutil.NormalizeDay(lastSeen); ok {
+			lastSeen = day
+		}
 		execution.Results = append(execution.Results, schema.ModuleResult{
 			Type:     constants.TypeDate,
 			Category: constants.CategoryProperty,
-			Value:    "Last Seen: " + res.NetworkLastSeen,
+			Value:    "Last Seen: " + lastSeen,
 			LocalID:  gen.NextID(),
 		})
 		writeRaw(&rawBuffer, "NetworkLastSeen", res.NetworkLastSeen)

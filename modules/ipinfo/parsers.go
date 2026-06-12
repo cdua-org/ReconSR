@@ -6,6 +6,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dateutil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
@@ -67,10 +68,14 @@ func parseASN(exec *schema.ModuleExecution, resp *ipinfoResponse, gen *modutil.L
 		asLastChanged = resp.As.LastChanged
 	}
 	if asLastChanged != "" {
+		lastChanged := asLastChanged
+		if day, ok := dateutil.NormalizeDay(lastChanged); ok {
+			lastChanged = day
+		}
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeDate,
 			Category: constants.CategoryProperty,
-			Value:    "Last Changed: " + asLastChanged,
+			Value:    "Last Changed: " + lastChanged,
 			LocalID:  gen.NextID(),
 			Source: &schema.EntityRef{
 				Type:    constants.TypeASN,
@@ -194,10 +199,14 @@ func parseGeo(exec *schema.ModuleExecution, resp *ipinfoResponse, gen *modutil.L
 		})
 
 		if resp.Geo != nil && resp.Geo.LastChanged != "" {
+			lastChanged := resp.Geo.LastChanged
+			if day, ok := dateutil.NormalizeDay(lastChanged); ok {
+				lastChanged = day
+			}
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeDate,
 				Category: constants.CategoryProperty,
-				Value:    "Last Changed: " + resp.Geo.LastChanged,
+				Value:    "Last Changed: " + lastChanged,
 				LocalID:  gen.NextID(),
 				Source: &schema.EntityRef{
 					Type:    constants.TypeGeo,
@@ -326,10 +335,14 @@ func parseAnonymous(exec *schema.ModuleExecution, resp *ipinfoResponse, gen *mod
 		})
 	}
 	if resp.Anonymous.LastSeen != "" {
+		lastSeen := resp.Anonymous.LastSeen
+		if day, ok := dateutil.NormalizeDay(lastSeen); ok {
+			lastSeen = day
+		}
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeDate,
 			Category: constants.CategoryProperty,
-			Value:    "Last Seen: " + resp.Anonymous.LastSeen,
+			Value:    "Last Seen: " + lastSeen,
 			Context:  "Privacy",
 			LocalID:  gen.NextID(),
 			Source:   anonRef,

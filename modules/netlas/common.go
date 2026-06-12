@@ -8,6 +8,7 @@ import (
 
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dateutil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/schema"
@@ -528,10 +529,14 @@ func extractIoCMetadata(exec *schema.ModuleExecution, ioc *netlasIoC, parentRef,
 	}
 
 	if ioc.LastSeen != "" {
+		lastSeen := ioc.LastSeen
+		if day, ok := dateutil.NormalizeDay(lastSeen); ok {
+			lastSeen = day
+		}
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeDate,
 			Category: constants.CategoryProperty,
-			Value:    "Last Seen: " + ioc.LastSeen,
+			Value:    "Last Seen: " + lastSeen,
 			Source:   parentRef,
 			LocalID:  gen.NextID(),
 		})

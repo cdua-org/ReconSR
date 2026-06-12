@@ -38,7 +38,7 @@ func assertSubdomains(t *testing.T, results []schema.ModuleResult) {
 		if res.Type == constants.TypeSubdomain && res.Value == "www.example.com" {
 			hasSub1 = true
 		}
-		if res.Type == constants.TypeDate && res.Value == "Last Seen: 2026-05-20T11:25:41.243Z" {
+		if res.Type == constants.TypeDate && res.Value == "Last Seen: 2026-05-20" {
 			hasLastSeen = true
 		}
 		if res.Type == constants.TypeSubdomain && res.Value == "staging.example.com" {

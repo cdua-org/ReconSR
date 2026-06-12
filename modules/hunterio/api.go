@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dateutil"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/orgdomain"
 	"cdua-org/ReconSR/modules/utils/resolver"
@@ -631,19 +632,27 @@ func appendSourceWithURI(s apiEmailSource, results []schema.ModuleResult, source
 		})
 	}
 	if s.ExtractedOn != "" {
+		extractedOn := s.ExtractedOn
+		if day, ok := dateutil.NormalizeDay(extractedOn); ok {
+			extractedOn = day
+		}
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypeDate,
 			Category: constants.CategoryProperty,
-			Value:    "Extracted on: " + s.ExtractedOn,
+			Value:    "Extracted on: " + extractedOn,
 			Source:   sourceRef,
 			LocalID:  gen.NextID(),
 		})
 	}
 	if s.LastSeenOn != "" {
+		lastSeenOn := s.LastSeenOn
+		if day, ok := dateutil.NormalizeDay(lastSeenOn); ok {
+			lastSeenOn = day
+		}
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypeDate,
 			Category: constants.CategoryProperty,
-			Value:    "Last seen: " + s.LastSeenOn,
+			Value:    "Last seen: " + lastSeenOn,
 			Source:   sourceRef,
 			LocalID:  gen.NextID(),
 		})
