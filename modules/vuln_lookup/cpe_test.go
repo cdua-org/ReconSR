@@ -110,7 +110,7 @@ func TestSearchCirclCPE_Pagination(t *testing.T) {
 	m := &module{}
 	gen := modutil.NewLocalIDGenerator()
 
-	exec := m.searchCirclCPE(context.Background(), constants.TypeCPE, "cpe:2.3:a:nginx:nginx:1.24.0:*:*:*:*:*:*:*", gen)
+	exec := m.searchCirclCPE(context.Background(), constants.TypeCPE, "cpe:2.3:a:nginx:nginx:1.24.2:*:*:*:*:*:*:*", gen)
 
 	if exec.Error != nil {
 		t.Fatalf("unexpected error: %s", *exec.Error)

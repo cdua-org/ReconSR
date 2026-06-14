@@ -2,15 +2,27 @@ package vuln_lookup
 
 import (
 	"context"
-	"embed"
+	_ "embed"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
-//go:embed testdata/*.json
-var demoData embed.FS
+//go:embed testdata/cpe_nginx.json
+var demoCPENginx []byte
+
+//go:embed testdata/cpe_nvd.json
+var demoCPENVD []byte
+
+//go:embed testdata/cve-2024-38063.json
+var demoCVE1 []byte
+
+//go:embed testdata/cve-2021-44228.json
+var demoCVE2 []byte
+
+//go:embed testdata/cve-2014-0160.json
+var demoCVE3 []byte
 
 func (m *module) searchCirclCPEDemo(ctx context.Context, exec *schema.ModuleExecution, target string, gen *modutil.LocalIDGenerator) {
 	_ = ctx
@@ -27,13 +39,8 @@ func (m *module) searchCirclCPEDemo(ctx context.Context, exec *schema.ModuleExec
 		Value:    "⚠️ DEMO MODE: Showing sample data for CIRCL CPE (API key not configured)",
 	})
 
-	fixtures := []string{"testdata/cpe_nginx.json", "testdata/cpe_nvd.json"}
-	for _, f := range fixtures {
-		data, err := demoData.ReadFile(f)
-		if err != nil {
-			modutil.SetError(exec, "read fixture err: %v", err)
-			continue
-		}
+	fixtures := [][]byte{demoCPENginx, demoCPENVD}
+	for _, data := range fixtures {
 		modutil.SetRawFromBytes(exec, data)
 		m.parseCPEResponse(exec, data, target, gen)
 	}
@@ -56,13 +63,8 @@ func (m *module) enrichCirclCVEDemo(ctx context.Context, exec *schema.ModuleExec
 		Value:    "⚠️ DEMO MODE: Showing sample data for CIRCL CVE (API key not configured)",
 	})
 
-	fixtures := []string{"testdata/cve-2024-38063.json", "testdata/cve-2021-44228.json", "testdata/cve-2014-0160.json"}
-	for _, f := range fixtures {
-		data, err := demoData.ReadFile(f)
-		if err != nil {
-			modutil.SetError(exec, "read fixture err: %v", err)
-			continue
-		}
+	fixtures := [][]byte{demoCVE1, demoCVE2, demoCVE3}
+	for _, data := range fixtures {
 		modutil.SetRawFromBytes(exec, data)
 		m.parseCVEResponse(exec, data, target, gen)
 	}

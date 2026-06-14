@@ -18,11 +18,12 @@ func TestDemoMode_CPE(t *testing.T) {
 		t.Fatal("failed to cast module")
 	}
 	mod.apiKey = demoIndicator
+	mod.demoCPEFired.Store(false)
 
 	input := schema.ModuleInput{
 		Target: schema.Entity{
 			Type:  constants.TypeCPE,
-			Value: "cpe:2.3:a:nginx:nginx:1.24.0:*:*:*:*:*:*:*",
+			Value: "cpe:2.3:a:nginx:nginx:1.24.1:*:*:*:*:*:*:*",
 		},
 		Functions: []string{constants.FuncSearchCirclCPE},
 	}
@@ -44,6 +45,20 @@ func TestDemoMode_CPE(t *testing.T) {
 	if cveCount == 0 {
 		t.Errorf("expected >0 CVEs in demo mode, got %d", cveCount)
 	}
+
+	input2 := input
+	input2.Target.Value = "cpe:2.3:a:nginx:nginx:1.25.0:*:*:*:*:*:*:*"
+
+	out2, err2 := m.Exec(input2)
+	if err2 != nil {
+		t.Fatalf("unexpected error on second call: %v", err2)
+	}
+	if len(out2.Executions) != 1 || out2.Executions[0].Error != nil {
+		t.Fatalf("expected no errors on second call")
+	}
+	if len(out2.Executions[0].Results) != 0 {
+		t.Errorf("expected 0 results on second call, got %d", len(out2.Executions[0].Results))
+	}
 }
 
 func TestDemoMode_CVE(t *testing.T) {
@@ -57,11 +72,12 @@ func TestDemoMode_CVE(t *testing.T) {
 		t.Fatal("failed to cast module")
 	}
 	mod.apiKey = demoIndicator
+	mod.demoCVEFired.Store(false)
 
 	input := schema.ModuleInput{
 		Target: schema.Entity{
 			Type:  constants.TypeCVE,
-			Value: "CVE-2024-38063",
+			Value: "CVE-2024-38065",
 		},
 		Functions: []string{constants.FuncEnrichCirclCVE},
 	}
@@ -81,5 +97,19 @@ func TestDemoMode_CVE(t *testing.T) {
 
 	if len(exec.Results) == 0 {
 		t.Error("expected results in demo mode")
+	}
+
+	input2 := input
+	input2.Target.Value = "CVE-2024-38064"
+
+	out2, err2 := m.Exec(input2)
+	if err2 != nil {
+		t.Fatalf("unexpected error on second call: %v", err2)
+	}
+	if len(out2.Executions) != 1 || out2.Executions[0].Error != nil {
+		t.Fatalf("expected no errors on second call")
+	}
+	if len(out2.Executions[0].Results) != 0 {
+		t.Errorf("expected 0 results on second call, got %d", len(out2.Executions[0].Results))
 	}
 }

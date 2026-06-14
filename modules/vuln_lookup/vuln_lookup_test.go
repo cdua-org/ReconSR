@@ -18,6 +18,13 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
+func TestModule_Name(t *testing.T) {
+	m := New()
+	if n := m.Name(); n != "vuln_lookup" {
+		t.Errorf("expected module name 'vuln_lookup', got %q", n)
+	}
+}
+
 func TestModule_Capabilities(t *testing.T) {
 	m := New()
 	caps, err := m.Capabilities()
@@ -101,7 +108,7 @@ func getMockFixture(w http.ResponseWriter, r *http.Request) string {
 
 func getCVEMockFixture(w http.ResponseWriter, r *http.Request) string {
 	switch {
-	case strings.Contains(r.URL.Path, "CVE-2024-38063"):
+	case strings.Contains(r.URL.Path, "CVE-2024-38063") || strings.Contains(r.URL.Path, "CVE-2024-38064"):
 		return "cve-2024-38063.json"
 	case strings.Contains(r.URL.Path, "CVE-2021-44228"):
 		return "cve-2021-44228.json"
@@ -129,7 +136,7 @@ func getCPEMockFixture(w http.ResponseWriter, r *http.Request) string {
 			return "cpe_nvd.json"
 		}
 		return "cpe_aioseo.json"
-	case strings.Contains(r.URL.Path, "cpe:2.3:a:nginx:nginx:1.24.0"):
+	case strings.Contains(r.URL.Path, "cpe:2.3:a:nginx:nginx:1.24.0") || strings.Contains(r.URL.Path, "cpe:2.3:a:nginx:nginx:1.24.2"):
 		return "cpe_nginx.json"
 	case strings.Contains(r.URL.Path, "cpe:2.3:a:empty:empty"):
 		return "cpe_empty.json"
@@ -433,7 +440,7 @@ func TestModule_LocalIDChaining(t *testing.T) {
 
 	gen := modutil.NewLocalIDGenerator()
 	m := &module{}
-	exec := m.enrichCirclCVE(context.Background(), constants.TypeCVE, "CVE-2024-38063", gen)
+	exec := m.enrichCirclCVE(context.Background(), constants.TypeCVE, "CVE-2024-38064", gen)
 
 	if exec.Error != nil {
 		t.Fatalf("unexpected error: %s", *exec.Error)
