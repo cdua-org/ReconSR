@@ -76,3 +76,83 @@ func TestParseRDAP(t *testing.T) {
 		t.Errorf("parseRDAP() mismatch\nGot:  %+v\nWant: %+v", got, expected)
 	}
 }
+
+func TestParseRDAP_InvalidDataTypes(t *testing.T) {
+	rdapJSON := `
+	{
+		"events": [
+			123,
+			{"eventAction": "unknown", "eventDate": "2000"}
+		],
+		"status": ["", "serverTransferProhibited"],
+		"nameservers": [
+			123,
+			{"ldhName": ""},
+			{"ldhName": "ns1.example.net [192.0.2.1]"}
+		],
+		"entities": [
+			"invalid-entity",
+			{
+				"entities": [
+					{
+						"roles": ["administrative", "technical", "billing", "abuse", "unknown"],
+						"vcardArray": [
+							"vcard",
+							[
+								["fn", {}, "text", "Admin Name"],
+								"short",
+								["tel"]
+							]
+						]
+					}
+				],
+				"roles": "not-array",
+				"vcardArray": []
+			},
+			{
+				"roles": [123],
+				"vcardArray": ["vcard", "not-array"]
+			},
+			{
+				"roles": ["registrant"],
+				"vcardArray": []
+			},
+			{
+				"roles": ["registrant"],
+				"vcardArray": ["vcard", "not-array"]
+			}
+		]
+	}`
+
+	var data map[string]any
+	err := json.Unmarshal([]byte(rdapJSON), &data)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal RDAP edge cases JSON: %v", err)
+	}
+
+	got := parseRDAP(data)
+
+	expectedName := []string{"Admin Name"}
+	if !reflect.DeepEqual(got.Admin.Name, expectedName) {
+		t.Errorf("Expected Admin.Name %v, got %v", expectedName, got.Admin.Name)
+	}
+	if !reflect.DeepEqual(got.Tech.Name, expectedName) {
+		t.Errorf("Expected Tech.Name %v, got %v", expectedName, got.Tech.Name)
+	}
+	if !reflect.DeepEqual(got.Billing.Name, expectedName) {
+		t.Errorf("Expected Billing.Name %v, got %v", expectedName, got.Billing.Name)
+	}
+	if !reflect.DeepEqual(got.Abuse.Name, expectedName) {
+		t.Errorf("Expected Abuse.Name %v, got %v", expectedName, got.Abuse.Name)
+	}
+
+	expectedNS := []string{"ns1.example.net"}
+	if !reflect.DeepEqual(got.NameServers, expectedNS) {
+		t.Errorf("Expected NameServers %v, got %v", expectedNS, got.NameServers)
+	}
+
+	expectedStatus := []string{"serverTransferProhibited"}
+	if !reflect.DeepEqual(got.DomainStatus, expectedStatus) {
+		t.Errorf("Expected DomainStatus %v, got %v", expectedStatus, got.DomainStatus)
+	}
+}

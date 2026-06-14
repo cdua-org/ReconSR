@@ -2,8 +2,6 @@ package whois
 
 import "testing"
 
-// TestParseWHOIS_NICAT validates Austrian Austrian WHOIS format where
-// contact blocks are not prefixed so they fall back to Registrant.
 func TestParseWHOIS_NICAT(t *testing.T) {
 	rawWHOIS := `
 % Copyright (c)2026 by NIC.AT (1)
@@ -52,7 +50,6 @@ source:         AT-DOM
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"Fake Registrar GmbH ( https://fake.at/registrar/123 )"})
 	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"FAKETECH-NICAT"})
 
-	// Austrian RPSL maps all root-level blocks to Registrant due to lack of standard headers
 	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Fake Registrant Name", "Fake Tech Name"})
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"FAKEREG-NICAT", "Fake Org Inc", "Fake Tech Org"})
 	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{

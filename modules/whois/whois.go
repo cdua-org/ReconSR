@@ -24,6 +24,11 @@ import (
 
 var dbg = debuglog.New("whois")
 
+var (
+	ianaWhoisServer = "whois.iana.org"
+	whoisPort       = "43"
+)
+
 type module struct{}
 
 // New instantiates the WHOIS metadata module for the Dispatcher.
@@ -444,7 +449,7 @@ func attemptRDAP(ctx context.Context, url string) (data map[string]any, retriabl
 }
 
 func queryWHOIS(ctx context.Context, domain string) (string, error) {
-	ianaRes, err := dialWHOIS(ctx, "whois.iana.org", domain)
+	ianaRes, err := dialWHOIS(ctx, ianaWhoisServer, domain)
 	if err != nil {
 		return "", fmt.Errorf("failed to query IANA: %w", err)
 	}
@@ -468,7 +473,7 @@ func queryWHOIS(ctx context.Context, domain string) (string, error) {
 		}
 	}
 
-	if referServer == "" || referServer == "whois.iana.org" {
+	if referServer == "" || referServer == ianaWhoisServer {
 		return ianaRes, nil
 	}
 
@@ -489,7 +494,7 @@ func dialWHOIS(ctx context.Context, server, query string) (string, error) {
 			attemptCtx, cancel := context.WithTimeout(ctx, resolver.Timeout)
 			defer cancel()
 
-			conn, err := d.DialContext(attemptCtx, "tcp", net.JoinHostPort(server, "43"))
+			conn, err := d.DialContext(attemptCtx, "tcp", net.JoinHostPort(server, whoisPort))
 			if err != nil {
 				return "", fmt.Errorf("dial error: %w", err)
 			}

@@ -19,7 +19,6 @@ type roleMarker struct {
 	isPrefix bool
 }
 
-// roleMarkers defines section headers in priority order.
 var roleMarkers = []roleMarker{
 	// Contains: generic ICANN / RPSL / EDUCAUSE
 	{"registrar:", whoisRoleRegistrar, false},
@@ -80,7 +79,6 @@ func updateRoleContext(lineLower, currentRole string) string {
 		}
 	}
 
-	// Reset role to prevent data leakage from prior sections for unknown headers.
 	if strings.HasSuffix(lineLower, ":") {
 		return ""
 	}
@@ -330,7 +328,7 @@ func processHandles(parts []string, handleRoles map[string]string, currentRole *
 	case "registrant":
 		if registryType == "cz" || registryType == "ar" {
 			handleRoles[v] = whoisRoleRegistrant
-			return true // Skip parsing handle as Name/Org
+			return true
 		}
 	case "admin-c":
 		handleRoles[v] = whoisRoleAdministrative

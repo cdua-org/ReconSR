@@ -100,7 +100,7 @@ func normalizePhone(phone string) string {
 
 	var digits []rune
 	for _, r := range phone {
-		if (r >= '0' && r <= '9') || r == '+' {
+		if r >= '0' && r <= '9' {
 			digits = append(digits, r)
 		}
 	}

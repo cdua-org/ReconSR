@@ -4,7 +4,6 @@ import (
 	"testing"
 )
 
-// TestParseWHOIS_JPRS1 validates JPRS format 1 (letter-prefixed bracket fields).
 func TestParseWHOIS_JPRS1(t *testing.T) {
 	rawWHOIS := `[ JPRS database provides information on network administration. ]
 Domain Information:
@@ -34,8 +33,6 @@ s. [Signing Key]
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "2026/03/15 10:30:00 (JST)")
 }
 
-// TestParseWHOIS_JPRS2 validates JPRS format 2 (bracket fields without
-// letter prefix) including Contact Information with continuation lines.
 func TestParseWHOIS_JPRS2(t *testing.T) {
 	rawWHOIS := `Domain Information:
 [Domain Name]                   FAKESTORE.JP

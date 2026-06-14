@@ -37,7 +37,6 @@ func applyJPDomainMatch(m *Metadata, key, val string) bool {
 		}
 		return true
 	case "jp_domain", "jp_org_type":
-		// Informational only, no metadata mapping required.
 		return true
 	}
 	return false

@@ -9,7 +9,7 @@ func TestParseWHOIS_ICANN(t *testing.T) {
 	rawWHOIS := `
 Domain Name: EXAMPLE.COM
 Registry Domain ID: 123456789_DOMAIN_COM-VRSN
-Registrar WHOIS Server: whois.example.com
+Registrar WHOIS Server: whois.icann.example.com
 Registrar URL: http://www.example.com
 Updated Date: 2023-01-01T12:00:00Z
 Creation Date: 2000-01-01T12:00:00Z
@@ -18,11 +18,12 @@ Registrar: Example Registrar, Inc.
 Registrar IANA ID: 9999
 Registrar Abuse Contact Email: abuse@example.com
 Registrar Abuse Contact Phone: +1.5555555555
-Domain Status: clientTransferProhibited https://icann.org/epp#clientTransferProhibited
-Name Server: NS1.EXAMPLE.COM
+Domain Status: serverDeleteProhibited https://icann.org/epp#serverDeleteProhibited
+Name Server: NS1.ICANN.EXAMPLE.COM
 Name Server: NS2.EXAMPLE.COM
 DNSSEC: unsigned
 
+Registry Registrant ID:
 Registrant Name: John Doe
 Registrant Organization: Doe Inc
 Registrant Street: 123 Main St
@@ -31,51 +32,51 @@ Registrant State/Province: CA
 Registrant Postal Code: 12345
 Registrant Country: US
 Registrant Phone: +1.5551234567
-Registrant Email: john@doe.com
+Registrant Email: john@doe.example.com
 
 Admin Name: Jane Smith
 Admin Organization: Smith LLC
 Admin Street: 456 Elm St
 Admin Phone: +1.5559876543
-Admin Email: jane@smith.com
+Admin Email: jane@smith.example.com
 
 Tech Name: Tech Guy
 Tech Organization: Tech Co
 Tech Phone: +1.5551112222
-Tech Email: tech@tech.com
+Tech Email: tech@tech.example.com
 `
 
 	expected := Metadata{
 		RegistrarURL:   "http://www.example.com",
-		WhoisServer:    "whois.example.com",
+		WhoisServer:    "whois.icann.example.com",
 		IANAID:         "9999",
 		DNSSEC:         "unsigned",
 		CreationDate:   "2000-01-01T12:00:00Z",
 		UpdatedDate:    "2023-01-01T12:00:00Z",
 		ExpirationDate: "2025-01-01T12:00:00Z",
-		NameServers:    []string{"ns1.example.com", "ns2.example.com"},
-		DomainStatus:   []string{"clientTransferProhibited https://icann.org/epp#clientTransferProhibited"},
+		NameServers:    []string{"ns1.icann.example.com", "ns2.example.com"},
+		DomainStatus:   []string{"serverDeleteProhibited https://icann.org/epp#serverDeleteProhibited"},
 		Registrar: Contact{
 			Name: []string{"Example Registrar, Inc."},
 		},
 		Registrant: Contact{
 			Name:         []string{"John Doe"},
 			Organization: []string{"Doe Inc"},
-			Email:        []string{"john@doe.com"},
+			Email:        []string{"john@doe.example.com"},
 			Address:      []string{"123 Main St", "Anytown", "CA", "12345", "US"},
 			Phone:        []string{"+1.5551234567"},
 		},
 		Admin: Contact{
 			Name:         []string{"Jane Smith"},
 			Organization: []string{"Smith LLC"},
-			Email:        []string{"jane@smith.com"},
+			Email:        []string{"jane@smith.example.com"},
 			Address:      []string{"456 Elm St"},
 			Phone:        []string{"+1.5559876543"},
 		},
 		Tech: Contact{
 			Name:         []string{"Tech Guy"},
 			Organization: []string{"Tech Co"},
-			Email:        []string{"tech@tech.com"},
+			Email:        []string{"tech@tech.example.com"},
 			Phone:        []string{"+1.5551112222"},
 		},
 		Abuse: Contact{
@@ -90,8 +91,6 @@ Tech Email: tech@tech.com
 	}
 }
 
-// TestParseWHOIS_EDUCAUSE validates EDUCAUSE tab-indented freeform format
-// with org-on-line-1 heuristic (lineIndex==1 without digits → Organization).
 func TestParseWHOIS_EDUCAUSE(t *testing.T) {
 	rawWHOIS := `Domain Name: TESTUNI.EDU
 
@@ -152,10 +151,8 @@ Domain expires:             31-Dec-2027
 	assertSlice(t, "Tech.Phone", got.Tech.Phone, []string{"+1.5550002222"})
 }
 
-// TestParseWHOIS_NICMexico validates NIC Mexico format with rpsl-style
-// indented sections and DNS: name server format.
 func TestParseWHOIS_NICMexico(t *testing.T) {
-	rawWHOIS := `Domain Name:       fakeshop.com.mx
+	rawWHOIS := `Domain Name:       fakeshop.test.example
 
 Created On:        2010-05-15
 Expiration Date:   2028-05-15
@@ -213,13 +210,10 @@ DNSSEC DS Records:
 	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"Tech Crew Tres"})
 	assertSlice(t, "Tech.Address", got.Tech.Address, []string{"Techvale Este", "Eaststate Tres", "Fakeland Este"})
 
-	// Billing Contact must not leak into other contacts.
 	assertSlice(t, "Billing.Name", got.Billing.Name, []string{"Billing Team"})
 	assertSlice(t, "Billing.Address", got.Billing.Address, []string{"Otherville", "Otherstate", "Fakeland Oeste"})
 }
 
-// TestParseWHOIS_NICIT validates Italian WHOIS format with bare-word headers,
-// multi-line indented addresses, and independent scopes for contacts.
 func TestParseWHOIS_NICIT(t *testing.T) {
 	rawWHOIS := `
 Domain:             fake.it
@@ -296,20 +290,19 @@ Nameservers
 	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.example.it", "ns2.fake.example.it"})
 }
 
-// TestParseWHOIS_CN validates Chinese WHOIS format
 func TestParseWHOIS_CN(t *testing.T) {
 	rawWHOIS := `
-Domain Name: fake.cn
+Domain Name: cn.test.example
 ROID: 20030312s10001s00062053-cn
 Domain Status: clientDeleteProhibited
-Domain Status: clientTransferProhibited
+Domain Status: serverUpdateProhibited
 Registrant: Mock Registry Ltd
-Registrant Contact Email: fake@fake.cn
+Registrant Contact Email: fake@cn.test.example
 Sponsoring Registrar: Fake Beijing Registrar Co. Ltd
-Name Server: ns1.fake.cn
-Name Server: ns2.fake.cn
-Name Server: ns3.fake.cn
-Name Server: ns4.fake.cn
+Name Server: ns1.cn.test.example
+Name Server: ns2.cn.test.example
+Name Server: ns3.cn.test.example
+Name Server: ns4.cn.test.example
 Registration Time: 2003-03-17 12:20:05
 Expiration Time: 2029-03-17 12:48:36
 DNSSEC: unsigned
@@ -321,16 +314,15 @@ DNSSEC: unsigned
 	assertEq(t, "ExpirationDate", got.ExpirationDate, "2029-03-17 12:48:36")
 	assertEq(t, "DNSSEC", got.DNSSEC, "unsigned")
 
-	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"clientDeleteProhibited", "clientTransferProhibited"})
+	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"clientDeleteProhibited", "serverUpdateProhibited"})
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"Fake Beijing Registrar Co. Ltd"})
 
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Mock Registry Ltd"})
-	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"fake@fake.cn"})
+	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"fake@cn.test.example"})
 
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.cn", "ns2.fake.cn", "ns3.fake.cn", "ns4.fake.cn"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.cn.test.example", "ns2.cn.test.example", "ns3.cn.test.example", "ns4.cn.test.example"})
 }
 
-// TestParseWHOIS_RU validates Russian TCI WHOIS format (.ru, .su, .rf)
 func TestParseWHOIS_RU(t *testing.T) {
 	rawWHOIS := `% TCI Whois Service. Terms of use:
 % https://tcinet.ru/documents/whois_ru_rf.pdf (in Russian)
@@ -364,7 +356,6 @@ Last updated on 2026-04-07T07:53:01Z
 	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"REGISTERED, DELEGATED, VERIFIED"})
 }
 
-// TestParseWHOIS_IANA validates IANA root zone whois format.
 func TestParseWHOIS_IANA(t *testing.T) {
 	rawWHOIS := `% IANA WHOIS server
 % for more information on IANA, visit http://www.iana.org
@@ -430,9 +421,8 @@ source:       IANA`
 	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"ACTIVE"})
 }
 
-// TestParseWHOIS_AU validates Australian .au WHOIS format.
 func TestParseWHOIS_AU(t *testing.T) {
-	rawWHOIS := `Domain Name: fake.com.au
+	rawWHOIS := `Domain Name: au.test.example
 Registry Domain ID: 123456789-AU
 Registrar WHOIS Server: whois.auda.org.au
 Registrar URL: https://www.fake.example/contact
@@ -472,12 +462,11 @@ Eligibility Type: Company`
 	assertSlice(t, "Abuse.Phone", got.Abuse.Phone, []string{"+61.123456789"})
 }
 
-// TestParseWHOIS_FR validates French .fr WHOIS format (AFNIC).
 func TestParseWHOIS_FR(t *testing.T) {
-	rawWHOIS := `domain:      fake.fr
+	rawWHOIS := `domain:      fr.test.example
 status:      ACTIVE
 eppstatus:   serverUpdateProhibited
-eppstatus:   serverTransferProhibited
+eppstatus:   clientTransferProhibited
 holder-c:    FAKE1-FRNIC
 admin-c:     FAKE2-FRNIC
 tech-c:      FAKE3-FRNIC
@@ -487,8 +476,8 @@ created:     2001-02-01T23:00:00Z
 +last-update: 2025-03-30T12:17:54.513642Z
 source:      FRNIC
 
-nserver:     ns1.fake.fr
-nserver:     ns2.fake.fr
+nserver:     ns1.fr.test.example
+nserver:     ns2.fr.test.example
 source:      FRNIC
 
 nic-hdl:     FAKE1-FRNIC
@@ -498,28 +487,27 @@ address:     123 Fake Street
 address:     75000 Paris
 country:     FR
 phone:       +33.123456789
-e-mail:      holder@fake.fr`
+e-mail:      holder@fr.test.example`
 
 	got := parseWHOIS(rawWHOIS)
 
 	assertEq(t, "CreationDate", got.CreationDate, "2001-02-01T23:00:00Z")
 	assertEq(t, "ExpirationDate", got.ExpirationDate, "2026-10-14T15:12:55Z")
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "2025-03-30T12:17:54.513642Z")
-	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"ACTIVE", "serverUpdateProhibited", "serverTransferProhibited"})
+	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"ACTIVE", "serverUpdateProhibited", "clientTransferProhibited"})
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"FAKE REGISTRAR"})
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.fr", "ns2.fake.fr"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fr.test.example", "ns2.fr.test.example"})
 }
 
-// TestParseWHOIS_BR validates Brazilian .br WHOIS format.
 func TestParseWHOIS_BR(t *testing.T) {
-	rawWHOIS := `domain:      fake.com.br
+	rawWHOIS := `domain:      br.test.example
 owner:       Fake S.A.
 ownerid:     12.345.678/0001-99
 responsible: Contato da Entidade
 country:     BR
 owner-c:     FAK12
 tech-c:      TEC34
-nserver:     ns1.fake.com.br
+nserver:     ns1.br.test.example
 created:     19960424 #7137
 changed:     20240827
 expires:     20340424
@@ -527,11 +515,11 @@ status:      published
 
 nic-hdl-br:  FAK12
 person:      Admin Contact
-e-mail:      admin@fake.com.br
+e-mail:      admin@br.test.example
 
 nic-hdl-br:  TEC34
 person:      Tech Contact
-e-mail:      tech@fake.com.br`
+e-mail:      tech@br.test.example`
 
 	got := parseWHOIS(rawWHOIS)
 
@@ -539,17 +527,16 @@ e-mail:      tech@fake.com.br`
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "20240827")
 	assertEq(t, "ExpirationDate", got.ExpirationDate, "20340424")
 	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"published"})
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.com.br"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.br.test.example"})
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake S.A.", "12.345.678/0001-99"})
 	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"Admin Contact"})
-	assertSlice(t, "Admin.Email", got.Admin.Email, []string{"admin@fake.com.br"})
+	assertSlice(t, "Admin.Email", got.Admin.Email, []string{"admin@br.test.example"})
 	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"Tech Contact"})
-	assertSlice(t, "Tech.Email", got.Tech.Email, []string{"tech@fake.com.br"})
+	assertSlice(t, "Tech.Email", got.Tech.Email, []string{"tech@br.test.example"})
 }
 
-// TestParseWHOIS_NL validates Dutch .nl WHOIS format (SIDN).
 func TestParseWHOIS_NL(t *testing.T) {
-	rawWHOIS := `Domain name: fake.nl
+	rawWHOIS := `Domain name: nl.test.example
 Status:      active
 
 Registrar:
@@ -559,13 +546,13 @@ Registrar:
    Netherlands
 
 Abuse Contact:
-   abuse@fake.nl
+   abuse@nl.test.example
 
 DNSSEC:      yes
 
 Domain nameservers:
-   ns1.fake.nl
-   ns2.fake.nl
+   ns1.nl.test.example
+   ns2.nl.test.example
 
 Creation Date: 1996-07-22
 
@@ -581,16 +568,15 @@ Record maintained by: SIDN BV`
 	assertEq(t, "DNSSEC", got.DNSSEC, "yes")
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"Fake B.V."})
 	assertSlice(t, "Registrar.Address", got.Registrar.Address, []string{"Fake Street 123", "1234AB Faketown", "Netherlands"})
-	assertSlice(t, "Abuse.Email", got.Abuse.Email, []string{"abuse@fake.nl"})
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.nl", "ns2.fake.nl"})
+	assertSlice(t, "Abuse.Email", got.Abuse.Email, []string{"abuse@nl.test.example"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.nl.test.example", "ns2.nl.test.example"})
 }
 
-// TestParseWHOIS_PL validates Polish .pl WHOIS format (NASK).
 func TestParseWHOIS_PL(t *testing.T) {
-	rawWHOIS := `DOMAIN NAME:           fake.pl
+	rawWHOIS := `DOMAIN NAME:           pl.test.example
 registrant type:       organization
-nameservers:           ns1.fake.pl. [192.0.2.1]
-                       ns2.fake.pl. [198.51.100.1]
+nameservers:           ns1.pl.test.example. [192.0.2.1]
+                       ns2.pl.test.example. [198.51.100.1]
 created:               1998.04.28 13:00:00
 last modified:         2026.02.18 14:22:40
 renewal date:          2027.04.27 14:00:00
@@ -606,28 +592,27 @@ ul. Fake 4
 70-653 Faketown
 Polska/Poland
 Tel: +48.123456789
-https://fake.pl/
-domena@fake.pl`
+https://pl.test.example/
+domena@pl.test.example`
 
 	got := parseWHOIS(rawWHOIS)
 
 	assertEq(t, "CreationDate", got.CreationDate, "1998.04.28 13:00:00")
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "2026.02.18 14:22:40")
-	assertEq(t, "ExpirationDate", got.ExpirationDate, "2027.04.27 14:00:00") // Should NOT be 2029.02.10
+	assertEq(t, "ExpirationDate", got.ExpirationDate, "2027.04.27 14:00:00")
 	assertEq(t, "DNSSEC", got.DNSSEC, "Unsigned")
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.pl", "ns2.fake.pl"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.pl.test.example", "ns2.pl.test.example"})
 
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"Fake Registrar Sp. z o.o."})
 	assertSlice(t, "Registrar.Address", got.Registrar.Address, []string{"ul. Fake 4", "70-653 Faketown", "Polska/Poland"})
 	assertSlice(t, "Registrar.Phone", got.Registrar.Phone, []string{"+48.123456789"})
-	assertEq(t, "RegistrarURL", got.RegistrarURL, "https://fake.pl/")
-	assertSlice(t, "Registrar.Email", got.Registrar.Email, []string{"domena@fake.pl"})
+	assertEq(t, "RegistrarURL", got.RegistrarURL, "https://pl.test.example/")
+	assertSlice(t, "Registrar.Email", got.Registrar.Email, []string{"domena@pl.test.example"})
 }
 
-// TestParseWHOIS_CZ validates Czech .cz WHOIS format (CZ.NIC).
 func TestParseWHOIS_CZ(t *testing.T) {
 	rawWHOIS := `
-domain:       fake.cz
+domain:       cz.test.example
 registrant:   REG-ID-123
 admin-c:      ADM-ID-456
 nsset:        NS-SET-789
@@ -644,7 +629,7 @@ address:      Street 1
 address:      City A
 address:      12345
 address:      CZ
-e-mail:       owner@fake.cz
+e-mail:       owner@cz.test.example
 
 contact:      ADM-ID-456
 org:          Fake Admin Organization
@@ -653,11 +638,11 @@ address:      Street 2
 address:      City B
 address:      67890
 address:      CZ
-e-mail:       admin@fake.cz
+e-mail:       admin@cz.test.example
 
 nsset:        NS-SET-789
-nserver:      ns1.fake.cz (1.2.3.4, 2a02:598::1)
-nserver:      ns2.fake.cz (5.6.7.8, 2a02:598::2)
+nserver:      ns1.cz.test.example (1.2.3.4, 2a02:598::1)
+nserver:      ns2.cz.test.example (5.6.7.8, 2a02:598::2)
 `
 
 	got := parseWHOIS(rawWHOIS)
@@ -667,24 +652,20 @@ nserver:      ns2.fake.cz (5.6.7.8, 2a02:598::2)
 	assertEq(t, "ExpirationDate", got.ExpirationDate, "29.10.2026")
 	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"Sponsoring registrar change forbidden"})
 
-	// Handle descriptors (e.g., REG-ID-123) are relational IDs used for cross-referencing and must be excluded from Organization fields.
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake Registrant Organization"})
 	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Jane Doe"})
-	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"owner@fake.cz"})
+	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"owner@cz.test.example"})
 
-	// The 'admin-c' field in the domain header maps the specific 'contact:' block that should be assigned to the Administrative role.
 	assertSlice(t, "Admin.Organization", got.Admin.Organization, []string{"Fake Admin Organization"})
 	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"John Smith"})
-	assertSlice(t, "Admin.Email", got.Admin.Email, []string{"admin@fake.cz"})
+	assertSlice(t, "Admin.Email", got.Admin.Email, []string{"admin@cz.test.example"})
 
-	// Nameservers in the CZ.NIC registry often append glue records or IP addresses in parentheses which require stripping.
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.cz", "ns2.fake.cz"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.cz.test.example", "ns2.cz.test.example"})
 }
 
-// TestParseWHOIS_AR validates Argentinian .ar WHOIS format (NIC Argentina).
 func TestParseWHOIS_AR(t *testing.T) {
 	rawWHOIS := `
-domain:      fake.com.ar
+domain:      ar.test.example
 registrant:  50037928906
 registrar:   nicar
 registered:  1999-06-08 00:00:00
@@ -697,8 +678,8 @@ registrar:   nicar
 created:     2013-10-29 00:00:00
 changed:     2026-03-26 14:55:08.507049
 
-nserver:     ns1.fake.com.ar ()
-nserver:     ns2.fake.com.ar ()
+nserver:     ns1.ar.test.example ()
+nserver:     ns2.ar.test.example ()
 `
 
 	got := parseWHOIS(rawWHOIS)
@@ -707,19 +688,15 @@ nserver:     ns2.fake.com.ar ()
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "2025-06-09 15:37:19.837308")
 	assertEq(t, "ExpirationDate", got.ExpirationDate, "2026-07-08 00:00:00")
 
-	// The numeric handle (CUIT/Tax ID) appearing in 'registrant' and 'contact' fields is a relational ID and must be excluded from Organization names to ensure data cleanliness.
-	// In NIC.ar WHOIS, corporate entities are often listed under the 'name' field without an accompanying 'org' field; these should be mapped to Organization.
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"FAKE CORPORATE INC."})
 	assertSlice(t, "Registrant.Name", got.Registrant.Name, nil)
 
-	// The Argentinian registry frequently appends empty parentheses '()' to name server hostnames, which must be stripped during parsing.
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.com.ar", "ns2.fake.com.ar"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.ar.test.example", "ns2.ar.test.example"})
 }
 
-// TestParseWHOIS_UA_Noise validates that Ukrainian .ua WHOIS decorative comments and 'n/a' placeholders are not captured as data.
 func TestParseWHOIS_UA_Noise(t *testing.T) {
 	rawWHOIS := `
-domain:           fake.com.ua
+domain:           ua.test.example
 mnt-by:           ua.fake
 status:           ok
 
@@ -739,60 +716,49 @@ address-loc:      1600 Amphitheatre Parkway
 
 	got := parseWHOIS(rawWHOIS)
 
-	// Lines beginning with '%' are comments or structural delimiters in registries like Hostmaster.ua and must be excluded from metadata to prevent field corruption.
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"ua.fake"})
-
-	// Placeholder values such as 'n/a' represent missing information and should be ignored during parsing to ensure only valid, actionable data is stored.
 	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Domain Administrator"})
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Mock Privacy Shield LLC"})
 	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"1600 Amphitheatre Parkway"})
 }
 
-// TestParseWHOIS_XYZ_Noise validates that informational RDAP links located in the footer/disclaimer
-// sections are not erroneously captured as the Registrar URL when the official field is empty.
 func TestParseWHOIS_XYZ_Noise(t *testing.T) {
-	rawWHOIS := `Domain Name: FAKE.XYZ
+	rawWHOIS := `Domain Name: TEST.EXAMPLE
 Registrar: Fake Registrar, Inc.
 Registrar IANA ID: 999
 Registrar URL:
 Updated Date: 2025-11-11T12:00:30.0Z
-Name Server: NS1.FAKE.XYZ
+Name Server: NS1.TEST.EXAMPLE
 
 >>> IMPORTANT INFORMATION ABOUT THE DEPLOYMENT OF RDAP: please visit
-https://www.fake.registry/rdap <<<
+https://www.example.com/rdap <<<
 
 The Whois and RDAP services are provided by Fake Registry.`
 
 	got := parseWHOIS(rawWHOIS)
 
-	// The 'Registrar URL' field in the domain header is explicitly empty.
-	// The parser must not scavenge unrelated URLs from the footer or promotional text,
-	// especially those containing trailing noise characters like '<<<'.
 	assertEq(t, "RegistrarURL", got.RegistrarURL, "")
-
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"Fake Registrar, Inc."})
 	assertEq(t, "IANAID", got.IANAID, "999")
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "2025-11-11T12:00:30.0Z")
 }
 
-// TestParseWHOIS_ICANN_Footer validates that ICANN-format footer and disclaimer
-// text does not leak into structured metadata fields.
 func TestParseWHOIS_ICANN_Footer(t *testing.T) {
-	rawWHOIS := `   Domain Name: FAKE.COM
+	rawWHOIS := `   Domain Name: TEST.EXAMPLE
    Registry Domain ID: 12345_DOMAIN_COM-VRSN
-   Registrar WHOIS Server: whois.fakeregistrar.com
-   Registrar URL: http://www.fakeregistrar.com
+   Registrar WHOIS Server: whois.fakeregistrar.example.com
+   Registrar URL: http://www.fakeregistrar.example.com
    Updated Date: 2019-09-09T15:39:04Z
    Creation Date: 1997-09-15T04:00:00Z
    Registry Expiry Date: 2028-09-14T04:00:00Z
    Registrar: FakeRegistrar Inc.
    Registrar IANA ID: 292
-   Registrar Abuse Contact Email: abuse@fakeregistrar.com
+   Registrar Abuse Contact Email: abuse@fakeregistrar.example.com
    Registrar Abuse Contact Phone: +1.2085551234
    Domain Status: clientDeleteProhibited https://icann.org/epp#clientDeleteProhibited
    Domain Status: serverUpdateProhibited https://icann.org/epp#serverUpdateProhibited
-   Name Server: NS1.FAKE.COM
-   Name Server: NS2.FAKE.COM
+   Name Server: NS1.TEST.EXAMPLE
+   Name Server: NS2.TEST.EXAMPLE
    DNSSEC: unsigned
    URL of the ICANN Whois Inaccuracy Complaint Form: https://www.icann.org/wicf/
 >>> Last update of whois database: 2026-04-07T13:32:18Z <<<
@@ -817,87 +783,78 @@ Registrars.`
 	assertEq(t, "CreationDate", got.CreationDate, "1997-09-15T04:00:00Z")
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "2019-09-09T15:39:04Z")
 	assertEq(t, "ExpirationDate", got.ExpirationDate, "2028-09-14T04:00:00Z")
-	assertEq(t, "WhoisServer", got.WhoisServer, "whois.fakeregistrar.com")
-	assertEq(t, "RegistrarURL", got.RegistrarURL, "http://www.fakeregistrar.com")
+	assertEq(t, "WhoisServer", got.WhoisServer, "whois.fakeregistrar.example.com")
+	assertEq(t, "RegistrarURL", got.RegistrarURL, "http://www.fakeregistrar.example.com")
 	assertEq(t, "IANAID", got.IANAID, "292")
 	assertEq(t, "DNSSEC", got.DNSSEC, "unsigned")
 
-	// Registrar.Name must contain ONLY the actual registrar name, not disclaimer text.
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"FakeRegistrar Inc."})
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.com", "ns2.fake.com"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.test.example", "ns2.test.example"})
 	assertSlice(t, "DomainStatus", got.DomainStatus, []string{
 		"clientDeleteProhibited https://icann.org/epp#clientDeleteProhibited",
 		"serverUpdateProhibited https://icann.org/epp#serverUpdateProhibited",
 	})
 
-	// Footer/disclaimer text must NEVER leak into contact fields.
 	assertSlice(t, "Registrar.Organization", got.Registrar.Organization, nil)
 	assertSlice(t, "Registrar.Address", got.Registrar.Address, nil)
 	assertSlice(t, "Registrant.Name", got.Registrant.Name, nil)
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, nil)
-	assertSlice(t, "Abuse.Email", got.Abuse.Email, []string{"abuse@fakeregistrar.com"})
+	assertSlice(t, "Abuse.Email", got.Abuse.Email, []string{"abuse@fakeregistrar.example.com"})
 	assertSlice(t, "Abuse.Phone", got.Abuse.Phone, []string{"+1.2085551234"})
 }
 
-// TestParseWHOIS_TW validates Taiwanese .tw WHOIS format (TWNIC).
 func TestParseWHOIS_TW(t *testing.T) {
 	rawWHOIS := `
-Domain Name: fake.com.tw
+Domain Name: tw.test.example
    Domain Status: clientTransferProhibited
    Registrant:
       Fake Taiwan Corp.
       Fake Global Inc.
-      admin@fake.com.tw
+      admin@tw.test.example
       TW
 
    Record expires on 2035-05-31 00:00:00 (UTC+8)
    Record created on 1985-07-04 00:00:00 (UTC+8)
 
    Domain servers in listed order:
-      ns1.fake.com.tw      1.2.3.4
-      ns2.fake.com.tw      5.6.7.8
+      ns1.tw.test.example      1.2.3.4
+      ns2.tw.test.example      5.6.7.8
 
 Registration Service Provider: FAKEPROVIDER
-Registration Service URL: http://registrar.fake.tw
-Registrar Abuse Contact Email: abuse@fake.tw
+Registration Service URL: http://registrar.tw2.test.example
+Registrar Abuse Contact Email: abuse@tw2.test.example
 `
 
 	got := parseWHOIS(rawWHOIS)
 
-	// TWNIC uses a distinct date prefix "Record created/expires on" followed by a timestamp and timezone, which requires specific pattern matching.
 	assertEq(t, "CreationDate", got.CreationDate, "1985-07-04 00:00:00 (UTC+8)")
 	assertEq(t, "ExpirationDate", got.ExpirationDate, "2035-05-31 00:00:00 (UTC+8)")
 
-	// Nameservers are grouped under a "Domain servers in listed order" header and often include associated IP addresses (glue records) that must be filtered out.
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.com.tw", "ns2.fake.com.tw"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.tw.test.example", "ns2.tw.test.example"})
 
-	// "Registration Service Provider" is the standard field name for the Registrar in the .tw registry.
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"FAKEPROVIDER"})
 
-	assertEq(t, "RegistrarURL", got.RegistrarURL, "http://registrar.fake.tw")
-	assertSlice(t, "Abuse.Email", got.Abuse.Email, []string{"abuse@fake.tw"})
+	assertEq(t, "RegistrarURL", got.RegistrarURL, "http://registrar.tw2.test.example")
+	assertSlice(t, "Abuse.Email", got.Abuse.Email, []string{"abuse@tw2.test.example"})
 
-	// The Registrant block uses positional indentation to provide the Name, Organization, Email, and Location, necessitating sequential classification.
 	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Fake Taiwan Corp."})
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake Global Inc."})
-	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"admin@fake.com.tw"})
+	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"admin@tw.test.example"})
 	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"TW"})
 }
 
-// TestParseWHOIS_WhoisServerHTTP_Noise validates that 'http://' or 'https://' prefixes are stripped
-// from the WhoisServer field so it remains a valid hostname rather than a URL.
 func TestParseWHOIS_WhoisServerHTTP_Noise(t *testing.T) {
 	rawWHOIS := `
 Domain Name: fake.org
 Registry Domain ID: REDACTED
-Registrar WHOIS Server: http://whois.fakeregistrar.com
-Registrar URL: http://www.fakeregistrar.com
+Registrar WHOIS Server: http://whois.fakeregistrar.example.com
+Registrar URL: http://www.fakeregistrar.example.com
 Updated Date: 2025-12-17T09:26:13Z
 Creation Date: 2001-01-13T00:12:14Z
 Registry Expiry Date: 2027-01-13T00:12:14Z
 Registrar: FakeRegistrar Inc.
 Registrar IANA ID: 292
-Registrar Abuse Contact Email: abuse@fakeregistrar.com
+Registrar Abuse Contact Email: abuse@fakeregistrar.example.com
 Registrar Abuse Contact Phone: +1.2083895740
 Domain Status: clientDeleteProhibited https://icann.org/epp#clientDeleteProhibited
 Name Server: ns0.fake.org
@@ -909,15 +866,13 @@ For more information on Whois status codes, please visit https://icann.org/epp
 `
 	got := parseWHOIS(rawWHOIS)
 
-	assertEq(t, "RegistrarURL", got.RegistrarURL, "http://www.fakeregistrar.com")
+	assertEq(t, "RegistrarURL", got.RegistrarURL, "http://www.fakeregistrar.example.com")
 
-	// Ensure the "http://" prefix is stripped from WhoisServer!
-	assertEq(t, "WhoisServer", got.WhoisServer, "whois.fakeregistrar.com")
+	assertEq(t, "WhoisServer", got.WhoisServer, "whois.fakeregistrar.example.com")
 }
 
-// TestParseWHOIS_FI validates Finnish .fi WHOIS format (Traficom).
 func TestParseWHOIS_FI(t *testing.T) {
-	rawWHOIS := `domain.............: fake.fi
+	rawWHOIS := `domain.............: fi.test.example
 status.............: Registered
 created............: 1.1.1991 00:00:00
 expires............: 31.8.2030 00:00:00
@@ -927,9 +882,9 @@ RegistryLock.......: locked
 
 Nameservers
 
-nserver............: ns1.fake.fi [192.0.2.1] [OK]
-nserver............: ns2.fake.fi [OK]
-nserver............: ns-secondary.fake.fi [192.0.2.2] [2001:db8::53] [OK]
+nserver............: ns1.fi.test.example [192.0.2.1] [OK]
+nserver............: ns2.fi.test.example [OK]
+nserver............: ns-secondary.fi.test.example [192.0.2.2] [2001:db8::53] [OK]
 
 DNSSEC
 
@@ -944,7 +899,7 @@ postal.............: 00100
 city...............: Fake City
 country............: Finland
 phone..............: +358.123456789
-holder email.......: admin@fake.fi
+holder email.......: admin@fi.test.example
 
 Registrar
 
@@ -952,27 +907,22 @@ registrar..........: Fake Registrar`
 
 	got := parseWHOIS(rawWHOIS)
 
-	// The .fi registry uses a unique 'key.............: value' format heavily padded with dots.
 	assertEq(t, "CreationDate", got.CreationDate, "1.1.1991 00:00:00")
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "17.3.2022 13:30:38")
 	assertEq(t, "ExpirationDate", got.ExpirationDate, "31.8.2030 00:00:00")
 	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"Registered"})
 
-	// Nameservers in .fi WHOIS append IP addresses (IPv4 and IPv6) and health status tags within brackets (e.g., [OK]) which must be stripped.
-	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fake.fi", "ns2.fake.fi", "ns-secondary.fake.fi"})
+	assertSlice(t, "NameServers", got.NameServers, []string{"ns1.fi.test.example", "ns2.fi.test.example", "ns-secondary.fi.test.example"})
 	assertEq(t, "DNSSEC", got.DNSSEC, "no")
 
-	// The section header 'Holder' maps to the Registrant role in standard ICANN taxonomy.
-	// Specific keys like 'holder email', 'postal', and 'city' must be mapped correctly despite non-standard naming.
 	assertSlice(t, "Registrant.Name", got.Registrant.Name, []string{"Fake Registrant"})
 	assertSlice(t, "Registrant.Address", got.Registrant.Address, []string{"Fake Street 1", "00100", "Fake City", "Finland"})
 	assertSlice(t, "Registrant.Phone", got.Registrant.Phone, []string{"+358.123456789"})
-	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"admin@fake.fi"})
+	assertSlice(t, "Registrant.Email", got.Registrant.Email, []string{"admin@fi.test.example"})
 
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"Fake Registrar"})
 }
 
-// TestParseWHOIS_NO validates Norwegian .no WHOIS format (Norid).
 func TestParseWHOIS_NO(t *testing.T) {
 	rawWHOIS := `
 Domain Information
@@ -996,11 +946,66 @@ Last updated:    2025-10-18
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "2025-10-18")
 	assertEq(t, "DNSSEC", got.DNSSEC, "Signed")
 
-	// Norid WHOIS restricts plaintext PII and hostnames, providing only relational handles. These handles must be mapped to standard fields to retain registry linkage.
 	assertSlice(t, "Registrar.Name", got.Registrar.Name, []string{"REG99-NORID"})
 
-	// The 'Tech-c Handle' field represents the technical contact entity. Relational handles must be captured and mapped to the Technical Contact Name/ID.
 	assertSlice(t, "Tech.Name", got.Tech.Name, []string{"NH1234R-NORID"})
-	// Actual nameserver hostnames are obfuscated behind handles in the .no registry; extract the handles to indicate DNS delegation exists.
+
 	assertSlice(t, "NameServers", got.NameServers, []string{"A1111H-NORID", "A2222H-NORID"})
+}
+
+func TestParseWHOIS_EdgeCases(t *testing.T) {
+	rawWHOIS := `
+contact: billing
+Billing Name: Bob Billing
+address: 123 Billing St
+                Apt 4B
+  US
+
+abuse:
+abuse-email: abuse@edge.example.com
+name: Abuse Guy
+address: 123 Abuse St
+                Apt 5B
+
+Registrar:
+address: 123 Reg St
+                Apt Reg
+
+unknown contact:
+                Apt X
+
+Registrant:
+address: 123 Reg St
+                Apt 1
+Administrative Contact:
+address: 123 Admin St
+                Apt 2
+Technical Contact:
+address: 123 Tech St
+                Apt 3
+
+Registrant Street: 123 Reg St
+                Apt 1
+Admin Street: 123 Admin St
+                Apt 2
+Tech Street: 123 Tech St
+                Apt 3
+Billing Street: 123 Billing St
+                Apt 4
+
+Registrant Fax: +1.234
+`
+	got := parseWHOIS(rawWHOIS)
+
+	assertSlice(t, "Billing.Name", got.Billing.Name, []string{"Bob Billing"})
+	assertSlice(t, "Abuse.Email", got.Abuse.Email, []string{"abuse@edge.example.com"})
+	assertSlice(t, "Registrant.Fax", got.Registrant.Fax, []string{"+1.234"})
+
+	applyContactMatch(&got.Registrant, "unknown_field", "unknown_", "value")
+	applyDomainMatch(&got, whoisFieldCNRegistrant, "CN Org")
+	applyDomainMatch(&got, whoisFieldCNRegistrantEmail, "cn@cn.example.com")
+	classifyIndentedLine(&got, whoisRoleNameServers, "ns1.deadcode.example.com", 0)
+	classifyIndentedLine(&got, "unknown_role", "Data", 0)
+	applyTWMatch(&got, "tw_url", "http://edge.test.example")
+	applyKRMatch(&got, whoisFieldKRRegZip, "12345")
 }

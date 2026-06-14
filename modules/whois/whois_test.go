@@ -10,9 +10,12 @@ import (
 )
 
 func TestBuildMetadataResults_WhoisServerUsesDomainTag(t *testing.T) {
-	m := &module{}
-	targetDomain := "example.net"
-	whoisServer := "WHOIS.EXAMPLE.COM"
+	targetDomain := "target.client.example.net"
+	m, ok := New().(*module)
+	if !ok {
+		t.Fatalf("New() did not return *module")
+	}
+	whoisServer := "WHOIS.BACKEND.EXAMPLE.COM"
 	anchor := &schema.EntityRef{Type: constants.TypeWhoisRegistrar, Value: "Registrar of " + targetDomain}
 
 	gen := modutil.NewLocalIDGenerator()
@@ -28,8 +31,8 @@ func TestBuildMetadataResults_WhoisServerUsesDomainTag(t *testing.T) {
 	if got.Category != constants.CategoryNode {
 		t.Fatalf("Category = %q, want %q", got.Category, constants.CategoryNode)
 	}
-	if got.Value != "whois.example.com" {
-		t.Fatalf("Value = %q, want %q", got.Value, "whois.example.com")
+	if got.Value != "whois.backend.example.com" {
+		t.Fatalf("Value = %q, want %q", got.Value, "whois.backend.example.com")
 	}
 	if !slices.Contains(got.Tags, constants.TagWhoisServer) {
 		t.Fatalf("Tags = %v, want to contain %q", got.Tags, constants.TagWhoisServer)

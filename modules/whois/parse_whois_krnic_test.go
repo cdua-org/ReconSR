@@ -4,8 +4,6 @@ import (
 	"testing"
 )
 
-// TestParseWHOIS_KRNIC validates Korean KRNIC format with Host Name
-// name servers and Administrative Contact(AC) fields.
 func TestParseWHOIS_KRNIC(t *testing.T) {
 	rawWHOIS := `
 # KOREAN(UTF8)
@@ -42,7 +40,7 @@ Domain Name                 : fakecompany.co.kr
 Registrant                  : Fake Company Ltd
 Registrant Address          : 99, Fake-ro, Gangnam-gu, Seoul
 Registrant Zip Code         : 06100
-Administrative Contact(AC)  : Fake Company Ltd
+Administrative Contact(AC)  : Admin Company Ltd
 AC E-Mail                   : domain@fakecompany.example
 AC Phone Number             : 02-1234-5678
 Registered Date             : 2000. 03. 15.
@@ -51,7 +49,7 @@ Expiration Date             : 2027. 03. 15.
 Publishes                   : Y
 Authorized Agency           : FakeAgent Corp.(http://fakeagent.example)
 DNSSEC                      : unsigned
-Domain Status               : clientTransferProhibited
+Domain Status               : clientDeleteProhibited
 Domain Status               : clientUpdateProhibited
 
 Primary Name Server
@@ -71,7 +69,7 @@ Secondary Name Server
 	assertSlice(t, "Registrant.Address", got.Registrant.Address,
 		[]string{"99, Fake-ro, Gangnam-gu, Seoul", "06100"})
 
-	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"Fake Company Ltd"})
+	assertSlice(t, "Admin.Name", got.Admin.Name, []string{"Admin Company Ltd"})
 	assertSlice(t, "Admin.Email", got.Admin.Email, []string{"domain@fakecompany.example"})
 	assertSlice(t, "Admin.Phone", got.Admin.Phone, []string{"02-1234-5678"})
 
@@ -81,7 +79,7 @@ Secondary Name Server
 	assertEq(t, "UpdatedDate", got.UpdatedDate, "2024. 06. 20.")
 	assertEq(t, "ExpirationDate", got.ExpirationDate, "2027. 03. 15.")
 	assertEq(t, "DNSSEC", got.DNSSEC, "unsigned")
-	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"clientTransferProhibited", "clientUpdateProhibited"})
+	assertSlice(t, "DomainStatus", got.DomainStatus, []string{"clientDeleteProhibited", "clientUpdateProhibited"})
 
 	assertSlice(t, "NameServers", got.NameServers,
 		[]string{"ns1.fakecompany.example", "ns2.fakecompany.example", "ns3.fakecompany.example"})
