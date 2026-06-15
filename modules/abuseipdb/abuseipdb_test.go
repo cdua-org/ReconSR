@@ -1,14 +1,17 @@
 package abuseipdb
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
@@ -192,8 +195,8 @@ func TestAbuseIPDB_Tor(t *testing.T) {
 func TestAbuseIPDB_RateLimit_Retryable(t *testing.T) {
 	setupTestEnv(t)
 	headers := map[string]string{
-		"Retry-After":           "1",
-		"X-RateLimit-Remaining": "500",
+		headerRetryAfter:         "1",
+		headerRateLimitRemaining: "500",
 	}
 	exec := runModuleTest(t, "192.0.2.4", "", http.StatusTooManyRequests, headers)
 
@@ -208,8 +211,8 @@ func TestAbuseIPDB_RateLimit_Retryable(t *testing.T) {
 func TestAbuseIPDB_RateLimit_DailyQuota(t *testing.T) {
 	setupTestEnv(t)
 	headers := map[string]string{
-		"Retry-After":           "29241",
-		"X-RateLimit-Remaining": "0",
+		headerRetryAfter:         "29241",
+		headerRateLimitRemaining: "0",
 	}
 	exec := runModuleTest(t, "192.0.2.5", "", http.StatusTooManyRequests, headers)
 
@@ -317,7 +320,7 @@ func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
 }
 
 func TestAbuseIPDB_DemoMode(t *testing.T) {
-	if err := os.Setenv("RECONSR_ABUSEIPDB", "demo-api-key"); err != nil {
+	if err := os.Setenv("RECONSR_ABUSEIPDB", demoIndicator); err != nil {
 		t.Fatalf("setenv: %v", err)
 	}
 	t.Cleanup(func() {
@@ -356,4 +359,381 @@ func TestAbuseIPDB_DemoMode(t *testing.T) {
 		t.Errorf("Missing subdomain node1.example.com with reverse_ip tag in demo mode")
 	}
 	requireUniqueLocalIDs(t, exec.Results)
+
+	out2, err2 := m.Exec(schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.2"},
+		Functions: []string{constants.FuncCheckAbuseIPDB},
+	})
+	if err2 != nil {
+		t.Fatalf("second m.Exec failed: %v", err2)
+	}
+	exec2 := out2.Executions[0]
+	if exec2.Error != nil {
+		t.Fatalf("Expected no error on second call, got: %s", *exec2.Error)
+	}
+	if len(exec2.Results) != 0 {
+		t.Fatalf("Expected 0 results on second call, got %d", len(exec2.Results))
+	}
+}
+
+func TestName(t *testing.T) {
+	m := New()
+	if name := m.Name(); name != "abuseipdb" {
+		t.Errorf("Expected name 'abuseipdb', got '%s'", name)
+	}
+}
+
+func TestCapabilities(t *testing.T) {
+	t.Run("with_api_key", func(t *testing.T) {
+		setupTestEnv(t)
+		m := New()
+		caps, err := m.Capabilities()
+		if err != nil {
+			t.Fatalf("Capabilities returned error: %v", err)
+		}
+		if caps.ModuleConfig == nil {
+			t.Fatal("Expected ModuleConfig to be present")
+		}
+		if len(caps.Functions) == 0 {
+			t.Fatal("Expected Functions to be present")
+		}
+	})
+
+	t.Run("without_api_key", func(t *testing.T) {
+		t.Cleanup(func() {
+			if err := os.Unsetenv("RECONSR_ABUSEIPDB"); err != nil {
+				t.Logf("unsetenv failed: %v", err)
+			}
+		})
+		if err := os.Unsetenv("RECONSR_ABUSEIPDB"); err != nil {
+			t.Fatalf("unsetenv failed: %v", err)
+		}
+		m := New()
+		caps, err := m.Capabilities()
+		if err != nil {
+			t.Fatalf("Capabilities returned error: %v", err)
+		}
+		if caps.ModuleConfig != nil {
+			t.Errorf("Expected nil ModuleConfig when no API key, got %+v", caps.ModuleConfig)
+		}
+	})
+}
+
+func TestExec_UnsupportedFunction(t *testing.T) {
+	setupTestEnv(t)
+	m := New()
+	out, err := m.Exec(schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.1"},
+		Functions: []string{"invalid_func"},
+	})
+	if err != nil {
+		t.Fatalf("m.Exec failed: %v", err)
+	}
+	if len(out.Executions) != 1 {
+		t.Fatalf("Expected 1 execution, got %d", len(out.Executions))
+	}
+	exec := out.Executions[0]
+	if exec.Error == nil {
+		t.Fatal("Expected error for unsupported function, got nil")
+	}
+	expectedErr := "unsupported function: invalid_func"
+	if *exec.Error != expectedErr {
+		t.Errorf("Expected error '%s', got '%s'", expectedErr, *exec.Error)
+	}
+}
+
+func TestAbuseIPDB_ProcessCheckCoverage(t *testing.T) {
+	setupTestEnv(t)
+
+	t.Run("maxAge_less_than_1", func(t *testing.T) {
+		origMax := resolver.AbuseIPDBmaxAgeInDays
+		resolver.AbuseIPDBmaxAgeInDays = 0
+		defer func() { resolver.AbuseIPDBmaxAgeInDays = origMax }()
+		exec := runModuleTest(t, "192.0.2.1", "ip.json", http.StatusOK, nil)
+		if exec.Error != nil {
+			t.Errorf("expected no error, got %v", *exec.Error)
+		}
+	})
+
+	t.Run("maxAge_greater_than_365", func(t *testing.T) {
+		origMax := resolver.AbuseIPDBmaxAgeInDays
+		resolver.AbuseIPDBmaxAgeInDays = 400
+		defer func() { resolver.AbuseIPDBmaxAgeInDays = origMax }()
+		exec := runModuleTest(t, "192.0.2.2", "ip.json", http.StatusOK, nil)
+		if exec.Error != nil {
+			t.Errorf("expected no error, got %v", *exec.Error)
+		}
+	})
+
+	t.Run("invalid_url", func(t *testing.T) {
+		origURL := defaultAPIURL
+		defaultAPIURL = "://invalid-url"
+		defer func() { defaultAPIURL = origURL }()
+
+		m := New()
+		out, err := m.Exec(schema.ModuleInput{
+			Target:    schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.3"},
+			Functions: []string{constants.FuncCheckAbuseIPDB},
+		})
+		if err != nil {
+			t.Fatalf("m.Exec failed: %v", err)
+		}
+		exec := out.Executions[0]
+		if exec.Error == nil {
+			t.Error("expected error for invalid URL")
+		}
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+			time.Sleep(10 * time.Millisecond)
+		}))
+		defer ts.Close()
+
+		origURL := defaultAPIURL
+		defaultAPIURL = ts.URL
+		defer func() { defaultAPIURL = origURL }()
+
+		origTimeout := resolver.HTTPTimeout
+		resolver.HTTPTimeout = 2 * time.Millisecond
+		defer func() { resolver.HTTPTimeout = origTimeout }()
+
+		m := New()
+		out, err := m.Exec(schema.ModuleInput{
+			Target:    schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.4"},
+			Functions: []string{constants.FuncCheckAbuseIPDB},
+		})
+		if err != nil {
+			t.Fatalf("m.Exec failed: %v", err)
+		}
+		exec := out.Executions[0]
+		if exec.Error == nil {
+			t.Error("expected error for timeout")
+		}
+	})
+
+	t.Run("network_error_retries", func(t *testing.T) {
+		origURL := defaultAPIURL
+		defaultAPIURL = "http://127.0.0.1:0"
+		defer func() { defaultAPIURL = origURL }()
+
+		m := New()
+		out, err := m.Exec(schema.ModuleInput{
+			Target:    schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.5"},
+			Functions: []string{constants.FuncCheckAbuseIPDB},
+		})
+		if err != nil {
+			t.Fatalf("m.Exec failed: %v", err)
+		}
+		exec := out.Executions[0]
+		if exec.Error == nil {
+			t.Error("expected error for network failure")
+		}
+	})
+
+	t.Run("unexpected_status_500", func(t *testing.T) {
+		exec := runModuleTest(t, "192.0.2.6", "", http.StatusInternalServerError, nil)
+		if exec.Error == nil {
+			t.Error("expected error for status 500")
+		} else if !strings.Contains(*exec.Error, "unexpected status 500") {
+			t.Errorf("expected unexpected status 500, got %v", *exec.Error)
+		}
+	})
+
+	t.Run("invalid_json", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			if _, wErr := w.Write([]byte("{invalid-json")); wErr != nil {
+				t.Logf("write error: %v", wErr)
+			}
+		}))
+		defer ts.Close()
+
+		origURL := defaultAPIURL
+		defaultAPIURL = ts.URL
+		defer func() { defaultAPIURL = origURL }()
+
+		m := New()
+		out, err := m.Exec(schema.ModuleInput{
+			Target:    schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.7"},
+			Functions: []string{constants.FuncCheckAbuseIPDB},
+		})
+		if err != nil {
+			t.Fatalf("m.Exec failed: %v", err)
+		}
+		exec := out.Executions[0]
+		if exec.Error == nil {
+			t.Error("expected error for invalid json")
+		} else if !strings.Contains(*exec.Error, "parse json") {
+			t.Errorf("expected parse json error, got %v", *exec.Error)
+		}
+	})
+}
+
+func TestDoRequest_Coverage(t *testing.T) {
+	setupTestEnv(t)
+
+	t.Run("create_request_error", func(t *testing.T) {
+		ctx := context.Background()
+		invalidURL := string([]byte{0x7f})
+		_, _, _, err := doRequest(ctx, invalidURL, "test_key")
+		if err == nil {
+			t.Error("expected error for invalid URL in doRequest")
+		} else if !strings.Contains(err.Error(), "create request") {
+			t.Errorf("expected create request error, got: %v", err)
+		}
+	})
+
+	t.Run("read_body_error", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Length", "100")
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer ts.Close()
+
+		ctx := context.Background()
+		_, _, _, err := doRequest(ctx, ts.URL, "test_key")
+		if err == nil {
+			t.Error("expected error for read body")
+		} else if !strings.Contains(err.Error(), "read body") {
+			t.Errorf("expected read body error, got: %v", err)
+		}
+	})
+}
+
+func TestIsDailyQuotaExceeded_Coverage(t *testing.T) {
+	tests := []struct {
+		headers  map[string]string
+		name     string
+		expected bool
+	}{
+		{
+			name:     "remaining_zero",
+			headers:  map[string]string{headerRateLimitRemaining: "0"},
+			expected: true,
+		},
+		{
+			name:     "retry_after_gt_60",
+			headers:  map[string]string{headerRetryAfter: "61"},
+			expected: true,
+		},
+		{
+			name:     "retry_after_eq_60",
+			headers:  map[string]string{headerRetryAfter: "60"},
+			expected: false,
+		},
+		{
+			name:     "invalid_retry_after",
+			headers:  map[string]string{headerRetryAfter: "abc"},
+			expected: false,
+		},
+		{
+			name:     "empty_headers",
+			headers:  map[string]string{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := http.Header{}
+			for k, v := range tt.headers {
+				h.Set(k, v)
+			}
+			if got := isDailyQuotaExceeded(h); got != tt.expected {
+				t.Errorf("expected %v, got %v", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestPopulateMoreResults_Coverage(t *testing.T) {
+	exec := &schema.ModuleExecution{}
+	gen := modutil.NewLocalIDGenerator()
+
+	resp := &abuseIPDBResponse{}
+	resp.Data.Hostnames = []string{
+		"",
+		"valid.example.com",
+		"invalid host name",
+	}
+
+	populateMoreResults(exec, resp, gen)
+
+	foundInvalidHost := false
+	for _, res := range exec.Results {
+		if res.Type == constants.TypeHostname && res.Value == "invalid host name" {
+			foundInvalidHost = true
+			break
+		}
+	}
+
+	if !foundInvalidHost {
+		t.Errorf("expected to find invalid hostname added as constants.TypeHostname")
+	}
+}
+
+func TestParseReports_Coverage(t *testing.T) {
+	exec := &schema.ModuleExecution{}
+	gen := modutil.NewLocalIDGenerator()
+
+	resp := &abuseIPDBResponse{}
+	resp.Data.TotalReports = 1
+	resp.Data.Reports = []struct {
+		ReportedAt string `json:"reportedAt"`
+		Comment    string `json:"comment"`
+		Categories []int  `json:"categories"`
+	}{
+		{
+			ReportedAt: "2024-01-01T00:00:00Z",
+			Comment:    "Test report",
+			Categories: []int{999},
+		},
+	}
+
+	parseReports(exec, resp, gen)
+
+	foundUnknownCategory := false
+	for _, res := range exec.Results {
+		if res.Type == constants.TypeAbuseReport && strings.Contains(res.Value, "Unknown Category 999") {
+			foundUnknownCategory = true
+			break
+		}
+	}
+
+	if !foundUnknownCategory {
+		t.Errorf("expected to find abuse report result with 'Unknown Category 999'")
+	}
+}
+
+func TestAbuseIPDB_DemoMode_Error(t *testing.T) {
+	if err := os.Setenv("RECONSR_ABUSEIPDB", demoIndicator); err != nil {
+		t.Fatalf("setenv: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Unsetenv("RECONSR_ABUSEIPDB"); err != nil {
+			t.Logf("unsetenv failed: %v", err)
+		}
+	})
+
+	oldDemoData := demoData
+	demoData = []byte(`{invalid json`)
+	defer func() { demoData = oldDemoData }()
+
+	m := New()
+	out, err := m.Exec(schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.10"},
+		Functions: []string{constants.FuncCheckAbuseIPDB},
+	})
+	if err != nil {
+		t.Fatalf("Exec failed: %v", err)
+	}
+
+	exec := out.Executions[0]
+	if exec.Error == nil {
+		t.Fatal("expected error for invalid demo JSON")
+	}
+	if !strings.Contains(*exec.Error, "unmarshal fixture err") {
+		t.Errorf("expected unmarshal error, got: %v", *exec.Error)
+	}
 }

@@ -52,6 +52,12 @@ var categoriesMap = map[int]string{
 var defaultAPIURL = "https://api.abuseipdb.com/api/v2/check"
 var dbg = debuglog.New("abuseipdb")
 
+const (
+	headerRetryAfter         = "Retry-After"
+	headerRateLimitRemaining = "X-RateLimit-Remaining"
+	demoIndicator            = "demo-api-key"
+)
+
 type module struct {
 	apiKey    string
 	demoFired atomic.Bool
@@ -110,7 +116,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		gen := modutil.NewLocalIDGenerator()
 
 		if f == constants.FuncCheckAbuseIPDB {
-			if m.apiKey == "demo-api-key" {
+			if m.apiKey == demoIndicator {
 				m.processCheckDemo(&exec, data.Target.Type, data.Target.Value, gen)
 			} else {
 				processCheck(&exec, data.Target.Type, data.Target.Value, m.apiKey, gen)
@@ -172,8 +178,8 @@ func processCheck(exec *schema.ModuleExecution, targetType, targetValue, apiKey 
 
 		if action == httputil.RateLimit {
 			if isDailyQuotaExceeded(headers) {
-				lastErr = fmt.Errorf("daily API quota exceeded (HTTP 429), Retry-After: %s", headers.Get("Retry-After"))
-				dbg.Printf("%s error target=%q stage=rate_limit attempt=%d retry_after=%q quota=daily_exhausted", constants.FuncCheckAbuseIPDB, targetValue, attempt, headers.Get("Retry-After"))
+				lastErr = fmt.Errorf("daily API quota exceeded (HTTP 429), Retry-After: %s", headers.Get(headerRetryAfter))
+				dbg.Printf("%s error target=%q stage=rate_limit attempt=%d retry_after=%q quota=daily_exhausted", constants.FuncCheckAbuseIPDB, targetValue, attempt, headers.Get(headerRetryAfter))
 				break
 			}
 
@@ -236,10 +242,10 @@ func doRequest(ctx context.Context, urlStr, apiKey string) (body []byte, statusC
 }
 
 func isDailyQuotaExceeded(header http.Header) bool {
-	if header.Get("X-RateLimit-Remaining") == "0" {
+	if header.Get(headerRateLimitRemaining) == "0" {
 		return true
 	}
-	retryAfterSec, err := strconv.Atoi(header.Get("Retry-After"))
+	retryAfterSec, err := strconv.Atoi(header.Get(headerRetryAfter))
 	if err == nil && retryAfterSec > 60 {
 		return true
 	}
