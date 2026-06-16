@@ -2460,7 +2460,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 		if id, exists := idMap[dbID]; exists {
 			return id
 		}
-		newID := "n" + strconv.Itoa(nodeCounter)
+		newID := strconv.Itoa(nodeCounter)
 		nodeCounter++
 		idMap[dbID] = newID
 		return newID

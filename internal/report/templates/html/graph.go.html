@@ -1190,7 +1190,6 @@
                                         }[m];
                                     });
                                 }
-
                                 function toggleRawData(id) {
                                     const el = document.getElementById(id);
                                     if (el) {
@@ -2081,7 +2080,7 @@
                                     });
                                     if (actualEdgeUpdates.length > 0) edges.update(actualEdgeUpdates);
 
-                                    const oldV = edges.getIds({ filter: item => item.id.startsWith('v_') });
+                                    const oldV = edges.getIds({ filter: item => item.isVirtual });
                                     edges.remove(oldV);
                                     if (virtualEdges.size > 0) {
                                         edges.add(Array.from(virtualEdges.values()));
@@ -2104,6 +2103,8 @@
                                 }, 700);
 
                                 let currentModalId = null;
+                                let currentModalType = null;
+
                                 let currentlySelectedNodeId = null;
                                 let currentlyExpandedEdges = [];
 
@@ -2155,6 +2156,7 @@
                                             easingFunction: "easeInOutQuad"
                                         }
                                     });
+
 
                                     const node = nodes.get(nodeId);
                                     if (!node) return;
@@ -2735,7 +2737,7 @@
                                             fnHasVisible = true;
 
                                             const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
-                                            const focusBtnHtml = !isHidden ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.to) + '">Focus</button>' : '';
+                                            const focusBtnHtml = !isHidden ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + e.to + ')">Focus</button>' : '';
                                             const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
 
                                             fnChildrenHtml += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #10b981; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
@@ -2810,7 +2812,7 @@
                                             }
 
                                             const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
-                                            const focusBtnHtml = !isHidden ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(e.from) + '">Focus</button>' : '';
+                                            const focusBtnHtml = !isHidden ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + e.from + ')">Focus</button>' : '';
                                             const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
 
                                             fnChildrenHtml += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #8b5cf6; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
@@ -3061,20 +3063,10 @@
                                     });
                                     html += '</div></div>';
                                     return html;
-                                }
-
-                                document.getElementById('modalBody').addEventListener('click', function(e) {
-                                    if (e.target && e.target.classList.contains('focus-btn')) {
-                                        const nodeId = e.target.getAttribute('data-node-id');
-                                        if (nodeId) {
-                                            focusNode(nodeId);
-                                        }
                                     }
-                                });
 
-                                function showNodeDetails(node) {
-                                    currentModalId = node.id;
-                                    document.getElementById('modal').style.display = 'block';
+                                    function showNodeDetails(node) {
+                                        document.getElementById('modal').style.display = 'block';
                                     const trControls = document.getElementById('top-right-controls');
                                     if (trControls) trControls.classList.add('modal-open');
 
@@ -3116,14 +3108,17 @@
 
                                 network.on("click", function (params) {
                                     let clickedId = null;
+                                    let clickedType = null;
                                     if (params.nodes.length > 0) {
-                                        clickedId = 'n_' + params.nodes[0];
+                                        clickedId = params.nodes[0];
+                                        clickedType = 'node';
                                     } else if (params.edges.length > 0) {
-                                        clickedId = 'e_' + params.edges[0];
+                                        clickedId = params.edges[0];
+                                        clickedType = 'edge';
                                     }
 
                                     const modal = document.getElementById('modal');
-                                    if (!clickedId) {
+                                    if (clickedId === null) {
                                         if (currentlyExpandedEdges.length > 0) {
                                             const collapseUpdates = currentlyExpandedEdges.map(edgeId => {
                                                 const eData = edges.get(edgeId);
@@ -3140,7 +3135,7 @@
                                         return;
                                     }
 
-                                    if (clickedId === currentModalId && modal.style.display === 'block') {
+                                    if (clickedId === currentModalId && clickedType === currentModalType && modal.style.display === 'block') {
                                         if (currentlyExpandedEdges.length > 0) {
                                             const collapseUpdates = currentlyExpandedEdges.map(edgeId => {
                                                 const eData = edges.get(edgeId);
@@ -3158,6 +3153,8 @@
                                     }
 
                                     currentModalId = clickedId;
+                                    currentModalType = clickedType;
+
                                     const trControls = document.getElementById('top-right-controls');
                                     if (trControls) trControls.classList.add('modal-open');
                                     let content = '';
@@ -3193,7 +3190,7 @@
                                             }
 
                                             content += '<div class="prop-container" style="position: relative;">';
-                                            content += '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(nodeId) + '">Focus</button>';
+                                            content += '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + nodeId + ')">Focus</button>';
                                             content += '<div class="prop-header" style="margin-right: 50px;"><span class="prop-title" style="font-size: 1rem;">' + escapeHTML(node.group) + '</span></div>';
                                             content += '<div class="prop-value" style="font-size: 1.1rem; color: #fff; display: flex; align-items: flex-start;"><span>' + escapeHTML(nodeLabel) + '</span>' + getCopyBtnHTML(nodeLabel) + '</div>';
                                             if (node.outOfScope) {
@@ -3340,7 +3337,7 @@
                                                         sourceLabel = maskValueByType(sourceNode.group, sourceLabel);
                                                     }
                                                     const isHiddenSource = !sourceNode.hidden === false;
-                                                    const focusBtnHtml = !isHiddenSource ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(sourceNode.id) + '">Focus</button>' : '';
+                                                    const focusBtnHtml = !isHiddenSource ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + sourceNode.id + ')">Focus</button>' : '';
                                                     const opacityStyle = isHiddenSource ? 'opacity: 0.7;' : '';
                                                     const badgeHtml = isHiddenSource ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
 
@@ -3401,7 +3398,7 @@
 
                                                         const isHiddenNode = !targetNode.hidden === false;
                                                         const badgeHtml = isHiddenNode ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
-                                                        const focusBtnHtml = !isHiddenNode ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(targetNode.id) + '">Focus</button>' : '';
+                                                        const focusBtnHtml = !isHiddenNode ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + targetNode.id + ')">Focus</button>' : '';
                                                         const opacityStyle = isHiddenNode ? 'opacity: 0.7;' : '';
 
                                                         content += '<div class="prop-container" style="position: relative; ' + opacityStyle + '">';
@@ -3424,7 +3421,7 @@
                                                         sourceLabel = maskValueByType(sourceNode.group, sourceLabel);
                                                     }
 
-                                                    const focusBtnHtml = '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(sourceNode.id) + '">Focus</button>';
+                                                    const focusBtnHtml = '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + sourceNode.id + ')">Focus</button>';
 
                                                     content += '<div class="prop-container" style="position: relative;">';
                                                     content += focusBtnHtml;
@@ -3479,7 +3476,7 @@
                                                         targetLabel = maskValueByType(targetNode.group, targetLabel);
                                                     }
 
-                                                    const focusBtnHtml = '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" data-node-id="' + escapeHTML(targetNode.id) + '">Focus</button>';
+                                                    const focusBtnHtml = '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + targetNode.id + ')">Focus</button>';
 
                                                     content += '<div class="prop-container" style="position: relative;">';
                                                     content += focusBtnHtml;

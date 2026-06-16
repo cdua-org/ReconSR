@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -66,12 +67,12 @@ type visProperty struct {
 }
 
 type visNode struct {
-	ID                string            `json:"id"`
+	ID                int64             `json:"id"`
 	Label             string            `json:"label"`
 	Group             string            `json:"group"`
 	Title             string            `json:"title"`
 	Properties        []*visProperty    `json:"properties,omitempty"`
-	Executions        map[string]string `json:"executions,omitempty"`
+	Executions        map[string]int64  `json:"executions,omitempty"`
 	OutOfScope        bool              `json:"outOfScope"`
 	DepthLimitReached bool              `json:"depthLimitReached"`
 	Color             map[string]string `json:"color,omitempty"`
@@ -80,9 +81,9 @@ type visNode struct {
 }
 
 type visEdge struct {
-	ID        string   `json:"id"`
-	From      string   `json:"from"`
-	To        string   `json:"to"`
+	ID        int64    `json:"id"`
+	From      int64    `json:"from"`
+	To        int64    `json:"to"`
 	Label     string   `json:"label"`
 	Title     string   `json:"title"`
 	Contexts  []string `json:"contexts,omitempty"`
@@ -93,8 +94,8 @@ type visEdge struct {
 }
 
 type edgeKey struct {
-	From     string
-	To       string
+	From     int64
+	To       int64
 	Function string
 }
 
@@ -130,18 +131,23 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 	relPath := filepath.Join(targetSubDir, filename)
 	reportPath := filepath.Join("reports", relPath)
 
-	nodesMap := make(map[string]visNode)
+	nodesMap := make(map[int64]visNode)
 	edgesMap := make(map[edgeKey]*visEdge)
-	edgeIDCounter := 0
+	edgeIDCounter := int64(1)
 
-	allProps := make(map[string]*visProperty)
-	propToParent := make(map[string]string)
-	nodeProperties := make(map[string][]*visProperty)
-	nodeExecutions := make(map[string]map[string]string)
+	allProps := make(map[int64]*visProperty)
+	propToParent := make(map[int64]int64)
+	nodeProperties := make(map[int64][]*visProperty)
+	nodeExecutions := make(map[int64]map[string]int64)
 
-	rawDataRegistry := make(map[string]string)
-	rawDataToID := make(map[string]string)
-	rawDataCounter := 0
+	rawDataRegistry := make(map[int64]string)
+	rawDataToID := make(map[string]int64)
+	rawDataCounter := int64(1)
+
+	asInt := func(s string) int64 {
+		i, _ := strconv.ParseInt(s, 10, 64)
+		return i
+	}
 
 	parseTime := func(timeStr string) (int64, error) {
 		layouts := []string{"2006-01-02 15:04:05", "2006-01-02T15:04:05Z", time.RFC3339}
@@ -166,8 +172,8 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 	}
 
 	type propLink struct {
-		parent string
-		child  string
+		parent int64
+		child  int64
 	}
 	var propLinks []propLink
 	seenLinks := make(map[propLink]bool)
@@ -175,8 +181,8 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 	for _, edge := range graph.Edges {
 		targetNode := graph.Nodes[edge.TargetID]
 		if targetNode.Category == "property" {
-			srcID := edge.SourceID
-			dstID := edge.TargetID
+			srcID := asInt(edge.SourceID)
+			dstID := asInt(edge.TargetID)
 			propToParent[dstID] = srcID
 
 			link := propLink{parent: srcID, child: dstID}
@@ -188,9 +194,9 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 	}
 
 	for _, edge := range graph.Edges {
-		srcID := edge.SourceID
-		dstID := edge.TargetID
-		targetNode := graph.Nodes[dstID]
+		srcID := asInt(edge.SourceID)
+		dstID := asInt(edge.TargetID)
+		targetNode := graph.Nodes[edge.TargetID]
 
 		rootID := srcID
 		for {
@@ -204,14 +210,14 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		if edge.RawData != "" {
 			dataID, ok := rawDataToID[edge.RawData]
 			if !ok {
-				dataID = fmt.Sprintf("r%d", rawDataCounter)
+				dataID = rawDataCounter
 				rawDataCounter++
 				rawDataToID[edge.RawData] = dataID
 				rawDataRegistry[dataID] = edge.RawData
 			}
 
 			if nodeExecutions[rootID] == nil {
-				nodeExecutions[rootID] = make(map[string]string)
+				nodeExecutions[rootID] = make(map[string]int64)
 			}
 			nodeExecutions[rootID][edge.FunctionName] = dataID
 		}
@@ -267,9 +273,9 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		default:
 		}
 
-		srcID := edge.SourceID
-		dstID := edge.TargetID
-		targetNode := graph.Nodes[dstID]
+		srcID := asInt(edge.SourceID)
+		dstID := asInt(edge.TargetID)
+		targetNode := graph.Nodes[edge.TargetID]
 
 		for {
 			if parentID, ok := propToParent[srcID]; ok {
@@ -284,10 +290,10 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		}
 
 		if _, exists := nodesMap[srcID]; !exists {
-			srcNode := graph.Nodes[srcID]
+			srcNode := graph.Nodes[edge.SourceID]
 			title := fmt.Sprintf("Type: %s\nValue: %s", srcNode.Type, srcNode.Value)
 			var borderWidth int = 2
-			srcLimitReached := isLimitReached(srcID)
+			srcLimitReached := isLimitReached(edge.SourceID)
 			if srcNode.OutOfScope {
 				title += "\nOut of Scope: Yes"
 			} else if srcLimitReached {
@@ -310,7 +316,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		if _, exists := nodesMap[dstID]; !exists {
 			title := fmt.Sprintf("Type: %s\nValue: %s", targetNode.Type, targetNode.Value)
 			var borderWidth int = 2
-			targetLimitReached := isLimitReached(dstID)
+			targetLimitReached := isLimitReached(edge.TargetID)
 			if targetNode.OutOfScope {
 				title += "\nOut of Scope: Yes"
 			} else if targetLimitReached {
@@ -355,7 +361,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 				contexts = append(contexts, edge.Context)
 			}
 			newEdge := &visEdge{
-				ID:        fmt.Sprintf("e_%d", edgeIDCounter),
+				ID:        edgeIDCounter,
 				From:      srcID,
 				To:        dstID,
 				Contexts:  contexts,
@@ -400,7 +406,8 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		if n.Category == "property" {
 			continue
 		}
-		if _, exists := nodesMap[id]; !exists {
+		nid := asInt(id)
+		if _, exists := nodesMap[nid]; !exists {
 			title := fmt.Sprintf("Type: %s\nValue: %s", n.Type, n.Value)
 			var borderWidth int = 2
 			limitReached := isLimitReached(id)
@@ -409,13 +416,13 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 			} else if limitReached {
 				title += "\nDepth Limit Reached: Yes"
 			}
-			nodesMap[id] = visNode{
-				ID:                id,
+			nodesMap[nid] = visNode{
+				ID:                nid,
 				Label:             n.Value,
 				Group:             n.Type,
 				Title:             title,
-				Properties:        nodeProperties[id],
-				Executions:        nodeExecutions[id],
+				Properties:        nodeProperties[nid],
+				Executions:        nodeExecutions[nid],
 				OutOfScope:        n.OutOfScope,
 				DepthLimitReached: limitReached,
 				BorderWidth:       borderWidth,
@@ -424,10 +431,10 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		}
 	}
 
-	var initialTargetID string
+	var initialTargetID int64
 	for id, n := range graph.Nodes {
 		if n.Value == graph.InitialTarget && n.Category != "property" {
-			initialTargetID = id
+			initialTargetID = asInt(id)
 			break
 		}
 	}
@@ -450,7 +457,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		}
 
 		isInitial := false
-		if initialTargetID != "" {
+		if initialTargetID != 0 {
 			isInitial = n.ID == initialTargetID
 		} else {
 			isInitial = n.Label == graph.InitialTarget
