@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <title>ReconSR Graph - {{ .ProjectName }}</title>
+        <title>ReconSR</title>
         <script
             type="text/javascript"
             src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"
@@ -456,7 +456,9 @@
         <div id="top-bar">
             <div id="top-bar-text">
                 <div class="brand">ReconSR</div>
-                <h1 id="project-title">Project: {{ .ProjectName }}</h1>
+                <h1 id="project-title">
+                    Project: <span id="target-name"></span>
+                </h1>
                 <div class="meta" style="margin-bottom: 2px">
                     Generated: {{ .Timestamp }}
                 </div>
@@ -970,8 +972,8 @@
             // Privacy Mode State
             let isPrivacyMode = false;
             let originalNodesData = new Map();
-            let originalProjectName = document.getElementById("project-title") ? document.getElementById("project-title").innerHTML : "";
-            let originalDocumentTitle = document.title;
+            let originalTargetName = "";
+            const APP_NAME = "ReconSR";
 
             function togglePrivacyMode() {
                 const trControls = document.getElementById('top-right-controls');
@@ -994,30 +996,8 @@
                     </svg> Privacy Mode`;
                 }
 
-                const updates = [];
-                nodes.forEach(n => {
-                    if (!originalNodesData.has(n.id)) {
-                        originalNodesData.set(n.id, { label: n.label, title: n.title });
-                    }
-                    const orig = originalNodesData.get(n.id);
-                    const mLabel = isPrivacyMode ? maskValueByType(n.group, orig.label) : orig.label;
-                    const mTitle = isPrivacyMode ? maskValueByType(n.group, orig.title) : orig.title;
-
-                    if (n.group === 'root') {
-                        if (isPrivacyMode) {
-                            const parts = originalProjectName.split(': ');
-                            if (projectTitle) projectTitle.innerHTML = (parts.length > 1 ? parts[0] + ': ' : '') + mLabel;
-                            document.title = originalDocumentTitle.split(' - ')[0] + ' - ' + mLabel;
-                        } else {
-                            if (projectTitle) projectTitle.innerHTML = originalProjectName;
-                            document.title = originalDocumentTitle;
-                        }
-                    }
-
-                    updates.push({ id: n.id, label: mLabel, title: mTitle });
-                });
-                if(updates.length > 0) {
-                    nodes.update(updates);
+                if (typeof rebuildDisplayLayer === 'function') {
+                    rebuildDisplayLayer();
                 }
             }
 
@@ -1210,8 +1190,29 @@
                         {{define "middle"}}] ; const initialEdges = [{{end}}
 
                         {{define "footer"}}] ;
+
+                                const allPropsMap = {{ .AllProperties }};
+                                const ROOT_NODE_ID = {{ .InitialTargetID }};
+
                                 const edgePairs = {};
                                 initialEdges.forEach(e => {
+                                    let titleParts = [];
+                                    if (e.contexts && e.contexts.length > 0) {
+                                        titleParts.push(...e.contexts);
+                                    }
+                                    titleParts.push("Function: " + e.function);
+
+                                    if (typeof formatDateTime === 'function' && e.firstSeen && e.lastSeen) {
+                                        const firstTime = new Date(e.firstSeen).toISOString().split('T')[0];
+                                        const lastTime = new Date(e.lastSeen).toISOString().split('T')[0];
+                                        if (firstTime === lastTime) {
+                                            titleParts.push("Seen: " + firstTime);
+                                        } else {
+                                            titleParts.push("Seen: " + firstTime + " - " + lastTime);
+                                        }
+                                    }
+                                    e.title = titleParts.join("\n");
+
                                     e.font = { size: 0, strokeWidth: 0 };
 
                                     const pairId = [e.from, e.to].sort().join('-');
@@ -1539,7 +1540,53 @@
                                     if (prevTimes.length > 0) setTime(prevTimes[prevTimes.length - 1]);
                                 }
 
-                                const nodes = new vis.DataSet(initialNodes);
+                                let displayPropsMap = {};
+                                let displayNodes = [];
+                                let isGraphInitialized = false;
+
+                                function rebuildDisplayLayer() {
+                                    displayPropsMap = {};
+                                    for (let id in allPropsMap) {
+                                        let prop = allPropsMap[id];
+                                        let val = (typeof isPrivacyMode !== 'undefined' && isPrivacyMode) ? maskValueByType(prop.type, prop.value) : prop.value;
+                                        displayPropsMap[id] = { ...prop, value: val };
+                                    }
+
+                                    Object.values(displayPropsMap).forEach(prop => {
+                                        if (prop.properties && prop.properties.length > 0) {
+                                            prop.properties = prop.properties.map(childId => displayPropsMap[childId]).filter(Boolean);
+                                        }
+                                    });
+
+                                    displayNodes = initialNodes.map(node => {
+                                        let lbl = (typeof isPrivacyMode !== 'undefined' && isPrivacyMode) ? maskValueByType(node.group, node.label) : node.label;
+
+                                        let titleParts = ["Type: " + node.group, "Value: " + lbl];
+                                        if (node.outOfScope) titleParts.push("Out of Scope: Yes");
+                                        if (node.depthLimitReached) titleParts.push("Depth Limit Reached: Yes");
+
+                                        let shadowNode = { ...node, label: lbl, title: titleParts.join("\n") };
+
+                                        if (node.properties && node.properties.length > 0) {
+                                            shadowNode.properties = node.properties.map(id => displayPropsMap[id]).filter(Boolean);
+                                        }
+
+                                        if (node.id === ROOT_NODE_ID) {
+                                            const targetSpan = document.getElementById("target-name");
+                                            if (targetSpan) targetSpan.innerText = lbl;
+                                            document.title = APP_NAME + ' - ' + lbl;
+                                        }
+
+                                        return shadowNode;
+                                    });
+
+                                    if (isGraphInitialized) {
+                                        nodes.update(displayNodes);
+                                    }
+                                    }
+                                rebuildDisplayLayer();
+
+                                const nodes = new vis.DataSet(displayNodes);
                                 const edges = new vis.DataSet(initialEdges);
                                 const container = document.getElementById('mynetwork');
                                 const data = { nodes: nodes, edges: edges };
@@ -1585,6 +1632,7 @@
                                 };
 
                                 const network = new vis.Network(container, data, options);
+                                isGraphInitialized = true;
 
                                 const originalColors = {};
                                 const initialUpdates = [];
@@ -2724,9 +2772,6 @@
                                             if (targetNode && modalHiddenOutNodes.has(targetNode.id)) return;
 
                                             let targetLabel = targetNode ? targetNode.label : e.to;
-                                            if (isPrivacyMode) {
-                                                targetLabel = maskValueByType(targetGroup, targetLabel);
-                                            }
                                             const isOOS = targetNode ? targetNode.outOfScope : false;
                                             const isLimit = targetNode ? targetNode.depthLimitReached : false;
                                             const isHidden = targetNode ? targetNode.hidden : false;
@@ -2796,9 +2841,6 @@
                                             if (sourceNode2 && modalHiddenInNodes.has(sourceNode2.id)) return;
 
                                             let sourceLabel = sourceNode2 ? sourceNode2.label : e.from;
-                                            if (isPrivacyMode) {
-                                                sourceLabel = maskValueByType(sourceGroup, sourceLabel);
-                                            }
                                             const isOOS = sourceNode2 ? sourceNode2.outOfScope : false;
                                             const isLimit = sourceNode2 ? sourceNode2.depthLimitReached : false;
                                             const isHidden = sourceNode2 ? sourceNode2.hidden : false;
@@ -2861,10 +2903,11 @@
                                 function getPropertyTypesData(props) {
                                     const counts = {};
                                     function traverse(p) {
+                                        if (!p) return;
                                         counts[p.type] = (counts[p.type] || 0) + 1;
-                                        if (p.properties) p.properties.forEach(traverse);
+                                        if (p.properties && Array.isArray(p.properties)) p.properties.forEach(traverse);
                                     }
-                                    if (props) props.forEach(traverse);
+                                    if (props && Array.isArray(props)) props.forEach(traverse);
                                     return Object.keys(counts).sort().map(k => ({ type: k, count: counts[k] }));
                                 }
 
@@ -2896,7 +2939,7 @@
                                     let childrenHtml = '';
                                     let hasVisibleChild = false;
 
-                                    if (prop.properties && prop.properties.length > 0) {
+                                    if (prop.properties && Array.isArray(prop.properties) && prop.properties.length > 0) {
                                         prop.properties.forEach(child => {
                                             const childRes = renderPropNode(child, executions, depth + 1, isVisibleExplicit, targetGroupType);
                                             if (childRes.hasVisible) {
@@ -2917,9 +2960,6 @@
                                     const borderStyle = isTransit ? 'border-left: 3px dashed #64748b;' : 'border-left: 3px solid #a78bfa;';
 
                                     let displayValue = prop.value;
-                                    if (isPrivacyMode) {
-                                        displayValue = maskValueByType(prop.type, String(displayValue));
-                                    }
 
                                     let htmlStr = '<div style="margin-bottom: 8px; padding: 8px; background: #1e293b; border-radius: 0 4px 4px 0; ' + borderStyle + ' ' + opacityStyle + '">';
                                     htmlStr += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
@@ -3184,10 +3224,7 @@
 
                                         const node = nodes.get(nodeId);
                                         if (node) {
-                                            let nodeLabel = originalNodesData.has(nodeId) ? originalNodesData.get(nodeId).label : node.label;
-                                            if (isPrivacyMode) {
-                                                nodeLabel = maskValueByType(node.group, nodeLabel);
-                                            }
+                                            let nodeLabel = node.label;
 
                                             content += '<div class="prop-container" style="position: relative;">';
                                             content += '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + nodeId + ')">Focus</button>';
@@ -3332,10 +3369,7 @@
 
                                                 const sourceNode = nodes.get(edge.from);
                                                 if (sourceNode) {
-                                                    let sourceLabel = originalNodesData.has(sourceNode.id) ? originalNodesData.get(sourceNode.id).label : sourceNode.label;
-                                                    if (isPrivacyMode) {
-                                                        sourceLabel = maskValueByType(sourceNode.group, sourceLabel);
-                                                    }
+                                                    let sourceLabel = sourceNode.label;
                                                     const isHiddenSource = !sourceNode.hidden === false;
                                                     const focusBtnHtml = !isHiddenSource ? '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + sourceNode.id + ')">Focus</button>' : '';
                                                     const opacityStyle = isHiddenSource ? 'opacity: 0.7;' : '';
@@ -3391,10 +3425,7 @@
                                                     if (targetNode) {
                                                         content += '<div style="text-align: center; color: #64748b; margin: 4px 0; font-size: 1.2rem;">↓</div>';
 
-                                                        let targetLabel = originalNodesData.has(targetNode.id) ? originalNodesData.get(targetNode.id).label : targetNode.label;
-                                                        if (isPrivacyMode) {
-                                                            targetLabel = maskValueByType(targetNode.group, targetLabel);
-                                                        }
+                                                        let targetLabel = targetNode.label;
 
                                                         const isHiddenNode = !targetNode.hidden === false;
                                                         const badgeHtml = isHiddenNode ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
@@ -3416,10 +3447,7 @@
                                             } else {
                                                 const sourceNode = nodes.get(edge.from);
                                                 if (sourceNode) {
-                                                    let sourceLabel = originalNodesData.has(sourceNode.id) ? originalNodesData.get(sourceNode.id).label : sourceNode.label;
-                                                    if (isPrivacyMode) {
-                                                        sourceLabel = maskValueByType(sourceNode.group, sourceLabel);
-                                                    }
+                                                    let sourceLabel = sourceNode.label;
 
                                                     const focusBtnHtml = '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + sourceNode.id + ')">Focus</button>';
 
@@ -3472,9 +3500,6 @@
                                                     content += '<div style="text-align: center; color: #64748b; margin: 4px 0; font-size: 1.2rem;">↓</div>';
 
                                                     let targetLabel = targetNode.label;
-                                                    if (isPrivacyMode) {
-                                                        targetLabel = maskValueByType(targetNode.group, targetLabel);
-                                                    }
 
                                                     const focusBtnHtml = '<button class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + targetNode.id + ')">Focus</button>';
 

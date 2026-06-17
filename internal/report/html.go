@@ -43,6 +43,8 @@ type reportTemplateData struct {
 	EdgesCount          int
 	Stats               []statItem
 	RawDataRegistryJSON string
+	AllProperties       string
+	InitialTargetID     int64
 }
 
 func sanitizePath(name string) string {
@@ -56,22 +58,22 @@ func sanitizePath(name string) string {
 }
 
 type visProperty struct {
-	Type       string         `json:"type"`
-	Value      string         `json:"value"`
-	Properties []*visProperty `json:"properties,omitempty"`
-	Contexts   []string       `json:"contexts,omitempty"`
-	Module     string         `json:"module,omitempty"`
-	Function   string         `json:"function,omitempty"`
-	FirstSeen  int64          `json:"firstSeen,omitempty"`
-	LastSeen   int64          `json:"lastSeen,omitempty"`
+	ID         int64    `json:"id"`
+	Type       string   `json:"type"`
+	Value      string   `json:"value"`
+	Properties []int64  `json:"properties,omitempty"`
+	Contexts   []string `json:"contexts,omitempty"`
+	Module     string   `json:"module,omitempty"`
+	Function   string   `json:"function,omitempty"`
+	FirstSeen  int64    `json:"firstSeen,omitempty"`
+	LastSeen   int64    `json:"lastSeen,omitempty"`
 }
 
 type visNode struct {
 	ID                int64             `json:"id"`
 	Label             string            `json:"label"`
 	Group             string            `json:"group"`
-	Title             string            `json:"title"`
-	Properties        []*visProperty    `json:"properties,omitempty"`
+	Properties        []int64           `json:"properties,omitempty"`
 	Executions        map[string]int64  `json:"executions,omitempty"`
 	OutOfScope        bool              `json:"outOfScope"`
 	DepthLimitReached bool              `json:"depthLimitReached"`
@@ -85,7 +87,6 @@ type visEdge struct {
 	From      int64    `json:"from"`
 	To        int64    `json:"to"`
 	Label     string   `json:"label"`
-	Title     string   `json:"title"`
 	Contexts  []string `json:"contexts,omitempty"`
 	Module    string   `json:"module"`
 	Function  string   `json:"function"`
@@ -137,7 +138,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 
 	allProps := make(map[int64]*visProperty)
 	propToParent := make(map[int64]int64)
-	nodeProperties := make(map[int64][]*visProperty)
+	nodeProperties := make(map[int64][]int64)
 	nodeExecutions := make(map[int64]map[string]int64)
 
 	rawDataRegistry := make(map[int64]string)
@@ -244,6 +245,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 					contexts = append(contexts, edge.Context)
 				}
 				allProps[dstID] = &visProperty{
+					ID:        dstID,
 					Type:      targetNode.Type,
 					Value:     targetNode.Value,
 					Module:    edge.ModuleName,
@@ -260,9 +262,9 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		srcID := link.parent
 		dstID := link.child
 		if parentProp, ok := allProps[srcID]; ok {
-			parentProp.Properties = append(parentProp.Properties, allProps[dstID])
+			parentProp.Properties = append(parentProp.Properties, dstID)
 		} else {
-			nodeProperties[srcID] = append(nodeProperties[srcID], allProps[dstID])
+			nodeProperties[srcID] = append(nodeProperties[srcID], dstID)
 		}
 	}
 
@@ -291,19 +293,12 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 
 		if _, exists := nodesMap[srcID]; !exists {
 			srcNode := graph.Nodes[edge.SourceID]
-			title := fmt.Sprintf("Type: %s\nValue: %s", srcNode.Type, srcNode.Value)
 			var borderWidth int = 2
 			srcLimitReached := isLimitReached(edge.SourceID)
-			if srcNode.OutOfScope {
-				title += "\nOut of Scope: Yes"
-			} else if srcLimitReached {
-				title += "\nDepth Limit Reached: Yes"
-			}
 			node := visNode{
 				ID:                srcID,
 				Label:             srcNode.Value,
 				Group:             srcNode.Type,
-				Title:             title,
 				Properties:        nodeProperties[srcID],
 				Executions:        nodeExecutions[srcID],
 				OutOfScope:        srcNode.OutOfScope,
@@ -314,19 +309,12 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 			nodesMap[srcID] = node
 		}
 		if _, exists := nodesMap[dstID]; !exists {
-			title := fmt.Sprintf("Type: %s\nValue: %s", targetNode.Type, targetNode.Value)
 			var borderWidth int = 2
 			targetLimitReached := isLimitReached(edge.TargetID)
-			if targetNode.OutOfScope {
-				title += "\nOut of Scope: Yes"
-			} else if targetLimitReached {
-				title += "\nDepth Limit Reached: Yes"
-			}
 			node := visNode{
 				ID:                dstID,
 				Label:             targetNode.Value,
 				Group:             targetNode.Type,
-				Title:             title,
 				Properties:        nodeProperties[dstID],
 				Executions:        nodeExecutions[dstID],
 				OutOfScope:        targetNode.OutOfScope,
@@ -387,18 +375,6 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 			e.Label = fmt.Sprintf("%s(+%d)", e.Contexts[0], len(e.Contexts)-1)
 		}
 
-		var titleParts []string
-		titleParts = append(titleParts, e.Contexts...)
-		titleParts = append(titleParts, fmt.Sprintf("Function: %s", e.Function))
-		firstTime := time.UnixMilli(e.FirstSeen).Format("2006-01-02")
-		lastTime := time.UnixMilli(e.LastSeen).Format("2006-01-02")
-		if firstTime == lastTime {
-			titleParts = append(titleParts, fmt.Sprintf("Seen: %s", firstTime))
-		} else {
-			titleParts = append(titleParts, fmt.Sprintf("Seen: %s - %s", firstTime, lastTime))
-		}
-		e.Title = strings.Join(titleParts, "\n")
-
 		visEdges = append(visEdges, *e)
 	}
 
@@ -408,19 +384,12 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		}
 		nid := asInt(id)
 		if _, exists := nodesMap[nid]; !exists {
-			title := fmt.Sprintf("Type: %s\nValue: %s", n.Type, n.Value)
 			var borderWidth int = 2
 			limitReached := isLimitReached(id)
-			if n.OutOfScope {
-				title += "\nOut of Scope: Yes"
-			} else if limitReached {
-				title += "\nDepth Limit Reached: Yes"
-			}
 			nodesMap[nid] = visNode{
 				ID:                nid,
 				Label:             n.Value,
 				Group:             n.Type,
-				Title:             title,
 				Properties:        nodeProperties[nid],
 				Executions:        nodeExecutions[nid],
 				OutOfScope:        n.OutOfScope,
@@ -522,6 +491,11 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		return "", err
 	}
 
+	allPropsJSON, err := json.Marshal(allProps)
+	if err != nil {
+		return "", err
+	}
+
 	data := reportTemplateData{
 		ProjectName:         html.EscapeString(graph.ProjectName),
 		Timestamp:           timestamp,
@@ -532,6 +506,8 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		EdgesCount:          len(visEdges),
 		Stats:               stats,
 		RawDataRegistryJSON: string(rawDataJSON),
+		AllProperties:       string(allPropsJSON),
+		InitialTargetID:     initialTargetID,
 	}
 
 	f, err := root.Create(relPath)
