@@ -424,7 +424,8 @@
                 visibility: hidden;
             }
 
-            .privacy-toggle-btn {
+            .privacy-toggle-btn,
+            .physics-toggle-btn {
                 background: #1e293b;
                 border: 1px solid #334155;
                 color: #f1f5f9;
@@ -439,7 +440,8 @@
                 pointer-events: auto;
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
             }
-            .privacy-toggle-btn:hover {
+            .privacy-toggle-btn:hover,
+            .physics-toggle-btn:hover {
                 background: #334155;
                 border-color: #475569;
                 transform: translateY(-1px);
@@ -449,6 +451,12 @@
                 border-color: rgba(16, 185, 129, 0.4);
                 color: #6ee7b7;
                 box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);
+            }
+            .physics-toggle-btn.active {
+                background: rgba(56, 189, 248, 0.15);
+                border-color: rgba(56, 189, 248, 0.4);
+                color: #38bdf8;
+                box-shadow: 0 0 15px rgba(56, 189, 248, 0.1);
             }
         </style>
     </head>
@@ -502,6 +510,54 @@
 
         <div id="top-right-controls">
             <button
+                id="save-report"
+                class="privacy-toggle-btn"
+                onclick="saveReport()"
+                title="Save current state into a new HTML file"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path
+                        d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+                    />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                </svg>
+            </button>
+            <button
+                id="physics-toggle"
+                class="physics-toggle-btn"
+                onclick="togglePhysics()"
+                title="Toggle Physics"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path
+                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                    />
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                    <line x1="12" y1="22.08" x2="12" y2="12" />
+                </svg>
+            </button>
+            <button
                 id="privacy-toggle"
                 class="privacy-toggle-btn"
                 onclick="togglePrivacyMode()"
@@ -520,7 +576,6 @@
                 >
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
-                Privacy Mode
             </button>
         </div>
 
@@ -969,6 +1024,11 @@
             // Raw Data Registry (Lazy Loaded)
             let rawDataRegistry = null;
 
+            let isFreshLoad = true;
+            let network = null;
+            let isPhysicsEnabled = false;
+            let globalNodesDataSet = null;
+
             // Privacy Mode State
             let isPrivacyMode = false;
             let originalNodesData = new Map();
@@ -985,20 +1045,100 @@
 
                 if (isPrivacyMode) {
                     btn.classList.add("active");
-                    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                        <path d="M9 12l2 2 4-4"/>
-                    </svg> Privacy Mode (ON)`;
+                    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>`;
                 } else {
                     btn.classList.remove("active");
-                    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg> Privacy Mode`;
+                    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
                 }
 
                 if (typeof rebuildDisplayLayer === 'function') {
                     rebuildDisplayLayer();
                 }
+            }
+
+            function togglePhysics() {
+                const trControls = document.getElementById('top-right-controls');
+                if (trControls && trControls.classList.contains('modal-open')) return;
+
+                isPhysicsEnabled = !isPhysicsEnabled;
+                const btn = document.getElementById("physics-toggle");
+
+                if (isPhysicsEnabled) {
+                    btn.classList.add("active");
+                } else {
+                    btn.classList.remove("active");
+                }
+
+                if (network) {
+                    network.setOptions({ physics: { enabled: isPhysicsEnabled } });
+                }
+            }
+
+            function updateInitialNodesPositions() {
+                if (!network) return;
+                const pos = network.getPositions();
+                for (let i = 0; i < initialNodes.length; i++) {
+                    const node = initialNodes[i];
+                    const p = pos[node.id] || pos[String(node.id)];
+                    if (p && typeof p.x === 'number' && !isNaN(p.x) && typeof p.y === 'number' && !isNaN(p.y)) {
+                        node.x = p.x;
+                        node.y = p.y;
+                    }
+                }
+            }
+
+            function saveReport() {
+                if (!network) return;
+
+                let unhideUpdates = [];
+                if (typeof globalNodesDataSet !== 'undefined' && globalNodesDataSet) {
+                    const currentNodes = globalNodesDataSet.get();
+                    currentNodes.forEach(n => {
+                        if (n.hidden) {
+                            unhideUpdates.push({ id: n.id, hidden: false });
+                        }
+                    });
+                    if (unhideUpdates.length > 0) {
+                        globalNodesDataSet.update(unhideUpdates);
+                    }
+                }
+
+                updateInitialNodesPositions();
+
+                if (typeof globalNodesDataSet !== 'undefined' && globalNodesDataSet && unhideUpdates.length > 0) {
+                    const hideUpdates = unhideUpdates.map(u => ({ id: u.id, hidden: true }));
+                    globalNodesDataSet.update(hideUpdates);
+                }
+
+                const updatedNodes = initialNodes.map(node => ({ ...node }));
+
+                let html = '<!doctype html>\n' + document.documentElement.outerHTML;
+
+                const replaceVar = (name, val) => {
+                    const re = new RegExp(`let\\s+${name}\\s*=\\s*(true|false);`, 'g');
+                    html = html.replace(re, () => `let ${name} = ${val};`);
+                };
+
+                replaceVar('isFreshLoad', false);
+                replaceVar('isPrivacyMode', isPrivacyMode);
+                replaceVar('isPhysicsEnabled', isPhysicsEnabled);
+                replaceVar('showOOS', showOOS);
+                replaceVar('showLimitReached', showLimitReached);
+
+                const nodesRegex = /const\s+initialNodes\s*=\s*\[[\s\S]*?\]\s*;/;
+                const replacement = `const initialNodes = ${JSON.stringify(updatedNodes)};`;
+                html = html.replace(nodesRegex, () => replacement);
+
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                a.download = `ReconSR_Report_${dateStr}.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
             }
 
             function maskValueByType(type, value) {
@@ -1561,11 +1701,16 @@
                                     displayNodes = initialNodes.map(node => {
                                         let lbl = (typeof isPrivacyMode !== 'undefined' && isPrivacyMode) ? maskValueByType(node.group, node.label) : node.label;
 
+                                        let displayLbl = lbl;
+                                        if (displayLbl && displayLbl.length > 20) {
+                                            displayLbl = displayLbl.substring(0, 17) + "...";
+                                        }
+
                                         let titleParts = ["Type: " + node.group, "Value: " + lbl];
                                         if (node.outOfScope) titleParts.push("Out of Scope: Yes");
                                         if (node.depthLimitReached) titleParts.push("Depth Limit Reached: Yes");
 
-                                        let shadowNode = { ...node, label: lbl, title: titleParts.join("\n") };
+                                        let shadowNode = { ...node, label: displayLbl, title: titleParts.join("\n") };
 
                                         if (node.properties && node.properties.length > 0) {
                                             shadowNode.properties = node.properties.map(id => displayPropsMap[id]).filter(Boolean);
@@ -1587,6 +1732,7 @@
                                 rebuildDisplayLayer();
 
                                 const nodes = new vis.DataSet(displayNodes);
+                                globalNodesDataSet = nodes;
                                 const edges = new vis.DataSet(initialEdges);
                                 const container = document.getElementById('mynetwork');
                                 const data = { nodes: nodes, edges: edges };
@@ -1599,6 +1745,8 @@
                                     },
                                     edges: {
                                         width: 1.5,
+                                        selectionWidth: 1.5,
+                                        hoverWidth: 1.5,
                                         color: { color: 'rgba(100, 116, 139, 0.8)', highlight: '#38bdf8', hover: '#94a3b8' },
                                         arrows: { to: { enabled: true, scaleFactor: 0.7 } },
                                         font: {
@@ -1617,7 +1765,7 @@
                                         root: { mass: 8, color: { background: '#d97706', border: '#fbbf24', highlight: { background: '#f59e0b', border: '#fbbf24' } }, shape: 'diamond', size: 35 }
                                     },
                                     physics: {
-                                        enabled: true,
+                                        enabled: isPhysicsEnabled,
                                         barnesHut: {
                                             gravitationalConstant: -1500,
                                             centralGravity: 0.1,
@@ -1631,8 +1779,40 @@
                                     interaction: { hover: true, navigationButtons: true, keyboard: true, dragNodes: true }
                                 };
 
-                                const network = new vis.Network(container, data, options);
+                                network = new vis.Network(container, data, options);
                                 isGraphInitialized = true;
+
+                                if (isFreshLoad) {
+                                    isPhysicsEnabled = true;
+                                    network.setOptions({ physics: { enabled: true } });
+                                    const physBtn = document.getElementById("physics-toggle");
+                                    if (physBtn) physBtn.classList.add("active");
+                                } else {
+                                    const physBtn = document.getElementById("physics-toggle");
+                                    if (physBtn && isPhysicsEnabled) {
+                                        physBtn.classList.add("active");
+                                    }
+                                }
+
+                                function updateZoomVisibility() {
+                                    const scale = network.getScale();
+                                    const isZoomedOut = scale < 0.45;
+
+                                    network.setOptions({
+                                        nodes: { font: { size: isZoomedOut ? 0 : 16 } },
+                                        edges: {
+                                            color: {
+                                                color: isZoomedOut ? 'rgba(100, 116, 139, 0.2)' : 'rgba(100, 116, 139, 0.8)',
+                                                highlight: '#38bdf8',
+                                                hover: '#94a3b8'
+                                            },
+                                            font: { size: isZoomedOut ? 0 : 11 },
+                                            arrows: { to: { enabled: !isZoomedOut } }
+                                        }
+                                    });
+                                }
+
+                                network.on("zoom", updateZoomVisibility);
 
                                 const originalColors = {};
                                 const initialUpdates = [];
@@ -1749,6 +1929,20 @@
                                 }
 
                                 const hiddenNodes = new Set();
+
+                                // Restore hidden nodes state from DOM classes (useful for saved portable reports)
+                                document.querySelectorAll('.vis-toggle-btn.state-none, .vis-toggle-btn.state-filtered').forEach(btn => {
+                                    const type = btn.getAttribute('data-type');
+                                    if (!type) return;
+                                    initialNodes.forEach(n => {
+                                        const scopes = [n.group];
+                                        if (n.subtypes) n.subtypes.forEach(st => scopes.push(n.group + ":" + st));
+                                        if (scopes.includes(type)) {
+                                            hiddenNodes.add(n.id);
+                                        }
+                                    });
+                                });
+
                                 let currentVisibilityStats = {
                                     all: { total: 0, visible: 0 },
                                     oos: { total: 0, visible: 0 },
@@ -1954,6 +2148,7 @@
                                 }
 
                                 function applyTimeFilter() {
+                                    updateInitialNodesPositions();
                                     const activeNodes = new Set();
                                     const visibleNodes = new Set();
 
@@ -2148,6 +2343,7 @@
                                             easingFunction: "easeOutQuart"
                                         }
                                     });
+                                    updateZoomVisibility();
                                 }, 700);
 
                                 let currentModalId = null;
