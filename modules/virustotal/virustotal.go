@@ -24,10 +24,13 @@ import (
 )
 
 const (
-	moduleName     = "virustotal"
-	apiServiceName = "VirusTotal"
-	demoIndicator  = "demo-api-key"
-	keyAttributes  = "attributes"
+	moduleName          = "virustotal"
+	apiServiceName      = "VirusTotal"
+	demoIndicator       = "demo-api-key"
+	vtKeyAnalysisStats  = "last_analysis_stats"
+	vtKeySandboxVerdict = "sandbox_verdicts"
+	vtKeyRuleMsg        = "rule_msg"
+	vtKeyReputation     = "reputation"
 )
 
 var baseURL = "https://www.virustotal.com/api/v3"
@@ -35,17 +38,20 @@ var baseURL = "https://www.virustotal.com/api/v3"
 var dbg = debuglog.New("vt")
 
 type module struct {
-	lastReqTime     time.Time
-	apiKey          string
-	mu              sync.Mutex
-	keyInvalid      atomic.Bool
-	demoDomainFired atomic.Bool
-	demoIPFired     atomic.Bool
+	lastReqTime              time.Time
+	apiKey                   string
+	mu                       sync.Mutex
+	keyInvalid               atomic.Bool
+	demoDomainFired          atomic.Bool
+	demoIPFired              atomic.Bool
+	demoDomainCommFilesFired atomic.Bool
+	demoIPCommFilesFired     atomic.Bool
 }
 
 type vtRequestError struct {
-	err    error
-	action httputil.ResponseAction
+	err        error
+	statusCode int
+	action     httputil.ResponseAction
 }
 
 func (e *vtRequestError) Error() string {
@@ -54,6 +60,22 @@ func (e *vtRequestError) Error() string {
 
 func (e *vtRequestError) Unwrap() error {
 	return e.err
+}
+
+func parseVTError(statusCode int, bodyBytes []byte) error {
+	var vtErr struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(bodyBytes, &vtErr); err == nil && vtErr.Error.Message != "" {
+		if vtErr.Error.Code != "" {
+			return fmt.Errorf("HTTP %d (%s): %s", statusCode, vtErr.Error.Code, vtErr.Error.Message)
+		}
+		return fmt.Errorf("HTTP %d: %s", statusCode, vtErr.Error.Message)
+	}
+	return fmt.Errorf("HTTP %d", statusCode)
 }
 
 func requestAction(err error) httputil.ResponseAction {
@@ -97,6 +119,12 @@ func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 			},
 			constants.FuncGetVTApiDomain: {
 				InputTypes: domainTypes,
+			},
+			constants.FuncGetVTApiDomainCommunicatingFiles: {
+				InputTypes: domainTypes,
+			},
+			constants.FuncGetVTApiIPCommunicatingFiles: {
+				InputTypes: []string{constants.TypeIPv4, constants.TypeIPv6},
 			},
 		},
 	}, nil
@@ -160,6 +188,12 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 		case constants.FuncGetVTApiDomain:
 			execution = modutil.NewExecution(constants.FuncGetVTApiDomain)
 			m.processDomain(ctx, targetType, target, &execution, gen)
+		case constants.FuncGetVTApiDomainCommunicatingFiles:
+			execution = modutil.NewExecution(constants.FuncGetVTApiDomainCommunicatingFiles)
+			m.processCommunicatingFiles(ctx, constants.FuncGetVTApiDomainCommunicatingFiles, fmt.Sprintf("domains/%s/communicating_files", target), &execution, gen)
+		case constants.FuncGetVTApiIPCommunicatingFiles:
+			execution = modutil.NewExecution(constants.FuncGetVTApiIPCommunicatingFiles)
+			m.processCommunicatingFiles(ctx, constants.FuncGetVTApiIPCommunicatingFiles, fmt.Sprintf("ip_addresses/%s/communicating_files", target), &execution, gen)
 		default:
 			execution = modutil.NewExecution(f)
 			modutil.SetError(&execution, "unsupported function: %v", fmt.Errorf("%s", f))
@@ -185,13 +219,13 @@ func (m *module) processDomain(ctx context.Context, targetType, target string, e
 	}
 	if err != nil {
 		dbg.Printf("%s error target=%q phase=root_metadata action=%d err=%v", constants.FuncGetVTApiDomain, target, requestAction(err), err)
-		modutil.SetError(exec, "domain metadata failed: %v", err)
+		handleVTError(err, exec, gen, "domain metadata failed")
 		return
 	}
 	dbg.Printf("%s root_metadata_loaded target=%q raw_bytes=%d", constants.FuncGetVTApiDomain, target, len(raw))
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
-		if attr, ok := dataMap[keyAttributes].(map[string]any); ok {
+		if attr, ok := dataMap[constants.KeyAttributes].(map[string]any); ok {
 			m.extractDomainMetadata(attr, targetType, target, exec, gen)
 		}
 	}
@@ -203,7 +237,7 @@ func (m *module) processDomain(ctx context.Context, targetType, target string, e
 
 	var expiredDomains []string
 	subURL := fmt.Sprintf("%s/domains/%s/subdomains?limit=40", baseURL, target)
-	m.processPaginated(ctx, subURL, exec, func(item map[string]any) {
+	m.processPaginated(ctx, subURL, exec, gen, func(item map[string]any) {
 		if expired := m.extractSubdomain(item, targetType, target, disableCertExpired, exec, gen); expired != "" {
 			expiredDomains = append(expiredDomains, expired)
 		}
@@ -238,26 +272,26 @@ func (m *module) processIP(ctx context.Context, target string, exec *schema.Modu
 	}
 	if err != nil {
 		dbg.Printf("%s error target=%q phase=ip_metadata action=%d err=%v", constants.FuncGetVTApiIP, target, requestAction(err), err)
-		modutil.SetError(exec, "IP metadata failed: %v", err)
+		handleVTError(err, exec, gen, "IP metadata failed")
 		return
 	}
 	dbg.Printf("%s ip_metadata_loaded target=%q raw_bytes=%d", constants.FuncGetVTApiIP, target, len(raw))
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
-		if attr, ok := dataMap[keyAttributes].(map[string]any); ok {
+		if attr, ok := dataMap[constants.KeyAttributes].(map[string]any); ok {
 			m.extractIPMetadata(attr, target, exec, gen)
 		}
 	}
 
 	resURL := fmt.Sprintf("%s/ip_addresses/%s/resolutions?limit=40", baseURL, target)
-	m.processPaginated(ctx, resURL, exec, func(item map[string]any) {
+	m.processPaginated(ctx, resURL, exec, gen, func(item map[string]any) {
 		m.extractIPResolution(item, target, exec, gen)
 	})
 
 	dbg.Printf("%s success target=%q results=%d", constants.FuncGetVTApiIP, target, len(exec.Results))
 }
 
-func (m *module) processPaginated(ctx context.Context, firstURL string, exec *schema.ModuleExecution, handler func(map[string]any)) {
+func (m *module) processPaginated(ctx context.Context, firstURL string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator, handler func(map[string]any)) {
 	currentURL := firstURL
 	page := 1
 	maxPages := resolver.VirustotalMaxPages
@@ -272,14 +306,17 @@ func (m *module) processPaginated(ctx context.Context, firstURL string, exec *sc
 
 		data, raw, err := m.doVTRequest(ctx, currentURL)
 		if raw != "" {
-			exec.RawData += "\n---\n" + raw
+			if exec.RawData != "" {
+				exec.RawData += "\n---\n"
+			}
+			exec.RawData += raw
 			dbg.Printf("vt_pagination_raw_saved page=%d bytes=%d", page, len(raw))
 		} else {
 			dbg.Printf("vt_pagination_raw_empty page=%d", page)
 		}
 		if err != nil {
 			dbg.Printf("vt_pagination error page=%d action=%d err=%v", page, requestAction(err), err)
-			modutil.SetError(exec, "pagination failed: %v", err)
+			handleVTError(err, exec, gen, "pagination failed")
 			return
 		}
 
@@ -379,29 +416,52 @@ func (m *module) doVTRequest(ctx context.Context, url string) (data map[string]a
 func (m *module) processResponse(resp *http.Response, attempt int) (data map[string]any, body string, err error) {
 	dbg.Printf("vt_response_status attempt=%d status=%d", attempt, resp.StatusCode)
 
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		m.keyInvalid.Store(true)
-		dbg.Printf("vt_request error attempt=%d stage=auth status=%d invalid_api_key=true", attempt, resp.StatusCode)
-		return nil, "", &vtRequestError{err: fmt.Errorf("HTTP %d: API key invalid", resp.StatusCode), action: httputil.Abort}
-	}
-
 	bodyBytes, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		dbg.Printf("vt_request error attempt=%d stage=read_body err=%v", attempt, readErr)
-		return nil, "", &vtRequestError{err: fmt.Errorf("read response body: %w", readErr), action: httputil.Retry}
+		return nil, "", &vtRequestError{err: fmt.Errorf("read response body: %w", readErr), statusCode: resp.StatusCode, action: httputil.Retry}
 	}
 	body = string(bodyBytes)
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		m.keyInvalid.Store(true)
+		dbg.Printf("vt_request error attempt=%d stage=auth status=%d invalid_api_key=true", attempt, resp.StatusCode)
+		return nil, body, &vtRequestError{err: parseVTError(resp.StatusCode, bodyBytes), statusCode: resp.StatusCode, action: httputil.Abort}
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		dbg.Printf("vt_request attempt=%d stage=response_status status=404 action=ignore", attempt)
+		return nil, body, nil
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		action := httputil.ClassifyStatus(resp.StatusCode)
 		dbg.Printf("vt_request error attempt=%d stage=response_status status=%d action=%d", attempt, resp.StatusCode, action)
-		return nil, body, &vtRequestError{err: fmt.Errorf("HTTP %d", resp.StatusCode), action: action}
+		return nil, body, &vtRequestError{err: parseVTError(resp.StatusCode, bodyBytes), statusCode: resp.StatusCode, action: action}
 	}
 
 	if unmarshalErr := json.Unmarshal(bodyBytes, &data); unmarshalErr != nil {
 		dbg.Printf("vt_request error attempt=%d stage=unmarshal err=%v", attempt, unmarshalErr)
-		return nil, body, &vtRequestError{err: fmt.Errorf("unmarshal response: %w", unmarshalErr), action: httputil.Abort}
+		return nil, body, &vtRequestError{err: fmt.Errorf("unmarshal response: %w", unmarshalErr), statusCode: resp.StatusCode, action: httputil.Abort}
 	}
 
 	return data, body, nil
+}
+
+func handleVTError(err error, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator, contextMsg string) {
+	var reqErr *vtRequestError
+	if errors.As(err, &reqErr) {
+		if reqErr.statusCode == http.StatusUnauthorized || reqErr.statusCode == http.StatusForbidden || reqErr.statusCode == http.StatusTooManyRequests || reqErr.statusCode == 429 || reqErr.statusCode == http.StatusPaymentRequired {
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     constants.TypeInfo,
+				Category: constants.CategoryProperty,
+				Value:    reqErr.Error(),
+				Context:  "API Error",
+				LocalID:  gen.NextID(),
+			})
+			return
+		}
+	}
+
+	modutil.SetError(exec, contextMsg+": %v", err)
 }

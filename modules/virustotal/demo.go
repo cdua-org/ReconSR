@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
-//go:embed testdata/domain_page1.json testdata/subdomains_page1.json testdata/subdomains_page2.json testdata/ip_page1.json testdata/resolutions_page1.json testdata/resolutions_page2.json
+//go:embed testdata/domain_page1.json testdata/subdomains_page1.json testdata/subdomains_page2.json testdata/ip_page1.json testdata/resolutions_page1.json testdata/resolutions_page2.json testdata/communicating_files.json
 var demoData embed.FS
 
 var readDemoFile = demoData.ReadFile
@@ -47,7 +48,7 @@ func (m *module) processDomainDemo(_ context.Context, targetType, target string,
 	}
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
-		if attr, ok := dataMap[keyAttributes].(map[string]any); ok {
+		if attr, ok := dataMap[constants.KeyAttributes].(map[string]any); ok {
 			m.extractDomainMetadata(attr, targetType, target, exec, gen)
 		}
 	}
@@ -127,7 +128,7 @@ func (m *module) processIPDemo(_ context.Context, target string, exec *schema.Mo
 	}
 
 	if dataMap, ok := data["data"].(map[string]any); ok {
-		if attr, ok := dataMap[keyAttributes].(map[string]any); ok {
+		if attr, ok := dataMap[constants.KeyAttributes].(map[string]any); ok {
 			m.extractIPMetadata(attr, target, exec, gen)
 		}
 	}
@@ -161,4 +162,42 @@ func (m *module) processIPDemo(_ context.Context, target string, exec *schema.Mo
 	}
 
 	dbg.Printf("%s success stage=demo_parsed results=%d", constants.FuncGetVTApiIP, len(exec.Results))
+}
+
+func (m *module) processCommunicatingFilesDemo(_ context.Context, funcName string, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
+	var fired *atomic.Bool
+	if funcName == constants.FuncGetVTApiDomainCommunicatingFiles {
+		fired = &m.demoDomainCommFilesFired
+	} else {
+		fired = &m.demoIPCommFilesFired
+	}
+
+	if !fired.CompareAndSwap(false, true) {
+		dbg.Printf("%s skipped stage=demo_already_fired", funcName)
+		return
+	}
+
+	dbg.Printf("%s start stage=demo_mode", funcName)
+
+	raw, err := readDemoFile("testdata/communicating_files.json")
+	if err != nil {
+		modutil.SetError(exec, "failed to read demo communicating files data", err)
+		return
+	}
+
+	exec.RawData += string(raw)
+
+	var response struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &response); err != nil {
+		modutil.SetError(exec, "demo unmarshal error", err)
+		return
+	}
+
+	for _, item := range response.Data {
+		extractCommunicatingFile(item, exec, gen)
+	}
+
+	dbg.Printf("%s success stage=demo_parsed results=%d", funcName, len(exec.Results))
 }

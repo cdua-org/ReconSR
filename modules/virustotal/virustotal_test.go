@@ -143,6 +143,8 @@ func loadVTFixture(t *testing.T, fileName string) string {
 		data, err = os.ReadFile("testdata/resolutions_page1.json")
 	case "resolutions_page2.json":
 		data, err = os.ReadFile("testdata/resolutions_page2.json")
+	case "communicating_files.json":
+		data, err = os.ReadFile("testdata/communicating_files.json")
 	default:
 		t.Fatalf("unsupported fixture %s", fileName)
 	}
@@ -194,7 +196,7 @@ func requireResult(t *testing.T, results []schema.ModuleResult, description stri
 		}
 	}
 
-	t.Fatalf("expected result: %s", description)
+	t.Fatalf("expected result: %s, got: %+v", description, results)
 	return nil
 }
 
@@ -350,9 +352,12 @@ func TestModuleKeyInvalidationStopsFurtherRequests(t *testing.T) {
 
 	mod := &module{apiKey: "invalid-key"}
 	first := execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: "fail-example.com"})
-	if first.Error == nil {
-		t.Fatal("expected first execution to fail with 401")
+	if first.Error != nil {
+		t.Fatalf("expected first execution to return info, not error, got %v", *first.Error)
 	}
+	requireResult(t, first.Results, "info result on 401", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeInfo && strings.Contains(result.Value, "HTTP 401")
+	})
 	if !mod.keyInvalid.Load() {
 		t.Fatal("expected keyInvalid to be set after 401")
 	}
@@ -387,9 +392,12 @@ func TestModuleKeyInvalidationAlsoHandlesForbidden(t *testing.T) {
 
 	mod := &module{apiKey: "forbidden-key"}
 	exec := execVT(t, mod, schema.Entity{Type: constants.TypeDomain, Value: "forbidden-example.com"})
-	if exec.Error == nil || !strings.Contains(*exec.Error, "HTTP 403") {
-		t.Fatalf("expected HTTP 403 execution error, got %+v", exec.Error)
+	if exec.Error != nil {
+		t.Fatalf("expected HTTP 403 to return info, not error, got %+v", exec.Error)
 	}
+	requireResult(t, exec.Results, "info result on 403", func(result schema.ModuleResult) bool {
+		return result.Type == constants.TypeInfo && strings.Contains(result.Value, "HTTP 403")
+	})
 	if !mod.keyInvalid.Load() {
 		t.Fatal("expected keyInvalid to be set after 403")
 	}
@@ -569,6 +577,32 @@ func TestModuleDemoModeAndName(t *testing.T) {
 	execIP2 := execVT(t, mod, schema.Entity{Type: constants.TypeIPv4, Value: fixtureIPTarget})
 	if len(execIP2.Results) != 0 {
 		t.Fatalf("expected 0 results on second demo ip call, got %d", len(execIP2.Results))
+	}
+
+	execCommDomain := execVTCommFiles(t, mod, constants.FuncGetVTApiDomainCommunicatingFiles, schema.Entity{Type: constants.TypeDomain, Value: fixtureDomainTarget})
+	if execCommDomain.Error != nil {
+		t.Fatalf("demo mode domain comm files exec error: %s", *execCommDomain.Error)
+	}
+	if len(execCommDomain.Results) == 0 {
+		t.Fatal("expected results in demo mode for domain comm files, got 0")
+	}
+
+	execCommIP := execVTCommFiles(t, mod, constants.FuncGetVTApiIPCommunicatingFiles, schema.Entity{Type: constants.TypeIPv4, Value: fixtureIPTarget})
+	if execCommIP.Error != nil {
+		t.Fatalf("demo mode IP comm files exec error: %s", *execCommIP.Error)
+	}
+	if len(execCommIP.Results) == 0 {
+		t.Fatal("expected results in demo mode for IP comm files, got 0")
+	}
+
+	execCommDomain2 := execVTCommFiles(t, mod, constants.FuncGetVTApiDomainCommunicatingFiles, schema.Entity{Type: constants.TypeDomain, Value: fixtureDomainTarget})
+	if len(execCommDomain2.Results) != 0 {
+		t.Fatalf("expected 0 results on second demo domain comm files call, got %d", len(execCommDomain2.Results))
+	}
+
+	execCommIP2 := execVTCommFiles(t, mod, constants.FuncGetVTApiIPCommunicatingFiles, schema.Entity{Type: constants.TypeIPv4, Value: fixtureIPTarget})
+	if len(execCommIP2.Results) != 0 {
+		t.Fatalf("expected 0 results on second demo IP comm files call, got %d", len(execCommIP2.Results))
 	}
 }
 
@@ -930,7 +964,8 @@ func TestProcessPaginated_EdgeCases(t *testing.T) {
 		defer srv.Close()
 
 		exec := &schema.ModuleExecution{}
-		mod.processPaginated(ctx, srv.URL, exec, func(_ map[string]any) {})
+		gen := modutil.NewLocalIDGenerator()
+		mod.processPaginated(ctx, srv.URL, exec, gen, func(_ map[string]any) {})
 		if exec.Error == nil || !strings.Contains(*exec.Error, "pagination failed") {
 			t.Errorf("expected pagination error, got %v", exec.Error)
 		}
@@ -945,8 +980,9 @@ func TestProcessPaginated_EdgeCases(t *testing.T) {
 		defer srv.Close()
 
 		exec := &schema.ModuleExecution{}
+		gen := modutil.NewLocalIDGenerator()
 		count := 0
-		mod.processPaginated(ctx, srv.URL, exec, func(_ map[string]any) { count++ })
+		mod.processPaginated(ctx, srv.URL, exec, gen, func(_ map[string]any) { count++ })
 		if count != 1 {
 			t.Errorf("expected 1 item, got %d", count)
 		}
@@ -967,7 +1003,8 @@ func TestProcessPaginated_EdgeCases(t *testing.T) {
 		cancel()
 
 		exec := &schema.ModuleExecution{}
-		mod.processPaginated(ctxCancel, srv.URL, exec, func(_ map[string]any) {})
+		gen := modutil.NewLocalIDGenerator()
+		mod.processPaginated(ctxCancel, srv.URL, exec, gen, func(_ map[string]any) {})
 		if exec.Error == nil {
 			t.Error("expected error due to cancelled context")
 		}
@@ -975,4 +1012,79 @@ func TestProcessPaginated_EdgeCases(t *testing.T) {
 			t.Errorf("did not expect raw data to be saved, got %q", exec.RawData)
 		}
 	})
+}
+
+func TestParseVTError_Coverage(t *testing.T) {
+	err1 := parseVTError(400, []byte(`{"error": {"code": "BadRequestError", "message": "Invalid request"}}`))
+	if err1.Error() != "HTTP 400 (BadRequestError): Invalid request" {
+		t.Errorf("expected HTTP 400 (BadRequestError): Invalid request, got %s", err1.Error())
+	}
+
+	err2 := parseVTError(400, []byte(`{"error": {"message": "Invalid request"}}`))
+	if err2.Error() != "HTTP 400: Invalid request" {
+		t.Errorf("expected HTTP 400: Invalid request, got %s", err2.Error())
+	}
+}
+
+func TestProcessResponse_NotFound(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	originalBaseURL := baseURL
+	baseURL = mockServer.URL
+	defer func() { baseURL = originalBaseURL }()
+
+	originalDelay := resolver.VirustotalDelayMs
+	resolver.VirustotalDelayMs = 0
+	defer func() { resolver.VirustotalDelayMs = originalDelay }()
+
+	mod := &module{}
+	exec := &schema.ModuleExecution{}
+	gen := modutil.NewLocalIDGenerator()
+
+	mod.processDomain(context.Background(), constants.TypeDomain, "not-found.com", exec, gen)
+
+	if exec.Error != nil {
+		t.Errorf("expected no error for 404, got %v", *exec.Error)
+	}
+}
+
+func TestProcessCommFilesDemo_ErrorsAndEdgeCases(t *testing.T) {
+	originalReadFile := readDemoFile
+	defer func() { readDemoFile = originalReadFile }()
+
+	m := &module{}
+	ctx := context.Background()
+	gen := modutil.NewLocalIDGenerator()
+
+	readDemoFile = func(_ string) ([]byte, error) {
+		return nil, errors.New("mock read error")
+	}
+	exec := &schema.ModuleExecution{}
+	m.processCommunicatingFilesDemo(ctx, constants.FuncGetVTApiDomainCommunicatingFiles, exec, gen)
+	if exec.Error == nil || !strings.Contains(*exec.Error, "mock read error") {
+		t.Errorf("expected mock read error, got %v", exec.Error)
+	}
+
+	m.demoDomainCommFilesFired.Store(false)
+	readDemoFile = func(_ string) ([]byte, error) {
+		return []byte("invalid json"), nil
+	}
+	exec = &schema.ModuleExecution{}
+	m.processCommunicatingFilesDemo(ctx, constants.FuncGetVTApiDomainCommunicatingFiles, exec, gen)
+	if exec.Error == nil || !strings.Contains(*exec.Error, "demo unmarshal error") {
+		t.Errorf("expected unmarshal error, got %v", exec.Error)
+	}
+
+	m.demoIPCommFilesFired.Store(false)
+	readDemoFile = func(_ string) ([]byte, error) {
+		return nil, errors.New("mock read error")
+	}
+	exec = &schema.ModuleExecution{}
+	m.processCommunicatingFilesDemo(ctx, constants.FuncGetVTApiIPCommunicatingFiles, exec, gen)
+	if exec.Error == nil || !strings.Contains(*exec.Error, "mock read error") {
+		t.Errorf("expected mock read error, got %v", exec.Error)
+	}
 }

@@ -85,7 +85,7 @@ func TestHelpers_EdgeCases(t *testing.T) {
 	exec := &schema.ModuleExecution{}
 	gen := modutil.NewLocalIDGenerator()
 	m.extractThreatScore(map[string]any{
-		"last_analysis_stats": map[string]any{
+		vtKeyAnalysisStats: map[string]any{
 			constants.TagMalicious:  float64(0),
 			constants.TagSuspicious: float64(5),
 		},
@@ -104,8 +104,8 @@ func TestHelpers_EdgeCases(t *testing.T) {
 			"engine_alpha": 888,
 			"engine_beta":  map[string]any{},
 			"engine_gamma": map[string]any{
-				"category":    constants.TagMalicious,
-				"engine_name": "test_engine_999",
+				constants.KeyCategory: constants.TagMalicious,
+				"engine_name":         "test_engine_999",
 			},
 		},
 	})

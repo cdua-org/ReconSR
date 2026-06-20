@@ -72,7 +72,7 @@ func loadRootFixtureDNSRecords(data any, itemID string) []any {
 		return nil
 	}
 
-	attributes, ok := item[keyAttributes].(map[string]any)
+	attributes, ok := item[constants.KeyAttributes].(map[string]any)
 	if !ok {
 		return nil
 	}
@@ -100,7 +100,7 @@ func loadListFixtureDNSRecords(data any, itemID string) []any {
 			continue
 		}
 
-		attributes, ok := item[keyAttributes].(map[string]any)
+		attributes, ok := item[constants.KeyAttributes].(map[string]any)
 		if !ok {
 			return nil
 		}

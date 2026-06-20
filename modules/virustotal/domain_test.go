@@ -310,7 +310,7 @@ func TestParseVTCertificateExpiration(t *testing.T) {
 		},
 		{
 			name:        "invalid last_https_certificate type",
-			attr:        map[string]any{keyCert: "not a map"},
+			attr:        map[string]any{keyCert: 123},
 			wantDateStr: "",
 			wantExpired: false,
 		},
@@ -440,7 +440,7 @@ func TestDomain_EdgeCases(t *testing.T) {
 	appendDomainCategories(exec, map[string]any{"categories": map[string]any{"prov1": 111}}, gen)
 
 	appendDomainReputation(exec, map[string]any{}, gen)
-	appendDomainReputation(exec, map[string]any{"reputation": float64(10)}, gen)
+	appendDomainReputation(exec, map[string]any{vtKeyReputation: float64(10)}, gen)
 
 	appendDomainPopularityRanks(exec, map[string]any{}, gen)
 	appendDomainPopularityRanks(exec, map[string]any{keyPopularityRanks: map[string]any{}}, gen)
@@ -476,7 +476,7 @@ func TestDomain_EdgeCases(t *testing.T) {
 	m.extractSubdomain(map[string]any{"id": "u14.example.net"}, constants.TypeSubdomain, "u15.example.net", false, exec, gen)
 	m.extractSubdomain(map[string]any{
 		"id": "u16.example.net",
-		keyAttributes: map[string]any{
+		constants.KeyAttributes: map[string]any{
 			"tags": []any{"tag1", "tag2"},
 			"last_https_certificate": map[string]any{
 				"validity": map[string]any{

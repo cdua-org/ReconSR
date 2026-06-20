@@ -80,7 +80,7 @@ func appendDomainCategories(exec *schema.ModuleExecution, attr map[string]any, g
 }
 
 func appendDomainReputation(exec *schema.ModuleExecution, attr map[string]any, gen *modutil.LocalIDGenerator) {
-	reputationFloat, ok := attr["reputation"].(float64)
+	reputationFloat, ok := attr[vtKeyReputation].(float64)
 	if !ok {
 		return
 	}
@@ -199,7 +199,7 @@ func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[strin
 			continue
 		}
 
-		algo := "sha1"
+		algo := constants.KeySHA1
 		if suffix, found := strings.CutPrefix(k, "thumbprint_"); found {
 			algo = suffix
 		}
@@ -363,7 +363,7 @@ func (m *module) extractSubdomain(item map[string]any, parentType, parent string
 		return ""
 	}
 
-	attr, ok := item[keyAttributes].(map[string]any)
+	attr, ok := item[constants.KeyAttributes].(map[string]any)
 	if !ok {
 		attr = map[string]any{}
 	}

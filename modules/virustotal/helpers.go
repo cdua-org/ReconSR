@@ -57,7 +57,7 @@ func extractVTTags(attr map[string]any) []string {
 }
 
 func (m *module) extractThreatScore(attr map[string]any, entityType, entityValue string, src *schema.EntityRef, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
-	stats, ok := attr["last_analysis_stats"].(map[string]any)
+	stats, ok := attr[vtKeyAnalysisStats].(map[string]any)
 	if !ok {
 		return
 	}
@@ -114,16 +114,16 @@ func extractEngines(attr map[string]any) string {
 		if !ok {
 			continue
 		}
-		cat, ok := res["category"].(string)
+		cat, ok := res[constants.KeyCategory].(string)
 		if !ok {
 			continue
 		}
 		eng, ok := res["engine_name"].(string)
 		if ok && eng != "" {
 			switch cat {
-			case "malicious":
+			case constants.TagMalicious:
 				malicious = append(malicious, eng)
-			case "suspicious":
+			case constants.TagSuspicious:
 				suspicious = append(suspicious, eng)
 			}
 		}

@@ -186,19 +186,19 @@ func TestExtractIPResolution_EdgeCases(t *testing.T) {
 		{
 			name: "invalid_attributes_type",
 			item: map[string]any{
-				keyAttributes: "not_a_map",
+				constants.KeyAttributes: "not_a_map",
 			},
 		},
 		{
 			name: "missing_host_name",
 			item: map[string]any{
-				keyAttributes: map[string]any{},
+				constants.KeyAttributes: map[string]any{},
 			},
 		},
 		{
 			name: "invalid_host_name_type",
 			item: map[string]any{
-				keyAttributes: map[string]any{
+				constants.KeyAttributes: map[string]any{
 					"host_name": 12345,
 				},
 			},
@@ -206,7 +206,7 @@ func TestExtractIPResolution_EdgeCases(t *testing.T) {
 		{
 			name: "invalid_domain_validation",
 			item: map[string]any{
-				keyAttributes: map[string]any{
+				constants.KeyAttributes: map[string]any{
 					"host_name": "invalid-domain-[].example",
 				},
 			},
