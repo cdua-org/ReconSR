@@ -138,4 +138,6 @@ const (
 	TypeMalwareConfig         = "malware_config"
 	TypeSandboxVerdict        = "sandbox_verdict"
 	TypeMatchContext          = "match_context"
+	TypePassword              = "password"
+	TypeBundleInfo            = "bundle_info"
 )

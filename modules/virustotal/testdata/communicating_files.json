@@ -448,6 +448,52 @@
             },
             "id": "8d1d8cd98f00b204e9800998ecf8427e8d1d8cd98f00b204e9800998ecf8427e",
             "type": "file"
+        },
+        {
+            "attributes": {
+                "bundle_info": {
+                    "extensions": {
+                        "exe": 1
+                    },
+                    "file_types": {
+                        "Portable Executable": 1,
+                        "XML": 1
+                    },
+                    "highest_datetime": "2017-06-07 09:07:38",
+                    "lowest_datetime": "1980-01-00 00:00:00",
+                    "num_children": 2,
+                    "password": "infected",
+                    "type": "ZIP",
+                    "uncompressed_size": 222702
+                },
+                "md5": "clean_md5",
+                "meaningful_name": "clean_bundle.zip",
+                "sha256": "clean_sha256",
+                "size": 2048,
+                "type_description": "ZIP",
+                "type_tag": "zip"
+            },
+            "id": "clean_sha256",
+            "type": "file"
+        },
+        {
+            "attributes": {
+                "bundle_info": {
+                    "beginning": "PK\u0003\u0004\u0014\u0000\u0000\u0000",
+                    "error": "CRC check failed 0x3e8059d7 != 0x1add145aL",
+                    "num_children": 1,
+                    "type": "GZIP",
+                    "uncompressed_size": 3646766
+                },
+                "md5": "corrupt_md5",
+                "meaningful_name": "corrupt_bundle.gz",
+                "sha256": "corrupt_sha256",
+                "size": 1024,
+                "type_description": "GZIP",
+                "type_tag": "gzip"
+            },
+            "id": "corrupt_sha256",
+            "type": "file"
         }
     ],
     "links": {
