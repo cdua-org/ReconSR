@@ -2,6 +2,7 @@ package virustotal
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -92,39 +93,49 @@ func appendFileYaraRules(exec *schema.ModuleExecution, attr map[string]any, hash
 		if !ok {
 			continue
 		}
-		ruleName, ok := entry["rule_name"].(string)
-		if !ok || ruleName == "" {
-			continue
-		}
+		extractYaraRule(exec, entry, hashRef, gen)
+	}
+}
 
-		var parts []string
-		parts = append(parts, ruleName)
-		if author, ok := entry["author"].(string); ok && author != "" {
-			parts = append(parts, "Author: "+author)
-		}
+func extractYaraRule(exec *schema.ModuleExecution, entry map[string]any, hashRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
+	ruleName, ok := entry["rule_name"].(string)
+	if !ok || ruleName == "" {
+		return
+	}
 
-		parentVal := strings.Join(parts, " | ")
-		parentID := gen.NextID()
+	var parts []string
+	parts = append(parts, ruleName)
+	if author, ok := entry["author"].(string); ok && author != "" {
+		parts = append(parts, "Author: "+author)
+	}
 
-		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:     constants.TypeYaraRule,
-			Category: constants.CategoryProperty,
-			Value:    parentVal,
-			Source:   hashRef,
-			LocalID:  parentID,
-		})
+	parentVal := strings.Join(parts, " | ")
+	parentID := gen.NextID()
 
-		parentRef := &schema.EntityRef{Type: constants.TypeYaraRule, Value: parentVal, LocalID: parentID}
+	exec.Results = append(exec.Results, schema.ModuleResult{
+		Type:     constants.TypeYaraRule,
+		Category: constants.CategoryProperty,
+		Value:    parentVal,
+		Source:   hashRef,
+		LocalID:  parentID,
+	})
 
-		if desc, ok := entry["description"].(string); ok && desc != "" {
-			desc = strings.ReplaceAll(desc, "\r", " ")
-			desc = strings.ReplaceAll(desc, "\n", " ")
-			desc = strings.Join(strings.Fields(desc), " ")
-			appendVTProperty(exec, constants.TypeDescription, desc, "", parentRef, gen)
-		}
-		if src, ok := entry["source"].(string); ok && src != "" {
-			appendVTProperty(exec, constants.TypeRule, src, "", parentRef, gen)
-		}
+	parentRef := &schema.EntityRef{Type: constants.TypeYaraRule, Value: parentVal, LocalID: parentID}
+
+	if desc, ok := entry["description"].(string); ok && desc != "" {
+		desc = strings.ReplaceAll(desc, "\r", " ")
+		desc = strings.ReplaceAll(desc, "\n", " ")
+		desc = strings.Join(strings.Fields(desc), " ")
+		appendVTProperty(exec, constants.TypeDescription, desc, "", parentRef, gen)
+	}
+	if src, ok := entry["source"].(string); ok && src != "" {
+		appendVTProperty(exec, constants.TypeRule, src, "", parentRef, gen)
+	}
+	if rulesetName, ok := entry["ruleset_name"].(string); ok && rulesetName != "" {
+		appendVTProperty(exec, constants.TypeRule, "Ruleset: "+rulesetName, "", parentRef, gen)
+	}
+	if rulesetID, ok := entry["ruleset_id"].(string); ok && rulesetID != "" {
+		appendVTProperty(exec, constants.TypeRule, "Ruleset ID: "+rulesetID, "", parentRef, gen)
 	}
 }
 
@@ -179,6 +190,92 @@ func appendFileSigmaRules(exec *schema.ModuleExecution, attr map[string]any, has
 	}
 }
 
+func formatNetworkEndpoint(prefix, ip, port string) []string {
+	if ip == "" && port == "" {
+		return nil
+	}
+	if ip != "" && port != "" {
+		return []string{prefix + ": " + ip + ":" + port}
+	}
+	if ip != "" {
+		return []string{prefix + ": " + ip}
+	}
+	return []string{prefix + "Port: " + port}
+}
+
+func getNetworkContextString(values map[string]any, keys ...string) string {
+	for _, k := range keys {
+		if k == "" {
+			continue
+		}
+		if v, ok := values[k]; ok {
+			if s, ok := v.(string); ok && s != "" {
+				return s
+			}
+			if s := fmt.Sprintf("%v", v); s != "" && s != "0" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+func formatNetworkContext(values map[string]any) string {
+	var parts []string
+	if e := getNetworkContextString(values, "EventID", ""); e != "" {
+		parts = append(parts, "Event: "+e)
+	}
+	if e := getNetworkContextString(values, "Image", ""); e != "" {
+		parts = append(parts, "Image: "+e)
+	}
+	if e := getNetworkContextString(values, "CommandLine", ""); e != "" {
+		parts = append(parts, "Cmd: "+e)
+	}
+	if e := getNetworkContextString(values, "protocol", "Protocol"); e != "" {
+		parts = append(parts, "Proto: "+strings.ToUpper(e))
+	}
+
+	srcParts := formatNetworkEndpoint("Src", getNetworkContextString(values, "src"+"_ip", "Source"+"Ip"), getNetworkContextString(values, "src"+"_port", "Source"+"Port"))
+	parts = append(parts, srcParts...)
+
+	dstParts := formatNetworkEndpoint("Dst", getNetworkContextString(values, "dest"+"_ip", "Destination"+"Ip"), getNetworkContextString(values, "dest"+"_port", "Destination"+"Port"))
+	parts = append(parts, dstParts...)
+
+	if e := getNetworkContextString(values, constants.TypeHostname, "Hostname"); e != "" {
+		parts = append(parts, "Host: "+e)
+	}
+	if e := getNetworkContextString(values, "url", "Url"); e != "" {
+		parts = append(parts, "URL: "+e)
+	}
+
+	knownKeys := []string{
+		"EventID", "Image", "CommandLine", "protocol", "Protocol",
+		"src_ip", "SourceIp", "src_port", "SourcePort",
+		"dest_ip", "DestinationIp", "dest_port", "DestinationPort",
+		constants.TypeHostname, "Hostname", "url", "Url",
+		"SourceIsIpv6", "DestinationIsIpv6", "Initiated",
+	}
+
+	var extra []string
+	for k, v := range values {
+		if !slices.Contains(knownKeys, k) {
+			if s := fmt.Sprintf("%v", v); s != "" && s != "0" && s != "<nil>" {
+				extra = append(extra, fmt.Sprintf("%s: %s", formatIDSUnknownKey(k), s))
+			}
+		}
+	}
+
+	if len(extra) > 0 {
+		sort.Strings(extra)
+		parts = append(parts, extra...)
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, ", ")
+}
+
 func extractSigmaMatchContext(exec *schema.ModuleExecution, entry map[string]any, parentRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	matchCtx, ok := entry["match_context"].([]any)
 	if !ok || len(matchCtx) == 0 {
@@ -195,74 +292,14 @@ func extractSigmaMatchContext(exec *schema.ModuleExecution, entry map[string]any
 			continue
 		}
 
-		if formatted := formatSigmaMatchContext(values); formatted != "" {
+		if formatted := formatNetworkContext(values); formatted != "" {
 			appendVTProperty(exec, constants.TypeMatchContext, formatted, "", parentRef, gen)
 		}
 	}
 }
 
-func formatSigmaMatchContext(values map[string]any) string {
-	var keys []string
-	strVals := make(map[string]string)
-	for k, v := range values {
-		var strVal string
-		if s, ok := v.(string); ok && s != "" {
-			strVal = s
-		} else if s := fmt.Sprintf("%v", v); s != "" {
-			strVal = s
-		}
-		if strVal != "" {
-			keys = append(keys, k)
-			strVals[k] = strVal
-		}
-	}
-
-	if len(keys) == 0 {
-		return ""
-	}
-
-	sort.Slice(keys, getSigmaMatchContextSortFunc(keys))
-
-	var ctxParts []string
-	for _, k := range keys {
-		ctxParts = append(ctxParts, fmt.Sprintf("%s: %s", k, strVals[k]))
-	}
-
-	return strings.Join(ctxParts, ", ")
-}
-
-func getSigmaMatchContextSortFunc(keys []string) func(i, j int) bool {
-	priority := map[string]int{
-		"EventID":           1,
-		"Image":             2,
-		"CommandLine":       3,
-		"Protocol":          4,
-		"SourceIp":          5,
-		"SourcePort":        6,
-		"SourceIsIpv6":      7,
-		"DestinationIp":     8,
-		"DestinationPort":   9,
-		"DestinationIsIpv6": 10,
-		"Initiated":         11,
-	}
-	return func(i, j int) bool {
-		pi, oki := priority[keys[i]]
-		pj, okj := priority[keys[j]]
-		if oki && okj {
-			return pi < pj
-		}
-		if oki {
-			return true
-		}
-		if okj {
-			return false
-		}
-		return keys[i] < keys[j]
-	}
-}
-
 func appendFileIDSAlerts(exec *schema.ModuleExecution, attr map[string]any, hashRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
-	results, ok := attr["crowdsourced_ids_results"].([]any)
+	results, ok := attr[vtKeyIDSResults].([]any)
 	if !ok || len(results) == 0 {
 		return
 	}
@@ -284,6 +321,9 @@ func extractIDSAlert(exec *schema.ModuleExecution, entry map[string]any, hashRef
 
 	var parts []string
 	parts = append(parts, msg)
+	if ruleID, ok := entry["rule_id"].(string); ok && ruleID != "" {
+		parts = append(parts, "ID: "+ruleID)
+	}
 	if severity, ok := entry["alert_severity"].(string); ok && severity != "" {
 		parts = append(parts, "Severity: "+severity)
 	}
@@ -301,6 +341,11 @@ func extractIDSAlert(exec *schema.ModuleExecution, entry map[string]any, hashRef
 
 	parentRef := &schema.EntityRef{Type: constants.TypeIDSAlert, Value: parentVal, LocalID: parentID}
 
+	extractIDSAlertProperties(exec, entry, parentRef, gen)
+	extractIDSAlertContext(exec, entry, parentRef, gen)
+}
+
+func extractIDSAlertProperties(exec *schema.ModuleExecution, entry map[string]any, parentRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	if rawRule, ok := entry["rule_raw"].(string); ok && rawRule != "" {
 		appendVTProperty(exec, constants.TypeRawRule, rawRule, "", parentRef, gen)
 	}
@@ -310,12 +355,69 @@ func extractIDSAlert(exec *schema.ModuleExecution, entry map[string]any, hashRef
 	if ruleURL, ok := entry["rule_url"].(string); ok && ruleURL != "" {
 		appendVTProperty(exec, constants.TypeRule, ruleURL, "", parentRef, gen)
 	}
+	if category, ok := entry["rule_category"].(string); ok && category != "" {
+		appendVTProperty(exec, constants.TypeCategory, category, "Rule Category", parentRef, gen)
+	}
 	if refs, ok := entry["rule_references"].([]any); ok {
 		for _, r := range refs {
 			if refStr, ok := r.(string); ok && refStr != "" {
 				appendVTProperty(exec, constants.TypeReference, refStr, "", parentRef, gen)
 			}
 		}
+	}
+}
+
+func formatIDSUnknownKey(k string) string {
+	words := strings.Split(k, "_")
+	for i, w := range words {
+		if w != "" {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, "")
+}
+
+func extractIDSAlertContext(exec *schema.ModuleExecution, entry map[string]any, parentRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
+	contexts, ok := entry["alert_context"].([]any)
+	if !ok {
+		return
+	}
+
+	for _, contextEntry := range contexts {
+		ctx, ok := contextEntry.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		if formatted := formatNetworkContext(ctx); formatted != "" {
+			appendVTProperty(exec, constants.TypeMatchContext, formatted, "Alert Context", parentRef, gen)
+		}
+	}
+}
+
+func extractIDSStatsParts(attr map[string]any, parts *[]string) {
+	stats, ok := attr["crowdsourced_ids_stats"].(map[string]any)
+	if !ok {
+		return
+	}
+
+	var statsParts []string
+	levels := []struct {
+		key   string
+		label string
+	}{
+		{"high", "High"},
+		{"medium", "Medium"},
+		{"low", "Low"},
+		{"info", "Info"},
+	}
+	for _, lvl := range levels {
+		if count, ok := stats[lvl.key].(float64); ok && count > 0 {
+			statsParts = append(statsParts, fmt.Sprintf("%s: %d", lvl.label, int(count)))
+		}
+	}
+	if len(statsParts) > 0 {
+		*parts = append(*parts, "IDS Stats: "+strings.Join(statsParts, ", "))
 	}
 }
 

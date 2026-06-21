@@ -318,6 +318,8 @@
                         "author": "John Doe",
                         "description": "Detects fake android bank app",
                         "rule_name": "android_banker_fake",
+                        "ruleset_id": "yara_rs_123",
+                        "ruleset_name": "malware_ruleset",
                         "source": "https://example.com/rules"
                     },
                     {}
@@ -360,7 +362,20 @@
                 "creation_date": 1620000000,
                 "crowdsourced_ids_results": [
                     {
+                        "alert_context": [
+                            {
+                                "dest_ip": "192.168.1.100",
+                                "dest_port": 8080,
+                                "hostname": "c2.malware.local",
+                                "protocol": "TCP",
+                                "src_ip": "10.0.0.5",
+                                "src_port": 12345,
+                                "url": "http://c2.malware.local/login"
+                            }
+                        ],
                         "alert_severity": "high",
+                        "rule_category": "A Network Trojan was detected",
+                        "rule_id": "2024123",
                         "rule_msg": "ET TROJAN Fake Malware C2 Checkin",
                         "rule_raw": "alert tcp any...",
                         "rule_references": [
@@ -371,6 +386,12 @@
                         "rule_url": "http://et.example.com"
                     }
                 ],
+                "crowdsourced_ids_stats": {
+                    "high": 5,
+                    "info": 0,
+                    "low": 1,
+                    "medium": 2
+                },
                 "detectiteasy": {
                     "filetype": "PE32"
                 },

@@ -94,6 +94,7 @@ func extractFileAnalyzerParts(attr map[string]any) []string {
 	if androguard, ok := attr["androguard"].(map[string]any); ok {
 		extractAndroguardAnalyzerParts(androguard, &parts)
 	}
+	extractIDSStatsParts(attr, &parts)
 	return parts
 }
 

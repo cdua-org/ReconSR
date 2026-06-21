@@ -29,6 +29,7 @@ const (
 	demoIndicator       = "demo-api-key"
 	vtKeyAnalysisStats  = "last_analysis_stats"
 	vtKeySandboxVerdict = "sandbox_verdicts"
+	vtKeyIDSResults     = "crowdsourced_ids_results"
 	vtKeyRuleMsg        = "rule_msg"
 	vtKeyReputation     = "reputation"
 )

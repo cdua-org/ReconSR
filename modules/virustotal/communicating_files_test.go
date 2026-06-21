@@ -64,6 +64,12 @@ func TestCommunicatingFiles_IPWinPE(t *testing.T) {
 		return r.Type == constants.TypeFileName &&
 			r.Value == "blablabla.exe"
 	})
+
+	requireResult(t, exec.Results, "IDS match context", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeMatchContext &&
+			strings.Contains(r.Value, "192.168.1.100") &&
+			strings.Contains(r.Value, "c2.malware.local")
+	})
 }
 
 func TestCommunicatingFiles_EmptyResponse(t *testing.T) {
@@ -270,7 +276,7 @@ func TestCommunicatingFiles_InvalidAndEdgeCases(t *testing.T) {
 				{Title: "Rule 2 (missing match_context)"},
 				{Title: "Rule 3 (empty match_context)", Ctx: []any{}},
 			}),
-			"crowdsourced_ids_results": []any{
+			vtKeyIDSResults: []any{
 				nil,
 			},
 			vtKeySandboxVerdict: map[string]any{
@@ -284,7 +290,7 @@ func TestCommunicatingFiles_InvalidAndEdgeCases(t *testing.T) {
 
 	requireResult(t, exec.Results, "sigma rule match context edge cases", func(r schema.ModuleResult) bool {
 		return r.Type == constants.TypeMatchContext &&
-			strings.Contains(r.Value, "SourceIp: 10.0.0.1, DestinationPort: 80, Key1: Val1, Key2: 42, Key3: <nil>")
+			strings.Contains(r.Value, "Src: 10.0.0.1, DstPort: 80, Key1: Val1, Key2: 42")
 	})
 
 	for _, r := range exec.Results {

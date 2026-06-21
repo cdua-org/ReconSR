@@ -179,6 +179,20 @@ func (m *module) processCommunicatingFilesDemo(_ context.Context, funcName strin
 
 	dbg.Printf("%s start stage=demo_mode", funcName)
 
+	var entityName string
+	if funcName == constants.FuncGetVTApiDomainCommunicatingFiles {
+		entityName = "Domain Communicating Files"
+	} else {
+		entityName = "IP Communicating Files"
+	}
+
+	exec.Results = append(exec.Results, schema.ModuleResult{
+		Type:     constants.TypeInfo,
+		Category: constants.CategoryProperty,
+		Value:    fmt.Sprintf("⚠️ DEMO MODE: Showing sample data for VirusTotal %s (API key not configured)", entityName),
+		LocalID:  gen.NextID(),
+	})
+
 	raw, err := readDemoFile("testdata/communicating_files.json")
 	if err != nil {
 		modutil.SetError(exec, "failed to read demo communicating files data", err)

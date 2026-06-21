@@ -29,13 +29,36 @@ func TestCommunicatingFiles_Advanced(t *testing.T) {
 
 	requireResult(t, exec.Results, "sigma rule match context", func(r schema.ModuleResult) bool {
 		return r.Type == constants.TypeMatchContext &&
-			strings.Contains(r.Value, "Image: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe, Protocol: tcp, DestinationIp: 192.0.2.100, DestinationPort: 443")
+			strings.Contains(r.Value, "Image: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe, Proto: TCP, Dst: 192.0.2.100:443")
 	})
 
 	requireResult(t, exec.Results, "IDS alert", func(r schema.ModuleResult) bool {
 		return r.Type == constants.TypeIDSAlert &&
 			strings.Contains(r.Value, "ET TROJAN Fake Malware C2 Checkin") &&
 			strings.Contains(r.Value, "high")
+	})
+
+	requireResult(t, exec.Results, "tlsh hash", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileHash &&
+			strings.HasPrefix(r.Value, "tlsh:")
+	})
+
+	assertAdvancedSecondHalf(t, &exec)
+}
+
+func assertAdvancedSecondHalf(t *testing.T, exec *schema.ModuleExecution) {
+	requireResult(t, exec.Results, "yara rule", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeYaraRule && strings.Contains(r.Value, "android_banker_fake")
+	})
+
+	requireResult(t, exec.Results, "IDS match context", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeMatchContext &&
+			strings.Contains(r.Value, "192.168.1.100") &&
+			strings.Contains(r.Value, "c2.malware.local")
+	})
+
+	requireResult(t, exec.Results, "IDS stats", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileAnalyzer && strings.Contains(r.Value, "IDS Stats") && strings.Contains(r.Value, "High: 5") && strings.Contains(r.Value, "Medium: 2")
 	})
 
 	requireResult(t, exec.Results, "malware config with family", func(r schema.ModuleResult) bool {
@@ -52,11 +75,6 @@ func TestCommunicatingFiles_Advanced(t *testing.T) {
 	requireResult(t, exec.Results, "dropper category", func(r schema.ModuleResult) bool {
 		return r.Type == constants.TypeCategory &&
 			r.Value == "dropper"
-	})
-
-	requireResult(t, exec.Results, "tlsh hash", func(r schema.ModuleResult) bool {
-		return r.Type == constants.TypeFileHash &&
-			strings.HasPrefix(r.Value, "tlsh:")
 	})
 }
 
@@ -205,7 +223,7 @@ func TestCommunicatingFiles_SigmaEmptyTitle(t *testing.T) {
 			"sigma_analysis_results": []any{
 				map[string]any{
 					"rule_title": "",
-					"rule_level": "high",
+					"rule_level": "critical",
 				},
 			},
 		},
@@ -218,45 +236,186 @@ func TestCommunicatingFiles_SigmaEmptyTitle(t *testing.T) {
 	}
 }
 
+func buildIDSTestEntry(msg, severity, source string, alertContext any, invalid bool) any {
+	if invalid {
+		return "invalid_type_entry"
+	}
+
+	m := map[string]any{
+		vtKeyRuleMsg: msg,
+	}
+	if severity != "" {
+		m["alert_severity"] = severity
+	}
+	if source != "" {
+		m["rule_source"] = source
+	}
+	if alertContext != nil {
+		m["alert_context"] = alertContext
+	}
+	return m
+}
+
 func TestCommunicatingFiles_IDSEdgeCases(t *testing.T) {
+	tests := []struct {
+		alertContext any
+		validate     func(_ *testing.T, _ *schema.ModuleExecution)
+		name         string
+		msg          string
+		severity     string
+		source       string
+		invalid      bool
+	}{
+		{
+			name:     "empty message",
+			severity: "high",
+			validate: func(t *testing.T, exec *schema.ModuleExecution) {
+				for _, r := range exec.Results {
+					if r.Type == constants.TypeIDSAlert && r.Value == "" {
+						t.Fatalf("expected no IDS results for empty msg, got %+v", r)
+					}
+				}
+			},
+		},
+		{
+			name:   "without severity",
+			msg:    "Test rule without severity",
+			source: "Some Valid Source",
+			validate: func(t *testing.T, exec *schema.ModuleExecution) {
+				found := false
+				for _, r := range exec.Results {
+					if r.Type == constants.TypeIDSAlert && r.Value == "Test rule without severity" {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Fatal("expected to find IDS alert without severity")
+				}
+			},
+		},
+		{
+			name:     "empty severity",
+			msg:      "Test rule with empty severity",
+			severity: "",
+			source:   "",
+			validate: func(_ *testing.T, _ *schema.ModuleExecution) {},
+		},
+		{
+			name: "invalid context element",
+			msg:  "Test rule with invalid context element",
+			alertContext: []any{
+				"invalid_context_type",
+			},
+			validate: func(_ *testing.T, _ *schema.ModuleExecution) {},
+		},
+		{
+			name:         "invalid alert_context type",
+			msg:          "Test rule with invalid alert_context type",
+			alertContext: "should_be_slice",
+			validate:     func(_ *testing.T, _ *schema.ModuleExecution) {},
+		},
+		{
+			name: "invalid IPs and valid domain",
+			msg:  "Test rule with invalid IPs and valid domain",
+			alertContext: []any{
+				map[string]any{
+					"dest_ip":              "not-an-ip",
+					"src_ip":               "also-not-an-ip",
+					constants.TypeHostname: "valid.example.com",
+				},
+			},
+			validate: func(_ *testing.T, _ *schema.ModuleExecution) {},
+		},
+		{
+			name: "protocol without ports",
+			msg:  "Test rule protocol no ports",
+			alertContext: []any{
+				map[string]any{
+					"protocol": "UDP",
+				},
+			},
+			validate: func(t *testing.T, exec *schema.ModuleExecution) {
+				foundProtocol := false
+				for _, r := range exec.Results {
+					if r.Type == constants.TypeMatchContext && strings.Contains(r.Value, "Proto: UDP") {
+						foundProtocol = true
+					}
+				}
+				if !foundProtocol {
+					t.Fatal("expected TypeMatchContext with Proto: UDP")
+				}
+			},
+		},
+		{
+			name: "port without IP and empty hostname",
+			msg:  "Test rule port no ip",
+			alertContext: []any{
+				map[string]any{
+					constants.TypeHostname: "    ",
+					"dest_port":            float64(80),
+					"src_port":             float64(443),
+				},
+			},
+			validate: func(_ *testing.T, _ *schema.ModuleExecution) {},
+		},
+		{
+			name:     "invalid_type_entry",
+			invalid:  true,
+			validate: func(_ *testing.T, _ *schema.ModuleExecution) {},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gen := modutil.NewLocalIDGenerator()
+			exec := &schema.ModuleExecution{Function: constants.FuncGetVTApiDomainCommunicatingFiles}
+
+			entry := buildIDSTestEntry(tt.msg, tt.severity, tt.source, tt.alertContext, tt.invalid)
+
+			extractCommunicatingFile(map[string]any{
+				"id": "aabb2222ccdd3333eeff4444aabb5555ccdd6666eeff777788889999aabb0000",
+				constants.KeyAttributes: map[string]any{
+					vtKeyIDSResults: []any{
+						entry,
+					},
+				},
+			}, exec, gen)
+
+			tt.validate(t, exec)
+		})
+	}
+}
+
+func TestCommunicatingFiles_IDSContextCoverage(t *testing.T) {
 	gen := modutil.NewLocalIDGenerator()
 	exec := &schema.ModuleExecution{Function: constants.FuncGetVTApiDomainCommunicatingFiles}
 
+	entry := buildIDSTestEntry("Coverage test", "", "", []any{
+		map[string]any{
+			"EventID":     "42",
+			"CommandLine": "cmd.exe /c ping 8.8.8.8",
+			"url":         "http://example.com",
+		},
+	}, false)
+
 	extractCommunicatingFile(map[string]any{
-		"id": "aabb2222ccdd3333eeff4444aabb5555ccdd6666eeff777788889999aabb0000",
+		"id": "cov0000000000000000000000000000000000000000000000000000000000000",
 		constants.KeyAttributes: map[string]any{
-			"crowdsourced_ids_results": []any{
-				map[string]any{
-					vtKeyRuleMsg:     "",
-					"alert_severity": "high",
-				},
-				map[string]any{
-					vtKeyRuleMsg:  "Test rule without severity",
-					"rule_source": "Some Valid Source",
-				},
-				map[string]any{
-					vtKeyRuleMsg:     "Test rule with empty severity",
-					"alert_severity": "",
-					"rule_source":    "",
-				},
-				"invalid_type_entry",
+			vtKeyIDSResults: []any{
+				entry,
 			},
 		},
 	}, exec, gen)
 
-	foundWithoutSeverity := false
+	found := false
 	for _, r := range exec.Results {
-		if r.Type == constants.TypeIDSAlert {
-			if r.Value == "" {
-				t.Fatalf("expected no IDS results for empty msg, got %+v", r)
-			}
-			if r.Value == "Test rule without severity" {
-				foundWithoutSeverity = true
-			}
+		if r.Type == constants.TypeMatchContext && strings.Contains(r.Value, "Event: 42") && strings.Contains(r.Value, "Cmd: cmd.exe /c ping 8.8.8.8") && strings.Contains(r.Value, "URL: http://example.com") {
+			found = true
 		}
 	}
-	if !foundWithoutSeverity {
-		t.Fatal("expected to find IDS alert without severity")
+	if !found {
+		t.Fatal("expected full network context to be parsed")
 	}
 }
 
@@ -334,31 +493,5 @@ func TestCommunicatingFiles_ReputationFormatting(t *testing.T) {
 				t.Fatalf("expected to extract reputation '%s'", tt.expected)
 			}
 		})
-	}
-}
-
-func TestGetSigmaMatchContextSortFunc(t *testing.T) {
-	keys := []string{"CommandLine", "DestinationIp", "Key1", "Key2"}
-	less := getSigmaMatchContextSortFunc(keys)
-
-	if !less(0, 1) {
-		t.Errorf("expected CommandLine < DestinationIp")
-	}
-	if less(1, 0) {
-		t.Errorf("expected CommandLine < DestinationIp")
-	}
-
-	if !less(0, 2) {
-		t.Errorf("expected CommandLine < Key1")
-	}
-	if less(2, 0) {
-		t.Errorf("expected CommandLine < Key1")
-	}
-
-	if !less(2, 3) {
-		t.Errorf("expected Key1 < Key2")
-	}
-	if less(3, 2) {
-		t.Errorf("expected Key1 < Key2")
 	}
 }
