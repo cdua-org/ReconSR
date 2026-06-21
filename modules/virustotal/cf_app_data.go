@@ -238,3 +238,40 @@ func extractX509Certificates(exec *schema.ModuleExecution, sigInfo map[string]an
 		}
 	}
 }
+
+func extractClassInfoParts(classInfo map[string]any, parts *[]string) {
+	if name, ok := classInfo["name"].(string); ok && name != "" {
+		*parts = append(*parts, "Class Name: "+name)
+	}
+	if platform, ok := classInfo["platform"].(string); ok && platform != "" {
+		*parts = append(*parts, "Platform: "+platform)
+	}
+	if extends, ok := classInfo["extends"].(string); ok && extends != "" {
+		*parts = append(*parts, "Extends: "+extends)
+	}
+
+	listFields := []struct {
+		key   string
+		label string
+	}{
+		{"implements", "Implements"},
+		{"methods", "Methods"},
+		{"constants", "Constants"},
+		{"provides", "Provides"},
+		{"requires", "Requires"},
+	}
+
+	for _, field := range listFields {
+		if rawList, ok := classInfo[field.key].([]any); ok && len(rawList) > 0 {
+			items := make([]string, 0, len(rawList))
+			for _, v := range rawList {
+				if str, ok := v.(string); ok && str != "" {
+					items = append(items, str)
+				}
+			}
+			if len(items) > 0 {
+				*parts = append(*parts, field.label+": "+strings.Join(items, ", "))
+			}
+		}
+	}
+}

@@ -96,6 +96,9 @@ func extractFileMetaParts(attr map[string]any, exec *schema.ModuleExecution, has
 	if bundleInfo, ok := attr["bundle_info"].(map[string]any); ok {
 		extractBundleInfoParts(bundleInfo, exec, hashRef, gen)
 	}
+	if classInfo, ok := attr["class_info"].(map[string]any); ok {
+		extractClassInfoParts(classInfo, &parts)
+	}
 	return parts
 }
 

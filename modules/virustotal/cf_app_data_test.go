@@ -239,7 +239,7 @@ func TestCommunicatingFiles_APK_StringPermissions(t *testing.T) {
 	exec := &schema.ModuleExecution{Function: constants.FuncGetVTApiDomainCommunicatingFiles}
 
 	extractCommunicatingFile(map[string]any{
-		"id": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+		"id": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcde1",
 		constants.KeyAttributes: map[string]any{
 			"androguard": map[string]any{
 				"permission_details": map[string]any{
@@ -259,5 +259,76 @@ func TestCommunicatingFiles_APK_StringPermissions(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("expected to extract dangerous string permissions")
+	}
+}
+
+func TestCommunicatingFiles_ClassInfo(t *testing.T) {
+	fixture := loadVTFixture(t, "communicating_files.json")
+	mod := setupCommFilesTest(t, "/api/v3/domains/class.example.com/communicating_files?limit=40", fixture)
+
+	exec := execVTCommFiles(t, mod, constants.FuncGetVTApiDomainCommunicatingFiles, schema.Entity{
+		Type:  constants.TypeDomain,
+		Value: "class.example.com",
+	})
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %s", *exec.Error)
+	}
+
+	requireResult(t, exec.Results, "class name", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileMeta && strings.Contains(r.Value, "Class Name: MalwareApplet")
+	})
+	requireResult(t, exec.Results, "class platform", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileMeta && strings.Contains(r.Value, "Platform: 1.0.2")
+	})
+	requireResult(t, exec.Results, "class extends", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileMeta && strings.Contains(r.Value, "Extends: java.lang.Object")
+	})
+	requireResult(t, exec.Results, "class implements", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileMeta && strings.Contains(r.Value, "Implements: javax.microedition.lcdui.CommandListener")
+	})
+	requireResult(t, exec.Results, "class methods", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileMeta && strings.Contains(r.Value, "Methods: <init>, commandAction")
+	})
+	requireResult(t, exec.Results, "class constants", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileMeta && strings.Contains(r.Value, "Constants: StackMap, equals, java/lang/Exception, java/lang/Object, javax/microedition/lcdui/Command")
+	})
+	requireResult(t, exec.Results, "class provides", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileMeta && strings.Contains(r.Value, "Provides: MalwareApplet.commandAction")
+	})
+	requireResult(t, exec.Results, "class requires", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileMeta && strings.Contains(r.Value, "Requires: java.lang.StringBuffer.toString():java.lang.String")
+	})
+}
+
+func TestCommunicatingFiles_ClassInfo_EdgeCases(t *testing.T) {
+	gen := modutil.NewLocalIDGenerator()
+	exec := &schema.ModuleExecution{Function: constants.FuncGetVTApiDomainCommunicatingFiles}
+
+	extractCommunicatingFile(map[string]any{
+		"id": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcde2",
+		constants.KeyAttributes: map[string]any{
+			"class_info": map[string]any{
+				"name":       12345,
+				"platform":   []any{},
+				"extends":    "",
+				"implements": []any{123, "valid_interface", nil, ""},
+			},
+		},
+	}, exec, gen)
+
+	foundValidInterface := false
+	for _, r := range exec.Results {
+		if r.Type == constants.TypeFileMeta {
+			if strings.Contains(r.Value, "Class Name") || strings.Contains(r.Value, "Platform") || strings.Contains(r.Value, "Extends: ") {
+				t.Fatalf("unexpected meta value extracted: %s", r.Value)
+			}
+			if strings.Contains(r.Value, "Implements: valid_interface") {
+				foundValidInterface = true
+			}
+		}
+	}
+
+	if !foundValidInterface {
+		t.Fatal("expected to extract only valid_interface")
 	}
 }

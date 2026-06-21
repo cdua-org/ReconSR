@@ -494,6 +494,43 @@
             },
             "id": "corrupt_sha256",
             "type": "file"
+        },
+        {
+            "attributes": {
+                "class_info": {
+                    "constants": [
+                        "StackMap",
+                        "equals",
+                        "java/lang/Exception",
+                        "java/lang/Object",
+                        "javax/microedition/lcdui/Command"
+                    ],
+                    "extends": "java.lang.Object",
+                    "implements": [
+                        "javax.microedition.lcdui.CommandListener"
+                    ],
+                    "methods": [
+                        "<init>",
+                        "commandAction"
+                    ],
+                    "name": "MalwareApplet",
+                    "platform": "1.0.2",
+                    "provides": [
+                        "MalwareApplet.commandAction"
+                    ],
+                    "requires": [
+                        "java.lang.StringBuffer.toString():java.lang.String"
+                    ]
+                },
+                "md5": "class_md5",
+                "meaningful_name": "MalwareApplet.class",
+                "sha256": "class_sha256",
+                "size": 1024,
+                "type_description": "Java Bytecode",
+                "type_tag": "class"
+            },
+            "id": "class_sha256",
+            "type": "file"
         }
     ],
     "links": {

@@ -317,7 +317,7 @@ func TestCommunicatingFiles_ReputationFormatting(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			exec := &schema.ModuleExecution{Function: constants.FuncGetVTApiDomainCommunicatingFiles}
 			extractCommunicatingFile(map[string]any{
-				"id": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+				"id": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcde3",
 				constants.KeyAttributes: map[string]any{
 					vtKeyReputation: tt.rep,
 				},
