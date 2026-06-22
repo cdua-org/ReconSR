@@ -213,3 +213,175 @@ func appendFileMagic(exec *schema.ModuleExecution, attr map[string]any, hashRef 
 		appendVTProperty(exec, constants.TypeFileMagic, magic, "", hashRef, gen)
 	}
 }
+
+func appendFileDebInfo(exec *schema.ModuleExecution, attr map[string]any, hashRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
+	debInfo, ok := attr["deb_info"].(map[string]any)
+	if !ok {
+		return
+	}
+
+	var parts []string
+	var author, maintainer, vendor, homepage, pkgName string
+
+	extractDebControlMetadata(debInfo, exec, hashRef, gen, &parts, &maintainer, &vendor, &homepage, &pkgName)
+	extractDebChangelog(debInfo, exec, hashRef, gen, &parts, &author, pkgName)
+	extractDebContacts(&parts, author, maintainer, vendor, homepage)
+	extractDebStructuralMetadata(debInfo, exec, hashRef, gen, &parts)
+
+	if len(parts) > 0 {
+		appendVTProperty(exec, constants.TypePackageInfo, strings.Join(parts, " | "), "", hashRef, gen)
+	}
+
+	extractDebScripts(debInfo, exec, hashRef, gen)
+}
+
+func extractDebControlMetadata(debInfo map[string]any, exec *schema.ModuleExecution, hashRef *schema.EntityRef, gen *modutil.LocalIDGenerator, parts *[]string, maintainer, vendor, homepage, pkgName *string) {
+	controlMetadata, ok := debInfo["control_metadata"].(map[string]any)
+	if !ok {
+		return
+	}
+
+	if pkg, ok := controlMetadata["Package"].(string); ok && pkg != "" {
+		*pkgName = pkg
+		appendVTProperty(exec, constants.TypeFileName, pkg, "", hashRef, gen)
+	}
+
+	if version, ok := controlMetadata["Version"].(string); ok && version != "" {
+		versionStr := "Version: " + version
+		if arch, ok := controlMetadata["Architecture"].(string); ok && arch != "" {
+			versionStr += " (" + arch + ")"
+		}
+		*parts = append(*parts, versionStr)
+	}
+
+	if m, ok := controlMetadata["Maintainer"].(string); ok && m != "" {
+		*maintainer = m
+	}
+	if v, ok := controlMetadata["Vendor"].(string); ok && v != "" {
+		*vendor = v
+	}
+	if hp, ok := controlMetadata["Homepage"].(string); ok && hp != "" {
+		*homepage = hp
+	}
+}
+
+func extractDebChangelog(debInfo map[string]any, exec *schema.ModuleExecution, hashRef *schema.EntityRef, gen *modutil.LocalIDGenerator, parts *[]string, author *string, pkgName string) {
+	changelog, ok := debInfo["changelog"].(map[string]any)
+	if !ok {
+		return
+	}
+
+	if urgency, ok := changelog["Urgency"].(string); ok && urgency != "" {
+		*parts = append(*parts, "Urgency: "+urgency)
+	}
+	if a, ok := changelog["Author"].(string); ok && a != "" {
+		*author = a
+	}
+
+	if dateStr, ok := changelog["Date"].(string); ok && dateStr != "" {
+		if t, err := time.Parse(time.RFC1123Z, dateStr); err == nil {
+			appendVTProperty(exec, constants.TypeDate, "Build: "+t.UTC().Format(time.DateTime), "", hashRef, gen)
+		} else if t, err := time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", dateStr); err == nil {
+			appendVTProperty(exec, constants.TypeDate, "Build: "+t.UTC().Format(time.DateTime), "", hashRef, gen)
+		} else if t, err := time.Parse(time.RFC1123, dateStr); err == nil {
+			appendVTProperty(exec, constants.TypeDate, "Build: "+t.UTC().Format(time.DateTime), "", hashRef, gen)
+		} else {
+			appendVTProperty(exec, constants.TypeDate, "Build: "+dateStr, "", hashRef, gen)
+		}
+	}
+
+	if pkgName == "" {
+		if pkg, ok := changelog["Package"].(string); ok && pkg != "" {
+			appendVTProperty(exec, constants.TypeFileName, pkg, "", hashRef, gen)
+		}
+	}
+}
+
+func extractDebContacts(parts *[]string, author, maintainer, vendor, homepage string) {
+	contactRoles := make(map[string][]string)
+	if author != "" {
+		contactRoles[author] = append(contactRoles[author], "Author")
+	}
+	if maintainer != "" {
+		contactRoles[maintainer] = append(contactRoles[maintainer], "Maintainer")
+	}
+	if vendor != "" {
+		contactRoles[vendor] = append(contactRoles[vendor], "Vendor")
+	}
+
+	contacts := make([]string, 0, len(contactRoles))
+	for contact, roles := range contactRoles {
+		sort.Strings(roles)
+		contacts = append(contacts, strings.Join(roles, "/")+": "+contact)
+	}
+	if len(contacts) > 0 {
+		sort.Strings(contacts)
+		*parts = append(*parts, contacts...)
+	}
+
+	if homepage != "" {
+		*parts = append(*parts, "Homepage: "+homepage)
+	}
+}
+
+func extractDebStructuralMetadata(debInfo map[string]any, exec *schema.ModuleExecution, hashRef *schema.EntityRef, gen *modutil.LocalIDGenerator, parts *[]string) {
+	structuralMetadata, ok := debInfo["structural_metadata"].(map[string]any)
+	if !ok {
+		return
+	}
+
+	var structParts []string
+	if files, ok := structuralMetadata["contained_items"].(float64); ok {
+		structParts = append(structParts, fmt.Sprintf("Files: %d", int(files)))
+	} else if files, ok := structuralMetadata["contained_files"].(float64); ok {
+		structParts = append(structParts, fmt.Sprintf("Files: %d", int(files)))
+	}
+
+	var dates []string
+	if minDate, ok := structuralMetadata["min_date"].(string); ok && minDate != "" {
+		dates = append(dates, "Oldest: "+minDate)
+		appendVTProperty(exec, constants.TypeDate, "Oldest Contained File: "+minDate, "", hashRef, gen)
+	}
+	if maxDate, ok := structuralMetadata["max_date"].(string); ok && maxDate != "" {
+		dates = append(dates, "Newest: "+maxDate)
+		appendVTProperty(exec, constants.TypeDate, "Newest Contained File: "+maxDate, "", hashRef, gen)
+	}
+
+	if len(structParts) > 0 {
+		if len(dates) > 0 {
+			*parts = append(*parts, structParts[0]+" ("+strings.Join(dates, ", ")+")")
+		} else {
+			*parts = append(*parts, structParts[0])
+		}
+	}
+}
+
+func extractDebScripts(debInfo map[string]any, exec *schema.ModuleExecution, hashRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
+	controlScripts, ok := debInfo["control_scripts"].(map[string]any)
+	if !ok {
+		return
+	}
+	var scriptNames []string
+	for k := range controlScripts {
+		scriptNames = append(scriptNames, k)
+	}
+	sort.Strings(scriptNames)
+	for _, scriptName := range scriptNames {
+		if scriptContent, ok := controlScripts[scriptName].(string); ok && scriptContent != "" {
+			formatted := strings.ReplaceAll(scriptContent, "\n", `\n`)
+			runes := []rune(formatted)
+			if len(runes) > 150 {
+				formatted = string(runes[:146]) + "..."
+			}
+
+			exec.Results = append(exec.Results, schema.ModuleResult{
+				Type:     constants.TypeFileScript,
+				Category: constants.CategoryProperty,
+				Value:    formatted,
+				Tags:     []string{scriptName},
+				Source:   hashRef,
+				LocalID:  gen.NextID(),
+			})
+		}
+	}
+}

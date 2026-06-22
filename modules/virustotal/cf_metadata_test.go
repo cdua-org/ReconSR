@@ -260,3 +260,168 @@ func TestCommunicatingFiles_BundleInfo_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestCommunicatingFiles_DebInfoMeta(t *testing.T) {
+	fixture := loadVTFixture(t, "communicating_files.json")
+	mod := setupCommFilesTest(t, "/api/v3/domains/deb.example.com/communicating_files?limit=40", fixture)
+
+	exec := execVTCommFiles(t, mod, constants.FuncGetVTApiDomainCommunicatingFiles, schema.Entity{
+		Type:  constants.TypeDomain,
+		Value: "deb.example.com",
+	})
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %s", *exec.Error)
+	}
+
+	requireResult(t, exec.Results, "deb package info", func(r schema.ModuleResult) bool {
+		if r.Type != constants.TypePackageInfo {
+			return false
+		}
+		if !strings.Contains(r.Value, "Version: 1.34.1 (amd64)") {
+			return false
+		}
+		if !strings.Contains(r.Value, "Urgency: medium") {
+			return false
+		}
+		if !strings.Contains(r.Value, "Author: Blablabla <support@lablabla.bla>") {
+			return false
+		}
+		if !strings.Contains(r.Value, "Maintainer: Blablabla <support@blablabla.bla>") {
+			return false
+		}
+		return strings.Contains(r.Value, "Vendor: Blablabla <support@blabla.org>")
+	})
+
+	requireResult(t, exec.Results, "deb file script postinst", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileScript && len(r.Tags) > 0 && r.Tags[0] == "postinst"
+	})
+
+	requireResult(t, exec.Results, "deb file name", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileName && r.Value == "blabla-desktop"
+	})
+}
+
+func TestCommunicatingFiles_DebInfoDates(t *testing.T) {
+	fixture := loadVTFixture(t, "communicating_files.json")
+	mod := setupCommFilesTest(t, "/api/v3/domains/deb.example.com/communicating_files?limit=40", fixture)
+
+	exec := execVTCommFiles(t, mod, constants.FuncGetVTApiDomainCommunicatingFiles, schema.Entity{
+		Type:  constants.TypeDomain,
+		Value: "deb.example.com",
+	})
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %s", *exec.Error)
+	}
+
+	t.Run("dates", func(t *testing.T) {
+		requireResult(t, exec.Results, "deb package build date", func(r schema.ModuleResult) bool {
+			return r.Type == constants.TypeDate && r.Value == "Build: 2020-05-16 00:25:05"
+		})
+
+		requireResult(t, exec.Results, "deb package oldest date", func(r schema.ModuleResult) bool {
+			return r.Type == constants.TypeDate && r.Value == "Oldest Contained File: 2020-05-16 00:08:35"
+		})
+
+		requireResult(t, exec.Results, "deb package newest date", func(r schema.ModuleResult) bool {
+			return r.Type == constants.TypeDate && r.Value == "Newest Contained File: 2020-05-16 00:25:05"
+		})
+	})
+}
+
+func TestCommunicatingFiles_DebInfo_EdgeCases(t *testing.T) {
+	gen := modutil.NewLocalIDGenerator()
+
+	tests := []struct {
+		controlVal any
+		changeVal  any
+		structVal  any
+		scriptVal  any
+		expectVals map[string]bool
+		changeDate string
+		name       string
+	}{
+		{
+			name:       "not maps",
+			controlVal: 123,
+			changeVal:  123,
+			structVal:  123,
+			scriptVal:  123,
+		},
+		{
+			name:       "missing arch but has version",
+			controlVal: map[string]any{"Version": "1.0"},
+			expectVals: map[string]bool{"Version: 1.0": true},
+		},
+		{
+			name:       "missing pkgName in control, present in changelog",
+			changeVal:  map[string]any{"Package": "fallback-pkg"},
+			expectVals: map[string]bool{"fallback-pkg": true},
+		},
+		{
+			name:       "date parsing fallback RFC1123",
+			changeDate: "Fri, 15 May 2020 17:25:05 UTC",
+			expectVals: map[string]bool{"Build: 2020-05-15 17:25:05": true},
+		},
+		{
+			name:       "date parsing fallback custom",
+			changeDate: "Fri, 5 May 2020 17:25:05 -0700",
+			expectVals: map[string]bool{"Build: 2020-05-06 00:25:05": true},
+		},
+		{
+			name:       "date parsing unparseable",
+			changeDate: "Just a random string",
+			expectVals: map[string]bool{"Build: Just a random string": true},
+		},
+		{
+			name:       "contained_files instead of contained_items",
+			structVal:  map[string]any{"contained_files": float64(42)},
+			expectVals: map[string]bool{"Files: 42": true},
+		},
+		{
+			name:      "invalid script type",
+			scriptVal: map[string]any{"postinst": 12345},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exec := &schema.ModuleExecution{Function: constants.FuncGetVTApiDomainCommunicatingFiles}
+
+			debInfo := make(map[string]any)
+			if tt.controlVal != nil {
+				debInfo["control_metadata"] = tt.controlVal
+			}
+			if tt.changeVal != nil {
+				debInfo["changelog"] = tt.changeVal
+			} else if tt.changeDate != "" {
+				debInfo["changelog"] = map[string]any{"Date": tt.changeDate}
+			}
+			if tt.structVal != nil {
+				debInfo["structural_metadata"] = tt.structVal
+			}
+			if tt.scriptVal != nil {
+				debInfo["control_scripts"] = tt.scriptVal
+			}
+
+			extractCommunicatingFile(map[string]any{
+				"id": "deb_edge_" + tt.name,
+				constants.KeyAttributes: map[string]any{
+					"deb_info": debInfo,
+				},
+			}, exec, gen)
+
+			for expectVal, shouldExist := range tt.expectVals {
+				found := false
+				for _, r := range exec.Results {
+					if strings.Contains(r.Value, expectVal) {
+						found = true
+						break
+					}
+				}
+				if found != shouldExist {
+					t.Errorf("expected string %q presence to be %v, but was %v", expectVal, shouldExist, found)
+				}
+			}
+		})
+	}
+}

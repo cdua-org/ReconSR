@@ -553,6 +553,59 @@
             "id": "class_sha256",
             "type": "file"
         }
+        ,{
+            "attributes": {
+                "deb_info": {
+                    "changelog": {
+                        "Author": "Blablabla <support@lablabla.bla>",
+                        "Date": "Fri, 15 May 2020 17:25:05 -0700",
+                        "Debian revision": "2",
+                        "Debian version": "2",
+                        "Distributions": "whatever",
+                        "Full version": "1.2.13-2",
+                        "Package": "blabla-desktop",
+                        "Urgency": "medium",
+                        "Version history": "1.2.13-2, 1.2.13-1, 1.2.12-1, 1.2.11-2, 1.2.11-1"
+                    },
+                    "control_metadata": {
+                        "Architecture": "amd64",
+                    	"Conflicts": "containerd, runc",
+                        "Depends": "libc6 (>= 2.14), libnotify4, libappindicator1, libxtst6, libnss3, libasound2, libxss1",
+                        "Description": "\n  Blablabla desktop",
+                        "Homepage": "https://github.com/blabla/blabla",
+                        "Installed-Size": "325997",
+                        "License": "GPL-3.0",
+                        "Maintainer": "Blablabla <support@blablabla.bla>",
+                        "Package": "blabla-desktop",
+                        "Priority": "extra",
+                        "Provides": "blabla, runc",
+                        "Replaces": "blabla, runc",
+                        "Section": "default",
+                        "Vendor": "Blablabla <support@blabla.org>",
+                        "Version": "1.34.1"
+                    },
+                    "control_scripts": {
+                    "postinst": "#!/bin/bash\n\n# Link to the binary\nln -sf '/opt/blabla/blabla-desktop' '/usr/bin/blabla-desktop'\n\nupdate-mime-database /usr/share/mime || true\nupdate-desktop-database /usr/share/applications || true\n",
+                    "postrm": "#!/bin/bash\n\n# Delete the link to the binary\nrm -f '/usr/bin/blabla-desktop'\n",
+                  	"preinst": "#!/bin/bash\n# $Id: preinst 127855 2019-01-01 01:45:53Z bird $\n## @file\n# Blabla pre-install.\n#\n\n#\n# Copyright (C) 2006-2019 Blabla Systems\n",
+                  	"prerm": "#!/bin/sh\nset -e\n# Automatically added by dh_systemd_start/11.1.6ubuntu2\nif [ -d /run/systemd/system ] && [ \"$1\" = remove ]; then\n\tdeb-systemd-invoke stop 'blabla.service' >/dev/null || true\nfi\n# End automatically added section\n"
+                },
+                    "structural_metadata": {
+                        "contained_items": 1160,
+                        "max_date": "2020-05-16 00:25:05",
+                        "min_date": "2020-05-16 00:08:35"
+                    }
+                },
+                "md5": "deb_md5",
+                "meaningful_name": "blabla-desktop.deb",
+                "sha256": "deb_sha256",
+                "size": 2048,
+                "type_description": "Debian Package",
+                "type_tag": "deb"
+            },
+            "id": "deb_sha256",
+            "type": "file"
+        }
     ],
     "links": {
         "self": "https://www.virustotal.com/api/v3/domains/example.com/communicating_files"

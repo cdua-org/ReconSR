@@ -66,4 +66,5 @@ func extractCommunicatingFile(item map[string]any, exec *schema.ModuleExecution,
 	appendFileSandboxVerdicts(exec, attr, hashRef, gen)
 	appendFileReputation(exec, attr, hashRef, gen)
 	appendFileCertificates(exec, attr, hashRef, gen)
+	appendFileDebInfo(exec, attr, hashRef, gen)
 }

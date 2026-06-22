@@ -140,4 +140,6 @@ const (
 	TypeMatchContext          = "match_context"
 	TypePassword              = "password"
 	TypeBundleInfo            = "bundle_info"
+	TypePackageInfo           = "package_info"
+	TypeFileScript            = "script"
 )
