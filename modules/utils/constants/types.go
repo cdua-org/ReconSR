@@ -129,6 +129,7 @@ const (
 	TypeFileHash              = "file_hash"
 	TypeFileName              = "file_name"
 	TypeFileInfo              = "file_info"
+	TypePDBPath               = "pdb_path"
 	TypeFileMeta              = "file_meta"
 	TypeFileMagic             = "file_magic"
 	TypeFileAnalyzer          = "file_analyzer"

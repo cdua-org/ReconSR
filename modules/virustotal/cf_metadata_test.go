@@ -86,6 +86,14 @@ func TestCommunicatingFiles_DomainWinPE_Metadata(t *testing.T) {
 	requireResult(t, exec.Results, "peexe tag", func(r schema.ModuleResult) bool {
 		return r.Type == constants.TypeTag && r.Value == "peexe"
 	})
+
+	requireResult(t, exec.Results, "pdb path", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypePDBPath && r.Value == "E:\\987.pdb"
+	})
+
+	requireResult(t, exec.Results, "compilation date", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeDate && r.Value == "Compilation: 1992-06-19 22:22:17"
+	})
 }
 
 func TestCommunicatingFiles_BundleInfo(t *testing.T) {
@@ -421,6 +429,73 @@ func TestCommunicatingFiles_DebInfo_EdgeCases(t *testing.T) {
 				if found != shouldExist {
 					t.Errorf("expected string %q presence to be %v, but was %v", expectVal, shouldExist, found)
 				}
+			}
+		})
+	}
+}
+
+func TestCommunicatingFiles_PEInfo_EdgeCases(t *testing.T) {
+	gen := modutil.NewLocalIDGenerator()
+	hashRef := &schema.EntityRef{Type: constants.TypeFileHash, Value: "sha256:abc"}
+
+	debugList := make([]any, 0, 6)
+	debugList = append(debugList, "string-item", map[string]any{"no-codeview": true}, map[string]any{"codeview": "not-a-map"})
+	for _, val := range []any{123, "", " \t "} {
+		debugList = append(debugList, map[string]any{"codeview": map[string]any{"name": val}})
+	}
+
+	tests := []struct {
+		val  any
+		name string
+	}{
+		{
+			name: "no pe_info",
+			val:  nil,
+		},
+		{
+			name: "invalid pe_info type",
+			val:  "not-a-map",
+		},
+		{
+			name: "empty pe_info",
+			val:  map[string]any{},
+		},
+		{
+			name: "empty imphash",
+			val:  map[string]any{"imphash": ""},
+		},
+		{
+			name: "invalid imphash type",
+			val:  map[string]any{"imphash": 123},
+		},
+		{
+			name: "negative timestamp",
+			val:  map[string]any{"timestamp": float64(-1)},
+		},
+		{
+			name: "invalid timestamp type",
+			val:  map[string]any{"timestamp": "2020"},
+		},
+		{
+			name: "invalid debug type",
+			val:  map[string]any{"debug": "not-a-list"},
+		},
+		{
+			name: "debug list with invalid items",
+			val:  map[string]any{"debug": debugList},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exec := &schema.ModuleExecution{}
+			attr := map[string]any{}
+			if tt.val != nil {
+				attr["pe_info"] = tt.val
+			}
+			appendPEInfo(exec, attr, hashRef, gen)
+			if len(exec.Results) > 0 {
+				t.Fatalf("expected 0 results for edge case, got %d", len(exec.Results))
 			}
 		})
 	}

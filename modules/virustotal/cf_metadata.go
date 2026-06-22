@@ -30,10 +30,44 @@ func appendFileHashes(exec *schema.ModuleExecution, attr map[string]any, hashRef
 			appendVTProperty(exec, constants.TypeFileHash, h.prefix+":"+val, "", hashRef, gen)
 		}
 	}
+}
 
-	if peInfo, ok := attr["pe_info"].(map[string]any); ok {
-		if imphash, ok := peInfo["imphash"].(string); ok && imphash != "" {
-			appendVTProperty(exec, constants.TypeFileHash, "imphash:"+imphash, "", hashRef, gen)
+func appendPEInfo(exec *schema.ModuleExecution, attr map[string]any, hashRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
+	peInfo, hasPE := attr["pe_info"].(map[string]any)
+	if !hasPE {
+		return
+	}
+
+	if imphash, hasImp := peInfo["imphash"].(string); hasImp && imphash != "" {
+		appendVTProperty(exec, constants.TypeFileHash, "imphash:"+imphash, "", hashRef, gen)
+	}
+
+	if tsFloat, hasTS := peInfo["timestamp"].(float64); hasTS && tsFloat > 0 {
+		t := time.Unix(int64(tsFloat), 0).UTC()
+		appendVTProperty(exec, constants.TypeDate, "Compilation: "+t.Format(time.DateTime), "", hashRef, gen)
+	}
+
+	debugList, hasDebug := peInfo["debug"].([]any)
+	if !hasDebug {
+		return
+	}
+
+	for _, d := range debugList {
+		dMap, isMap := d.(map[string]any)
+		if !isMap {
+			continue
+		}
+		cv, hasCV := dMap["codeview"].(map[string]any)
+		if !hasCV {
+			continue
+		}
+		name, hasName := cv["name"].(string)
+		if !hasName || name == "" {
+			continue
+		}
+		name = strings.TrimSpace(name)
+		if name != "" {
+			appendVTProperty(exec, constants.TypePDBPath, name, "", hashRef, gen)
 		}
 	}
 }

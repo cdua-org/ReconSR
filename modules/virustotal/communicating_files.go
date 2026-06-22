@@ -51,6 +51,7 @@ func extractCommunicatingFile(item map[string]any, exec *schema.ModuleExecution,
 	})
 
 	appendFileHashes(exec, attr, hashRef, gen)
+	appendPEInfo(exec, attr, hashRef, gen)
 	appendFileName(exec, attr, hashRef, gen)
 	appendFileInfo(exec, attr, hashRef, gen)
 	appendFileMagic(exec, attr, hashRef, gen)
