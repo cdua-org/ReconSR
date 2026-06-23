@@ -327,8 +327,93 @@ func TestCommunicatingFiles_ClassInfo_EdgeCases(t *testing.T) {
 			}
 		}
 	}
-
 	if !foundValidInterface {
 		t.Fatal("expected to extract only valid_interface")
+	}
+}
+
+func TestCommunicatingFiles_SignatureInfo_Extraction(t *testing.T) {
+	sigInfoMap := map[string]any{
+		"verified":       "Signed",
+		"signing date":   "2020-01-01",
+		"Timestamp":      "2020-01-02",
+		"TeamIdentifier": "TEAM123",
+		"Identifier":     "com.test",
+		"description":    "TestDesc",
+		"file version":   "1.0",
+		"internal name":  "test.exe",
+		"original name":  "orig.exe",
+		"product":        "TestProduct",
+		"copyright":      "TestCopy",
+	}
+
+	var parts []string
+	extractSignatureMetaParts(sigInfoMap, &parts)
+	metaStr := strings.Join(parts, " | ")
+
+	expectedMeta := "Original Name: orig.exe | Product: TestProduct | Copyright: TestCopy | Description: TestDesc | File Version: 1.0 | Internal Name: test.exe | Team ID: TEAM123 | App ID: com.test"
+	if metaStr != expectedMeta {
+		t.Errorf("expected meta %q, got %q", expectedMeta, metaStr)
+	}
+}
+
+func TestCommunicatingFiles_SignatureInfo_FallbackDate(t *testing.T) {
+	gen := modutil.NewLocalIDGenerator()
+	exec := &schema.ModuleExecution{Function: constants.FuncGetVTApiDomainCommunicatingFiles}
+	hashRef := &schema.EntityRef{Type: constants.TypeFileHash, Value: "sha256:0000111122223333444455556666777788889999aaaabbbbccccddddeeeeffff"}
+
+	appendFileCertificates(exec, map[string]any{
+		"signature_info": map[string]any{
+			"Timestamp": "2020-01-02",
+		},
+	}, hashRef, gen)
+
+	foundRootTimestamp := false
+	for _, r := range exec.Results {
+		if r.Type == constants.TypeDate && r.Value == "Signed: 2020-01-02" {
+			foundRootTimestamp = true
+		}
+	}
+	if !foundRootTimestamp {
+		t.Error("missing fallback Timestamp")
+	}
+}
+
+func TestMergeSignatureCertificates_Coverage(t *testing.T) {
+	sigInfo := make(map[string]any)
+	tests := []struct {
+		listKey string
+		tp1     string
+		tp2     string
+		k       string
+		v       string
+		invalid bool
+	}{
+		{"x509", "tp1", "", "k1", "v1", true},
+		{"signers details", "tp1", "tp2", "k2", "v2", false},
+		{"counter signers details", "tp2", "     ", "k3", "v3", false},
+	}
+
+	for _, tt := range tests {
+		list := []any{
+			map[string]any{"thumbprint": tt.tp1, tt.k: tt.v},
+		}
+		if tt.invalid {
+			list = append(list, "not-a-map")
+		} else {
+			list = append(list, map[string]any{"thumbprint": tt.tp2})
+		}
+		sigInfo[tt.listKey] = list
+	}
+
+	res := mergeSignatureCertificates(sigInfo)
+	if len(res) != 2 {
+		t.Fatalf("expected 2 merged certs, got %d", len(res))
+	}
+	if res["TP1"]["k1"] != "v1" || res["TP1"]["k2"] != "v2" {
+		t.Errorf("failed to merge tp1: %+v", res["TP1"])
+	}
+	if res["TP2"]["k3"] != "v3" {
+		t.Errorf("failed to merge tp2: %+v", res["TP2"])
 	}
 }

@@ -283,7 +283,7 @@ func TestCommunicatingFiles_InvalidAndEdgeCases(t *testing.T) {
 				"bad_entry": "not_valid_map_entry",
 			},
 			"signature_info": map[string]any{
-				"x509": "not_valid_list",
+				"signers details": "not_valid_list",
 			},
 		},
 	}, exec, gen)

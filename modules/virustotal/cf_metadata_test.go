@@ -96,6 +96,34 @@ func TestCommunicatingFiles_DomainWinPE_Metadata(t *testing.T) {
 	})
 }
 
+func TestCommunicatingFiles_DomainWinPE_Signature(t *testing.T) {
+	fixture := loadVTFixture(t, "communicating_files.json")
+	mod := setupCommFilesTest(t, "/api/v3/domains/meta.example.com/communicating_files?limit=40", fixture)
+
+	exec := execVTCommFiles(t, mod, constants.FuncGetVTApiDomainCommunicatingFiles, schema.Entity{
+		Type:  constants.TypeDomain,
+		Value: "meta.example.com",
+	})
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %s", *exec.Error)
+	}
+
+	requireResult(t, exec.Results, "signature verified status", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeStatus && r.Value == "Signed"
+	})
+
+	requireResult(t, exec.Results, "signature date", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeDate && r.Value == "Signed: 2020-04-16 15:35:24"
+	})
+
+	requireResult(t, exec.Results, "signature attributes in file meta", func(r schema.ModuleResult) bool {
+		return r.Type == constants.TypeFileMeta &&
+			strings.Contains(r.Value, "Team ID: TEAM123XYZ") &&
+			strings.Contains(r.Value, "App ID: com.blablabla.app") &&
+			strings.Contains(r.Value, "Authority: Apple Development")
+	})
+}
+
 func TestCommunicatingFiles_BundleInfo(t *testing.T) {
 	fixture := loadVTFixture(t, "communicating_files.json")
 	mod := setupCommFilesTest(t, "/api/v3/domains/bundle.example.com/communicating_files?limit=40", fixture)
@@ -436,10 +464,10 @@ func TestCommunicatingFiles_DebInfo_EdgeCases(t *testing.T) {
 
 func TestCommunicatingFiles_PEInfo_EdgeCases(t *testing.T) {
 	gen := modutil.NewLocalIDGenerator()
-	hashRef := &schema.EntityRef{Type: constants.TypeFileHash, Value: "sha256:abc"}
+	hashRef := &schema.EntityRef{Type: constants.TypeFileHash, Value: "sha256:ffffeeeeddddccccbbbbaaaa0000111122223333444455556666777788889999"}
 
 	debugList := make([]any, 0, 6)
-	debugList = append(debugList, "string-item", map[string]any{"no-codeview": true}, map[string]any{"codeview": "not-a-map"})
+	debugList = append(debugList, "string-item", map[string]any{"no-codeview": true}, map[string]any{"codeview": "invalid-map-value"})
 	for _, val := range []any{123, "", " \t "} {
 		debugList = append(debugList, map[string]any{"codeview": map[string]any{"name": val}})
 	}

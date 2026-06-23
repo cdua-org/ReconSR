@@ -227,12 +227,25 @@
                     "internal name": "blablabla.exe",
                     "original name": "blablabla.exe",
                     "product": "blablabla",
+                    "verified": "Signed",
+                    "signing date": "2020-04-16 15:35:24",
+                    "TeamIdentifier": "TEAM123XYZ",
+                    "Identifier": "com.blablabla.app",
+                    "Authority": "Apple Development: Test User",
                     "x509": [
                         {
                             "cert issuer": "GlobalSign",
                             "name": "Stolen CA",
                             "serial number": "11 22 33",
-                            "thumbprint": "DEADBEEF"
+                            "thumbprint": "DEADBEEF",
+                            "status": "Valid"
+                        }
+                    ],
+                    "signers details": [
+                        {
+                            "name": "Blablabla Inc.",
+                            "thumbprint": "BEEFDEAD",
+                            "status": "Valid"
                         }
                     ]
                 },

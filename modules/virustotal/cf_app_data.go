@@ -2,6 +2,7 @@ package virustotal
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -39,14 +40,25 @@ func extractPDFInfoParts(pdfInfo map[string]any, parts *[]string) {
 }
 
 func extractSignatureMetaParts(sigInfo map[string]any, parts *[]string) {
-	if origName, ok := sigInfo["original name"].(string); ok && origName != "" {
-		*parts = append(*parts, "Original Name: "+origName)
+	fields := []struct {
+		key   string
+		label string
+	}{
+		{"original name", "Original Name"},
+		{"product", "Product"},
+		{"copyright", "Copyright"},
+		{"description", "Description"},
+		{"file version", "File Version"},
+		{"internal name", "Internal Name"},
+		{"TeamIdentifier", "Team ID"},
+		{"Identifier", "App ID"},
+		{"Authority", "Authority"},
 	}
-	if product, ok := sigInfo["product"].(string); ok && product != "" {
-		*parts = append(*parts, "Product: "+product)
-	}
-	if copyright, ok := sigInfo["copyright"].(string); ok && copyright != "" {
-		*parts = append(*parts, "Copyright: "+copyright)
+
+	for _, f := range fields {
+		if val, ok := sigInfo[f.key].(string); ok && val != "" {
+			*parts = append(*parts, fmt.Sprintf("%s: %s", f.label, val))
+		}
 	}
 }
 
@@ -149,6 +161,14 @@ func extractDangerousPerms(permDetails map[string]any, parts *[]string) {
 
 func appendFileCertificates(exec *schema.ModuleExecution, attr map[string]any, hashRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
 	if sigInfo, ok := attr["signature_info"].(map[string]any); ok {
+		if verified, ok := sigInfo["verified"].(string); ok && verified != "" {
+			appendVTProperty(exec, constants.TypeStatus, verified, "Signature Status", hashRef, gen)
+		}
+		if signingDate, ok := sigInfo["signing date"].(string); ok && signingDate != "" {
+			appendVTProperty(exec, constants.TypeDate, "Signed: "+signingDate, "Digital Signature", hashRef, gen)
+		} else if timestamp, ok := sigInfo["Timestamp"].(string); ok && timestamp != "" {
+			appendVTProperty(exec, constants.TypeDate, "Signed: "+timestamp, "Digital Signature", hashRef, gen)
+		}
 		extractX509Certificates(exec, sigInfo, hashRef, gen)
 	}
 
@@ -195,22 +215,52 @@ func extractAndroguardCertificates(exec *schema.ModuleExecution, androguard map[
 	}
 }
 
+func mergeSignatureCertificates(sigInfo map[string]any) map[string]map[string]any {
+	certMap := make(map[string]map[string]any)
+
+	mergeCerts := func(list []any) {
+		for _, item := range list {
+			if cert, ok := item.(map[string]any); ok {
+				if tp, ok := cert["thumbprint"].(string); ok && strings.TrimSpace(tp) != "" {
+					tp = strings.ToUpper(strings.TrimSpace(tp))
+					if existing, found := certMap[tp]; found {
+						maps.Copy(existing, cert)
+					} else {
+						certMap[tp] = maps.Clone(cert)
+					}
+				}
+			}
+		}
+	}
+
+	if x509List, ok := sigInfo["x509"].([]any); ok {
+		mergeCerts(x509List)
+	}
+	if signersList, ok := sigInfo["signers details"].([]any); ok {
+		mergeCerts(signersList)
+	}
+	if counterList, ok := sigInfo["counter signers details"].([]any); ok {
+		mergeCerts(counterList)
+	}
+
+	return certMap
+}
+
 func extractX509Certificates(exec *schema.ModuleExecution, sigInfo map[string]any, hashRef *schema.EntityRef, gen *modutil.LocalIDGenerator) {
-	x509List, ok := sigInfo["x509"].([]any)
-	if !ok {
+	certMap := mergeSignatureCertificates(sigInfo)
+
+	if len(certMap) == 0 {
 		return
 	}
-	for _, item := range x509List {
-		cert, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
 
-		tp, ok := cert["thumbprint"].(string)
-		if !ok || tp == "" {
-			continue
-		}
+	var thumbprints []string
+	for tp := range certMap {
+		thumbprints = append(thumbprints, tp)
+	}
+	sort.Strings(thumbprints)
 
+	for _, tp := range thumbprints {
+		cert := certMap[tp]
 		tpVal := "sha1:" + tp
 		tpID := gen.NextID()
 		exec.Results = append(exec.Results, schema.ModuleResult{
@@ -236,6 +286,12 @@ func extractX509Certificates(exec *schema.ModuleExecution, sigInfo map[string]an
 			} else {
 				appendVTProperty(exec, constants.TypeCertNotAfter, validTo, "Digital Signature", tpRef, gen)
 			}
+		}
+		if name, ok := cert["name"].(string); ok && name != "" {
+			appendVTProperty(exec, constants.TypeOrganization, name, "Digital Signature", tpRef, gen)
+		}
+		if status, ok := cert["status"].(string); ok && status != "" {
+			appendVTProperty(exec, constants.TypeStatus, status, "Digital Signature", tpRef, gen)
 		}
 	}
 }
