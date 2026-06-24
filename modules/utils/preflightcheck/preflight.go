@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,6 +55,14 @@ const (
 	dnsClassINET    = 1
 	dnsHeaderSize   = 12
 	dnsMaxPacketLen = 512
+
+	strNoError  = "NOERROR"
+	strFormerr  = "FORMERR"
+	strServfail = "SERVFAIL"
+	strNxdomain = "NXDOMAIN"
+	strNotimp   = "NOTIMP"
+	strRefused  = "REFUSED"
+	strNotauth  = "NOTAUTH"
 )
 
 // ErrZoneBroken indicates the target's authoritative DNS zone is unusable
@@ -63,6 +72,27 @@ var ErrZoneBroken = errors.New("DNS zone is broken")
 func isBrokenZone(rcode uint8) bool {
 	return rcode == rcodeServfail || rcode == rcodeRefused ||
 		rcode == rcodeNotimp || rcode == rcodeNotauth
+}
+
+func rcodeToString(rcode uint8) string {
+	switch rcode {
+	case 0:
+		return strNoError
+	case 1:
+		return strFormerr
+	case 2:
+		return strServfail
+	case 3:
+		return strNxdomain
+	case rcodeNotimp:
+		return strNotimp
+	case rcodeRefused:
+		return strRefused
+	case rcodeNotauth:
+		return strNotauth
+	default:
+		return fmt.Sprintf("UNKNOWN(%d)", rcode)
+	}
 }
 
 // PreFlightCheck verifies if a target subdomain's authoritative DNS zone
@@ -94,45 +124,38 @@ func doPreFlightCheck(ctx context.Context, target string) error {
 	}
 
 	baseDomain := orgdomain.GetOrganizationalDomain(target)
-	if baseDomain == "" {
-		baseDomain = target
-	}
 
-	nsRecords, err := fetchNSRecords(ctx, baseDomain)
+	nsRecords, err := fetchNSRecords(ctx, target, baseDomain)
 	if err != nil {
 		if errors.Is(err, ErrZoneBroken) {
 			return ErrZoneBroken
 		}
 		return fmt.Errorf("failed to fetch NS records for %s: %w", baseDomain, err)
 	}
-	if len(nsRecords) == 0 {
-		return ErrZoneBroken
-	}
 
 	slices.Sort(nsRecords)
 
-	// Probe up to 2 NS servers; declare broken only when all probed agree.
 	limit := min(len(nsRecords), 2)
 	confirmations := 0
 	checked := 0
 
 	for i := range limit {
-		nsIP, resolveErr := resolveNSAddress(ctx, nsRecords[i])
+		nsIP, resolveErr := resolveNSAddress(ctx, target, nsRecords[i])
 		if resolveErr != nil {
-			log.Printf("skipping NS %s: %v", nsRecords[i], resolveErr)
+			log.Printf("resolveNS error target=%q nsHost=%q err=%v", target, nsRecords[i], resolveErr)
 			continue
 		}
 
 		key := cacheKey{domain: target, nsIP: nsIP}
-		var rcode uint8
 
+		var rcode uint8
 		if cached, ok := loadFromCache(key); ok {
 			rcode = cached.rcode
 		} else {
 			var queryErr error
-			rcode, queryErr = performDirectSOAQuery(ctx, target, nsIP)
+			rcode, queryErr = performDirectSOAQuery(ctx, target, nsRecords[i], nsIP)
 			if queryErr != nil {
-				log.Printf("SOA query to %s for %s failed: %v", nsIP, target, queryErr)
+				log.Printf("performDirectSOAQuery error target=%q nsHost=%q nsIP=%q err=%v", target, nsRecords[i], nsIP, queryErr)
 				continue
 			}
 			storeInCache(key, rcode)
@@ -143,7 +166,6 @@ func doPreFlightCheck(ctx context.Context, target string) error {
 		if isBrokenZone(rcode) {
 			confirmations++
 		} else {
-			// At least one NS reports a healthy zone — trust it.
 			return nil
 		}
 	}
@@ -155,63 +177,152 @@ func doPreFlightCheck(ctx context.Context, target string) error {
 	return nil
 }
 
-func fetchNSRecords(ctx context.Context, domain string) ([]string, error) {
-	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
-	defer cancel()
+var overridePlainServers []string
 
-	nsRecords, err := resolver.GetResolver().LookupNS(queryCtx, domain)
-	if err != nil {
+func getPlainServers() []string {
+	if overridePlainServers != nil {
+		return overridePlainServers
+	}
+	return resolver.GetPlainServers()
+}
+
+func fetchNSRecords(ctx context.Context, target, domain string) ([]string, error) {
+	servers := getPlainServers()
+	startIdx := int(resolver.PlainStartIndex())
+	maxAttempts := min(resolver.MaxRetriesPreflight, len(servers))
+	var lastErr error
+
+	for i := range maxAttempts {
+		server := servers[(startIdx+i)%len(servers)]
+
+		r := &net.Resolver{
+			PreferGo: true,
+			Dial: func(dialCtx context.Context, _, _ string) (net.Conn, error) {
+				host := server
+				port := "53"
+				if h, p, err := net.SplitHostPort(server); err == nil {
+					host = h
+					port = p
+				}
+				d := net.Dialer{Timeout: resolver.Timeout}
+				return d.DialContext(dialCtx, "udp", net.JoinHostPort(host, port))
+			},
+		}
+
+		queryCtx, cancel := context.WithTimeout(ctx, resolver.PreflightTimeout)
+		nsRecords, err := r.LookupNS(queryCtx, domain)
+		cancel()
+
+		if err == nil {
+			log.Printf("fetchNS success target=%q domain=%q attempt=%d/%d via=%q",
+				target, domain, i+1, maxAttempts, server)
+			result := make([]string, 0, len(nsRecords))
+			for _, ns := range nsRecords {
+				result = append(result, ns.Host)
+			}
+			return result, nil
+		}
+
 		if dnsErr, ok := errors.AsType[*net.DNSError](err); ok {
-			if dnsErr.IsNotFound || strings.Contains(dnsErr.Error(), "no such host") || strings.Contains(dnsErr.Error(), "server misbehaving") {
+			if dnsErr.IsNotFound || strings.Contains(dnsErr.Error(), "no such host") ||
+				strings.Contains(dnsErr.Error(), "server misbehaving") {
+				log.Printf("fetchNS error target=%q domain=%q via=%q err=%v",
+					target, domain, server, err)
 				return nil, ErrZoneBroken
 			}
 		}
-		return nil, fmt.Errorf("NS lookup failed: %w", err)
+
+		log.Printf("fetchNS error target=%q domain=%q attempt=%d/%d via=%q err=%v",
+			target, domain, i+1, maxAttempts, server, err)
+		lastErr = err
 	}
 
-	result := make([]string, 0, len(nsRecords))
-	for _, ns := range nsRecords {
-		result = append(result, ns.Host)
-	}
-	return result, nil
+	log.Printf("fetchNS error target=%q domain=%q attempts=%d err=%v",
+		target, domain, maxAttempts, lastErr)
+	return nil, fmt.Errorf("NS lookup failed: %w", lastErr)
 }
 
-func resolveNSAddress(ctx context.Context, nsHost string) (string, error) {
+func resolveNSAddress(ctx context.Context, target, nsHost string) (string, error) {
 	nsHost = stripTrailingDot(nsHost)
+	servers := getPlainServers()
+	startIdx := int(resolver.PlainStartIndex())
+	maxAttempts := min(resolver.MaxRetriesPreflight, len(servers))
+	var lastErr error
 
-	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
-	defer cancel()
+	for i := range maxAttempts {
+		server := servers[(startIdx+i)%len(servers)]
 
-	ips, err := resolver.GetResolver().LookupHost(queryCtx, nsHost)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve %s: %w", nsHost, err)
+		r := &net.Resolver{
+			PreferGo: true,
+			Dial: func(dialCtx context.Context, _, _ string) (net.Conn, error) {
+				host := server
+				port := "53"
+				if h, p, err := net.SplitHostPort(server); err == nil {
+					host = h
+					port = p
+				}
+				d := net.Dialer{Timeout: resolver.Timeout}
+				return d.DialContext(dialCtx, "udp", net.JoinHostPort(host, port))
+			},
+		}
+
+		queryCtx, cancel := context.WithTimeout(ctx, resolver.PreflightTimeout)
+		ips, err := r.LookupIP(queryCtx, "ip4", nsHost)
+		cancel()
+
+		if err == nil && len(ips) > 0 {
+			log.Printf("resolveNS success target=%q nsHost=%q attempt=%d/%d via=%q",
+				target, nsHost, i+1, maxAttempts, server)
+			return ips[0].String(), nil
+		}
+
+		if dnsErr, ok := errors.AsType[*net.DNSError](err); ok {
+			if dnsErr.IsNotFound || strings.Contains(dnsErr.Error(), "no such host") {
+				log.Printf("resolveNS error target=%q nsHost=%q via=%q err=%v",
+					target, nsHost, server, err)
+				break
+			}
+		}
+
+		log.Printf("resolveNS error target=%q nsHost=%q attempt=%d/%d via=%q err=%v",
+			target, nsHost, i+1, maxAttempts, server, err)
+		lastErr = err
 	}
 
-	for _, ip := range ips {
-		if parsed := net.ParseIP(ip); parsed != nil && parsed.To4() != nil {
-			return ip, nil
+	log.Printf("resolveNS error target=%q nsHost=%q attempts=%d err=%v",
+		target, nsHost, maxAttempts, lastErr)
+	return "", fmt.Errorf("failed to resolve %s: %w", nsHost, lastErr)
+}
+
+func performDirectSOAQuery(_ context.Context, target, nsHost, nsIP string) (uint8, error) {
+	host := nsIP
+	port := 53
+	if h, p, err := net.SplitHostPort(nsIP); err == nil {
+		host = h
+		if parsedPort, err := strconv.Atoi(p); err == nil {
+			port = parsedPort
 		}
 	}
 
-	return "", fmt.Errorf("no IPv4 address found for %s", nsHost)
-}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return 0, fmt.Errorf("invalid IP address: %s", host)
+	}
 
-func performDirectSOAQuery(_ context.Context, target, nsIP string) (uint8, error) {
 	conn, err := net.DialUDP("udp4", nil, &net.UDPAddr{
-		IP:   net.ParseIP(nsIP),
-		Port: 53,
+		IP:   ip,
+		Port: port,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to create UDP connection: %w", err)
 	}
 	defer func() {
-		closeErr := conn.Close()
-		if closeErr != nil {
-			log.Printf("conn.Close() error: %v", closeErr)
+		if closeErr := conn.Close(); closeErr != nil {
+			log.Printf("performDirectSOAQuery error target=%q nsIP=%q err=%v", target, nsIP, closeErr)
 		}
 	}()
 
-	if deadlineErr := conn.SetDeadline(time.Now().Add(dnsTimeout)); deadlineErr != nil {
+	if deadlineErr := conn.SetDeadline(time.Now().Add(resolver.PreflightTimeout)); deadlineErr != nil {
 		return 0, fmt.Errorf("failed to set deadline: %w", deadlineErr)
 	}
 
@@ -224,8 +335,7 @@ func performDirectSOAQuery(_ context.Context, target, nsIP string) (uint8, error
 	buffer := make([]byte, dnsMaxPacketLen)
 	n, err := conn.Read(buffer)
 	if err != nil {
-		var netErr net.Error
-		if errors.As(err, &netErr) && netErr.Timeout() {
+		if netErr, ok := errors.AsType[net.Error](err); ok && netErr.Timeout() {
 			return 0, errors.New("DNS query timeout")
 		}
 		return 0, fmt.Errorf("failed to read DNS response: %w", err)
@@ -236,7 +346,12 @@ func performDirectSOAQuery(_ context.Context, target, nsIP string) (uint8, error
 	}
 
 	rcode := buffer[3] & 0x0F
-	log.Printf("performDirectSOAQuery IP=%s query=%x rcode=%d size=%d", nsIP, query, rcode, n)
+	zoneStatus := "dns_ok"
+	if isBrokenZone(rcode) {
+		zoneStatus = "dns_bad"
+	}
+	log.Printf("performDirectSOAQuery success target=%q nsHost=%q nsIP=%q query=%x rcode=%s(%d) size=%d zone=%q",
+		target, nsHost, nsIP, query, rcodeToString(rcode), rcode, n, zoneStatus)
 	return rcode, nil
 }
 

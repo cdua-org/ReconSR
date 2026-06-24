@@ -29,6 +29,14 @@ DNSConcurrency=10
 # Maximum retry attempts for DNS resolution (default: 3)
 MaxRetriesDNS=3
 
+# Maximum DNS server rotation attempts during preflight zone health checks.
+# Higher than MaxRetriesDNS to tolerate VPN environments that block several upstream servers. (default: 5)
+MaxRetriesPreflight=5
+
+# Timeout for each individual DNS attempt during preflight checks, in seconds.
+# Kept shorter than DNSFallbackTimeout to allow more rotation attempts. (default: 7)
+PreflightTimeout=7
+
 
 ### HTTP & General API Options ###
 

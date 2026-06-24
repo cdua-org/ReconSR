@@ -58,6 +58,10 @@ var (
 	MaxRetriesWhois = 3
 	// MaxRetriesDNS defines maximum attempts for normal DNS queries.
 	MaxRetriesDNS = 3
+	// MaxRetriesPreflight defines maximum DNS server rotation attempts during
+	// preflight zone health checks. Higher than MaxRetriesDNS because VPN
+	// environments may block multiple upstream DNS servers simultaneously.
+	MaxRetriesPreflight = 5
 	// MaxRetriesHT defines maximum attempts for hackertarget API.
 	MaxRetriesHT = 3
 	// MaxRetriesLeakIX defines maximum attempts for LeakIX API.
@@ -103,6 +107,10 @@ var (
 	DNSFallbackTimeout = 15 * time.Second
 	// DNSBruteTimeout bounds concurrent brute-force operations (DKIM, SRV, TLSA).
 	DNSBruteTimeout = 30 * time.Second
+	// PreflightTimeout bounds each individual DNS attempt during preflight zone
+	// health checks. Kept shorter than DNSFallbackTimeout to allow more rotation
+	// attempts within the same total time budget.
+	PreflightTimeout = 7 * time.Second
 	// DNSConcurrency limits parallel goroutines in brute-force DNS handlers.
 	DNSConcurrency = 10
 	// CrtshPGTimeout is the timeout for crt.sh direct PostgreSQL connections.
@@ -319,6 +327,7 @@ func initOptionMaps() {
 		"DNSQueryTimeout":       &DNSQueryTimeout,
 		"DNSFallbackTimeout":    &DNSFallbackTimeout,
 		"DNSBruteTimeout":       &DNSBruteTimeout,
+		"PreflightTimeout":      &PreflightTimeout,
 		"CrtshPGTimeout":        &CrtshPGTimeout,
 		"RetryBaseDelay":        &RetryBaseDelay,
 		"NetlasRetryBaseDelay":  &NetlasRetryBaseDelay,
@@ -346,6 +355,7 @@ func initOptionMaps() {
 		"MaxRetriesCert":            &MaxRetriesCert,
 		"MaxRetriesWhois":           &MaxRetriesWhois,
 		"MaxRetriesDNS":             &MaxRetriesDNS,
+		"MaxRetriesPreflight":       &MaxRetriesPreflight,
 		"MaxRetriesHT":              &MaxRetriesHT,
 		"MaxRetriesLeakIX":          &MaxRetriesLeakIX,
 		"MaxRetriesNetlas":          &MaxRetriesNetlas,
@@ -795,6 +805,23 @@ func GetResolver() *net.Resolver {
 			return d.DialContext(ctx, "udp", net.JoinHostPort(server, "53"))
 		},
 	}
+}
+
+// GetPlainServers returns a copy of the configured Plain DNS server pool,
+// allowing callers to iterate through servers with guaranteed uniqueness
+// per attempt in their own retry loops.
+func GetPlainServers() []string {
+	initResolver()
+	result := make([]string, len(plainServers))
+	copy(result, plainServers)
+	return result
+}
+
+// PlainStartIndex returns the current plain DNS round-robin counter value,
+// enabling callers to pick a starting offset into the server pool that
+// distributes load across servers under concurrent access.
+func PlainStartIndex() uint32 {
+	return plainIndex.Add(1)
 }
 
 // GetDialer returns a preconfigured net.Dialer equipped with the shared plain DNS resolver rotation.

@@ -3,10 +3,13 @@ package preflightcheck
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
 func TestStripTrailingDot(t *testing.T) {
@@ -148,8 +151,9 @@ func TestBuildDNSQuery_DifferentDomains(t *testing.T) {
 		subdomain  = "sub.example.com"
 		deepDomain = "a.b.c.d.example.com"
 	)
+	longLabelDomain := strings.Repeat("a", 256) + ".example.com"
 
-	for _, domain := range []string{domainA, subdomain, deepDomain} {
+	for _, domain := range []string{domainA, subdomain, deepDomain, longLabelDomain} {
 		t.Run(domain, func(t *testing.T) {
 			query := buildDNSQuery(domain)
 			if len(query) < dnsHeaderSize {
@@ -332,13 +336,13 @@ func TestParseDNSResponse_RCODEExtraction(t *testing.T) {
 		rcode     uint8
 		expectErr bool
 	}{
-		{"NOERROR", 0, false},
-		{"FORMERR", 1, false},
-		{"SERVFAIL", 2, true},
-		{"NXDOMAIN", 3, false},
-		{"NOTIMP", 4, true},
-		{"REFUSED", 5, true},
-		{"NOTAUTH", 9, true},
+		{strNoError, 0, false},
+		{strFormerr, 1, false},
+		{strServfail, 2, true},
+		{strNxdomain, 3, false},
+		{strNotimp, 4, true},
+		{strRefused, 5, true},
+		{strNotauth, 9, true},
 	}
 
 	for _, tc := range testCases {
@@ -399,5 +403,102 @@ func TestCacheValidityDuration(t *testing.T) {
 func TestDNSTimeout(t *testing.T) {
 	if dnsTimeout != 2*time.Second {
 		t.Errorf("DNS timeout not 2 seconds: %v", dnsTimeout)
+	}
+}
+
+func TestFetchNSRecords_ServerRotationUniqueness(t *testing.T) {
+	servers := resolver.GetPlainServers()
+	if len(servers) < resolver.MaxRetriesPreflight {
+		t.Skipf("not enough plain servers (%d) for rotation test (need %d)",
+			len(servers), resolver.MaxRetriesPreflight)
+	}
+
+	startIdx := int(resolver.PlainStartIndex())
+	maxAttempts := min(resolver.MaxRetriesPreflight, len(servers))
+
+	seen := make(map[string]bool, maxAttempts)
+	for i := range maxAttempts {
+		server := servers[(startIdx+i)%len(servers)]
+		if seen[server] {
+			t.Errorf("duplicate server %s at attempt %d", server, i+1)
+		}
+		seen[server] = true
+	}
+
+	if len(seen) != maxAttempts {
+		t.Errorf("expected %d unique servers, got %d", maxAttempts, len(seen))
+	}
+}
+
+func TestPreflightConfig_Defaults(t *testing.T) {
+	if resolver.MaxRetriesPreflight < 3 {
+		t.Errorf("MaxRetriesPreflight too low: %d", resolver.MaxRetriesPreflight)
+	}
+	if resolver.PreflightTimeout < 1*time.Second {
+		t.Errorf("PreflightTimeout too short: %v", resolver.PreflightTimeout)
+	}
+	if resolver.MaxRetriesPreflight > len(resolver.GetPlainServers()) {
+		t.Errorf("MaxRetriesPreflight (%d) exceeds plain server pool size (%d)",
+			resolver.MaxRetriesPreflight, len(resolver.GetPlainServers()))
+	}
+}
+
+func TestFetchNSRecords_ConcurrentRotationIsolation(t *testing.T) {
+	servers := resolver.GetPlainServers()
+	if len(servers) < 2 {
+		t.Skip("not enough plain servers for concurrency test")
+	}
+
+	var wg sync.WaitGroup
+	results := make([][]string, 10)
+
+	for g := range 10 {
+		wg.Go(func() {
+			startIdx := int(resolver.PlainStartIndex())
+			maxAttempts := min(resolver.MaxRetriesPreflight, len(servers))
+			selected := make([]string, maxAttempts)
+			for i := range maxAttempts {
+				selected[i] = servers[(startIdx+i)%len(servers)]
+			}
+			results[g] = selected
+		})
+	}
+
+	wg.Wait()
+
+	for g, selected := range results {
+		seen := make(map[string]bool, len(selected))
+		for _, s := range selected {
+			if seen[s] {
+				t.Errorf("goroutine %d got duplicate server %s in its rotation window", g, s)
+			}
+			seen[s] = true
+		}
+	}
+}
+
+func TestRcodeToString(t *testing.T) {
+	testCases := []struct {
+		expected string
+		rcode    uint8
+	}{
+		{strNoError, 0},
+		{strFormerr, 1},
+		{strServfail, 2},
+		{strNxdomain, 3},
+		{strNotimp, 4},
+		{strRefused, 5},
+		{strNotauth, 9},
+		{"UNKNOWN(15)", 15},
+		{"UNKNOWN(255)", 255},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("RCODE_%d", tc.rcode), func(t *testing.T) {
+			actual := rcodeToString(tc.rcode)
+			if actual != tc.expected {
+				t.Errorf("rcodeToString(%d) = %q; want %q", tc.rcode, actual, tc.expected)
+			}
+		})
 	}
 }
