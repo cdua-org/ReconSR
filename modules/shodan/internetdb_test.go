@@ -323,6 +323,29 @@ func TestGetInternetDB_HTTPError(t *testing.T) {
 	}
 }
 
+func TestGetInternetDB_ZeroRetries(t *testing.T) {
+	originalRetries := resolver.MaxRetriesIPMeta
+	resolver.MaxRetriesIPMeta = 0
+	defer func() { resolver.MaxRetriesIPMeta = originalRetries }()
+
+	m := New()
+	input := schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeIP, Value: "192.0.2.3"},
+		Functions: []string{constants.FuncGetIDBShodan},
+	}
+	output, err := m.Exec(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	exec := output.Executions[0]
+	if exec.Error == nil {
+		t.Fatal("expected status 0 error, got nil")
+	}
+	if !strings.Contains(*exec.Error, "&{%!d(string=0)}") {
+		t.Fatalf("expected status error formatting bug string, got %q", *exec.Error)
+	}
+}
+
 func TestGetInternetDB_AbortStatus(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)

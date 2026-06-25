@@ -402,18 +402,8 @@ func formatShodanCertFingerprints(fingerprint *shodanRawBannerCertFingerprint) [
 	}
 	sort.Strings(algorithms)
 	formatted := make([]string, 0, len(algorithms))
-	seen := make(map[string]struct{}, len(algorithms))
 	for _, algorithm := range algorithms {
-		value := normalized[algorithm]
-		entry := algorithm + ":" + value
-		if _, exists := seen[entry]; exists {
-			continue
-		}
-		seen[entry] = struct{}{}
-		formatted = append(formatted, entry)
-	}
-	if len(formatted) == 0 {
-		return nil
+		formatted = append(formatted, algorithm+":"+normalized[algorithm])
 	}
 
 	return formatted
