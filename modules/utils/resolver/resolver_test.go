@@ -498,7 +498,7 @@ type errorBody struct {
 }
 
 func (errorBody) Close() error {
-	return context.DeadlineExceeded // mock error
+	return context.DeadlineExceeded
 }
 
 type mockTransport struct{}
@@ -749,12 +749,12 @@ func TestResolveRecord(t *testing.T) {
 	defer tsSuccess.Close()
 
 	tsAbort := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusBadRequest) // httputil.Abort
+		w.WriteHeader(http.StatusBadRequest)
 	}))
 	defer tsAbort.Close()
 
 	tsRateLimit := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusTooManyRequests) // httputil.RateLimit
+		w.WriteHeader(http.StatusTooManyRequests)
 	}))
 	defer tsRateLimit.Close()
 
@@ -785,7 +785,7 @@ func TestResolveRecord(t *testing.T) {
 			plainFunc: func(_ context.Context, _ *net.Resolver) ([]string, error) {
 				return nil, &net.DNSError{IsNotFound: true}
 			},
-			expectErr: false, // NXDOMAIN returns nil, nil, nil
+			expectErr: false,
 		},
 		{
 			name: "DoH fail fallback plain fail",
@@ -830,7 +830,7 @@ func TestResolveIP(t *testing.T) {
 	defer tsSuccess.Close()
 
 	tsAbort := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusBadRequest) // httputil.Abort
+		w.WriteHeader(http.StatusBadRequest)
 	}))
 	defer tsAbort.Close()
 
@@ -903,7 +903,7 @@ func TestResolveIP(t *testing.T) {
 			dohIndex.Store(^uint32(0))
 			plainIndex.Store(^uint32(0))
 			if tt.name == "Plain network error" {
-				plainServers = []string{"192.0.2.5"} // guaranteed to timeout/refuse
+				plainServers = []string{"192.0.2.5"}
 			} else {
 				plainServers = []string{"127.0.0.1"}
 			}
@@ -957,7 +957,6 @@ func TestGetResolver(t *testing.T) {
 		t.Fatalf("GetResolver returned invalid resolver")
 	}
 
-	// Trigger the Dial closure to cover the inner logic
 	if conn, err := r.Dial(context.Background(), "", ""); err == nil && conn != nil {
 		if cerr := conn.Close(); cerr != nil {
 			t.Logf("close err: %v", cerr)

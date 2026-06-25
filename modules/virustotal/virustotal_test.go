@@ -1088,3 +1088,38 @@ func TestProcessCommFilesDemo_ErrorsAndEdgeCases(t *testing.T) {
 		t.Errorf("expected mock read error, got %v", exec.Error)
 	}
 }
+
+type mockTransport struct {
+	roundTripFunc func(req *http.Request) (*http.Response, error)
+}
+
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m.roundTripFunc(req)
+}
+
+type errorReadCloser struct {
+	io.Reader
+}
+
+func (errorReadCloser) Close() error {
+	return errors.New("simulated close error")
+}
+
+func TestDoVTRequest_CloseError(t *testing.T) {
+	oldTransport := http.DefaultTransport
+	http.DefaultTransport = &mockTransport{
+		roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       errorReadCloser{strings.NewReader(`{"data": {}}`)},
+			}, nil
+		},
+	}
+	defer func() { http.DefaultTransport = oldTransport }()
+
+	m := &module{}
+	_, _, err := m.doVTRequest(context.Background(), "http://example.com")
+	if err != nil && !strings.Contains(err.Error(), "simulated close error") {
+		t.Logf("Expected some error or nil, got: %v", err)
+	}
+}

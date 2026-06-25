@@ -57,7 +57,7 @@ func executeDomainFixture(t *testing.T) domainFixtureRun {
 	subdomainsPage1 := loadVTFixture(t, "subdomains_page1.json")
 	subdomainsPage2 := loadVTFixture(t, "subdomains_page2.json")
 
-	resolver.VirustotalDelayMs = 20
+	resolver.VirustotalDelayMs = 50
 	defer func() { resolver.VirustotalDelayMs = 15000 }()
 
 	responses := map[string]string{

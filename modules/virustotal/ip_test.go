@@ -43,7 +43,7 @@ func executeIPFixture(t *testing.T) ipFixtureRun {
 	resolutionsPage1 := loadVTFixture(t, "resolutions_page1.json")
 	resolutionsPage2 := loadVTFixture(t, "resolutions_page2.json")
 
-	resolver.VirustotalDelayMs = 20
+	resolver.VirustotalDelayMs = 50
 	defer func() { resolver.VirustotalDelayMs = 15000 }()
 
 	responses := map[string]string{
