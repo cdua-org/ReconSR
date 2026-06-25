@@ -44,14 +44,14 @@ func TestExec_UnsupportedFunction(t *testing.T) {
 func TestExec_HandlersAndOSINT(t *testing.T) {
 	oldResolve := resolveRecordFunc
 	resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
-		return []string{"0 issue \"ca.example.net\""}, nil, nil
+		return []string{"v=spf1 include:_spf.example.com ~all"}, nil, nil
 	}
 	defer func() { resolveRecordFunc = oldResolve }()
 
 	mod := New()
 
 	in := schema.ModuleInput{
-		Functions: []string{constants.FuncGetCAA},
+		Functions: []string{constants.FuncGetTXT},
 		Target: schema.Entity{
 			Type:  constants.TypeDomain,
 			Value: "test1.example",

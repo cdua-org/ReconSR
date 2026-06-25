@@ -61,7 +61,6 @@ var trustedTaggingFuncs = map[string]bool{
 	constants.FuncGetMX:       true,
 	constants.FuncGetTXT:      true,
 	constants.FuncGetSRV:      true,
-	constants.FuncGetCAA:      true,
 	constants.FuncGetCERT:     true,
 	constants.FuncGetTLSA:     true,
 	constants.FuncGetSSHFP:    true,
@@ -74,7 +73,6 @@ var trustedTaggingFuncs = map[string]bool{
 	constants.FuncGetIPSECKEY: true,
 	constants.FuncGetRP:       true,
 	constants.FuncGetDKIM:     true,
-	constants.FuncGetDMARC:    true,
 }
 
 type module struct{}
