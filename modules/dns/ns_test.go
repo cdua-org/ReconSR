@@ -2,6 +2,8 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
 	"testing"
 
@@ -9,29 +11,104 @@ import (
 	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
-func TestGetNSDataEmpty(t *testing.T) {
-	execution := getNSData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
-
-	if execution.Error != nil {
-		t.Logf("ns lookup failed: %v", *execution.Error)
-		return
-	}
-
-	if len(execution.Results) != 0 {
-		t.Fatalf("expected 0 results, got %d", len(execution.Results))
-	}
-}
-
 func TestGetNSData(t *testing.T) {
-	res := getNSData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+	origResolve := resolveRecordFunc
+	origPlain := plainLookupNS
+	defer func() {
+		resolveRecordFunc = origResolve
+		plainLookupNS = origPlain
+	}()
 
-	switch {
-	case res.Error != nil:
-		t.Logf("Network resolution error: %v", *res.Error)
-	case len(res.Results) == 0:
-		t.Error("expected at least one NS for example.com")
-	case !slices.Contains(res.Results[0].Tags, constants.TagNS):
-		t.Errorf("expected ns tag, got %v", res.Results[0].Tags)
+	tests := []struct {
+		name         string
+		domain       string
+		mockErr      error
+		fallbackErr  error
+		mockRec      []string
+		mockRaw      []byte
+		fallbackNSs  []*net.NS
+		wantResult   int
+		callFallback bool
+		wantErr      bool
+	}{
+		{
+			name:         "ns_success_records",
+			domain:       "cherry-ns.example",
+			mockErr:      nil,
+			mockRec:      []string{"ns1.example.com.", "ns2.example.com.", "invalid_ns"},
+			mockRaw:      []byte("raw"),
+			callFallback: false,
+			wantResult:   2,
+			wantErr:      false,
+		},
+		{
+			name:         "ns_success_empty",
+			domain:       "empty-ns.example",
+			mockErr:      nil,
+			mockRec:      []string{"invalid_only"},
+			mockRaw:      []byte("raw"),
+			callFallback: false,
+			wantResult:   0,
+			wantErr:      false,
+		},
+		{
+			name:         "ns_resolve_error",
+			domain:       "berry-ns.example",
+			mockErr:      errors.New("mock dns error"),
+			callFallback: false,
+			wantResult:   0,
+			wantErr:      true,
+		},
+		{
+			name:         "ns_fallback_success",
+			domain:       "date-ns.example",
+			mockErr:      nil,
+			callFallback: true,
+			fallbackErr:  nil,
+			fallbackNSs: []*net.NS{
+				{Host: "fallback-ns.example.com."},
+			},
+			wantResult: 1,
+			wantErr:    false,
+		},
+		{
+			name:         "ns_fallback_error",
+			domain:       "fig-ns.example",
+			mockErr:      errors.New("mock dns error"),
+			callFallback: true,
+			fallbackErr:  errors.New("fallback failed"),
+			wantResult:   0,
+			wantErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plainLookupNS = func(_ context.Context, _ *net.Resolver, _ string) ([]*net.NS, error) {
+				return tt.fallbackNSs, tt.fallbackErr
+			}
+
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, fallback func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				if tt.callFallback && fallback != nil {
+					res, err := fallback(context.Background(), nil)
+					if err != nil {
+						return nil, nil, tt.mockErr
+					}
+					return res, tt.mockRaw, nil
+				}
+				return tt.mockRec, tt.mockRaw, tt.mockErr
+			}
+
+			gen := modutil.NewLocalIDGenerator()
+			exec := getNSData(context.Background(), tt.domain, gen)
+
+			if (exec.Error != nil) != tt.wantErr {
+				t.Errorf("getNSData() error = %v, wantErr %v", exec.Error, tt.wantErr)
+			}
+			if len(exec.Results) != tt.wantResult {
+				t.Errorf("getNSData() results count = %d, want %d", len(exec.Results), tt.wantResult)
+			}
+		})
 	}
 }
 
@@ -78,6 +155,13 @@ func TestBuildNSResultSelfReferential(t *testing.T) {
 	_, ok := buildNSResult("example.com.", "example.com", modutil.NewLocalIDGenerator())
 	if ok {
 		t.Fatal("expected self-referential NS to be skipped")
+	}
+}
+
+func TestBuildNSResultEmpty(t *testing.T) {
+	_, ok := buildNSResult(" . ", "example.com", modutil.NewLocalIDGenerator())
+	if ok {
+		t.Fatal("expected empty NS to be skipped")
 	}
 }
 

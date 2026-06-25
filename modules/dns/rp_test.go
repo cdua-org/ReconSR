@@ -2,8 +2,8 @@ package dns
 
 import (
 	"context"
+	"net"
 	"slices"
-	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -59,6 +59,11 @@ func TestProcessRPMailbox(t *testing.T) {
 		{
 			name:        "invalid mailbox",
 			input:       "invalid-mailbox",
+			wantResults: 0,
+		},
+		{
+			name:        "root mailbox",
+			input:       ".",
 			wantResults: 0,
 		},
 	}
@@ -286,24 +291,68 @@ func findResult(results []schema.ModuleResult, typ, value string) (schema.Module
 	return results[idx], true
 }
 
-func TestGetRPDataEmpty(t *testing.T) {
-	execution := getRPData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
-
-	if execution.Error != nil {
-		t.Logf("rp lookup failed: %v", *execution.Error)
-		return
+func TestGetRPData(t *testing.T) {
+	tests := []struct {
+		mockError     error
+		name          string
+		target        string
+		mockRecords   []string
+		expectedCount int
+		expectError   bool
+	}{
+		{
+			mockError:     nil,
+			name:          "successful lookup",
+			target:        "getrp.example.com",
+			mockRecords:   []string{"hostmaster.getrp.example.com. rp-info.getrp.example.com."},
+			expectedCount: 3,
+			expectError:   false,
+		},
+		{
+			mockError:     nil,
+			name:          "empty response",
+			target:        "empty.getrp.example.net",
+			mockRecords:   []string{},
+			expectedCount: 0,
+			expectError:   false,
+		},
+		{
+			mockError:     context.DeadlineExceeded,
+			name:          "lookup error",
+			target:        "error.getrp.example.org",
+			mockRecords:   nil,
+			expectedCount: 0,
+			expectError:   true,
+		},
 	}
 
-	if len(execution.Results) > 0 {
-		t.Logf("Found RP record for example.com: %v", execution.Results[0].Value)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origResolveRecordFunc := resolveRecordFunc
+			defer func() { resolveRecordFunc = origResolveRecordFunc }()
 
-func TestGetRPDataNX(t *testing.T) {
-	execution := getRPData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				if tt.mockError != nil {
+					return nil, nil, tt.mockError
+				}
+				return tt.mockRecords, []byte("mock raw data"), nil
+			}
 
-	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
-		t.Logf("rp lookup failed: %v", *execution.Error)
+			execution := getRPData(context.Background(), tt.target, modutil.NewLocalIDGenerator())
+
+			if tt.expectError {
+				if execution.Error == nil {
+					t.Error("expected error, got nil")
+				}
+			} else {
+				if execution.Error != nil {
+					t.Errorf("unexpected error: %v", *execution.Error)
+				}
+				if len(execution.Results) != tt.expectedCount {
+					t.Errorf("expected %d results, got %d", tt.expectedCount, len(execution.Results))
+				}
+			}
+		})
 	}
 }
 

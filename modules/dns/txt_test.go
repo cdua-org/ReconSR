@@ -139,6 +139,13 @@ func TestTXTCapabilities(t *testing.T) {
 }
 
 func TestGetTXTData_LocalIDChaining(t *testing.T) {
+	origResolve := resolveRecordFunc
+	defer func() { resolveRecordFunc = origResolve }()
+
+	resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return []string{"mock record 1", "mock record 2"}, []byte("mock raw"), nil
+	}
+
 	exec := getTXTData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if exec.Error != nil {

@@ -23,7 +23,7 @@ func getNSData(ctx context.Context, target string, gen *modutil.LocalIDGenerator
 	defer cancel()
 
 	plainFallback := func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {
-		nss, err := r.LookupNS(fallbackCtx, target)
+		nss, err := plainLookupNS(fallbackCtx, r, target)
 		if err != nil {
 			return nil, fmt.Errorf("plain lookup ns failed: %w", err)
 		}
@@ -34,7 +34,7 @@ func getNSData(ctx context.Context, target string, gen *modutil.LocalIDGenerator
 		return res, nil
 	}
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 2, plainFallback)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 2, plainFallback)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetNS, target, err)
 		modutil.SetError(&exec, "ns lookup failed: %v", err)

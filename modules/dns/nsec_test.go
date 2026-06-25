@@ -2,8 +2,8 @@ package dns
 
 import (
 	"context"
+	"errors"
 	"slices"
-	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -13,74 +13,169 @@ import (
 )
 
 func TestGetNSECData(t *testing.T) {
-	execution := getNSECData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+	originalQuery := queryDoHDnsFunc
+	defer func() { queryDoHDnsFunc = originalQuery }()
 
-	if execution.Error != nil {
-		t.Logf("nsec lookup failed (this can vary by network): %v", *execution.Error)
-		return
+	tests := []struct {
+		name       string
+		target     string
+		mockFunc   func(context.Context, string, int) (*resolver.DoHResponse, []byte, error)
+		wantPrefix string
+		wantResCnt int
+	}{
+		{
+			name:   "success_nsec",
+			target: "alpha.example.com",
+			mockFunc: func(_ context.Context, _ string, _ int) (*resolver.DoHResponse, []byte, error) {
+				return &resolver.DoHResponse{
+					Status: 0,
+					Answer: []resolver.DoHDnsRecord{
+						{Name: "alpha.example.com.", Type: 47, Data: "next.alpha.example.com. A NSEC"},
+					},
+				}, []byte("raw"), nil
+			},
+			wantResCnt: 6,
+		},
+		{
+			name:   "success_nsec3",
+			target: "beta.mango.example.com",
+			mockFunc: func(_ context.Context, _ string, _ int) (*resolver.DoHResponse, []byte, error) {
+				return &resolver.DoHResponse{
+					Status: 0,
+					Answer: []resolver.DoHDnsRecord{
+						{Name: "hash.beta.mango.example.com.", Type: 50, Data: "1 0 10 salt next A NSEC"},
+					},
+				}, []byte("raw"), nil
+			},
+			wantResCnt: 9,
+		},
+		{
+			name:   "nxdomain_authority",
+			target: "gamma.example.org",
+			mockFunc: func(_ context.Context, _ string, qtype int) (*resolver.DoHResponse, []byte, error) {
+				if qtype == 1 {
+					return &resolver.DoHResponse{
+						Status: 3,
+						Authority: []resolver.DoHDnsRecord{
+							{Name: "gamma.example.org.", Type: 47, Data: "next.gamma.example.org. A NSEC"},
+						},
+					}, []byte("raw_nx"), nil
+				}
+				return nil, nil, errors.New("error")
+			},
+			wantResCnt: 2,
+		},
+		{
+			name:   "nx_prefix_skip",
+			target: "nx-prefix.example.com",
+			mockFunc: func(_ context.Context, _ string, _ int) (*resolver.DoHResponse, []byte, error) {
+				return nil, nil, nil
+			},
+			wantResCnt: 0,
+		},
+		{
+			name:   "error_query",
+			target: "error.example.com",
+			mockFunc: func(_ context.Context, _ string, _ int) (*resolver.DoHResponse, []byte, error) {
+				return nil, nil, errors.New("doh error")
+			},
+			wantResCnt: 0,
+		},
+		{
+			name:   "nil_response",
+			target: "lambda.example.com",
+			mockFunc: func(_ context.Context, _ string, _ int) (*resolver.DoHResponse, []byte, error) {
+				return nil, nil, nil
+			},
+			wantResCnt: 0,
+		},
+		{
+			name:   "other_records_skipped",
+			target: "delta.example.com",
+			mockFunc: func(_ context.Context, _ string, _ int) (*resolver.DoHResponse, []byte, error) {
+				return &resolver.DoHResponse{
+					Status: 0,
+					Answer: []resolver.DoHDnsRecord{
+						{Name: "delta.example.com.", Type: 1, Data: "127.0.0.1"},
+					},
+				}, nil, nil
+			},
+			wantResCnt: 0,
+		},
 	}
 
-	foundNsec := false
-	for _, res := range execution.Results {
-		if strings.Contains(res.Context, "NSEC") {
-			foundNsec = true
-			break
-		}
-	}
-
-	if !foundNsec {
-		t.Logf("Expected some NSEC/NSEC3 records for example.com, got none. This can happen on some networks.")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			queryDoHDnsFunc = tt.mockFunc
+			exec := getNSECData(context.Background(), tt.target, modutil.NewLocalIDGenerator())
+			if len(exec.Results) != tt.wantResCnt {
+				t.Errorf("getNSECData() results count = %d, want %d", len(exec.Results), tt.wantResCnt)
+			}
+		})
 	}
 }
 
-func TestGetNSECDataEmpty(t *testing.T) {
-	execution := getNSECData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
-
-	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
-		t.Logf("nsec lookup failed: %v", *execution.Error)
+func TestExtractNSECDomain(t *testing.T) {
+	tests := []struct {
+		name     string
+		raw      string
+		target   string
+		nxTarget string
+		want     bool
+	}{
+		{
+			name:   "wildcard_root",
+			raw:    "*.example.org.",
+			target: "example.org",
+			want:   true,
+		},
+		{
+			name:   "wildcard_sub",
+			raw:    "*.wild.wildnsec.example.com.",
+			target: "wildnsec.example.com",
+			want:   true,
+		},
+		{
+			name:   "empty",
+			raw:    "",
+			target: "epsilon.example.com",
+			want:   false,
+		},
+		{
+			name:   "invalid_domain",
+			raw:    "invalid!!domain",
+			target: "zeta.example.com",
+			want:   false,
+		},
+		{
+			name:   "equals_target",
+			raw:    "theta.example.com.",
+			target: "theta.example.com",
+			want:   false,
+		},
+		{
+			name:     "equals_nxtarget",
+			raw:      "nx-123.iota.example.com.",
+			target:   "iota.example.com",
+			nxTarget: "nx-123.iota.example.com",
+			want:     false,
+		},
+		{
+			name:   "valid_subdomain",
+			raw:    "sub.kappa.example.com.",
+			target: "kappa.example.com",
+			want:   true,
+		},
 	}
 
-	t.Logf("Found %d NSEC results for nonexistent domain", len(execution.Results))
-	for _, res := range execution.Results {
-		if res.Type == "" {
-			t.Errorf("expected well-formed ModuleResult, got empty Type")
-		}
-	}
-}
-
-func TestExtractNSECDomainWildcard(t *testing.T) {
-	rootResult := extractNSECDomain("*.example.org.", "example.org", "missing.example.net", "NSEC Next Domain", modutil.NewLocalIDGenerator())
-	if rootResult == nil {
-		t.Fatal("expected wildcard root domain result")
-	}
-	if rootResult.Type != constants.TypeDomain {
-		t.Fatalf("expected normalized root domain type, got %q", rootResult.Type)
-	}
-	if rootResult.Value != "example.org" {
-		t.Fatalf("expected normalized root wildcard value, got %q", rootResult.Value)
-	}
-	if !slices.Contains(rootResult.Tags, constants.TagNSEC) {
-		t.Fatalf("expected nsec tag on root result, got %+v", rootResult.Tags)
-	}
-
-	result := extractNSECDomain("*.wild.example.net.", "example.net", "missing.example.edu", "NSEC Next Domain", modutil.NewLocalIDGenerator())
-	if result == nil {
-		t.Fatal("expected wildcard NSEC domain result")
-	}
-	if result.Type != constants.TypeSubdomain {
-		t.Fatalf("expected normalized subdomain type, got %q", result.Type)
-	}
-	if result.Value != "wild.example.net" {
-		t.Fatalf("expected normalized wildcard value, got %q", result.Value)
-	}
-	if !slices.Contains(result.Tags, constants.TagWildcard) {
-		t.Fatalf("expected wildcard tag, got %+v", result.Tags)
-	}
-	if !slices.Contains(result.Tags, constants.TagNSEC) {
-		t.Fatalf("expected nsec tag, got %+v", result.Tags)
-	}
-	if result.Context != "*.wild.example.net" {
-		t.Fatalf("expected full wildcard context, got %q", result.Context)
+	gen := modutil.NewLocalIDGenerator()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := extractNSECDomain(tt.raw, tt.target, tt.nxTarget, "Ctx", gen)
+			if (res != nil) != tt.want {
+				t.Errorf("extractNSECDomain() = %v, want %v", res, tt.want)
+			}
+		})
 	}
 }
 

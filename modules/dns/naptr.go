@@ -98,7 +98,7 @@ func getNAPTRData(ctx context.Context, target string, gen *modutil.LocalIDGenera
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 35, nil)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 35, nil)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetNAPTR, target, err)
 		modutil.SetError(&exec, "naptr lookup failed: %v", err)

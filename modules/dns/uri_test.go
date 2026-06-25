@@ -2,8 +2,8 @@ package dns
 
 import (
 	"context"
+	"net"
 	"slices"
-	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -12,24 +12,76 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func TestGetURIDataEmpty(t *testing.T) {
-	execution := getURIData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
-
-	if execution.Error != nil {
-		t.Logf("uri lookup failed: %v", *execution.Error)
-		return
+func TestGetURIData(t *testing.T) {
+	tests := []struct {
+		mockError     error
+		name          string
+		target        string
+		mockRecords   []string
+		expectedCount int
+		expectError   bool
+	}{
+		{
+			mockError:     nil,
+			name:          "uri lookup success",
+			target:        "geturi.example.com",
+			mockRecords:   []string{"10 100 \"https://example.com\""},
+			expectedCount: 2,
+			expectError:   false,
+		},
+		{
+			mockError:     nil,
+			name:          "uri lookup unparsed",
+			target:        "unparsed.geturi.example.net",
+			mockRecords:   []string{"invalid_uri_record"},
+			expectedCount: 0,
+			expectError:   false,
+		},
+		{
+			mockError:     nil,
+			name:          "uri lookup empty",
+			target:        "empty.geturi.example.org",
+			mockRecords:   []string{},
+			expectedCount: 0,
+			expectError:   false,
+		},
+		{
+			mockError:     context.DeadlineExceeded,
+			name:          "uri lookup err",
+			target:        "error.geturi.example.com",
+			mockRecords:   nil,
+			expectedCount: 0,
+			expectError:   true,
+		},
 	}
 
-	if len(execution.Results) > 0 {
-		t.Logf("Found URI record for example.com: %v", execution.Results[0].Value)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origResolveRecordFunc := resolveRecordFunc
+			defer func() { resolveRecordFunc = origResolveRecordFunc }()
 
-func TestGetURIDataNX(t *testing.T) {
-	execution := getURIData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				if tt.mockError != nil {
+					return nil, nil, tt.mockError
+				}
+				return tt.mockRecords, []byte("mock raw data"), nil
+			}
 
-	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
-		t.Logf("uri lookup failed: %v", *execution.Error)
+			execution := getURIData(context.Background(), tt.target, modutil.NewLocalIDGenerator())
+
+			if tt.expectError {
+				if execution.Error == nil {
+					t.Error("expected error, got nil")
+				}
+			} else {
+				if execution.Error != nil {
+					t.Errorf("unexpected error: %v", *execution.Error)
+				}
+				if len(execution.Results) != tt.expectedCount {
+					t.Errorf("expected %d results, got %d", tt.expectedCount, len(execution.Results))
+				}
+			}
+		})
 	}
 }
 

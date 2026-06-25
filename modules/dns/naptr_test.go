@@ -2,8 +2,9 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
-	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -145,29 +146,75 @@ func TestBuildNAPTRRegexpResults(t *testing.T) {
 	if targetProp.Source == nil || targetProp.Source.Type != constants.TypeNAPTR || targetProp.Source.Value != "!^.*$!sip:info@example.org!" {
 		t.Fatalf("unexpected target source: %#v", targetProp.Source)
 	}
+}
 
+func TestBuildNAPTRRegexpResultsOnly(t *testing.T) {
+	source := &schema.EntityRef{Type: constants.TypeNAPTR, Value: "E2U+sip-only"}
 	resultsOnlyRegexp := buildNAPTRRegexpResults(source, "!^.*$!$1!", "", modutil.NewLocalIDGenerator())
 	if len(resultsOnlyRegexp) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(resultsOnlyRegexp))
 	}
 }
 
-func TestGetNAPTRDataEmpty(t *testing.T) {
-	execution := getNAPTRData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
-
-	if execution.Error != nil {
-		t.Logf("naptr lookup failed: %v", *execution.Error)
-		return
+func TestBuildNAPTRRegexpResultsEmpty(t *testing.T) {
+	source := &schema.EntityRef{Type: constants.TypeNAPTR, Value: "E2U+sip-empty"}
+	resultsEmpty := buildNAPTRRegexpResults(source, "", "", modutil.NewLocalIDGenerator())
+	if resultsEmpty != nil {
+		t.Fatalf("expected nil results, got %d", len(resultsEmpty))
 	}
-
-	t.Logf("Found %d NAPTR results for example.com", len(execution.Results))
 }
 
-func TestGetNAPTRDataNX(t *testing.T) {
-	execution := getNAPTRData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
+func TestGetNAPTRData(t *testing.T) {
+	origResolve := resolveRecordFunc
+	defer func() { resolveRecordFunc = origResolve }()
 
-	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
-		t.Logf("naptr lookup failed: %v", *execution.Error)
+	tests := []struct {
+		name       string
+		domain     string
+		mockErr    error
+		mockRec    []string
+		mockRaw    []byte
+		wantResult int
+		wantErr    bool
+	}{
+		{
+			name:   "naptr_success_mixed",
+			domain: "cherry-naptr.example",
+			mockRec: []string{
+				"100 10 \"s\" \"SIP+D2U\" \"\" _sip._udp.example.com.",
+				"100 10 \"u\" \"E2U+sip\" \"!^.*$!sip:info@example.org!\" .",
+				"\\# 15 0064000a0173075349502b44325500045f736970045f756470076578616d706c6503636f6d00",
+				"completely invalid record",
+			},
+			mockRaw:    []byte("raw"),
+			wantResult: 8,
+			wantErr:    false,
+		},
+		{
+			name:       "naptr_resolve_error",
+			domain:     "berry-naptr.example",
+			mockErr:    errors.New("mock dns error"),
+			wantResult: 0,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				return tt.mockRec, tt.mockRaw, tt.mockErr
+			}
+
+			gen := modutil.NewLocalIDGenerator()
+			exec := getNAPTRData(context.Background(), tt.domain, gen)
+
+			if (exec.Error != nil) != tt.wantErr {
+				t.Errorf("getNAPTRData() error = %v, wantErr %v", exec.Error, tt.wantErr)
+			}
+			if len(exec.Results) != tt.wantResult {
+				t.Errorf("getNAPTRData() results count = %d, want %d", len(exec.Results), tt.wantResult)
+			}
+		})
 	}
 }
 

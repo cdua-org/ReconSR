@@ -2,8 +2,8 @@ package dns
 
 import (
 	"context"
+	"net"
 	"slices"
-	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -38,22 +38,58 @@ func TestParseTLSA(t *testing.T) {
 	}
 }
 
-func TestGetTLSADataEmpty(t *testing.T) {
-	execution := getTLSAData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
-
-	if execution.Error != nil {
-		t.Logf("tlsa lookup failed: %v", *execution.Error)
-		return
+func TestGetTLSAData(t *testing.T) {
+	tests := []struct {
+		mockError     error
+		name          string
+		target        string
+		mockRecords   []string
+		expectedCount int
+	}{
+		{
+			mockError:     nil,
+			name:          "tlsa lookup success",
+			target:        "gettlsa.example.com",
+			mockRecords:   []string{"\\# 35 03 01 01 abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"},
+			expectedCount: 8,
+		},
+		{
+			mockError:     nil,
+			name:          "tlsa lookup empty",
+			target:        "empty.gettlsa.example.net",
+			mockRecords:   []string{},
+			expectedCount: 0,
+		},
+		{
+			mockError:     context.DeadlineExceeded,
+			name:          "tlsa lookup err",
+			target:        "error.gettlsa.example.org",
+			mockRecords:   nil,
+			expectedCount: 0,
+		},
 	}
 
-	t.Logf("Found %d TLSA results for example.com", len(execution.Results))
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origResolveRecordFunc := resolveRecordFunc
+			defer func() { resolveRecordFunc = origResolveRecordFunc }()
 
-func TestGetTLSADataNX(t *testing.T) {
-	execution := getTLSAData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				if tt.mockError != nil {
+					return nil, nil, tt.mockError
+				}
+				return tt.mockRecords, []byte("mock raw data"), nil
+			}
 
-	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
-		t.Logf("tlsa lookup failed: %v", *execution.Error)
+			execution := getTLSAData(context.Background(), tt.target, modutil.NewLocalIDGenerator())
+
+			if execution.Error != nil {
+				t.Errorf("unexpected error: %v", *execution.Error)
+			}
+			if len(execution.Results) != tt.expectedCount {
+				t.Errorf("expected %d results, got %d", tt.expectedCount, len(execution.Results))
+			}
+		})
 	}
 }
 

@@ -76,6 +76,12 @@ func TestGetDMARCData_FallbackError(t *testing.T) {
 }
 
 func TestGetDMARCData_ContextCancelled(t *testing.T) {
+	oldResolve := resolveRecordFunc
+	defer func() { resolveRecordFunc = oldResolve }()
+	resolveRecordFunc = func(ctx context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return nil, nil, ctx.Err()
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 

@@ -2,6 +2,8 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
 	"testing"
 
@@ -86,16 +88,70 @@ func TestBuildSRVHostResult(t *testing.T) {
 	}
 }
 
-func TestGetSRVDataEmpty(t *testing.T) {
-	execution := getSRVData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
+func TestGetSRVData(t *testing.T) {
+	origResolve := resolveRecordFunc
+	defer func() { resolveRecordFunc = origResolve }()
 
-	if execution.Error != nil {
-		t.Logf("srv lookup failed: %v", *execution.Error)
-		return
+	tests := []struct {
+		mockFunc   func(context.Context, string, int, func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error)
+		name       string
+		domain     string
+		wantResult int
+	}{
+		{
+			name:   "srv_success",
+			domain: "example.com",
+			mockFunc: func(_ context.Context, target string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				if target == "_sip._tcp.example.com" {
+					return []string{"10 20 5060 sip.example.com."}, []byte("raw"), nil
+				}
+				if target == "_sip._udp.example.com" {
+					return []string{"invalid srv"}, []byte("raw"), nil
+				}
+				if target == "_http._tcp.example.com" {
+					return []string{}, nil, nil
+				}
+				if target == "_ftp._tcp.example.com" {
+					return []string{"10 20 21 example.com."}, []byte("raw"), nil
+				}
+				return nil, nil, errors.New("nxdomain")
+			},
+			wantResult: 3,
+		},
+		{
+			name:   "srv_all_error",
+			domain: "error.example",
+			mockFunc: func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				return nil, nil, errors.New("nxdomain")
+			},
+			wantResult: 0,
+		},
+		{
+			name:   "srv_context_canceled",
+			domain: "timeout.example",
+			mockFunc: func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				return nil, nil, nil
+			},
+			wantResult: 0,
+		},
 	}
 
-	if len(execution.Results) != 0 {
-		t.Fatalf("expected 0 results, got %d: %+v", len(execution.Results), execution.Results)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolveRecordFunc = tt.mockFunc
+
+			ctx := context.Background()
+			if tt.name == "srv_context_canceled" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			exec := getSRVData(ctx, tt.domain, modutil.NewLocalIDGenerator())
+			if len(exec.Results) != tt.wantResult {
+				t.Errorf("getSRVData() results count = %d, want %d", len(exec.Results), tt.wantResult)
+			}
+		})
 	}
 }
 
@@ -108,5 +164,38 @@ func TestSRVCapabilities(t *testing.T) {
 
 	if !slices.Contains(caps.Functions, constants.FuncGetSRV) {
 		t.Error("expected get_srv in capabilities")
+	}
+}
+
+func TestMakeSRVFallback(t *testing.T) {
+	origPlain := plainLookupSRV
+	defer func() { plainLookupSRV = origPlain }()
+
+	fallback := makeSRVFallback("fallback.srv.example.com")
+
+	plainLookupSRV = func(_ context.Context, _ *net.Resolver, _, _, name string) (string, []*net.SRV, error) {
+		if name == "error.srv.example.com" {
+			return "", nil, errors.New("mock srv error")
+		}
+		return "cname", []*net.SRV{
+			{Target: "server1.example.com.", Port: 5060, Priority: 10, Weight: 20},
+		}, nil
+	}
+
+	res, err := fallback(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(res) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(res))
+	}
+	if res[0] != "10 20 5060 server1.example.com." {
+		t.Fatalf("unexpected formatted srv: %s", res[0])
+	}
+
+	fallbackErr := makeSRVFallback("error.srv.example.com")
+	_, err = fallbackErr(context.Background(), nil)
+	if err == nil {
+		t.Fatal("expected error, got none")
 	}
 }

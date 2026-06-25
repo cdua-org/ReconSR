@@ -77,7 +77,7 @@ func getNSECData(ctx context.Context, target string, gen *modutil.LocalIDGenerat
 }
 
 func executeNSECQuery(ctx context.Context, q nsecQuery, target, nxTarget string, gen *modutil.LocalIDGenerator) (results []schema.ModuleResult, raw []byte) {
-	resp, raw, err := resolver.QueryDoHDns(ctx, q.queryTarget, q.qtype)
+	resp, raw, err := queryDoHDnsFunc(ctx, q.queryTarget, q.qtype)
 	if err != nil {
 		log.Printf("%s error target=%q query=%q qtype=%d stage=query_doh err=%v", constants.FuncGetNSEC, target, q.queryTarget, q.qtype, err)
 		return nil, nil

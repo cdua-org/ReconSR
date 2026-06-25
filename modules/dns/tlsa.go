@@ -73,7 +73,7 @@ func getTLSAData(ctx context.Context, target string, gen *modutil.LocalIDGenerat
 			}
 			defer func() { <-sem }()
 
-			records, _, err := resolver.ResolveRecord(bruteCtx, domain, 52, nil)
+			records, _, err := resolveRecordFunc(bruteCtx, domain, 52, nil)
 			if err != nil || len(records) == 0 {
 				return
 			}

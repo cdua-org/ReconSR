@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"net"
 	"slices"
 	"testing"
 
@@ -9,20 +10,66 @@ import (
 	"cdua-org/ReconSR/modules/utils/modutil"
 )
 
-func TestGetSVCBDataEmpty(t *testing.T) {
-	execution := getSVCBData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
-
-	if execution.Error != nil {
-		t.Logf("svcb lookup failed: %v", *execution.Error)
-		return
+func TestGetSVCBData(t *testing.T) {
+	tests := []struct {
+		mockError     error
+		name          string
+		target        string
+		mockRecords   []string
+		expectedCount int
+	}{
+		{
+			mockError:     nil,
+			name:          "svcb lookup success",
+			target:        "getsvcb.example.com",
+			mockRecords:   []string{"1 svc.getsvcb.example.com. ipv4hint=192.0.2.1 ipv6hint=::1 alpn=h2,h3 ech=YmFzZTY0"},
+			expectedCount: 10,
+		},
+		{
+			mockError:     nil,
+			name:          "svcb lookup unparsed",
+			target:        "unparsed.getsvcb.example.net",
+			mockRecords:   []string{"invalid_svcb_record"},
+			expectedCount: 2,
+		},
+		{
+			mockError:     nil,
+			name:          "svcb lookup empty",
+			target:        "empty.getsvcb.example.org",
+			mockRecords:   []string{},
+			expectedCount: 0,
+		},
+		{
+			mockError:     context.DeadlineExceeded,
+			name:          "svcb lookup err",
+			target:        "error.getsvcb.example.com",
+			mockRecords:   nil,
+			expectedCount: 0,
+		},
 	}
 
-	t.Logf("Found %d SVCB/HTTPS results for example.com", len(execution.Results))
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origResolveRecordFunc := resolveRecordFunc
+			defer func() { resolveRecordFunc = origResolveRecordFunc }()
 
-func TestGetSVCBDataNX(t *testing.T) {
-	execution := getSVCBData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
-	t.Logf("Found %d results for nonexistent domain", len(execution.Results))
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				if tt.mockError != nil {
+					return nil, nil, tt.mockError
+				}
+				return tt.mockRecords, []byte("mock raw data"), nil
+			}
+
+			execution := getSVCBData(context.Background(), tt.target, modutil.NewLocalIDGenerator())
+
+			if execution.Error != nil {
+				t.Errorf("unexpected error: %v", *execution.Error)
+			}
+			if len(execution.Results) != tt.expectedCount {
+				t.Errorf("expected %d results, got %d", tt.expectedCount, len(execution.Results))
+			}
+		})
+	}
 }
 
 func TestSVCBCapabilities(t *testing.T) {

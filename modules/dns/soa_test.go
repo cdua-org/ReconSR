@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"net"
 	"slices"
 	"testing"
 
@@ -86,17 +87,67 @@ func TestBuildSOAResponsibleEmailResultSkipsInvalidAndUsesValidatedType(t *testi
 }
 
 func TestGetSOAData(t *testing.T) {
-	res := getSOAData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+	tests := []struct {
+		mockError     error
+		name          string
+		target        string
+		mockRecords   []string
+		expectedCount int
+		expectError   bool
+	}{
+		{
+			mockError:     nil,
+			name:          "successful lookup",
+			target:        "getsoa.example.com",
+			mockRecords:   []string{"ns1.getsoa.example.com. admin.getsoa.example.com. 2025010101 3600 900 604800 86400"},
+			expectedCount: 4,
+			expectError:   false,
+		},
+		{
+			mockError:     nil,
+			name:          "empty response",
+			target:        "empty.getsoa.example.net",
+			mockRecords:   []string{},
+			expectedCount: 0,
+			expectError:   false,
+		},
+		{
+			mockError:     context.DeadlineExceeded,
+			name:          "lookup error",
+			target:        "error.getsoa.example.org",
+			mockRecords:   nil,
+			expectedCount: 0,
+			expectError:   true,
+		},
+	}
 
-	switch {
-	case res.Error != nil:
-		t.Logf("Network resolution error: %v", *res.Error)
-	case len(res.Results) == 0:
-		t.Log("No SOA records found for example.com")
-	default:
-		if len(res.Results) != 4 {
-			t.Errorf("expected 4 results, got %d", len(res.Results))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origResolveRecordFunc := resolveRecordFunc
+			defer func() { resolveRecordFunc = origResolveRecordFunc }()
+
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				if tt.mockError != nil {
+					return nil, nil, tt.mockError
+				}
+				return tt.mockRecords, []byte("mock raw data"), nil
+			}
+
+			execution := getSOAData(context.Background(), tt.target, modutil.NewLocalIDGenerator())
+
+			if tt.expectError {
+				if execution.Error == nil {
+					t.Error("expected error, got nil")
+				}
+			} else {
+				if execution.Error != nil {
+					t.Errorf("unexpected error: %v", *execution.Error)
+				}
+				if len(execution.Results) != tt.expectedCount {
+					t.Errorf("expected %d results, got %d", tt.expectedCount, len(execution.Results))
+				}
+			}
+		})
 	}
 }
 

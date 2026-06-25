@@ -87,7 +87,7 @@ func getSRVData(ctx context.Context, target string, gen *modutil.LocalIDGenerato
 
 			fallback := makeSRVFallback(domain)
 
-			records, _, err := resolver.ResolveRecord(threadCtx, domain, 33, fallback)
+			records, _, err := resolveRecordFunc(threadCtx, domain, 33, fallback)
 			if err != nil || len(records) == 0 {
 				return
 			}
@@ -166,7 +166,7 @@ func buildSRVHostResult(host, target string, source *schema.EntityRef, gen *modu
 
 func makeSRVFallback(domain string) func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {
 	return func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {
-		_, srvs, err := r.LookupSRV(fallbackCtx, "", "", domain)
+		_, srvs, err := plainLookupSRV(fallbackCtx, r, "", "", domain)
 		if err != nil {
 			return nil, fmt.Errorf("plain lookup srv failed: %w", err)
 		}

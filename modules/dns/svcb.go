@@ -35,7 +35,7 @@ func getSVCBData(ctx context.Context, target string, gen *modutil.LocalIDGenerat
 		{"HTTPS", 65},
 	} {
 		go func(code int, name string) {
-			recs, raw, err := resolver.ResolveRecord(queryCtx, target, code, nil)
+			recs, raw, err := resolveRecordFunc(queryCtx, target, code, nil)
 			if err != nil {
 				log.Printf("%s error target=%q rrtype=%s stage=resolve_record err=%v", constants.FuncGetSVCB, target, name, err)
 				ch <- queryResult{qtype: name}

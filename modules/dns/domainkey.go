@@ -21,7 +21,7 @@ func getDomainKeyData(ctx context.Context, target string, gen *modutil.LocalIDGe
 	domainkeyTarget := domainKeyLabel + "." + target
 
 	plainFallback := func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {
-		txts, err := r.LookupTXT(fallbackCtx, domainkeyTarget)
+		txts, err := plainLookupTXT(fallbackCtx, r, domainkeyTarget)
 		if err != nil {
 			return nil, fmt.Errorf("plain lookup domainkey failed: %w", err)
 		}

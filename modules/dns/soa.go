@@ -22,7 +22,7 @@ func getSOAData(ctx context.Context, target string, gen *modutil.LocalIDGenerato
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 6, nil)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 6, nil)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetSOA, target, err)
 		modutil.SetError(&exec, "soa lookup failed: %v", err)

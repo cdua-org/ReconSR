@@ -18,7 +18,7 @@ func getURIData(ctx context.Context, target string, gen *modutil.LocalIDGenerato
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 256, nil)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 256, nil)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetURI, target, err)
 		modutil.SetError(&exec, "uri lookup failed: %v", err)

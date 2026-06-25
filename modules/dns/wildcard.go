@@ -28,7 +28,7 @@ func checkWildcard(ctx context.Context, target string, gen *modutil.LocalIDGener
 
 	log.Printf("%s query_start target=%q", constants.FuncCheckWildcard, target)
 
-	ips, raw, err := resolver.ResolveIP(queryCtx, testDomain)
+	ips, raw, err := resolveIPFunc(queryCtx, testDomain)
 
 	if err != nil {
 		log.Printf("%s error target=%q test_domain=%q stage=resolve_ip err=%v", constants.FuncCheckWildcard, target, testDomain, err)

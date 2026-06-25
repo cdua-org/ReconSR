@@ -55,7 +55,7 @@ func getSSHFPData(ctx context.Context, target string, gen *modutil.LocalIDGenera
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 44, nil)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 44, nil)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetSSHFP, target, err)
 		modutil.SetError(&exec, "sshfp lookup failed: %v", err)
