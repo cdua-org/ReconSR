@@ -22,7 +22,7 @@ func getTXTData(ctx context.Context, target string, gen *modutil.LocalIDGenerato
 	defer cancel()
 
 	plainFallback := func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {
-		txts, err := r.LookupTXT(fallbackCtx, target)
+		txts, err := plainLookupTXT(fallbackCtx, r, target)
 		if err != nil {
 			return nil, fmt.Errorf("plain lookup txt failed: %w", err)
 		}
@@ -31,7 +31,7 @@ func getTXTData(ctx context.Context, target string, gen *modutil.LocalIDGenerato
 
 	log.Printf("%s query_start target=%q", constants.FuncGetTXT, target)
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 16, plainFallback)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 16, plainFallback)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetTXT, target, err)
 		modutil.SetError(&exec, "txt lookup failed: %v", err)

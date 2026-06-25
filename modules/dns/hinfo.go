@@ -19,7 +19,7 @@ func getHINFOData(ctx context.Context, target string, gen *modutil.LocalIDGenera
 
 	log.Printf("%s query_start target=%q", constants.FuncGetHINFO, target)
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 13, nil)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 13, nil)
 	if err != nil {
 		modutil.SetError(&exec, "hinfo lookup failed: %v", err)
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetHINFO, target, err)

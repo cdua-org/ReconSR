@@ -31,7 +31,7 @@ func getMXData(ctx context.Context, target string, gen *modutil.LocalIDGenerator
 	defer cancel()
 
 	plainFallback := func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {
-		mxs, err := r.LookupMX(fallbackCtx, target)
+		mxs, err := plainLookupMX(fallbackCtx, r, target)
 		if err != nil {
 			return nil, fmt.Errorf("plain lookup mx failed: %w", err)
 		}
@@ -42,7 +42,7 @@ func getMXData(ctx context.Context, target string, gen *modutil.LocalIDGenerator
 		return res, nil
 	}
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 15, plainFallback)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 15, plainFallback)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetMX, target, err)
 		modutil.SetError(&exec, "mx lookup failed: %v", err)

@@ -2,6 +2,8 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
 	"testing"
 
@@ -32,6 +34,12 @@ func TestParseMX(t *testing.T) {
 		{
 			name:     "invalid - too few fields",
 			input:    "mail.example.com.",
+			expected: mxRecord{},
+			wantErr:  true,
+		},
+		{
+			name:     "invalid mx host format",
+			input:    "\\# 2 broken",
 			expected: mxRecord{},
 			wantErr:  true,
 		},
@@ -122,26 +130,104 @@ func TestBuildMXHostResult(t *testing.T) {
 	}
 }
 
-func TestGetMXDataEmpty(t *testing.T) {
-	execution := getMXData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
-
-	if execution.Error != nil {
-		t.Logf("mx lookup failed: %v", *execution.Error)
-		return
-	}
-
-	if len(execution.Results) != 0 {
-		t.Fatalf("expected 0 results, got %d", len(execution.Results))
-	}
-}
-
 func TestGetMXData(t *testing.T) {
-	res := getMXData(context.Background(), "mx-lookup.example.com", modutil.NewLocalIDGenerator())
+	origResolve := resolveRecordFunc
+	origPlain := plainLookupMX
+	defer func() {
+		resolveRecordFunc = origResolve
+		plainLookupMX = origPlain
+	}()
 
-	if res.Error != nil {
-		t.Logf("Network resolution error: %v", *res.Error)
-	} else if len(res.Results) == 0 {
-		t.Log("No MX records found for example.com, which is possible but rare in this specific test")
+	tests := []struct {
+		name         string
+		domain       string
+		mockErr      error
+		fallbackErr  error
+		mockRec      []string
+		mockRaw      []byte
+		fallbackMXs  []*net.MX
+		wantResult   int
+		callFallback bool
+		wantErr      bool
+	}{
+		{
+			name:         "mx_success_records",
+			domain:       "cherry-mx.example",
+			mockErr:      nil,
+			mockRec:      []string{"10 mx1.example.com.", "20 mx2.example.com.", "invalid_no_pref"},
+			mockRaw:      []byte("raw"),
+			callFallback: false,
+			wantResult:   4,
+			wantErr:      false,
+		},
+		{
+			name:         "mx_success_empty",
+			domain:       "empty-mx.example",
+			mockErr:      nil,
+			mockRec:      []string{"invalid_only"},
+			mockRaw:      []byte("raw"),
+			callFallback: false,
+			wantResult:   0,
+			wantErr:      false,
+		},
+		{
+			name:         "mx_resolve_error",
+			domain:       "berry-mx.example",
+			mockErr:      errors.New("mock dns error"),
+			callFallback: false,
+			wantResult:   0,
+			wantErr:      true,
+		},
+		{
+			name:         "mx_fallback_success",
+			domain:       "date.example",
+			mockErr:      nil,
+			callFallback: true,
+			fallbackErr:  nil,
+			fallbackMXs: []*net.MX{
+				{Host: "fallback.example.com.", Pref: 50},
+			},
+			wantResult: 2,
+			wantErr:    false,
+		},
+		{
+			name:         "mx_fallback_error",
+			domain:       "fig.example",
+			mockErr:      errors.New("mock dns error"),
+			callFallback: true,
+			fallbackErr:  errors.New("fallback failed"),
+			wantResult:   0,
+			wantErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plainLookupMX = func(_ context.Context, _ *net.Resolver, _ string) ([]*net.MX, error) {
+				return tt.fallbackMXs, tt.fallbackErr
+			}
+
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, fallback func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				if tt.callFallback && fallback != nil {
+					res, err := fallback(context.Background(), nil)
+					if err != nil {
+						return nil, nil, tt.mockErr
+					}
+					return res, tt.mockRaw, nil
+				}
+				return tt.mockRec, tt.mockRaw, tt.mockErr
+			}
+
+			gen := modutil.NewLocalIDGenerator()
+			exec := getMXData(context.Background(), tt.domain, gen)
+
+			if (exec.Error != nil) != tt.wantErr {
+				t.Errorf("getMXData() error = %v, wantErr %v", exec.Error, tt.wantErr)
+			}
+			if len(exec.Results) != tt.wantResult {
+				t.Errorf("getMXData() results count = %d, want %d", len(exec.Results), tt.wantResult)
+			}
+		})
 	}
 }
 

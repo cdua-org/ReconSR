@@ -17,7 +17,7 @@ func getIPData(ctx context.Context, target string, gen *modutil.LocalIDGenerator
 
 	log.Printf("%s query_start target=%q", constants.FuncGetIP, target)
 
-	ips, raw, err := resolver.ResolveIP(queryCtx, target)
+	ips, raw, err := resolveIPFunc(queryCtx, target)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_ip err=%v", constants.FuncGetIP, target, err)
 		modutil.SetError(&exec, "dns lookup failed: %v", err)

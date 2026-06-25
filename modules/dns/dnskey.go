@@ -60,7 +60,7 @@ func getDNSKEYData(ctx context.Context, target string, gen *modutil.LocalIDGener
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 48, nil)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 48, nil)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetDNSKEY, target, err)
 		modutil.SetError(&exec, "dnskey lookup failed: %v", err)

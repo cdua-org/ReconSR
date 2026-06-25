@@ -122,7 +122,7 @@ func getIPSECKEYData(ctx context.Context, target string, gen *modutil.LocalIDGen
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 45, nil)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 45, nil)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetIPSECKEY, target, err)
 		modutil.SetError(&exec, "ipseckey lookup failed: %v", err)

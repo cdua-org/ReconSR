@@ -2,8 +2,9 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
-	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -12,24 +13,64 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func TestGetHINFODataEmpty(t *testing.T) {
-	execution := getHINFOData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+func TestGetHINFOData(t *testing.T) {
+	origResolve := resolveRecordFunc
+	defer func() { resolveRecordFunc = origResolve }()
 
-	if execution.Error != nil {
-		t.Logf("hinfo lookup failed: %v", *execution.Error)
-		return
+	tests := []struct {
+		name       string
+		domain     string
+		mockErr    error
+		mockRec    []string
+		mockRaw    []byte
+		wantResult int
+		wantErr    bool
+	}{
+		{
+			name:       "hinfo_success",
+			domain:     "peaches.example",
+			mockErr:    nil,
+			mockRec:    []string{"\"INTEL\" \"UNIX\""},
+			mockRaw:    []byte("raw"),
+			wantResult: 3,
+			wantErr:    false,
+		},
+		{
+			name:       "hinfo_resolve_error",
+			domain:     "plums.example",
+			mockErr:    errors.New("mock dns error"),
+			mockRec:    nil,
+			mockRaw:    nil,
+			wantResult: 0,
+			wantErr:    true,
+		},
+		{
+			name:       "invalid record",
+			domain:     "mangoes.example",
+			mockErr:    nil,
+			mockRec:    []string{"invalid"},
+			mockRaw:    []byte("raw"),
+			wantResult: 0,
+			wantErr:    false,
+		},
 	}
 
-	if len(execution.Results) > 0 {
-		t.Logf("Unexpectedly found HINFO record for example.com: %v", execution.Results[0].Value)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				return tt.mockRec, tt.mockRaw, tt.mockErr
+			}
 
-func TestGetHINFODataNX(t *testing.T) {
-	execution := getHINFOData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
+			gen := modutil.NewLocalIDGenerator()
+			exec := getHINFOData(context.Background(), tt.domain, gen)
 
-	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
-		t.Logf("hinfo lookup failed: %v", *execution.Error)
+			if (exec.Error != nil) != tt.wantErr {
+				t.Errorf("getHINFOData() error = %v, wantErr %v", exec.Error, tt.wantErr)
+			}
+			if len(exec.Results) != tt.wantResult {
+				t.Errorf("getHINFOData() results count = %d, want %d", len(exec.Results), tt.wantResult)
+			}
+		})
 	}
 }
 

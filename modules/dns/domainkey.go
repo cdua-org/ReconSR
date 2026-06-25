@@ -30,7 +30,7 @@ func getDomainKeyData(ctx context.Context, target string, gen *modutil.LocalIDGe
 
 	log.Printf("%s query_start target=%q", constants.FuncGetDomainKey, target)
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, domainkeyTarget, 16, plainFallback)
+	records, raw, err := resolveRecordFunc(queryCtx, domainkeyTarget, 16, plainFallback)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetDomainKey, target, err)
 		modutil.SetError(&exec, "domainkey lookup failed: %v", err)

@@ -26,14 +26,14 @@ func getDMARCData(ctx context.Context, target string, gen *modutil.LocalIDGenera
 	dmarcTarget := "_dmarc." + target
 
 	plainFallback := func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {
-		txts, err := r.LookupTXT(fallbackCtx, dmarcTarget)
+		txts, err := plainLookupTXT(fallbackCtx, r, dmarcTarget)
 		if err != nil {
 			return nil, fmt.Errorf("plain lookup dmarc failed: %w", err)
 		}
 		return txts, nil
 	}
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, dmarcTarget, 16, plainFallback)
+	records, raw, err := resolveRecordFunc(queryCtx, dmarcTarget, 16, plainFallback)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetDMARC, target, err)
 		modutil.SetError(&exec, "dmarc lookup failed: %v", err)

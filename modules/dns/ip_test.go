@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 
@@ -48,14 +49,53 @@ func TestExecUnsupported(t *testing.T) {
 }
 
 func TestGetIPData(t *testing.T) {
-	res := getIPData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+	origResolve := resolveIPFunc
+	defer func() { resolveIPFunc = origResolve }()
 
-	switch {
-	case res.Error != nil:
-		t.Logf("Network resolution error: %v", *res.Error)
-	case len(res.Results) == 0:
-		t.Error("expected at least one IP for example.com")
-	case res.Results[0].Type != constants.TypeIP:
-		t.Errorf("expected type 'ip', got '%s'", res.Results[0].Type)
+	tests := []struct {
+		name       string
+		domain     string
+		mockErr    error
+		mockIPs    []string
+		mockRaw    []byte
+		wantResult int
+		wantErr    bool
+	}{
+		{
+			name:       "ip_success_records",
+			domain:     "cherry-ip.example",
+			mockErr:    nil,
+			mockIPs:    []string{"192.0.2.1", "2001:db8::1"},
+			mockRaw:    []byte("raw"),
+			wantResult: 2,
+			wantErr:    false,
+		},
+		{
+			name:       "ip_resolve_error",
+			domain:     "berry-ip.example",
+			mockErr:    errors.New("mock dns error"),
+			mockIPs:    nil,
+			mockRaw:    nil,
+			wantResult: 0,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolveIPFunc = func(_ context.Context, _ string) ([]string, []byte, error) {
+				return tt.mockIPs, tt.mockRaw, tt.mockErr
+			}
+
+			gen := modutil.NewLocalIDGenerator()
+			exec := getIPData(context.Background(), tt.domain, gen)
+
+			if (exec.Error != nil) != tt.wantErr {
+				t.Errorf("getIPData() error = %v, wantErr %v", exec.Error, tt.wantErr)
+			}
+			if len(exec.Results) != tt.wantResult {
+				t.Errorf("getIPData() results count = %d, want %d", len(exec.Results), tt.wantResult)
+			}
+		})
 	}
 }

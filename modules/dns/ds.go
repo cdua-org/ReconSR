@@ -43,7 +43,7 @@ func getDSData(ctx context.Context, target string, gen *modutil.LocalIDGenerator
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 43, nil)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 43, nil)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetDS, target, err)
 		modutil.SetError(&exec, "ds lookup failed: %v", err)

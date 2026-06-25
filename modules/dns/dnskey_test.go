@@ -2,6 +2,8 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
 	"testing"
 
@@ -43,24 +45,60 @@ func TestParseDNSKEY(t *testing.T) {
 }
 
 func TestGetDNSKEYData(t *testing.T) {
-	res := getDNSKEYData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+	oldResolve := resolveRecordFunc
+	resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return []string{
+			"257 3 8 AwEAAc...",
+			"256 3 8 AwEAAcZSK...",
+			"255 3 8 AwEAAc...",
+			"257 3 999 AwEAAc...",
+			"257 3 invalid AwEAAc...",
+			"257 3 99 AwEAAc...",
+			"malformed record",
+		}, []byte("mocked raw data"), nil
+	}
+	defer func() { resolveRecordFunc = oldResolve }()
 
-	switch {
-	case res.Error != nil:
-		t.Logf("Network resolution error: %v", *res.Error)
-	case len(res.Results) == 0:
-		t.Log("No DNSKEY records found for example.com")
-	default:
-		found := false
-		for _, r := range res.Results {
-			if r.Type == constants.TypeDNSKEY {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("expected at least one 'dnskey' result")
-		}
+	res := getDNSKEYData(context.Background(), "test.example", modutil.NewLocalIDGenerator())
+
+	if res.Error != nil {
+		t.Fatalf("unexpected error: %v", *res.Error)
+	}
+
+	if len(res.Results) != 5 {
+		t.Errorf("expected 5 results, got %d", len(res.Results))
+	}
+	if res.RawData == "" {
+		t.Error("expected RawData to be set")
+	}
+}
+
+func TestGetDNSKEYDataEmpty(t *testing.T) {
+	oldResolve := resolveRecordFunc
+	resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return nil, nil, nil
+	}
+	defer func() { resolveRecordFunc = oldResolve }()
+
+	res := getDNSKEYData(context.Background(), "empty.example", modutil.NewLocalIDGenerator())
+	if res.Error != nil {
+		t.Fatalf("unexpected error: %v", *res.Error)
+	}
+	if len(res.Results) != 0 {
+		t.Errorf("expected 0 results, got %d", len(res.Results))
+	}
+}
+
+func TestGetDNSKEYData_Error(t *testing.T) {
+	oldResolve := resolveRecordFunc
+	resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return nil, nil, errors.New("mock dnskey error")
+	}
+	defer func() { resolveRecordFunc = oldResolve }()
+
+	res := getDNSKEYData(context.Background(), "error.example", modutil.NewLocalIDGenerator())
+	if res.Error == nil {
+		t.Error("expected error, got nil")
 	}
 }
 

@@ -146,7 +146,6 @@ func TestBuildNAPTRRegexpResults(t *testing.T) {
 		t.Fatalf("unexpected target source: %#v", targetProp.Source)
 	}
 
-	// Test without target
 	resultsOnlyRegexp := buildNAPTRRegexpResults(source, "!^.*$!$1!", "", modutil.NewLocalIDGenerator())
 	if len(resultsOnlyRegexp) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(resultsOnlyRegexp))

@@ -108,13 +108,11 @@ func TestParseNSECRecordSource(t *testing.T) {
 		t.Fatalf("expected at least 3 results, got %d", len(results))
 	}
 
-	// 1. Current Subdomain
 	currentSub := results[0]
 	if currentSub.Type != constants.TypeSubdomain || currentSub.Value != "current.example.com" {
 		t.Fatalf("expected current subdomain, got %s %s", currentSub.Type, currentSub.Value)
 	}
 
-	// 2. NSEC Property
 	primary := results[1]
 	if primary.Type != constants.TypeNSEC {
 		t.Fatalf("expected primary result to be NSEC, got %s", primary.Type)
@@ -128,7 +126,6 @@ func TestParseNSECRecordSource(t *testing.T) {
 		t.Errorf("expected NSEC property to have Source = current.example.com, got %v", primary.Source)
 	}
 
-	// 3. Leaked Subdomain
 	leakedSub := results[2]
 	expectedSource := &schema.EntityRef{Type: primary.Type, Value: primary.Value}
 

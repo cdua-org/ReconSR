@@ -2,6 +2,8 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
 	"strings"
 	"testing"
@@ -38,22 +40,42 @@ func TestParseCERT(t *testing.T) {
 	}
 }
 
-func TestGetCERTDataEmpty(t *testing.T) {
+func TestGetCERTData(t *testing.T) {
+	oldResolve := resolveRecordFunc
+	resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return []string{
+			"3 12345 5 Base64Data",
+			"999 12345 99 Base64Data",
+			"short record",
+		}, []byte("mock"), nil
+	}
+	defer func() { resolveRecordFunc = oldResolve }()
+
 	execution := getCERTData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if execution.Error != nil {
-		t.Logf("cert lookup failed: %v", *execution.Error)
-		return
+		t.Fatalf("unexpected network error: %v", *execution.Error)
 	}
 
-	t.Logf("Found %d CERT results for example.com", len(execution.Results))
+	if len(execution.Results) != 2 {
+		t.Fatalf("expected 2 CERT results, got %d", len(execution.Results))
+	}
+	if !strings.Contains(execution.Results[0].Context, "PGP") || !strings.Contains(execution.Results[0].Context, "RSASHA1") {
+		t.Errorf("expected translated names in Context, got: %s", execution.Results[0].Context)
+	}
 }
 
-func TestGetCERTDataNX(t *testing.T) {
-	execution := getCERTData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
+func TestGetCERTData_Error(t *testing.T) {
+	oldResolve := resolveRecordFunc
+	resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return nil, nil, errors.New("mock network error")
+	}
+	defer func() { resolveRecordFunc = oldResolve }()
 
-	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
-		t.Logf("cert lookup failed: %v", *execution.Error)
+	execution := getCERTData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+
+	if execution.Error == nil {
+		t.Errorf("expected error from mocked failure")
 	}
 }
 

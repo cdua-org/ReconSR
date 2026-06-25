@@ -2,34 +2,127 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/dnsutils"
 	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/schema"
 )
 
-func TestGetTXTDataEmpty(t *testing.T) {
-	execution := getTXTData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
+func TestGetTXTData(t *testing.T) {
+	origResolve := resolveRecordFunc
+	origPlain := plainLookupTXT
+	defer func() {
+		resolveRecordFunc = origResolve
+		plainLookupTXT = origPlain
+	}()
 
-	if execution.Error != nil {
-		t.Logf("txt lookup failed: %v", *execution.Error)
-		return
+	tests := []struct {
+		name         string
+		domain       string
+		mockErr      error
+		fallbackErr  error
+		mockRec      []string
+		mockRaw      []byte
+		fallbackTXTs []string
+		wantResult   int
+		callFallback bool
+		wantErr      bool
+	}{
+		{
+			name:         "txt_success_records",
+			domain:       "cherry-txt.example",
+			mockErr:      nil,
+			mockRec:      []string{"\"v=spf1 -all\"", "\"general txt record\"", ""},
+			mockRaw:      []byte("raw"),
+			callFallback: false,
+			wantResult:   2,
+			wantErr:      false,
+		},
+		{
+			name:         "txt_resolve_error",
+			domain:       "berry-txt.example",
+			mockErr:      errors.New("mock dns error"),
+			callFallback: false,
+			wantResult:   0,
+			wantErr:      true,
+		},
+		{
+			name:         "txt_fallback_success",
+			domain:       "date.example",
+			mockErr:      nil,
+			callFallback: true,
+			fallbackErr:  nil,
+			fallbackTXTs: []string{"v=spf1 include:spf.example.com ~all"},
+			wantResult:   2,
+			wantErr:      false,
+		},
+		{
+			name:         "txt_fallback_error",
+			domain:       "fig.example",
+			mockErr:      errors.New("mock dns error"),
+			callFallback: true,
+			fallbackErr:  errors.New("fallback failed"),
+			wantResult:   0,
+			wantErr:      true,
+		},
 	}
 
-	if len(execution.Results) != 0 {
-		t.Fatalf("expected 0 results, got %d", len(execution.Results))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plainLookupTXT = func(_ context.Context, _ *net.Resolver, _ string) ([]string, error) {
+				return tt.fallbackTXTs, tt.fallbackErr
+			}
+
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, fallback func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				if tt.callFallback && fallback != nil {
+					res, err := fallback(context.Background(), nil)
+					if err != nil {
+						return nil, nil, tt.mockErr
+					}
+					return res, tt.mockRaw, nil
+				}
+				return tt.mockRec, tt.mockRaw, tt.mockErr
+			}
+
+			gen := modutil.NewLocalIDGenerator()
+			exec := getTXTData(context.Background(), tt.domain, gen)
+
+			if (exec.Error != nil) != tt.wantErr {
+				t.Errorf("getTXTData() error = %v, wantErr %v", exec.Error, tt.wantErr)
+			}
+			if len(exec.Results) != tt.wantResult {
+				t.Errorf("getTXTData() results count = %d, want %d", len(exec.Results), tt.wantResult)
+			}
+		})
 	}
 }
 
-func TestGetTXTData(t *testing.T) {
-	res := getTXTData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+func TestBuildSPFEntityResult_Default(t *testing.T) {
+	ent := dnsutils.SPFEntity{Kind: 999}
+	_, ok := buildSPFEntityResult(nil, ent, "example.com", modutil.NewLocalIDGenerator())
+	if ok {
+		t.Error("expected false for unknown kind")
+	}
+}
 
-	if res.Error != nil {
-		t.Logf("Network resolution error: %v", *res.Error)
-	} else {
-		t.Logf("TXT/SPF records found (or none): %d", len(res.Results))
+func TestBuildSPFIPResult_Invalid(t *testing.T) {
+	ent := dnsutils.SPFEntity{Kind: dnsutils.SPFEntityIP4, Value: "invalid-ip"}
+	_, ok := buildSPFIPResult(nil, ent, modutil.NewLocalIDGenerator())
+	if ok {
+		t.Error("expected false for invalid IP")
+	}
+}
+
+func TestBuildSPFDomainResult_Invalid(t *testing.T) {
+	ent := dnsutils.SPFEntity{Kind: dnsutils.SPFEntityDomain, Value: "invalid domain!"}
+	_, ok := buildSPFDomainResult(nil, ent, "example.com", modutil.NewLocalIDGenerator())
+	if ok {
+		t.Error("expected false for invalid domain")
 	}
 }
 

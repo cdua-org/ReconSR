@@ -2,8 +2,9 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
-	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -12,22 +13,64 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func TestGetIPSECKEYDataEmpty(t *testing.T) {
-	execution := getIPSECKEYData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+func TestGetIPSECKEYData(t *testing.T) {
+	origResolve := resolveRecordFunc
+	defer func() { resolveRecordFunc = origResolve }()
 
-	if execution.Error != nil {
-		t.Logf("ipseckey lookup failed: %v", *execution.Error)
-		return
+	tests := []struct {
+		name       string
+		domain     string
+		mockErr    error
+		mockRec    []string
+		mockRaw    []byte
+		wantResult int
+		wantErr    bool
+	}{
+		{
+			name:       "ipseckey_success",
+			domain:     "apple.example",
+			mockErr:    nil,
+			mockRec:    []string{"10 1 2 192.0.2.38 AQID"},
+			mockRaw:    []byte("raw"),
+			wantResult: 2,
+			wantErr:    false,
+		},
+		{
+			name:       "ipseckey_resolve_error",
+			domain:     "banana.example",
+			mockErr:    errors.New("mock dns error"),
+			mockRec:    nil,
+			mockRaw:    nil,
+			wantResult: 0,
+			wantErr:    true,
+		},
+		{
+			name:       "invalid_record",
+			domain:     "cherry.example",
+			mockErr:    nil,
+			mockRec:    []string{"invalid"},
+			mockRaw:    []byte("raw"),
+			wantResult: 0,
+			wantErr:    false,
+		},
 	}
 
-	t.Logf("Found %d IPSECKEY results for example.com", len(execution.Results))
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				return tt.mockRec, tt.mockRaw, tt.mockErr
+			}
 
-func TestGetIPSECKEYDataNX(t *testing.T) {
-	execution := getIPSECKEYData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
+			gen := modutil.NewLocalIDGenerator()
+			exec := getIPSECKEYData(context.Background(), tt.domain, gen)
 
-	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
-		t.Logf("ipseckey lookup failed: %v", *execution.Error)
+			if (exec.Error != nil) != tt.wantErr {
+				t.Errorf("getIPSECKEYData() error = %v, wantErr %v", exec.Error, tt.wantErr)
+			}
+			if len(exec.Results) != tt.wantResult {
+				t.Errorf("getIPSECKEYData() results count = %d, want %d", len(exec.Results), tt.wantResult)
+			}
+		})
 	}
 }
 
@@ -96,6 +139,12 @@ func TestClassifyIPSECKEYGateway(t *testing.T) {
 			name:    "domain gateway rejects invalid domain",
 			gwType:  "3",
 			gateway: "vpn_example.com",
+			wantOK:  false,
+		},
+		{
+			name:    "unknown gateway type rejected",
+			gwType:  "4",
+			gateway: "192.0.2.11",
 			wantOK:  false,
 		},
 	}

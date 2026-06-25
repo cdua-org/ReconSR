@@ -2,6 +2,8 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
 	"testing"
 
@@ -92,6 +94,30 @@ func TestProcessCAARecord(t *testing.T) {
 			expectedTypes:  []string{constants.TypeCAA},
 			expectedValues: []string{`0 issue "target.example.net"`},
 		},
+		{
+			name:           "issuewild tag",
+			record:         `0 issuewild "ca.example.com"`,
+			expectedTypes:  []string{constants.TypeCAA, constants.TypeSubdomain},
+			expectedValues: []string{`0 issuewild "ca.example.com"`, authorityDomain},
+		},
+		{
+			name:           "issuemail tag",
+			record:         `0 issuemail "ca.example.com"`,
+			expectedTypes:  []string{constants.TypeCAA, constants.TypeSubdomain},
+			expectedValues: []string{`0 issuemail "ca.example.com"`, authorityDomain},
+		},
+		{
+			name:           "empty authority",
+			record:         `0 issue ""`,
+			expectedTypes:  []string{constants.TypeCAA},
+			expectedValues: []string{`0 issue ""`},
+		},
+		{
+			name:           "invalid format (unmatched)",
+			record:         `invalid record string`,
+			expectedTypes:  []string{constants.TypeCAA},
+			expectedValues: []string{`invalid record string`},
+		},
 	}
 
 	for _, tt := range tests {
@@ -116,17 +142,36 @@ func TestProcessCAARecord(t *testing.T) {
 }
 
 func TestGetCAAData(t *testing.T) {
+	oldResolve := resolveRecordFunc
+	resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return []string{`0 issue "mock.example.com"`}, []byte("mock raw data"), nil
+	}
+	defer func() { resolveRecordFunc = oldResolve }()
+
 	res := getCAAData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
-	switch {
-	case res.Error != nil:
-		t.Logf("Network resolution error: %v", *res.Error)
-	case len(res.Results) == 0:
-		t.Log("No CAA records found for example.com")
-	default:
-		if res.Results[0].Type != constants.TypeCAA {
-			t.Errorf("expected type 'caa' (raw CAA), got '%s'", res.Results[0].Type)
-		}
+	if res.Error != nil {
+		t.Fatalf("unexpected network error: %v", *res.Error)
+	}
+	if len(res.Results) == 0 {
+		t.Fatal("expected CAA records, got 0")
+	}
+	if res.Results[0].Type != constants.TypeCAA {
+		t.Errorf("expected type 'caa' (raw CAA), got '%s'", res.Results[0].Type)
+	}
+}
+
+func TestGetCAAData_Error(t *testing.T) {
+	oldResolve := resolveRecordFunc
+	resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return nil, nil, errors.New("mock network error")
+	}
+	defer func() { resolveRecordFunc = oldResolve }()
+
+	res := getCAAData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+
+	if res.Error == nil {
+		t.Errorf("expected error from mocked failure")
 	}
 }
 

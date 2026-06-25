@@ -5,6 +5,7 @@ package dns
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -52,6 +53,30 @@ var handlers = map[string]handlerFunc{
 	constants.FuncGetIPSECKEY:   getIPSECKEYData,
 }
 
+// trustedTaggingFuncs defines functions that prove a domain is actively configured and used.
+// If these find records, the domain gets "alive". If they return NXDOMAIN, it gets "dead".
+var trustedTaggingFuncs = map[string]bool{
+	constants.FuncGetIP:       true,
+	constants.FuncGetCNAME:    true,
+	constants.FuncGetMX:       true,
+	constants.FuncGetTXT:      true,
+	constants.FuncGetSRV:      true,
+	constants.FuncGetCAA:      true,
+	constants.FuncGetCERT:     true,
+	constants.FuncGetTLSA:     true,
+	constants.FuncGetSSHFP:    true,
+	constants.FuncGetSVCB:     true,
+	constants.FuncGetURI:      true,
+	constants.FuncGetNAPTR:    true,
+	constants.FuncGetLOC:      true,
+	constants.FuncGetHINFO:    true,
+	constants.FuncGetHIP:      true,
+	constants.FuncGetIPSECKEY: true,
+	constants.FuncGetRP:       true,
+	constants.FuncGetDKIM:     true,
+	constants.FuncGetDMARC:    true,
+}
+
 type module struct{}
 
 // New instantiates the module for registration within the dispatcher's lifecycle.
@@ -79,6 +104,9 @@ func (m *module) Capabilities() (schema.ModuleCapabilities, error) {
 
 	for name := range handlers {
 		c := customFuncs[name]
+		if c.DelayMs == 0 {
+			c.DelayMs = -1
+		}
 		c.RequiredTags = [][]string{{constants.TagDNSOK}}
 		customFuncs[name] = c
 	}
@@ -110,6 +138,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 			execution = handlePreflightDNS(ctx, data.Target, gen)
 		} else if handler, ok := handlers[f]; ok {
 			execution = handler(ctx, data.Target.Value, gen)
+			applyOSINTTags(f, data.Target, &execution, gen)
 		} else {
 			execution = modutil.NewExecution(f)
 			errMsg := "unsupported function: " + f
@@ -126,7 +155,7 @@ func (m *module) Exec(data schema.ModuleInput) (schema.ModuleOutput, error) {
 
 func handlePreflightDNS(ctx context.Context, target schema.Entity, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
 	execution := modutil.NewExecution(constants.FuncPreflightDNS)
-	err := preflightcheck.PreFlightCheck(ctx, target.Value)
+	err := preflightCheckFunc(ctx, target.Value)
 	if err != nil {
 		if errors.Is(err, preflightcheck.ErrZoneBroken) {
 			execution.Results = append(execution.Results, schema.ModuleResult{
@@ -135,6 +164,11 @@ func handlePreflightDNS(ctx context.Context, target schema.Entity, gen *modutil.
 				Value:    constants.StatusBrokenDNSZone,
 				Tags:     []string{constants.TagDNSBad},
 				LocalID:  gen.NextID(),
+			}, schema.ModuleResult{
+				Type:    target.Type,
+				Value:   target.Value,
+				Tags:    []string{constants.TagDead},
+				LocalID: gen.NextID(),
 			})
 		} else {
 			errMsg := err.Error()
@@ -149,4 +183,26 @@ func handlePreflightDNS(ctx context.Context, target schema.Entity, gen *modutil.
 		})
 	}
 	return execution
+}
+
+func applyOSINTTags(f string, target schema.Entity, execution *schema.ModuleExecution, gen *modutil.LocalIDGenerator) {
+	if !trustedTaggingFuncs[f] {
+		return
+	}
+
+	if len(execution.Results) > 0 {
+		execution.Results = append(execution.Results, schema.ModuleResult{
+			Type:    target.Type,
+			Value:   target.Value,
+			Tags:    []string{constants.TagAlive},
+			LocalID: gen.NextID(),
+		})
+	} else if execution.Error != nil && strings.Contains(*execution.Error, "no such host") {
+		execution.Results = append(execution.Results, schema.ModuleResult{
+			Type:    target.Type,
+			Value:   target.Value,
+			Tags:    []string{constants.TagDead},
+			LocalID: gen.NextID(),
+		})
+	}
 }

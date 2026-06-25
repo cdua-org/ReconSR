@@ -19,7 +19,7 @@ func getCAAData(ctx context.Context, target string, gen *modutil.LocalIDGenerato
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSFallbackTimeout)
 	defer cancel()
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 257, nil)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 257, nil)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetCAA, target, err)
 		modutil.SetError(&exec, "caa lookup failed: %v", err)

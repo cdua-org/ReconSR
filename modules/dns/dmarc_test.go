@@ -2,8 +2,11 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -11,26 +14,99 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func TestGetDMARCDataEmpty(t *testing.T) {
-	execution := getDMARCData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
-
-	if execution.Error != nil {
-		t.Logf("dmarc lookup failed: %v", *execution.Error)
-		return
-	}
-
-	if len(execution.Results) != 0 {
-		t.Fatalf("expected 0 results, got %d", len(execution.Results))
-	}
-}
-
 func TestGetDMARCData(t *testing.T) {
+	oldResolve := resolveRecordFunc
+	resolveRecordFunc = func(_ context.Context, target string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		if target == "_dmarc.example.com" {
+			return []string{"v=DMARC1; p=reject; rua=mailto:admin@example.com"}, []byte("raw"), nil
+		}
+		return nil, nil, nil
+	}
+	defer func() { resolveRecordFunc = oldResolve }()
+
 	res := getDMARCData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
 
 	if res.Error != nil {
-		t.Logf("Network resolution error: %v", *res.Error)
-	} else if len(res.Results) == 0 {
-		t.Log("No DMARC records found for example.com")
+		t.Fatalf("unexpected error: %v", *res.Error)
+	}
+	if len(res.Results) == 0 {
+		t.Fatal("expected DMARC records")
+	}
+}
+
+func TestGetDMARCDataEmpty(t *testing.T) {
+	oldResolve := resolveRecordFunc
+	resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		return nil, nil, nil
+	}
+	defer func() { resolveRecordFunc = oldResolve }()
+
+	res := getDMARCData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+
+	if res.Error != nil {
+		t.Fatalf("unexpected error: %v", *res.Error)
+	}
+	if len(res.Results) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(res.Results))
+	}
+}
+
+func TestGetDMARCData_FallbackError(t *testing.T) {
+	oldResolve := resolveRecordFunc
+	resolveRecordFunc = func(ctx context.Context, _ string, _ int, fallback func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		res, err := fallback(ctx, nil)
+		if err != nil && !strings.Contains(err.Error(), "plain lookup dmarc failed") {
+			t.Errorf("unexpected error from fallback: %v", err)
+		}
+		return res, nil, err
+	}
+	defer func() { resolveRecordFunc = oldResolve }()
+
+	oldPlain := plainLookupTXT
+	plainLookupTXT = func(_ context.Context, _ *net.Resolver, _ string) ([]string, error) {
+		return nil, errors.New("mock txt error")
+	}
+	defer func() { plainLookupTXT = oldPlain }()
+
+	res := getDMARCData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+
+	if res.Error == nil {
+		t.Error("expected error from lookup, got nil")
+	}
+}
+
+func TestGetDMARCData_ContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	res := getDMARCData(ctx, "example.com", modutil.NewLocalIDGenerator())
+
+	if res.Error == nil {
+		t.Error("expected error from context cancellation, got nil")
+	}
+}
+
+func TestGetDMARCData_FallbackSuccess(t *testing.T) {
+	oldResolve := resolveRecordFunc
+	resolveRecordFunc = func(ctx context.Context, _ string, _ int, fallback func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+		res, err := fallback(ctx, nil)
+		return res, nil, err
+	}
+	defer func() { resolveRecordFunc = oldResolve }()
+
+	oldPlain := plainLookupTXT
+	plainLookupTXT = func(_ context.Context, _ *net.Resolver, _ string) ([]string, error) {
+		return []string{"v=DMARC1; p=none"}, nil
+	}
+	defer func() { plainLookupTXT = oldPlain }()
+
+	res := getDMARCData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+
+	if res.Error != nil {
+		t.Fatalf("unexpected error: %v", *res.Error)
+	}
+	if len(res.Results) == 0 {
+		t.Fatal("expected DMARC results from fallback")
 	}
 }
 

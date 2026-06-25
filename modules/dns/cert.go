@@ -49,7 +49,7 @@ func getCERTData(ctx context.Context, target string, gen *modutil.LocalIDGenerat
 	queryCtx, cancel := context.WithTimeout(ctx, resolver.DNSQueryTimeout)
 	defer cancel()
 
-	records, raw, err := resolver.ResolveRecord(queryCtx, target, 37, nil)
+	records, raw, err := resolveRecordFunc(queryCtx, target, 37, nil)
 	if err != nil {
 		log.Printf("%s error target=%q stage=resolve_record err=%v", constants.FuncGetCERT, target, err)
 		modutil.SetError(&exec, "cert lookup failed: %v", err)

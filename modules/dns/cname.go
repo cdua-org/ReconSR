@@ -111,7 +111,7 @@ func buildCNAMEResult(cname, target, relationContext string, gen *modutil.LocalI
 
 func lookupCNAME(ctx context.Context, target string) (cnameStr string, rawData []byte, err error) {
 	plainFallback := func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {
-		cname, cErr := r.LookupCNAME(fallbackCtx, target)
+		cname, cErr := plainLookupCNAME(fallbackCtx, r, target)
 		if cErr != nil {
 			return nil, fmt.Errorf("plain lookup cname failed: %w", cErr)
 		}
@@ -121,7 +121,7 @@ func lookupCNAME(ctx context.Context, target string) (cnameStr string, rawData [
 		return nil, nil
 	}
 
-	records, raw, err := resolver.ResolveRecord(ctx, target, 5, plainFallback)
+	records, raw, err := resolveRecordFunc(ctx, target, 5, plainFallback)
 	if err != nil {
 		return "", nil, fmt.Errorf("cname resolution failed: %w", err)
 	}

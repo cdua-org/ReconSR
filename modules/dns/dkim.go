@@ -63,14 +63,14 @@ func getDKIMData(ctx context.Context, target string, gen *modutil.LocalIDGenerat
 			domain := fmt.Sprintf("%s.%s.%s", sel, domainKeyLabel, target)
 
 			plainFallback := func(fallbackCtx context.Context, r *net.Resolver) ([]string, error) {
-				txts, err := r.LookupTXT(fallbackCtx, domain)
+				txts, err := plainLookupTXT(fallbackCtx, r, domain)
 				if err != nil {
 					return nil, fmt.Errorf("plain lookup dkim failed: %w", err)
 				}
 				return txts, nil
 			}
 
-			records, _, err := resolver.ResolveRecord(bruteCtx, domain, 16, plainFallback)
+			records, _, err := resolveRecordFunc(bruteCtx, domain, 16, plainFallback)
 			if err != nil || len(records) == 0 {
 				return
 			}

@@ -2,8 +2,9 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
-	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -40,22 +41,64 @@ func TestParseDS(t *testing.T) {
 	}
 }
 
-func TestGetDSDataEmpty(t *testing.T) {
-	execution := getDSData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+func TestGetDSData(t *testing.T) {
+	origResolve := resolveRecordFunc
+	defer func() { resolveRecordFunc = origResolve }()
 
-	if execution.Error != nil {
-		t.Logf("ds lookup failed: %v", *execution.Error)
-		return
+	tests := []struct {
+		name       string
+		domain     string
+		mockErr    error
+		mockRec    []string
+		mockRaw    []byte
+		wantResult int
+		wantErr    bool
+	}{
+		{
+			name:       "ds_success",
+			domain:     "example.com",
+			mockErr:    nil,
+			mockRec:    []string{"\\# 20 0d6d08021234567890abcdef1234567890abcdef"},
+			mockRaw:    []byte("raw"),
+			wantResult: 1,
+			wantErr:    false,
+		},
+		{
+			name:       "ds_resolve_error",
+			domain:     "error.example.com",
+			mockErr:    errors.New("mock dns error"),
+			mockRec:    nil,
+			mockRaw:    nil,
+			wantResult: 0,
+			wantErr:    true,
+		},
+		{
+			name:       "malformed record length",
+			domain:     "malformed.example.com",
+			mockErr:    nil,
+			mockRec:    []string{"invalid ds record"},
+			mockRaw:    []byte("raw"),
+			wantResult: 0,
+			wantErr:    false,
+		},
 	}
 
-	t.Logf("Found %d DS results for example.com", len(execution.Results))
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				return tt.mockRec, tt.mockRaw, tt.mockErr
+			}
 
-func TestGetDSDataNX(t *testing.T) {
-	execution := getDSData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
+			gen := modutil.NewLocalIDGenerator()
+			exec := getDSData(context.Background(), tt.domain, gen)
 
-	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
-		t.Logf("ds lookup failed: %v", *execution.Error)
+			if (exec.Error != nil) != tt.wantErr {
+				t.Errorf("getDSData() error = %v, wantErr %v", exec.Error, tt.wantErr)
+			}
+			if len(exec.Results) != tt.wantResult {
+				t.Errorf("getDSData() results count = %d, want %d", len(exec.Results), tt.wantResult)
+			}
+		})
 	}
 }
 

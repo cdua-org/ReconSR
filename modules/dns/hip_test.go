@@ -2,8 +2,9 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
-	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -49,22 +50,64 @@ func TestParseHIP(t *testing.T) {
 	}
 }
 
-func TestGetHIPDataEmpty(t *testing.T) {
-	execution := getHIPData(context.Background(), "example.com", modutil.NewLocalIDGenerator())
+func TestGetHIPData(t *testing.T) {
+	origResolve := resolveRecordFunc
+	defer func() { resolveRecordFunc = origResolve }()
 
-	if execution.Error != nil {
-		t.Logf("hip lookup failed: %v", *execution.Error)
-		return
+	tests := []struct {
+		name       string
+		domain     string
+		mockErr    error
+		mockRec    []string
+		mockRaw    []byte
+		wantResult int
+		wantErr    bool
+	}{
+		{
+			name:       "hip_success",
+			domain:     "mango.example",
+			mockErr:    nil,
+			mockRec:    []string{"2 200100107B1A74DF365639CC39F1D578 AwEAAb rv2.example.net."},
+			mockRaw:    []byte("raw"),
+			wantResult: 2,
+			wantErr:    false,
+		},
+		{
+			name:       "hip_resolve_error",
+			domain:     "kiwi.example",
+			mockErr:    errors.New("mock dns error"),
+			mockRec:    nil,
+			mockRaw:    nil,
+			wantResult: 0,
+			wantErr:    true,
+		},
+		{
+			name:       "malformed record length",
+			domain:     "lime.example",
+			mockErr:    nil,
+			mockRec:    []string{"2 200100107B1A74DF365639CC39F1D578"},
+			mockRaw:    []byte("raw"),
+			wantResult: 0,
+			wantErr:    false,
+		},
 	}
 
-	t.Logf("Found %d HIP results for example.com", len(execution.Results))
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolveRecordFunc = func(_ context.Context, _ string, _ int, _ func(context.Context, *net.Resolver) ([]string, error)) ([]string, []byte, error) {
+				return tt.mockRec, tt.mockRaw, tt.mockErr
+			}
 
-func TestGetHIPDataNX(t *testing.T) {
-	execution := getHIPData(context.Background(), "nonexistent.domain.invalid", modutil.NewLocalIDGenerator())
+			gen := modutil.NewLocalIDGenerator()
+			exec := getHIPData(context.Background(), tt.domain, gen)
 
-	if execution.Error != nil && !strings.Contains(*execution.Error, "status 3") {
-		t.Logf("hip lookup failed: %v", *execution.Error)
+			if (exec.Error != nil) != tt.wantErr {
+				t.Errorf("getHIPData() error = %v, wantErr %v", exec.Error, tt.wantErr)
+			}
+			if len(exec.Results) != tt.wantResult {
+				t.Errorf("getHIPData() results count = %d, want %d", len(exec.Results), tt.wantResult)
+			}
+		})
 	}
 }
 
