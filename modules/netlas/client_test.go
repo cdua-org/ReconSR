@@ -2,6 +2,8 @@ package netlas
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -513,4 +515,43 @@ func TestDoAPIRequestPOST(t *testing.T) {
 	if ok {
 		t.Fatal("expected doAPIRequestPOST to return false when reqOK is false")
 	}
+}
+
+type mockTransport struct {
+	roundTripFunc func(req *http.Request) (*http.Response, error)
+}
+
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m.roundTripFunc(req)
+}
+
+type errorReadCloser struct {
+	io.Reader
+}
+
+func (errorReadCloser) Close() error {
+	return errors.New("simulated close error")
+}
+
+func TestNetlas_BodyCloseError(t *testing.T) {
+	oldTransport := http.DefaultTransport
+	http.DefaultTransport = &mockTransport{
+		roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       errorReadCloser{strings.NewReader(`{"data": {}}`)},
+			}, nil
+		},
+	}
+	defer func() { http.DefaultTransport = oldTransport }()
+
+	m := newTestModule(t, testAPIKey)
+	gen := modutil.NewLocalIDGenerator()
+	exec := &schema.ModuleExecution{Function: constants.FuncGetNetlasDomainsByIP}
+
+	_, _, _, _ = m.executeHTTPRequest(exec, "http://example.com", 0, "test", gen)
+
+	_, _, _, _ = m.executeHTTPPostRequest(exec, "http://example.com", nil, 0, "test", gen)
+
+	_, _, _ = m.executePreflightRequest()
 }

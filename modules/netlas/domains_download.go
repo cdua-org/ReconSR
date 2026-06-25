@@ -13,6 +13,8 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
+var jsonMarshal = json.Marshal
+
 type netlasCountResponse struct {
 	Count int `json:"count"`
 }
@@ -59,7 +61,7 @@ func (m *netlasModule) getNetlasDomainsByQuery(target schema.Entity, fn string, 
 	dbg.Printf("%s target=%q count=%d configured_limit=%d final_size=%d",
 		fn, targetValue, countResp.Count, resolver.NetlasLimitPerOneDownload, size)
 
-	payloadBytes, err := json.Marshal(buildDownloadPayload(query, size))
+	payloadBytes, err := jsonMarshal(buildDownloadPayload(query, size))
 	if err != nil {
 		modutil.SetError(&exec, "marshal payload: %v", err)
 		return exec

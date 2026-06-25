@@ -1,6 +1,7 @@
 package netlas
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -547,5 +548,34 @@ func TestExecuteHTTPPostRequest_ReadBodyError(t *testing.T) {
 	_, _, _, reqOK := m.executeHTTPPostRequest(exec, ts.URL, nil, 0, "198.51.100.1", gen)
 	if reqOK {
 		t.Fatal("expected reqOK=false on truncated body")
+	}
+}
+
+func TestGetNetlasDomainsByIP_MarshalError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "domains_count") {
+			writeMock(t, w, []byte(`{"count": 5}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+	netlasAPIBaseURL = ts.URL
+
+	original := jsonMarshal
+	jsonMarshal = func(_ any) ([]byte, error) {
+		return nil, errors.New("simulated marshal failure")
+	}
+	defer func() { jsonMarshal = original }()
+
+	m := newTestModule(t, testAPIKey)
+	gen := modutil.NewLocalIDGenerator()
+	exec := m.getNetlasDomainsByQuery(
+		schema.Entity{Type: constants.TypeIPv4, Value: "198.51.100.7"},
+		constants.FuncGetNetlasDomainsByIP,
+		gen,
+	)
+	if exec.Error == nil || !strings.Contains(*exec.Error, "marshal payload") {
+		t.Fatalf("expected marshal payload error, got %v", exec.Error)
 	}
 }
