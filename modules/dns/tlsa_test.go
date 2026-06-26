@@ -45,6 +45,7 @@ func TestGetTLSAData(t *testing.T) {
 		target        string
 		mockRecords   []string
 		expectedCount int
+		cancelCtx     bool
 	}{
 		{
 			mockError:     nil,
@@ -67,6 +68,12 @@ func TestGetTLSAData(t *testing.T) {
 			mockRecords:   nil,
 			expectedCount: 0,
 		},
+		{
+			name:          "tlsa context canceled",
+			target:        "cancel.gettlsa.example.com",
+			expectedCount: 0,
+			cancelCtx:     true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -81,7 +88,14 @@ func TestGetTLSAData(t *testing.T) {
 				return tt.mockRecords, []byte("mock raw data"), nil
 			}
 
-			execution := getTLSAData(context.Background(), tt.target, modutil.NewLocalIDGenerator())
+			ctx := context.Background()
+			if tt.cancelCtx {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			execution := getTLSAData(ctx, tt.target, modutil.NewLocalIDGenerator())
 
 			if execution.Error != nil {
 				t.Errorf("unexpected error: %v", *execution.Error)

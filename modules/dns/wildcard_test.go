@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 
@@ -17,6 +18,7 @@ func TestCheckWildcard(t *testing.T) {
 		mockRecords   []string
 		expectedCount int
 		expectError   bool
+		failRandRead  bool
 	}{
 		{
 			mockError:     nil,
@@ -42,12 +44,28 @@ func TestCheckWildcard(t *testing.T) {
 			expectedCount: 0,
 			expectError:   true,
 		},
+		{
+			name:         "rand read failure",
+			target:       "rand.getwildcard.example.com",
+			expectError:  true,
+			failRandRead: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			origResolveIPFunc := resolveIPFunc
-			defer func() { resolveIPFunc = origResolveIPFunc }()
+			origRandReadFunc := randReadFunc
+			defer func() {
+				resolveIPFunc = origResolveIPFunc
+				randReadFunc = origRandReadFunc
+			}()
+
+			if tt.failRandRead {
+				randReadFunc = func(_ []byte) (int, error) {
+					return 0, errors.New("entropy source unavailable")
+				}
+			}
 
 			resolveIPFunc = func(_ context.Context, _ string) ([]string, []byte, error) {
 				if tt.mockError != nil {

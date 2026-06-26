@@ -121,6 +121,7 @@ func TestExtractNSECDomain(t *testing.T) {
 		raw      string
 		target   string
 		nxTarget string
+		wantType string
 		want     bool
 	}{
 		{
@@ -161,10 +162,18 @@ func TestExtractNSECDomain(t *testing.T) {
 			want:     false,
 		},
 		{
-			name:   "valid_subdomain",
-			raw:    "sub.kappa.example.com.",
-			target: "kappa.example.com",
-			want:   true,
+			name:     "valid_subdomain",
+			raw:      "sub.kappa.example.com.",
+			target:   "kappa.example.com",
+			wantType: constants.TypeSubdomain,
+			want:     true,
+		},
+		{
+			name:     "org_domain_typed_as_domain",
+			raw:      "example.net.",
+			target:   "sub.example.net",
+			wantType: constants.TypeDomain,
+			want:     true,
 		},
 	}
 
@@ -174,6 +183,9 @@ func TestExtractNSECDomain(t *testing.T) {
 			res := extractNSECDomain(tt.raw, tt.target, tt.nxTarget, "Ctx", gen)
 			if (res != nil) != tt.want {
 				t.Errorf("extractNSECDomain() = %v, want %v", res, tt.want)
+			}
+			if res != nil && tt.wantType != "" && res.Type != tt.wantType {
+				t.Errorf("extractNSECDomain() type = %q, want %q", res.Type, tt.wantType)
 			}
 		})
 	}

@@ -196,30 +196,21 @@ func extractNSECDomain(raw, target, nxTarget, contextDesc string, gen *modutil.L
 		cleanDomain = strings.TrimPrefix(domain, "*.")
 	}
 
-	if _, err := validator.Validate(constants.TypeDomain, cleanDomain); err != nil {
+	res, err := validator.Validate(constants.TypeDomain, cleanDomain)
+	if err != nil {
 		return nil
 	}
 
-	if !isWildcard && (strings.EqualFold(cleanDomain, target) || strings.EqualFold(cleanDomain, nxTarget)) {
+	if !isWildcard && (strings.EqualFold(res.Value, target) || strings.EqualFold(res.Value, nxTarget)) {
 		return nil
-	}
-
-	org := orgdomain.GetOrganizationalDomain(cleanDomain)
-	if org == "" {
-		org = cleanDomain
-	}
-
-	resType := constants.TypeSubdomain
-	if strings.EqualFold(cleanDomain, org) {
-		resType = constants.TypeDomain
 	}
 
 	result := schema.ModuleResult{
-		Type:       resType,
+		Type:       res.Type,
 		Category:   constants.CategoryNode,
-		Value:      cleanDomain,
+		Value:      res.Value,
 		Context:    contextDesc,
-		OutOfScope: orgdomain.IsOutOfScope(cleanDomain, target),
+		OutOfScope: orgdomain.IsOutOfScope(res.Value, target),
 		Tags:       []string{constants.TagNSEC},
 		LocalID:    gen.NextID(),
 	}

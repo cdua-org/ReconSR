@@ -2,7 +2,6 @@ package dns
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/hex"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -18,7 +17,7 @@ func checkWildcard(ctx context.Context, target string, gen *modutil.LocalIDGener
 	defer cancel()
 
 	bytes := make([]byte, 6)
-	if _, err := rand.Read(bytes); err != nil {
+	if _, err := randReadFunc(bytes); err != nil {
 		log.Printf("%s error target=%q stage=generate_random_label err=%v", constants.FuncCheckWildcard, target, err)
 		modutil.SetError(&exec, "failed to generate random bytes: %v", err)
 		return exec

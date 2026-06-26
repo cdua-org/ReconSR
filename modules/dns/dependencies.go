@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"crypto/rand"
 	"net"
 
 	"cdua-org/ReconSR/modules/utils/preflightcheck"
@@ -11,6 +12,7 @@ import (
 var (
 	resolveRecordFunc = resolver.ResolveRecord
 	resolveIPFunc     = resolver.ResolveIP
+	randReadFunc      = rand.Read
 	plainLookupCNAME  = func(ctx context.Context, r *net.Resolver, target string) (string, error) {
 		return r.LookupCNAME(ctx, target)
 	}
