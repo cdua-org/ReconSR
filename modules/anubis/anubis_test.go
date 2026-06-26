@@ -2,6 +2,8 @@ package anubis
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -79,7 +81,7 @@ func TestExecUnsupportedFunction(t *testing.T) {
 
 func TestModule_LocalIDChaining(t *testing.T) {
 	resolver.HTTPTimeout = 2 * time.Second
-	resolver.MaxRetriesHT = 1
+	resolver.MaxRetriesAnubis = 1
 
 	handler := func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -129,7 +131,7 @@ func TestModule_LocalIDChaining(t *testing.T) {
 
 func TestAnubis_Forbidden403(t *testing.T) {
 	resolver.HTTPTimeout = 2 * time.Second
-	resolver.MaxRetriesHT = 1
+	resolver.MaxRetriesAnubis = 1
 
 	handler := func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -188,7 +190,7 @@ func TestFetchAnubisData_RequestErrors(t *testing.T) {
 	})
 
 	t.Run("client_do_error", func(t *testing.T) {
-		resolver.MaxRetriesHT = 2
+		resolver.MaxRetriesAnubis = 2
 		ctx := context.Background()
 		resolver.RetryBaseDelay = 1 * time.Millisecond
 
@@ -205,7 +207,7 @@ func TestFetchAnubisData_RequestErrors(t *testing.T) {
 	})
 
 	t.Run("client_do_error_and_context_cancelled", func(t *testing.T) {
-		resolver.MaxRetriesHT = 3
+		resolver.MaxRetriesAnubis = 3
 		ctx, cancel := context.WithCancel(context.Background())
 
 		origBaseURL := baseURL
@@ -224,7 +226,7 @@ func TestFetchAnubisData_RequestErrors(t *testing.T) {
 
 func TestFetchAnubisData_ReadBodyError(t *testing.T) {
 	t.Run("read_body_error", func(t *testing.T) {
-		resolver.MaxRetriesHT = 1
+		resolver.MaxRetriesAnubis = 1
 		ctx := context.Background()
 
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -264,7 +266,7 @@ func TestFetchAnubisData_ReadBodyError(t *testing.T) {
 
 func TestFetchAnubisData_ReadBodyErrorAndCancel(t *testing.T) {
 	t.Run("read_body_error_and_context_cancelled", func(t *testing.T) {
-		resolver.MaxRetriesHT = 2
+		resolver.MaxRetriesAnubis = 2
 		resolver.RetryBaseDelay = 50 * time.Millisecond
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -302,9 +304,50 @@ func TestFetchAnubisData_ReadBodyErrorAndCancel(t *testing.T) {
 	})
 }
 
+type mockTransport struct {
+	roundTripFunc func(*http.Request) (*http.Response, error)
+}
+
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m.roundTripFunc(req)
+}
+
+type errorReadCloser struct {
+	io.Reader
+}
+
+func (errorReadCloser) Close() error {
+	return errors.New("simulated close error")
+}
+
+func TestFetchAnubisData_CloseBodyError(t *testing.T) {
+	resolver.MaxRetriesAnubis = 1
+	ctx := context.Background()
+
+	oldTransport := http.DefaultTransport
+	http.DefaultTransport = &mockTransport{
+		roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       errorReadCloser{strings.NewReader(`["example.com"]`)},
+			}, nil
+		},
+	}
+	defer func() { http.DefaultTransport = oldTransport }()
+
+	origBaseURL := baseURL
+	baseURL = "http://127.0.0.1/"
+	defer func() { baseURL = origBaseURL }()
+
+	_, _, err := fetchAnubisData(ctx, "close.example.org")
+	if err != nil {
+		t.Errorf("expected successful fetch despite close error, got: %v", err)
+	}
+}
+
 func TestFetchAnubisData_Retries(t *testing.T) {
 	t.Run("retryable_status_and_context_cancelled", func(t *testing.T) {
-		resolver.MaxRetriesHT = 3
+		resolver.MaxRetriesAnubis = 3
 		resolver.RetryBaseDelay = 50 * time.Millisecond
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -325,7 +368,7 @@ func TestFetchAnubisData_Retries(t *testing.T) {
 	})
 
 	t.Run("hard_failure_status", func(t *testing.T) {
-		resolver.MaxRetriesHT = 3
+		resolver.MaxRetriesAnubis = 3
 		ctx := context.Background()
 
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -347,7 +390,7 @@ func TestFetchAnubisData_Retries(t *testing.T) {
 	})
 
 	t.Run("all_attempts_failed", func(t *testing.T) {
-		resolver.MaxRetriesHT = 2
+		resolver.MaxRetriesAnubis = 2
 		ctx := context.Background()
 		resolver.RetryBaseDelay = 1 * time.Millisecond
 
@@ -370,7 +413,7 @@ func TestFetchAnubisData_Retries(t *testing.T) {
 func TestGetDomains_Errors(t *testing.T) {
 	t.Run("general_error", func(t *testing.T) {
 		resolver.HTTPTimeout = 50 * time.Millisecond
-		resolver.MaxRetriesHT = 1
+		resolver.MaxRetriesAnubis = 1
 		resolver.RetryBaseDelay = 1 * time.Millisecond
 
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -401,7 +444,7 @@ func TestGetDomains_Errors(t *testing.T) {
 
 	t.Run("invalid_json", func(t *testing.T) {
 		resolver.HTTPTimeout = 50 * time.Millisecond
-		resolver.MaxRetriesHT = 1
+		resolver.MaxRetriesAnubis = 1
 
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -436,7 +479,7 @@ func TestGetDomains_Errors(t *testing.T) {
 func TestGetDomains_Limits(t *testing.T) {
 	t.Run("default_limit_and_duplicates", func(t *testing.T) {
 		resolver.HTTPTimeout = 50 * time.Millisecond
-		resolver.MaxRetriesHT = 1
+		resolver.MaxRetriesAnubis = 1
 
 		origLimit := resolver.AnubisLimit
 		resolver.AnubisLimit = 0
@@ -474,7 +517,7 @@ func TestGetDomains_Limits(t *testing.T) {
 
 	t.Run("exceeded_limit", func(t *testing.T) {
 		resolver.HTTPTimeout = 50 * time.Millisecond
-		resolver.MaxRetriesHT = 1
+		resolver.MaxRetriesAnubis = 1
 
 		origLimit := resolver.AnubisLimit
 		resolver.AnubisLimit = 1

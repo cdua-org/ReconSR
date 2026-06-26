@@ -81,8 +81,10 @@ var (
 	TimeoutASNMeta = 30 * time.Second
 	// MaxRecursionDepth defines maximum depth for ASN transit chain traversal.
 	MaxRecursionDepth = 3
-	// AnubisLimit limits the number of subdomains processed from jldc.me.
-	AnubisLimit = 1000
+	// MaxRetriesAnubis defines maximum attempts for Anubis API.
+	MaxRetriesAnubis = 3
+	// AnubisLimit limits the number of subdomains processed from anubisdb.com.
+	AnubisLimit = 10000
 
 	// ShodanDomainHistory includes historical DNS data for Shodan domain lookups.
 	ShodanDomainHistory = false
@@ -363,6 +365,7 @@ func initOptionMaps() {
 		"MaxRetriesIPMeta":          &MaxRetriesIPMeta,
 		"MaxRetriesASNMeta":         &MaxRetriesASNMeta,
 		"MaxRecursionDepth":         &MaxRecursionDepth,
+		"MaxRetriesAnubis":          &MaxRetriesAnubis,
 		"AnubisLimit":               &AnubisLimit,
 		"VirustotalDelayMs":         &VirustotalDelayMs,
 		"VirustotalMaxRetries":      &VirustotalMaxRetries,

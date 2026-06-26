@@ -1,4 +1,4 @@
-// Package anubis discovers subdomains using the jldc.me Anubis API.
+// Package anubis discovers subdomains using the anubisdb.com Anubis API.
 package anubis
 
 import (
@@ -76,7 +76,7 @@ func fetchAnubisData(ctx context.Context, target string) (body []byte, statusCod
 	reqURL := baseURL + target
 	var lastErr error
 
-	for attempt := 1; attempt <= resolver.MaxRetriesHT; attempt++ {
+	for attempt := 1; attempt <= resolver.MaxRetriesAnubis; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 		if err != nil {
 			dbg.Printf("%s error target=%q stage=create_request attempt=%d err=%v", constants.FuncGetDomains, target, attempt, err)

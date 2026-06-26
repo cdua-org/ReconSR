@@ -98,8 +98,11 @@ DisableMailcryptoBruteForce=true
 
 ### Anubis Options ###
 
-# Maximum number of subdomains to process from jldc.me/Anubis (default: 1000)
-AnubisLimit=1000
+# Maximum retry attempts for Anubis API requests (default: 3)
+MaxRetriesAnubis=3
+
+# Maximum number of subdomains to process from anubisdb.com (default: 10000)
+AnubisLimit=10000
 
 
 ### VirusTotal Options ###
@@ -176,7 +179,7 @@ CirclCPEDateSort=updated
 # Maximum number of results per page for CIRCL CPE search, capped at 100 (default: 100)
 CirclCPEPerPage=100
 
-# Source to filter vulnerabilities for CIRCL CPE search. 
+# Source to filter vulnerabilities for CIRCL CPE search.
 # Options: 'cvelistv5' (native CIRCL/CNA data) or 'nvd' (NVD/NIST data). (default: cvelistv5)
 CirclCPESource=cvelistv5
 
@@ -246,13 +249,13 @@ NetlasScanSubdomains=false
 # this configured limit, the available count, and your plan's Limit per one download.
 # Note: Each download API call decreases the Request Limit by 1, and consumes 1 Search Coin
 # for each document retrieved from the Netlas database.
-# WARNING: Setting a very high limit will result in a prolonged wait for the API to stream 
-# the NDJSON response. If the global function timeout (timeout in config.toml) is exceeded 
+# WARNING: Setting a very high limit will result in a prolonged wait for the API to stream
+# the NDJSON response. If the global function timeout (timeout in config.toml) is exceeded
 # before the download completes, the process will be canceled and data may be lost.
 NetlasLimitPerOneDownload=
 
-# Timeout specifically for Netlas data downloads (e.g., NDJSON streaming from the 
-# domains/download endpoint), in seconds. Set this high enough to allow large datasets 
+# Timeout specifically for Netlas data downloads (e.g., NDJSON streaming from the
+# domains/download endpoint), in seconds. Set this high enough to allow large datasets
 # to download without interruption, but be aware of the global function timeout. (default: 300)
 NetlasDownloadTimeout=300
 
