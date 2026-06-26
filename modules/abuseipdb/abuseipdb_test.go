@@ -2,6 +2,8 @@ package abuseipdb
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -584,6 +586,17 @@ func TestDoRequest_Coverage(t *testing.T) {
 		}
 	})
 
+	t.Run("do_request_error", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, _, _, err := doRequest(ctx, "http://api.example.com/check", "test_key")
+		if err == nil {
+			t.Error("expected error for cancelled context")
+		} else if !strings.Contains(err.Error(), "do request") {
+			t.Errorf("expected do request error, got: %v", err)
+		}
+	})
+
 	t.Run("read_body_error", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Length", "100")
@@ -599,6 +612,43 @@ func TestDoRequest_Coverage(t *testing.T) {
 			t.Errorf("expected read body error, got: %v", err)
 		}
 	})
+
+	t.Run("close_body_error", func(t *testing.T) {
+		oldTransport := http.DefaultTransport
+		http.DefaultTransport = &mockTransport{
+			roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{},
+					Body:       errorReadCloser{strings.NewReader(`{}`)},
+				}, nil
+			},
+		}
+		defer func() { http.DefaultTransport = oldTransport }()
+
+		_, _, _, err := doRequest(context.Background(), "http://api.example.com/check", "test_key")
+		if err == nil {
+			t.Error("expected error for close body")
+		} else if !strings.Contains(err.Error(), "read body") {
+			t.Errorf("expected read body error wrapping close, got: %v", err)
+		}
+	})
+}
+
+type mockTransport struct {
+	roundTripFunc func(*http.Request) (*http.Response, error)
+}
+
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m.roundTripFunc(req)
+}
+
+type errorReadCloser struct {
+	io.Reader
+}
+
+func (errorReadCloser) Close() error {
+	return errors.New("simulated close error")
 }
 
 func TestIsDailyQuotaExceeded_Coverage(t *testing.T) {
