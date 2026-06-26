@@ -186,6 +186,9 @@ CirclCPESource=cvelistv5
 # Maximum number of pages to fetch for CIRCL CPE search (default: 1)
 CirclCPEMaxPages=1
 
+# Base pause in milliseconds between consecutive CIRCL API requests
+CirclMutexDelayMs=3000
+
 
 ### Hunter.io Options ###
 
@@ -258,13 +261,6 @@ NetlasLimitPerOneDownload=
 # domains/download endpoint), in seconds. Set this high enough to allow large datasets
 # to download without interruption, but be aware of the global function timeout. (default: 300)
 NetlasDownloadTimeout=300
-
-# Function mapping
-get_circl_vuln concurrency=1 delay=0
-search_circl_cpe concurrency=1 delay=0
-
-# Base pause in milliseconds between consecutive CIRCL API requests
-CirclMutexDelayMs=3000
 
 
 [DoH]
