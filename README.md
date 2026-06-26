@@ -1,10 +1,10 @@
 # ReconSR
 
-```text
-  ░█▀█░█▀▀░█▀▀░█▀█░█▄░█░█▀▀░█▀█
-  ░█▀▄░█▀▀░█░░░█░█░█░▀█░▀▀█░█▀▄
-  ░▀░▀░▀▀▀░▀▀▀░▀▀▀░▀░░▀░▀▀▀░▀░▀
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/images/ReconSR-logo-dark-theme.svg">
+  <source media="(prefers-color-scheme: light)" srcset=".github/images/ReconSR-logo-light-theme.svg">
+  <img alt="ReconSR" src=".github/images/ReconSR-logo-dark-theme.svg" width="420">
+</picture>
 
 [![CI](https://github.com/cdua-org/ReconSR/actions/workflows/ci.yml/badge.svg)](https://github.com/cdua-org/ReconSR/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/cdua-org/reconsr?label=Release&include_prereleases)](https://github.com/cdua-org/ReconSR/releases)
@@ -260,11 +260,13 @@ Shodan enrichment uses two capability modes: without an API key, only the public
 </details>
 
 ### 18. VirusTotal Intelligence (`modules/virustotal`)
-<details><summary>View details (2 functions)</summary>
+<details><summary>View details (4 functions)</summary>
 
-API-backed enrichment for domains, optionally subdomains, and IPv4/IPv6 targets through VirusTotal API v3. Without a VirusTotal API key, no functions are advertised to the dispatcher; with a configured key, the module exposes both functions and supports explicit demo mode:
+API-backed enrichment for domains, optionally subdomains, and IPv4/IPv6 targets through VirusTotal API v3. Without a VirusTotal API key, no functions are advertised to the dispatcher; with a configured key, the module exposes its functions and supports explicit demo mode:
 - `get_virustotal_domain`: Queries VirusTotal domain metadata and, when enabled, related subdomains. Extracts tags, reputation and threat scores, categories, popularity ranks, JARM, crowdsourced context, certificate identities and fingerprints, DNS-derived entities, expired-certificate subdomain summaries, out-of-scope classifications, etc.
+- `get_virustotal_domain_communicating_files`: Queries VirusTotal for files that communicate with the domain. Extracts associated file hashes, PE metadata, file names, magic bytes, dates, threat scores, classifications, categories, YARA/Sigma rules, IDS alerts, malware configurations, tags, sandbox verdicts, reputation, certificates, DEB/RPM info, etc.
 - `get_virustotal_ip`: Queries VirusTotal IP metadata and passive DNS resolutions. Extracts ASN, network CIDR, AS owner, geo metadata, JARM, tags, threat scores, last update, passive DNS hostnames, etc.
+- `get_virustotal_ip_communicating_files`: Queries VirusTotal for files that communicate with the IP address. Extracts the same comprehensive file metadata as the domain communicating files function.
 </details>
 
 ### 19. Vulnerability Lookup (`modules/vuln_lookup`)
@@ -350,7 +352,7 @@ While the current alpha release is focused on automating point-in-time investiga
 - ✅ Offline IP2Location/IP2Proxy enrichment for geolocation, ASN, proxy/VPN/Tor indicators, and related IP metadata.
 - ✅ Offline MaxMind enrichment via locally installed MMDB databases for geolocation, ASN, proxy/VPN indicators, and comprehensive Enterprise data aggregation.
 - ✅ ASN intelligence: Transit peers hierarchy, BGP prefixes (CIDR), legal holder, and abuse contacts via RIPEstat.
-- ✅ VirusTotal API enrichment for domain/IP reputation, passive DNS, certificate, DNS-derived, and threat-intelligence findings with demo mode.
+- ✅ VirusTotal API enrichment for domain/IP reputation, passive DNS, certificate, DNS-derived, communicating files, and threat-intelligence findings with demo mode.
 - ✅ CIRCL vulnerability lookup for CVE enrichment and CPE search with CVSS, CWE, EPSS, SSVC/KEV, CPE, and related vulnerability metadata.
 - ✅ LeakIX exposure and data leak intelligence for domains and IPs, including service discovery, leaked credentials, SSL/SSH metadata, subdomain enumeration, and demo mode.
 </details>
