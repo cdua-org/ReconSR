@@ -1,11 +1,16 @@
 package asn_metadata
 
 import (
+	"context"
+	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
+	"cdua-org/ReconSR/modules/utils/resolver"
+	"cdua-org/ReconSR/modules/utils/ripestat"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -89,6 +94,17 @@ func TestGetASNPrefixesInvalid(t *testing.T) {
 	}
 }
 
+func TestGetASNPrefixesNetworkError(t *testing.T) {
+	setRIPEstatQueryMock(t, func(_ context.Context, _, _ string, _ any, _ int) error {
+		return errors.New("mock network error")
+	})
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNPrefixes("AS64517", gen)
+	if res.Error == nil {
+		t.Error("expected network error, got nil")
+	}
+}
+
 func TestGetASNInfoInvalid(t *testing.T) {
 	gen := modutil.NewLocalIDGenerator()
 	res := getASNInfo("", gen)
@@ -97,11 +113,33 @@ func TestGetASNInfoInvalid(t *testing.T) {
 	}
 }
 
+func TestGetASNInfoNetworkError(t *testing.T) {
+	setRIPEstatQueryMock(t, func(_ context.Context, _, _ string, _ any, _ int) error {
+		return errors.New("mock network error")
+	})
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNInfo("AS64516", gen)
+	if res.Error == nil {
+		t.Error("expected network error, got nil")
+	}
+}
+
 func TestGetASNAbuseContactsInvalid(t *testing.T) {
 	gen := modutil.NewLocalIDGenerator()
 	res := getASNAbuseContacts("", gen)
 	if res.Error == nil {
 		t.Error("expected error for empty ASN")
+	}
+}
+
+func TestGetASNAbuseContactsNetworkError(t *testing.T) {
+	setRIPEstatQueryMock(t, func(_ context.Context, _, _ string, _ any, _ int) error {
+		return errors.New("mock network error")
+	})
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNAbuseContacts("AS64515", gen)
+	if res.Error == nil {
+		t.Error("expected network error, got nil")
 	}
 }
 
@@ -209,6 +247,73 @@ func TestModule_LocalIDChaining(t *testing.T) {
 				t.Errorf("Expected LocalID %d at index %d, got %d (Type: %s, Value: %s)", expectedID, i, res.LocalID, res.Type, res.Value)
 			}
 		}
+	}
+}
+
+func TestGetASNPeersNetworkError(t *testing.T) {
+	setRIPEstatQueryMock(t, func(_ context.Context, _, _ string, _ any, _ int) error {
+		return errors.New("mock network error")
+	})
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNPeers("AS64512", gen)
+
+	if res.Error != nil {
+		t.Errorf("expected no error, got %v", *res.Error)
+	}
+	foundErrorToken := false
+	for _, r := range res.Results {
+		if strings.Contains(r.Value, chainTooManyPeers) {
+			foundErrorToken = true
+			break
+		}
+	}
+	if !foundErrorToken {
+		t.Error("expected [TOO_MANY_PEERS] in results")
+	}
+}
+
+func TestGetASNPeersEmptyChain(t *testing.T) {
+	setRIPEstatQueryMock(t, func(_ context.Context, _, _ string, _ any, _ int) error {
+		return nil
+	})
+	gen := modutil.NewLocalIDGenerator()
+	res := getASNPeers("AS64512", gen)
+	if len(res.Results) != 0 {
+		t.Errorf("expected 0 results for empty chain, got %d", len(res.Results))
+	}
+}
+
+func TestTraverseUpstreamEdgeCases(t *testing.T) {
+	ctx := context.Background()
+	visited := make(map[string]bool)
+	var chain []string
+
+	err := traverseUpstream(ctx, "AS64512", resolver.MaxRecursionDepth, visited, &chain, nil)
+	if err != nil {
+		t.Errorf("expected nil error for max depth, got %v", err)
+	}
+
+	visited["AS64513"] = true
+	err = traverseUpstream(ctx, "AS64513", 0, visited, &chain, nil)
+	if err != nil {
+		t.Errorf("expected nil error for already visited, got %v", err)
+	}
+}
+
+func TestExtractLargestUpstreamASN(t *testing.T) {
+	origin := "AS64512"
+	neighbours := []ripestat.Neighbour{
+		{ASN: 64513, Position: "left", PeerCount: 100},
+		{ASN: 0, Position: neighbourPositionRight, PeerCount: 100},
+		{ASN: 64512, Position: neighbourPositionRight, PeerCount: 100},
+		{ASN: 64514, Position: neighbourPositionRight, PeerCount: 5},
+		{ASN: 64515, Position: neighbourPositionRight, PeerCount: 10},
+		{ASN: 64516, Position: neighbourPositionRight, PeerCount: 10},
+	}
+
+	largest := extractLargestUpstreamASN(neighbours, origin)
+	if largest != "AS64515" {
+		t.Errorf("expected AS64515, got %q", largest)
 	}
 }
 

@@ -23,7 +23,7 @@ func mockRIPEstatSuccess(t *testing.T) {
 		var body string
 		switch endpoint {
 		case "asn-neighbours":
-			body = `{"data":{"neighbours":[{"asn":64519,"position":"right","peer_count":10}]}}`
+			body = `{"data":{"neighbours":[{"asn":64519,"type":"right","v4_peers":10}]}}`
 			if resp, ok := result.(*ripestat.APIResponse); ok {
 				resp.RawJSON = body
 			}
