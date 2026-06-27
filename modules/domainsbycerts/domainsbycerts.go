@@ -272,7 +272,7 @@ func formatResults(classified classifiedIdentities, disableCertExpiredSubdomains
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypeCertNotAfter,
 			Category: constants.CategoryProperty,
-			Value:    classified.targetMaxExpiry.Format(time.RFC3339),
+			Value:    classified.targetMaxExpiry.Format(time.DateTime),
 			Context:  classified.targetSource,
 			LocalID:  gen.NextID(),
 		})
@@ -301,7 +301,7 @@ func appendSubdomainResults(results []schema.ModuleResult, subdomains map[string
 		isExpired := !identity.notAfter.IsZero() && !identity.notAfter.After(now)
 
 		if isExpired && !disableCertExpiredSubdomains {
-			*expiredDomains = append(*expiredDomains, subdomain+" ("+identity.notAfter.Format(time.RFC3339)+")")
+			*expiredDomains = append(*expiredDomains, subdomain+" ("+identity.notAfter.Format(time.DateTime)+")")
 			continue
 		}
 
@@ -333,7 +333,7 @@ func appendSubdomainResults(results []schema.ModuleResult, subdomains map[string
 			continue
 		}
 
-		dateVal := identity.notAfter.Format(time.RFC3339)
+		dateVal := identity.notAfter.Format(time.DateTime)
 		dateLocalID := gen.NextID()
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypeCertNotAfter,
@@ -388,7 +388,7 @@ func appendEmailResults(results []schema.ModuleResult, emails map[string]classif
 			continue
 		}
 
-		dateVal := identity.notAfter.Format(time.RFC3339)
+		dateVal := identity.notAfter.Format(time.DateTime)
 		dateLocalID := gen.NextID()
 		results = append(results, schema.ModuleResult{
 			Type:     constants.TypeDomainCertNotAfter,

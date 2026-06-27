@@ -14,6 +14,8 @@ type crtshRecord struct {
 	NotAfter  string `json:"not_after"`
 }
 
+var crtshBaseURL = "https://crt.sh"
+
 type crtshFetcher struct{}
 
 func newCrtshFetcher() CertFetcher {
@@ -25,7 +27,7 @@ func (f *crtshFetcher) Name() string {
 }
 
 func (f *crtshFetcher) Fetch(ctx context.Context, target string) []certificateIdentityEntry {
-	u := "https://crt.sh/?q=%25." + url.QueryEscape(target) + "&output=json"
+	u := crtshBaseURL + "/?q=%25." + url.QueryEscape(target) + "&output=json"
 	body, err := doRequestWithRetry(ctx, u)
 	if err != nil {
 		return nil

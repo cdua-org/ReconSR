@@ -1,6 +1,9 @@
 package domainsbycerts
 
 import (
+	"context"
+	"errors"
+	"net/http"
 	"slices"
 	"strings"
 	"testing"
@@ -8,6 +11,7 @@ import (
 
 	"cdua-org/ReconSR/modules/utils/constants"
 	"cdua-org/ReconSR/modules/utils/modutil"
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -16,6 +20,8 @@ const (
 	srcCrtshPG = "src_crtsh_pg"
 	srcSpotter = "src_spotter"
 )
+
+const optTrue = "true"
 
 func TestNormalizeDomain(t *testing.T) {
 	tests := []struct {
@@ -67,6 +73,15 @@ func TestMatchesTargetIdentity(t *testing.T) {
 			t.Errorf("matchesTargetIdentity(%q, %q) = %v, want %v", tt.value, tt.target, got, tt.expected)
 		}
 	}
+}
+
+func setPgOpenDBMock(t *testing.T, mock func(dsn string) (QueryExecuter, error)) {
+	t.Helper()
+	original := pgOpenDB
+	pgOpenDB = mock
+	t.Cleanup(func() {
+		pgOpenDB = original
+	})
 }
 
 func TestClassifyMatchedIdentity(t *testing.T) {
@@ -128,6 +143,12 @@ func TestClassifyMatchedIdentity(t *testing.T) {
 		{
 			name:         "invalid domain is rejected",
 			value:        invalidDomain,
+			target:       targetDomain,
+			wantAccepted: false,
+		},
+		{
+			name:         "valid email but wrong target",
+			value:        "admin@example.org",
 			target:       targetDomain,
 			wantAccepted: false,
 		},
@@ -378,7 +399,7 @@ func TestFormatResults_WildcardSubdomain(t *testing.T) {
 		t.Fatalf("expected full wildcard context, got %q", wildcard.Context)
 	}
 
-	certDate := findDomainCertResult(results, constants.TypeCertNotAfter, future.Format(time.RFC3339))
+	certDate := findDomainCertResult(results, constants.TypeCertNotAfter, future.Format(time.DateTime))
 	if certDate == nil || certDate.Source == nil {
 		t.Fatalf("expected certificate date sourced from wildcard, got %+v", certDate)
 	}
@@ -409,6 +430,68 @@ func TestModuleCapabilities(t *testing.T) {
 	}
 }
 
+func TestModule_Name(t *testing.T) {
+	mod := New()
+	if name := mod.Name(); name != "domainsbycerts" {
+		t.Errorf("expected name %q, got %q", "domainsbycerts", name)
+	}
+}
+
+func TestModule_Exec(t *testing.T) {
+	mod := New()
+
+	inputUnsupported := schema.ModuleInput{
+		Functions: []string{"unsupported_func"},
+		Target: schema.Entity{
+			Type:  constants.TypeDomain,
+			Value: "unsupported.example",
+		},
+	}
+	out, err := mod.Exec(inputUnsupported)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(out.Executions) != 1 {
+		t.Fatalf("expected 1 execution, got %d", len(out.Executions))
+	}
+	if out.Executions[0].Error == nil || !strings.Contains(*out.Executions[0].Error, "unsupported function") {
+		t.Errorf("expected unsupported function error, got %v", out.Executions[0].Error)
+	}
+
+	mockServer := newMockServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if _, writeErr := w.Write([]byte(`[]`)); writeErr != nil {
+			panic(writeErr)
+		}
+	})
+
+	originalCertspotterBaseURL := certspotterBaseURL
+	certspotterBaseURL = mockServer.URL
+	t.Cleanup(func() { certspotterBaseURL = originalCertspotterBaseURL })
+
+	originalCrtshBaseURL := crtshBaseURL
+	crtshBaseURL = mockServer.URL
+	t.Cleanup(func() { crtshBaseURL = originalCrtshBaseURL })
+	setPgOpenDBMock(t, func(_ string) (QueryExecuter, error) {
+		return nil, errors.New("mock pg err")
+	})
+
+	inputSupported := schema.ModuleInput{
+		Functions: []string{constants.FuncGetDomains},
+		Target: schema.Entity{
+			Type:  constants.TypeDomain,
+			Value: "supported.example",
+		},
+	}
+	out, err = mod.Exec(inputSupported)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(out.Executions) != 1 {
+		t.Fatalf("expected 1 execution, got %d", len(out.Executions))
+	}
+}
+
 func TestFormatResults_ExpiredTarget(t *testing.T) {
 	past := time.Now().Add(-30 * 24 * time.Hour)
 
@@ -426,7 +509,84 @@ func TestFormatResults_ExpiredTarget(t *testing.T) {
 	}
 }
 
+func TestFormatResults_EmailWithoutDate(t *testing.T) {
+	classified := classifiedIdentities{
+		subdomains: make(map[string]classifiedIdentity),
+		emails: map[string]classifiedIdentity{
+			"admin@example.com": {
+				source: newCrtshFetcher().Name(),
+			},
+		},
+		targetSource: srcSpotter,
+	}
+
+	results := formatResults(classified, false, modutil.NewLocalIDGenerator())
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if results[0].Type != constants.TypeEmail || results[0].Value != "admin@example.com" {
+		t.Errorf("expected email result, got: %+v", results[0])
+	}
+}
+
+func TestCollectAllIdentities_DisabledFetchers(t *testing.T) {
+	resolver.Options["DisableCertspotter"] = optTrue
+	resolver.Options["DisableCrtshPG"] = optTrue
+	defer delete(resolver.Options, "DisableCertspotter")
+	defer delete(resolver.Options, "DisableCrtshPG")
+
+	mockServer := newMockServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if _, writeErr := w.Write([]byte(`[{"name_value":"disabled.example.com"}]`)); writeErr != nil {
+			panic(writeErr)
+		}
+	})
+
+	originalCrtshBaseURL := crtshBaseURL
+	crtshBaseURL = mockServer.URL
+	t.Cleanup(func() { crtshBaseURL = originalCrtshBaseURL })
+
+	identities := collectAllIdentities(context.Background(), "example.com")
+
+	if len(identities.identities) == 0 {
+		t.Errorf("expected identities, got 0")
+	}
+
+	found := false
+	for _, id := range identities.identities {
+		if id.value == "disabled.example.com" && id.source == newCrtshFetcher().Name() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected to find disabled.example.com from crtsh, got: %+v", identities.identities)
+	}
+}
+
 func TestModule_LocalIDChaining(t *testing.T) {
+	mockServer := newMockServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if _, writeErr := w.Write([]byte(`[{"name_value":"a.example.com\nb.example.com","dns_names":["a.example.com", "b.example.com"], "not_after": "2099-01-01T00:00:00"}]`)); writeErr != nil {
+			panic(writeErr)
+		}
+	})
+
+	originalCertspotterBaseURL := certspotterBaseURL
+	certspotterBaseURL = mockServer.URL
+	t.Cleanup(func() { certspotterBaseURL = originalCertspotterBaseURL })
+
+	originalCrtshBaseURL := crtshBaseURL
+	crtshBaseURL = mockServer.URL
+	t.Cleanup(func() { crtshBaseURL = originalCrtshBaseURL })
+	setPgOpenDBMock(t, func(_ string) (QueryExecuter, error) {
+		return nil, errors.New("mock pg err")
+	})
+	resolver.Options["DisableCertExpiredSubdomains"] = optTrue
+	defer delete(resolver.Options, "DisableCertExpiredSubdomains")
+
 	exec := getDomains("example.com")
 
 	if exec.Error != nil {
@@ -434,7 +594,7 @@ func TestModule_LocalIDChaining(t *testing.T) {
 	}
 
 	if len(exec.Results) < 2 {
-		t.Skip("Expected multiple results to verify chaining, skipping test")
+		t.Fatalf("Expected multiple results, got %d: %+v", len(exec.Results), exec.Results)
 	}
 
 	requireUniqueLocalIDs(t, exec.Results)

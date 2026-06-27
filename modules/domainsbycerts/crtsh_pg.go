@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -15,14 +16,26 @@ import (
 )
 
 type crtshPgFetcher struct {
-	openDB func(dsn string) (*sql.DB, error)
+	openDB func(dsn string) (QueryExecuter, error)
+}
+
+var pgOpenDB = defaultPgOpenDB
+
+var jsonMarshal = json.Marshal
+
+var sqlOpen = sql.Open
+
+func defaultPgOpenDB(dsn string) (QueryExecuter, error) {
+	db, err := sqlOpen("pgx", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("sql open: %w", err)
+	}
+	return &sqlDBWrapper{db: db}, nil
 }
 
 func newCrtshPgFetcher() CertFetcher {
 	return &crtshPgFetcher{
-		openDB: func(dsn string) (*sql.DB, error) {
-			return sql.Open("pgx", dsn)
-		},
+		openDB: pgOpenDB,
 	}
 }
 
@@ -115,7 +128,7 @@ func (f *crtshPgFetcher) Fetch(ctx context.Context, target string) []certificate
 	}
 
 	if len(rawRecords) > 0 {
-		if rawBytes, err := json.Marshal(rawRecords); err == nil {
+		if rawBytes, err := jsonMarshal(rawRecords); err == nil {
 			for i := range entries {
 				entries[i].rawData = rawBytes
 			}

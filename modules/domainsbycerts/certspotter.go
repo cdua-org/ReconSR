@@ -14,6 +14,8 @@ type certspotterResponse struct {
 	DNSNames  []string `json:"dns_names"`
 }
 
+var certspotterBaseURL = "https://api.certspotter.com"
+
 type certspotterFetcher struct{}
 
 func newCertspotterFetcher() CertFetcher {
@@ -25,7 +27,7 @@ func (f *certspotterFetcher) Name() string {
 }
 
 func (f *certspotterFetcher) Fetch(ctx context.Context, target string) []certificateIdentityEntry {
-	u := "https://api.certspotter.com/v1/issuances?domain=" + url.QueryEscape(target) + "&include_subdomains=true&expand=dns_names"
+	u := certspotterBaseURL + "/v1/issuances?domain=" + url.QueryEscape(target) + "&include_subdomains=true&expand=dns_names"
 	body, err := doRequestWithRetry(ctx, u)
 	if err != nil {
 		return nil
