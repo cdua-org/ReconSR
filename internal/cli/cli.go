@@ -86,12 +86,13 @@ func ShowResultsMenu(ctx context.Context) {
 
 // ShowBanner prints the application banner.
 func ShowBanner(ctx context.Context) {
+	const colorGold = "\033[38;2;218;165;32m"
 	logo := `
   ░█▀█░█▀▀░█▀▀░█▀█░█▄░█░█▀▀░█▀█
   ░█▀▄░█▀▀░█░░░█░█░█░▀█░▀▀█░█▀▄
   ░▀░▀░▀▀▀░▀▀▀░▀▀▀░▀░░▀░▀▀▀░▀░▀`
 
-	fmt.Println(colorMagenta + colorBold + logo + colorReset)
+	fmt.Println(colorGold + colorBold + logo + colorReset)
 	fmt.Println()
 	fmt.Printf(colorCyan+"  :: %s %s ::"+colorReset+"\n", AppName, AppVersion)
 	fmt.Printf(colorCyan+"  :: %s ::"+colorReset+"\n", AppDesc)
@@ -103,8 +104,8 @@ func ShowBanner(ctx context.Context) {
 	fmt.Printf("  + %-20s %s\n", i18n.T["MSG_INIT_CORE"]+":", colorGreen+i18n.T["MSG_STATUS_READY"]+colorReset)
 
 	totalMods, _, totalFuncs, _, _ := controller.GetSystemStatus(ctx)
-	modInfo := fmt.Sprintf("%d | %d", totalMods, totalFuncs)
-	fmt.Printf("  + %-20s %s\n", i18n.T["LBL_MODS"]+" | "+i18n.T["LBL_FUNCS"]+":", modInfo)
+	modInfo := fmt.Sprintf("%d(%d)", totalMods, totalFuncs)
+	fmt.Printf("  + %-20s %s\n", i18n.T["LBL_MODS"]+" ("+i18n.T["LBL_FUNCS"]+"):", modInfo)
 
 	fmt.Printf("  + %-20s %s\n", i18n.T["MSG_CONN_DB"]+":", colorGreen+i18n.T["MSG_STATUS_CONN"]+colorReset)
 	fmt.Println()
