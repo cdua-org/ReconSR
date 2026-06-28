@@ -183,12 +183,13 @@ type EdgeData struct {
 }
 
 type ProjectGraph struct {
-	ProjectName   string              `json:"ProjectName"`
-	InitialTarget string              `json:"InitialTarget"`
-	MaxDepth      int                 `json:"MaxDepth"`
-	StrictDepth   bool                `json:"StrictDepth"`
-	Nodes         map[string]NodeData `json:"Nodes"`
-	Edges         []EdgeData          `json:"Edges"`
+	ProjectName     string              `json:"ProjectName"`
+	InitialTarget   string              `json:"InitialTarget"`
+	MaxDepth        int                 `json:"MaxDepth"`
+	StrictDepth     bool                `json:"StrictDepth"`
+	Nodes           map[string]NodeData `json:"Nodes"`
+	Edges           []EdgeData          `json:"Edges"`
+	RawDataRegistry map[int64]string    `json:"RawDataRegistry,omitempty"`
 }
 
 type ProcessorToDispatcherData struct {

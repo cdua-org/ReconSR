@@ -59,10 +59,14 @@ func ShowResultsMenu(ctx context.Context) {
 				fmt.Printf("\n%s: %s\n", i18n.T["MSG_REPORT_SAVED"], filename)
 			}
 		case "3":
+			fmt.Println("\n" + i18n.T["MSG_GENERATING_GRAPH"])
 			graph, err := controller.GetActiveGraph(ctx, true)
 			if err != nil {
 				fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
 				continue
+			}
+			if len(graph.Nodes) >= 5000 {
+				fmt.Println(colorYellow + i18n.T["MSG_LARGE_GRAPH_WARNING"] + colorReset)
 			}
 			filename, err := report.GenerateHTML(ctx, graph)
 			if err != nil {

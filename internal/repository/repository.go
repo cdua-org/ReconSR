@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -2442,6 +2443,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 	type edgeWithID struct {
 		edge     schema.EdgeData
 		sourceID int64
+		targetID int64
 	}
 	var tempEdges []edgeWithID
 
@@ -2466,6 +2468,8 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 		return newID
 	}
 
+	dbPropToParent := make(map[int64]int64)
+
 	for rows.Next() {
 		var srcIDDb, tgtIDDb int64
 		var srcType, srcValue, srcCategory string
@@ -2485,6 +2489,10 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 		if err == nil {
 			srcID := getNodeID(srcIDDb)
 			tgtID := getNodeID(tgtIDDb)
+
+			if tgtCategory == "property" {
+				dbPropToParent[tgtIDDb] = srcIDDb
+			}
 
 			if _, exists := nodes[srcID]; !exists {
 				nodes[srcID] = schema.NodeData{
@@ -2516,39 +2524,148 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 				Context:      contextStr,
 				CreatedAt:    createdAt,
 			}
-			tempEdges = append(tempEdges, edgeWithID{edge: e, sourceID: srcIDDb})
-			if includeRawData {
-				neededRawData[rawDataKey{srcIDDb, moduleName, functionName}] = true
+			tempEdges = append(tempEdges, edgeWithID{edge: e, sourceID: srcIDDb, targetID: tgtIDDb})
+		}
+	}
+
+	if includeRawData {
+		for _, te := range tempEdges {
+			for _, id := range []int64{te.sourceID, te.targetID} {
+				curr := id
+				for {
+					neededRawData[rawDataKey{curr, te.edge.ModuleName, te.edge.FunctionName}] = true
+					if parent, ok := dbPropToParent[curr]; ok {
+						curr = parent
+					} else {
+						break
+					}
+				}
 			}
 		}
 	}
 
+	var rawByID map[int64]string
 	if includeRawData && len(neededRawData) > 0 {
-		rawMap := make(map[rawDataKey]string)
-		rawQuery := `SELECT l.entity_id, l.module_name, l.function_name, r.raw_data
-		             FROM entity_function_log l
-		             JOIN raw_data r ON l.id_raw_data = r.id
-		             WHERE l.id_raw_data IS NOT NULL`
-		rawRows, rrErr := db.QueryContext(ctx, rawQuery)
-		if rrErr == nil {
-			for rawRows.Next() {
-				var k rawDataKey
-				var rd string
-				if err := rawRows.Scan(&k.entityID, &k.moduleName, &k.funcName, &rd); err == nil {
-					if neededRawData[k] {
-						rawMap[k] = rd
-					}
-				}
-			}
-			if err := rawRows.Close(); err != nil {
+		type eflEntry struct {
+			key  rawDataKey
+			rdID int64
+		}
+		var eflEntries []eflEntry
+		neededRDIDs := make(map[int64]bool)
+
+		idRows, idErr := db.QueryContext(ctx,
+			`SELECT entity_id, module_name, function_name, id_raw_data
+			 FROM entity_function_log
+			 WHERE id_raw_data IS NOT NULL`)
+		if idErr != nil {
+			return nil, idErr
+		}
+		defer idRows.Close()
+
+		for idRows.Next() {
+			var k rawDataKey
+			var rdID int64
+			if err := idRows.Scan(&k.entityID, &k.moduleName, &k.funcName, &rdID); err != nil {
 				return nil, err
 			}
+			if neededRawData[k] {
+				eflEntries = append(eflEntries, eflEntry{k, rdID})
+				neededRDIDs[rdID] = true
+			}
+		}
+		if err := idRows.Err(); err != nil {
+			return nil, err
+		}
+		if err := idRows.Close(); err != nil {
+			return nil, err
 		}
 
-		for i, te := range tempEdges {
-			k := rawDataKey{te.sourceID, te.edge.ModuleName, te.edge.FunctionName}
-			if rd, ok := rawMap[k]; ok {
-				tempEdges[i].edge.RawData = rd
+		if len(neededRDIDs) > 0 {
+			rdIDs := make([]int64, 0, len(neededRDIDs))
+			for rdID := range neededRDIDs {
+				rdIDs = append(rdIDs, rdID)
+			}
+			slices.Sort(rdIDs)
+
+			dbToSynthetic := make(map[int64]int64, len(neededRDIDs))
+			var syntheticCounter int64 = 1
+			for _, rdID := range rdIDs {
+				dbToSynthetic[rdID] = syntheticCounter
+				syntheticCounter++
+			}
+
+			rawByID = make(map[int64]string, len(neededRDIDs))
+			for i := 0; i < len(rdIDs); i += sqliteMaxParams {
+				end := i + sqliteMaxParams
+				if end > len(rdIDs) {
+					end = len(rdIDs)
+				}
+				batch := rdIDs[i:end]
+
+				placeholders := make([]string, len(batch))
+				args := make([]any, len(batch))
+				for idx, val := range batch {
+					placeholders[idx] = "?"
+					args[idx] = val
+				}
+
+				var sb strings.Builder
+				sb.WriteString("SELECT id, raw_data FROM raw_data WHERE id IN (")
+				sb.WriteString(strings.Join(placeholders, ","))
+				sb.WriteString(")")
+				query := sb.String()
+				batchErr := func() error {
+					rdRows, rdErr := db.QueryContext(ctx, query, args...)
+					if rdErr != nil {
+						return rdErr
+					}
+					defer rdRows.Close()
+
+					for rdRows.Next() {
+						var rdID int64
+						var content string
+						if err := rdRows.Scan(&rdID, &content); err != nil {
+							return err
+						}
+						if synthID, ok := dbToSynthetic[rdID]; ok {
+							rawByID[synthID] = content
+						}
+					}
+					return rdRows.Err()
+				}()
+				if batchErr != nil {
+					return nil, batchErr
+				}
+			}
+
+			rawMap := make(map[rawDataKey]int64, len(eflEntries))
+			for _, entry := range eflEntries {
+				if synthID, ok := dbToSynthetic[entry.rdID]; ok {
+					rawMap[entry.key] = synthID
+				}
+			}
+
+			for i, te := range tempEdges {
+				resolved := false
+				for _, id := range []int64{te.targetID, te.sourceID} {
+					curr := id
+					for {
+						k := rawDataKey{curr, te.edge.ModuleName, te.edge.FunctionName}
+						if synthID, ok := rawMap[k]; ok {
+							tempEdges[i].edge.RawData = strconv.FormatInt(synthID, 10)
+							resolved = true
+							break
+						}
+						if parent, ok := dbPropToParent[curr]; ok {
+							curr = parent
+						} else {
+							break
+						}
+					}
+					if resolved {
+						break
+					}
+				}
 			}
 		}
 	}
@@ -2610,9 +2727,10 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 	}
 
 	return &schema.ProjectGraph{
-		ProjectName:   projectName,
-		InitialTarget: initialTarget,
-		Nodes:         nodes,
-		Edges:         edges,
+		ProjectName:     projectName,
+		InitialTarget:   initialTarget,
+		Nodes:           nodes,
+		Edges:           edges,
+		RawDataRegistry: rawByID,
 	}, nil
 }

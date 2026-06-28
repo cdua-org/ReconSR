@@ -42,7 +42,7 @@ OPT_BACK=Back
 OPT_EXIT=Exit
 OPT_TREE_CONSOLE=Results Tree (Console)
 OPT_TREE_HTML=Results Tree (HTML)
-OPT_GRAPH_HTML=Interactive Graph (HTML)
+OPT_GRAPH_HTML=Interactive Graph (HTML) (may take a few minutes for large graphs)
 OPT_START_SCAN=Start scan
 OPT_CONFIG_MODULES=Configure modules and functions
 OPT_SAVE_EXIT=Save and go back
@@ -93,6 +93,8 @@ MSG_EMPTY_RESULTS_NOTE=Empty results mean either nothing was found or required A
 MSG_API_KEYS_SETUP=Please check the Wiki for setup instructions
 MSG_CONFIG_SAVED=Configuration saved successfully.
 MSG_NO_RELATIONS_FOUND=No relations found.
+MSG_GENERATING_GRAPH=Generating graph, please wait...
+MSG_LARGE_GRAPH_WARNING=Large graph detected. Generating HTML may take several minutes, please wait...
 
 # ==========================================
 # ERRORS

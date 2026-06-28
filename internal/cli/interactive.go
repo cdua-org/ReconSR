@@ -20,13 +20,12 @@ func printReconStatus(isPaused bool) {
 		c = colorYellow
 	}
 
-	fmt.Printf("\n%s%s%s [1] %s | [2] %s | [3] %s | [4] %s | [5] %s | [0] %s%s\n",
+	fmt.Printf("\n%s%s%s [1] %s | [2] %s | [3] %s | [4] %s | [0] %s%s\n",
 		c, colorBold, msg,
 		opt1,
 		i18n.T["OPT_STATS"],
 		i18n.T["OPT_SHORT_TREE"],
 		i18n.T["OPT_SHORT_TREE_HTML"],
-		i18n.T["OPT_SHORT_GRAPH"],
 		i18n.T["OPT_EXIT"],
 		colorReset)
 }
@@ -73,18 +72,7 @@ func InteractiveControl(ctx context.Context, done <-chan struct{}) {
 						fmt.Printf("\n%s: %s\n", i18n.T["MSG_REPORT_SAVED"], filename)
 					}
 				}
-			case "5":
-				graph, err := controller.GetActiveGraph(ctx, true)
-				if err != nil {
-					fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
-				} else {
-					filename, err := report.GenerateHTML(ctx, graph)
-					if err != nil {
-						fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
-					} else {
-						fmt.Printf("\n%s: %s\n", i18n.T["MSG_REPORT_SAVED"], filename)
-					}
-				}
+
 			default:
 				fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
 			}
