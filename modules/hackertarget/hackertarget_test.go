@@ -2,12 +2,17 @@ package hackertarget
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/modutil"
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
@@ -263,5 +268,280 @@ func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
 				t.Errorf("expected source LocalID %d to be strictly less than result LocalID %d (Type: %s, Value: %s)", res.Source.LocalID, res.LocalID, res.Type, res.Value)
 			}
 		}
+	}
+}
+
+func TestExecGetHosts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("sub1.example.com,192.0.2.1\n")); err != nil {
+			t.Errorf("test server write error: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := apiBaseURL
+	apiBaseURL = server.URL
+	defer func() { apiBaseURL = originalBaseURL }()
+
+	m := New()
+	input := schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "example.net"},
+		Functions: []string{constants.FuncGetHosts},
+	}
+
+	output, err := m.Exec(input)
+	if err != nil {
+		t.Errorf("Exec() returned error: %v", err)
+	}
+
+	if len(output.Executions) != 1 {
+		t.Fatalf("expected 1 execution, got %d", len(output.Executions))
+	}
+
+	exec := output.Executions[0]
+	if exec.Function != constants.FuncGetHosts {
+		t.Errorf("expected Function %q, got %q", constants.FuncGetHosts, exec.Function)
+	}
+	if exec.Error != nil {
+		t.Errorf("expected no error, got %v", *exec.Error)
+	}
+	if len(exec.Results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(exec.Results))
+	}
+}
+
+func TestExecGetHostsQuotaExceeded(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set(quotaCountHeader, "100")
+		w.Header().Set(quotaLimitHeader, "100")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("sub1.example.com,192.0.2.1\n")); err != nil {
+			t.Errorf("test server write error: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := apiBaseURL
+	apiBaseURL = server.URL
+	defer func() { apiBaseURL = originalBaseURL }()
+
+	m := New()
+	input := schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "example.org"},
+		Functions: []string{constants.FuncGetHosts},
+	}
+
+	output, err := m.Exec(input)
+	if err != nil {
+		t.Errorf("Exec() returned error: %v", err)
+	}
+
+	if len(output.Executions) != 1 {
+		t.Fatalf("expected 1 execution, got %d", len(output.Executions))
+	}
+
+	exec := output.Executions[0]
+	if len(exec.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(exec.Results))
+	}
+
+	res := exec.Results[0]
+	if res.Type != constants.TypeAPIQuota {
+		t.Errorf("expected result type %q, got %q", constants.TypeAPIQuota, res.Type)
+	}
+	if res.Value != quotaExhaustedValue {
+		t.Errorf("expected result value %q, got %q", quotaExhaustedValue, res.Value)
+	}
+}
+
+func TestExecGetHostsError(t *testing.T) {
+	oldRetry := resolver.RetryBaseDelay
+	resolver.RetryBaseDelay = time.Millisecond
+	defer func() { resolver.RetryBaseDelay = oldRetry }()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	originalBaseURL := apiBaseURL
+	apiBaseURL = server.URL
+	defer func() { apiBaseURL = originalBaseURL }()
+
+	m := New()
+	input := schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "test.example"},
+		Functions: []string{constants.FuncGetHosts},
+	}
+
+	output, err := m.Exec(input)
+	if err != nil {
+		t.Errorf("Exec() returned error: %v", err)
+	}
+
+	if len(output.Executions) != 1 {
+		t.Fatalf("expected 1 execution, got %d", len(output.Executions))
+	}
+
+	exec := output.Executions[0]
+	if len(exec.Results) != 0 {
+		t.Errorf("expected 0 results on error, got %d", len(exec.Results))
+	}
+	if exec.RawData != "" {
+		t.Errorf("expected empty RawData on error, got %q", exec.RawData)
+	}
+}
+
+func TestFetchWithRetryAbort(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("invalid format string\n")); err != nil {
+			t.Errorf("test server write error: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := apiBaseURL
+	apiBaseURL = server.URL
+	defer func() { apiBaseURL = originalBaseURL }()
+
+	body, isQuota := fetchWithRetry(context.Background(), "example.edu", "")
+	if isQuota {
+		t.Error("expected isQuota to be false")
+	}
+	if body != "" {
+		t.Errorf("expected empty body, got %q", body)
+	}
+}
+
+func TestFetchWithRetryContextCancel(t *testing.T) {
+	oldRetry := resolver.RetryBaseDelay
+	resolver.RetryBaseDelay = 10 * time.Millisecond
+	defer func() { resolver.RetryBaseDelay = oldRetry }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		cancel()
+	}))
+	defer server.Close()
+
+	originalBaseURL := apiBaseURL
+	apiBaseURL = server.URL
+	defer func() { apiBaseURL = originalBaseURL }()
+
+	body, isQuota := fetchWithRetry(ctx, "example.int", "")
+	if isQuota {
+		t.Error("expected isQuota to be false")
+	}
+	if body != "" {
+		t.Errorf("expected empty body, got %q", body)
+	}
+}
+
+type mockTransport struct {
+	roundTripFunc func(req *http.Request) (*http.Response, error)
+}
+
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m.roundTripFunc(req)
+}
+
+type errReaderCloser struct {
+	readErr  error
+	closeErr error
+}
+
+func (e errReaderCloser) Read(_ []byte) (n int, err error) {
+	if e.readErr != nil {
+		return 0, e.readErr
+	}
+	return 0, io.EOF
+}
+
+func (e errReaderCloser) Close() error {
+	return e.closeErr
+}
+
+func TestDoRequestBadURL(t *testing.T) {
+	originalBaseURL := apiBaseURL
+	apiBaseURL = string([]byte{0x7f})
+	defer func() { apiBaseURL = originalBaseURL }()
+
+	body, isQuota, errMsg, action := doRequest(context.Background(), "example.arpa", "")
+	if body != "" || isQuota || errMsg == nil || action != httputil.Abort {
+		t.Errorf("unexpected results: body=%q, isQuota=%t, errMsg=%v, action=%v", body, isQuota, errMsg, action)
+	}
+}
+
+func TestDoRequestReadError(t *testing.T) {
+	originalTransport := http.DefaultTransport
+	http.DefaultTransport = &mockTransport{
+		roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       errReaderCloser{readErr: errors.New("mock read error")},
+			}, nil
+		},
+	}
+	defer func() { http.DefaultTransport = originalTransport }()
+
+	originalBaseURL := apiBaseURL
+	apiBaseURL = "http://dummy"
+	defer func() { apiBaseURL = originalBaseURL }()
+
+	body, isQuota, errMsg, action := doRequest(context.Background(), "example.test", "")
+	if body != "" || isQuota || errMsg == nil || action != httputil.Retry {
+		t.Errorf("unexpected results: body=%q, isQuota=%t, errMsg=%v, action=%v", body, isQuota, errMsg, action)
+	}
+}
+
+func TestDoRequestCloseError(t *testing.T) {
+	originalTransport := http.DefaultTransport
+	http.DefaultTransport = &mockTransport{
+		roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       errReaderCloser{closeErr: errors.New("mock close error")},
+			}, nil
+		},
+	}
+	defer func() { http.DefaultTransport = originalTransport }()
+
+	originalBaseURL := apiBaseURL
+	apiBaseURL = "http://dummy"
+	defer func() { apiBaseURL = originalBaseURL }()
+
+	body, isQuota, errMsg, action := doRequest(context.Background(), "example.invalid", "")
+	if body != "" || isQuota || errMsg != nil || action != 0 {
+		t.Errorf("unexpected results: body=%q, isQuota=%t, errMsg=%v, action=%v", body, isQuota, errMsg, action)
+	}
+}
+
+func TestParseHostSearchEdgeCases(t *testing.T) {
+	body := "just.example.net\n" +
+		"\n" +
+		"invalid_domain!@#,192.0.2.1\n" +
+		"sub.valid.example.org,not-an-ip\n" +
+		"sub.good.example.net,192.0.2.2\n"
+
+	gen := modutil.NewLocalIDGenerator()
+	results := parseHostSearch(body, "example.net", gen)
+
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+
+	if results[0].Type != constants.TypeSubdomain || results[0].Value != "sub.valid.example.org" {
+		t.Errorf("first result: expected %s %s, got %+v", constants.TypeSubdomain, "sub.valid.example.org", results[0])
+	}
+	if results[1].Type != constants.TypeSubdomain || results[1].Value != "sub.good.example.net" {
+		t.Errorf("second result: expected %s %s, got %+v", constants.TypeSubdomain, "sub.good.example.net", results[1])
+	}
+	if results[2].Type != constants.TypeIPv4 || results[2].Value != "192.0.2.2" {
+		t.Errorf("third result: expected %s %s, got %+v", constants.TypeIPv4, "192.0.2.2", results[2])
 	}
 }
