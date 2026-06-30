@@ -86,7 +86,7 @@ func ShowResultsMenu(ctx context.Context) {
 
 // ShowBanner prints the application banner.
 func ShowBanner(ctx context.Context) {
-	const colorGold = "\033[38;2;218;165;32m"
+	const colorGold = "\033[38;2;204;135;4m"
 	logo := `
   ░█▀█░█▀▀░█▀▀░█▀█░█▄░█░█▀▀░█▀█
   ░█▀▄░█▀▀░█░░░█░█░█░▀█░▀▀█░█▀▄
@@ -103,9 +103,13 @@ func ShowBanner(ctx context.Context) {
 
 	fmt.Printf("  + %-20s %s\n", i18n.T["MSG_INIT_CORE"]+":", colorGreen+i18n.T["MSG_STATUS_READY"]+colorReset)
 
-	totalMods, _, totalFuncs, _, _ := controller.GetSystemStatus(ctx)
-	modInfo := fmt.Sprintf("%d(%d)", totalMods, totalFuncs)
-	fmt.Printf("  + %-20s %s\n", i18n.T["LBL_MODS"]+" ("+i18n.T["LBL_FUNCS"]+"):", modInfo)
+	totalMods, _, totalFuncs, _, err := controller.GetSystemStatus(ctx)
+	if err != nil {
+		fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
+		return
+	}
+	fmt.Printf("  + %-20s %d\n", i18n.T["LBL_MODS"]+":", totalMods)
+	fmt.Printf("  + %-20s %d\n", i18n.T["LBL_FUNCS"]+":", totalFuncs)
 
 	fmt.Printf("  + %-20s %s\n", i18n.T["MSG_CONN_DB"]+":", colorGreen+i18n.T["MSG_STATUS_CONN"]+colorReset)
 	fmt.Println()
