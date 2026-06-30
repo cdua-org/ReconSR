@@ -97,8 +97,8 @@ func assertDomainSubdomainExtraction(t *testing.T, results []schema.ModuleResult
 	subdomain := requireResult(t, results, "discovered subdomain node", func(result schema.ModuleResult) bool {
 		return result.Value == fixtureAPISubdomain && result.Category == constants.CategoryNode
 	})
-	if subdomain.Source == nil || subdomain.Source.Type != constants.TypeDomain || subdomain.Source.Value != fixtureDomainTarget {
-		t.Fatalf("expected subdomain source to point to root domain, got %s", describeSource(subdomain.Source))
+	if subdomain.Source != nil {
+		t.Fatalf("expected subdomain source to be nil (implicitly pointing to target), got %s", describeSource(subdomain.Source))
 	}
 
 	assertDomainWildcardSAN(t, results)

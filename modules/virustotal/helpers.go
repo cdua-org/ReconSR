@@ -12,20 +12,23 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-func appendVTProperty(exec *schema.ModuleExecution, resultType, value, resultContext string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) {
+func appendVTProperty(exec *schema.ModuleExecution, resultType, value, resultContext string, source *schema.EntityRef, gen *modutil.LocalIDGenerator) *schema.EntityRef {
 	trimmedValue := strings.TrimSpace(value)
 	if trimmedValue == "" {
-		return
+		return nil
 	}
 
+	localID := gen.NextID()
 	exec.Results = append(exec.Results, schema.ModuleResult{
 		Type:     resultType,
 		Category: constants.CategoryProperty,
 		Value:    trimmedValue,
 		Context:  strings.TrimSpace(resultContext),
 		Source:   source,
-		LocalID:  gen.NextID(),
+		LocalID:  localID,
 	})
+
+	return &schema.EntityRef{Type: resultType, Value: trimmedValue, LocalID: localID}
 }
 
 func extractVTTags(attr map[string]any) []string {

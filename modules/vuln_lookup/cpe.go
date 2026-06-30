@@ -139,10 +139,11 @@ func (m *module) parseCPEResponse(exec *schema.ModuleExecution, raw []byte, targ
 	}
 
 	exec.Results = append(exec.Results, schema.ModuleResult{
-		Type:    constants.TypeCPE,
-		Value:   targetCPE,
-		LocalID: gen.NextID(),
-		Applied: true,
+		Type:     constants.TypeCPE,
+		Category: constants.CategoryProperty,
+		Value:    targetCPE,
+		LocalID:  gen.NextID(),
+		Applied:  true,
 	})
 
 	return len(combinedList)

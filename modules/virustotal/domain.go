@@ -173,13 +173,13 @@ func appendDomainLastUpdate(exec *schema.ModuleExecution, attr map[string]any, _
 	appendVTProperty(exec, constants.TypeDate, "Last Update: "+formattedDate, "", nil, gen)
 }
 
-func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[string]any, targetType, target string, gen *modutil.LocalIDGenerator) {
+func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[string]any, _, target string, gen *modutil.LocalIDGenerator) {
 	certificate, ok := attr["last_https_certificate"].(map[string]any)
 	if !ok {
 		return
 	}
 
-	sources := appendVTCertificateSANs(exec, certificate, targetType, target, gen)
+	sources := appendVTCertificateSANs(exec, certificate, "", target, gen)
 	issuer := formatVTCertificateIssuer(certificate)
 	notAfter := extractVTCertificateNotAfter(certificate)
 
@@ -208,7 +208,7 @@ func appendDomainCertificateSummary(exec *schema.ModuleExecution, attr map[strin
 	}
 }
 
-func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[string]any, targetType, target string, gen *modutil.LocalIDGenerator) []*schema.EntityRef {
+func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[string]any, _, target string, gen *modutil.LocalIDGenerator) []*schema.EntityRef {
 	extensions, ok := certificate["extensions"].(map[string]any)
 	if !ok {
 		return nil
@@ -246,12 +246,6 @@ func appendVTCertificateSANs(exec *schema.ModuleExecution, certificate map[strin
 				Tags:       []string{constants.TagSan},
 				OutOfScope: orgdomain.IsOutOfScope(resultValue, target),
 				LocalID:    gen.NextID(),
-			}
-			if resultValue != target {
-				result.Source = &schema.EntityRef{
-					Type:  targetType,
-					Value: target,
-				}
 			}
 			if wildcardContext != "" {
 				result.Tags = append(result.Tags, constants.TagWildcard)
@@ -381,11 +375,7 @@ func (m *module) extractSubdomain(item map[string]any, parentType, parent string
 		Value:      validatedSubdomain.Value,
 		Tags:       []string{constants.TagPDNS},
 		OutOfScope: isOOS,
-		Source: &schema.EntityRef{
-			Type:  parentType,
-			Value: parent,
-		},
-		LocalID: gen.NextID(),
+		LocalID:    gen.NextID(),
 	}
 	exec.Results = append(exec.Results, subEntity)
 
@@ -401,17 +391,14 @@ func (m *module) extractSubdomain(item map[string]any, parentType, parent string
 				LocalID:  gen.NextID(),
 			})
 		}
-		appendVTProperty(exec, constants.TypeCertNotAfter, notAfterStr, "", subRef, gen)
-		if isExpired {
+		notAfterRef := appendVTProperty(exec, constants.TypeCertNotAfter, notAfterStr, "", subRef, gen)
+		if isExpired && notAfterRef != nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeStatus,
 				Category: constants.CategoryProperty,
 				Value:    constants.StatusExpired,
-				Source: &schema.EntityRef{
-					Type:  constants.TypeCertNotAfter,
-					Value: notAfterStr,
-				},
-				LocalID: gen.NextID(),
+				Source:   notAfterRef,
+				LocalID:  gen.NextID(),
 			})
 		}
 	}
