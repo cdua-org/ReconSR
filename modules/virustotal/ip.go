@@ -32,7 +32,12 @@ func (m *module) extractIPMetadata(attr map[string]any, target string, exec *sch
 	}
 
 	if network, ok := attr["network"].(string); ok {
-		appendVTProperty(exec, constants.TypeCIDR, network, "", nil, gen)
+		exec.Results = append(exec.Results, schema.ModuleResult{
+			Type:     constants.TypeCIDR,
+			Category: constants.CategoryNode,
+			Value:    network,
+			LocalID:  gen.NextID(),
+		})
 	}
 
 	if asOwner, ok := attr["as_owner"].(string); ok {

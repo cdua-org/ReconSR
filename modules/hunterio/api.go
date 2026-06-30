@@ -320,9 +320,10 @@ func appendAPIErrorResult(exec *schema.ModuleExecution, statusCode int, respBody
 func appendDomainProperties(exec *schema.ModuleExecution, parsedResp *apiDomainSearchResponse, gen *modutil.LocalIDGenerator) {
 	if parsedResp.Data.Organization != "" {
 		exec.Results = append(exec.Results, schema.ModuleResult{
-			Type:    constants.TypeOrganization,
-			Value:   parsedResp.Data.Organization,
-			LocalID: gen.NextID(),
+			Type:     constants.TypeOrganization,
+			Category: constants.CategoryProperty,
+			Value:    parsedResp.Data.Organization,
+			LocalID:  gen.NextID(),
 		})
 	}
 	if parsedResp.Data.Pattern != "" {
@@ -453,9 +454,10 @@ func extractEmails(parsedResp *apiDomainSearchResponse, targetDomain string, gen
 func extractEmailEntry(e *apiEmailEntry, results []schema.ModuleResult, targetDomain string, gen *modutil.LocalIDGenerator) []schema.ModuleResult {
 	emailID := gen.NextID()
 	emailRes := schema.ModuleResult{
-		Type:    constants.TypeEmail,
-		Value:   e.Value,
-		LocalID: emailID,
+		Type:     constants.TypeEmail,
+		Category: constants.CategoryNode,
+		Value:    e.Value,
+		LocalID:  emailID,
 	}
 	if e.Type != "" {
 		emailRes.Context = strings.ToUpper(e.Type[:1]) + e.Type[1:] + " email"
@@ -506,10 +508,11 @@ func appendPersonData(e *apiEmailEntry, results *[]schema.ModuleResult, emailRef
 
 	personID := gen.NextID()
 	*results = append(*results, schema.ModuleResult{
-		Type:    constants.TypePerson,
-		Value:   personName,
-		Source:  emailRef,
-		LocalID: personID,
+		Type:     constants.TypePerson,
+		Category: constants.CategoryNode,
+		Value:    personName,
+		Source:   emailRef,
+		LocalID:  personID,
 	})
 	return &schema.EntityRef{Type: constants.TypePerson, Value: personName, LocalID: personID}
 }
@@ -569,10 +572,11 @@ func appendProfileData(e *apiEmailEntry, results []schema.ModuleResult, targetRe
 	}
 	if e.PhoneNumber != "" {
 		results = append(results, schema.ModuleResult{
-			Type:    constants.TypePhone,
-			Value:   e.PhoneNumber,
-			Source:  targetRef,
-			LocalID: gen.NextID(),
+			Type:     constants.TypePhone,
+			Category: constants.CategoryNode,
+			Value:    e.PhoneNumber,
+			Source:   targetRef,
+			LocalID:  gen.NextID(),
 		})
 	}
 	return results

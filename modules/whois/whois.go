@@ -177,7 +177,7 @@ func (m *module) appendSlice(results *[]schema.ModuleResult, arr []string, typ, 
 		if v != "" {
 			category := constants.CategoryProperty
 			resolvedType := typ
-			if typ == constants.TypePerson || typ == constants.TypeOrganization || typ == constants.TypeEmail {
+			if typ == constants.TypePerson || typ == constants.TypeEmail {
 				category = constants.CategoryNode
 			}
 			if typ == constants.TypeEmail {
@@ -219,7 +219,7 @@ func (m *module) appendAddress(results *[]schema.ModuleResult, arr []string, typ
 			return strings.Compare(strings.ToLower(a), strings.ToLower(b))
 		})
 		mergedAddress := strings.Join(uniqueParts, ", ")
-		*results = append(*results, m.result(typ, constants.CategoryNode, mergedAddress, prefix+" Address ("+sourceCtx+")", isOOS, anchor, gen))
+		*results = append(*results, m.result(typ, constants.CategoryProperty, mergedAddress, prefix+" Address ("+sourceCtx+")", isOOS, anchor, gen))
 	}
 }
 

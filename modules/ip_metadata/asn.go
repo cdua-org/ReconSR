@@ -129,7 +129,7 @@ func getASNData(target string) (execution schema.ModuleExecution) {
 
 			execution.Results = append(execution.Results, schema.ModuleResult{
 				Type:     constants.TypeCIDR,
-				Category: constants.CategoryProperty,
+				Category: constants.CategoryNode,
 				Value:    prefix,
 				Context:  "BGP Prefix",
 				LocalID:  gen.NextID(),

@@ -81,7 +81,7 @@ func getIPASN(target, dbPath string) schema.ModuleExecution {
 	if !isUnavailable(res.Ascidr) {
 		execution.Results = append(execution.Results, schema.ModuleResult{
 			Type:     constants.TypeCIDR,
-			Category: constants.CategoryProperty,
+			Category: constants.CategoryNode,
 			Value:    res.Ascidr,
 			Context:  "AS CIDR",
 			LocalID:  gen.NextID(),

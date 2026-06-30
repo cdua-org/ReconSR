@@ -443,7 +443,7 @@ func emitContactNodes(exec *schema.ModuleExecution, c *netlasWhoisContact, cRef 
 	if c.Organization != "" && !isRedacted(c.Organization) {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:       constants.TypeOrganization,
-			Category:   constants.CategoryNode,
+			Category:   constants.CategoryProperty,
 			Value:      c.Organization,
 			Source:     cRef,
 			LocalID:    gen.NextID(),
@@ -471,7 +471,7 @@ func emitContactNodes(exec *schema.ModuleExecution, c *netlasWhoisContact, cRef 
 		address := strings.Join(validAddressParts, ", ")
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:       constants.TypeAddress,
-			Category:   constants.CategoryNode,
+			Category:   constants.CategoryProperty,
 			Value:      address,
 			Source:     cRef,
 			LocalID:    gen.NextID(),

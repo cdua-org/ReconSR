@@ -47,7 +47,7 @@ func (m *leakixModule) doAPIRequest(exec *schema.ModuleExecution, u, targetValue
 }
 
 func (m *leakixModule) executeHTTPRequest(exec *schema.ModuleExecution, u string, attempt int, targetValue string) (rawBody []byte, status int, retryNeeded, ok bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), resolver.HTTPTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), resolver.LeakIXTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
@@ -62,7 +62,7 @@ func (m *leakixModule) executeHTTPRequest(exec *schema.ModuleExecution, u string
 
 	dbg.Printf("%s request_prepared target=%q has_api_key=%t", exec.Function, targetValue, m.apiKey != "")
 
-	client := &http.Client{Timeout: resolver.HTTPTimeout}
+	client := resolver.GetHTTPClient(resolver.LeakIXTimeout)
 	resp, err := client.Do(req)
 	if err != nil {
 		dbg.Printf("%s error stage=do_request err=%v", exec.Function, err)

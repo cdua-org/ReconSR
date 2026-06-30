@@ -232,6 +232,9 @@ IPINFOPaid=false
 
 ### LeakIX Options ###
 
+# Timeout specifically for LeakIX API requests, in seconds (default: 60)
+LeakIXTimeout=60
+
 # Maximum retry attempts for LeakIX API requests (default: 3)
 MaxRetriesLeakIX=3
 

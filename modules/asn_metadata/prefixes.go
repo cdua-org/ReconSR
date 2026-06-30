@@ -51,7 +51,7 @@ func getASNPrefixes(target string, gen *modutil.LocalIDGenerator) (execution sch
 		if p.Prefix != "" {
 			execution.Results = append(execution.Results, schema.ModuleResult{
 				Type:     constants.TypeCIDR,
-				Category: constants.CategoryProperty,
+				Category: constants.CategoryNode,
 				Value:    p.Prefix,
 				Context:  "Announced Prefix",
 				LocalID:  gen.NextID(),

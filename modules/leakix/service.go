@@ -786,7 +786,7 @@ func emitNetwork(exec *schema.ModuleExecution, srv *ServiceEvent, ipRef *schema.
 		if val, err := validator.Validate(constants.TypeASN, fmt.Sprintf("AS%d", srv.Network.ASN)); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     val.Type,
-				Category: constants.CategoryProperty,
+				Category: constants.CategoryNode,
 				Value:    val.Value,
 				Source:   ipRef,
 				LocalID:  gen.NextID(),
@@ -806,7 +806,7 @@ func emitNetwork(exec *schema.ModuleExecution, srv *ServiceEvent, ipRef *schema.
 		if val, err := validator.Validate(constants.TypeCIDR, srv.Network.Network); err == nil {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeCIDR,
-				Category: constants.CategoryProperty,
+				Category: constants.CategoryNode,
 				Value:    val.Value,
 				Source:   ipRef,
 				LocalID:  gen.NextID(),

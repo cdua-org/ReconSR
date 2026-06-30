@@ -50,6 +50,8 @@ var (
 	Timeout = 5 * time.Second
 	// HTTPTimeout defines timeout for HTTP API requests (RIPE, etc).
 	HTTPTimeout = 30 * time.Second
+	// LeakIXTimeout defines overall timeout for LeakIX API requests.
+	LeakIXTimeout = 60 * time.Second
 	// KeepAlive defines connection persistency timeframe.
 	KeepAlive = 30 * time.Second
 	// MaxRetriesCert defines maximum attempts for domainsbycerts.
@@ -335,6 +337,7 @@ func initOptionMaps() {
 		"NetlasRetryBaseDelay":  &NetlasRetryBaseDelay,
 		"NetlasDownloadTimeout": &NetlasDownloadTimeout,
 		"HTTPTimeout":           &HTTPTimeout,
+		"LeakIXTimeout":         &LeakIXTimeout,
 		"CirclRetryBaseDelay":   &CirclRetryBaseDelay,
 	}
 	boolOptions = map[string]*bool{
@@ -833,6 +836,30 @@ func GetDialer() *net.Dialer {
 		Timeout:   Timeout,
 		KeepAlive: KeepAlive,
 		Resolver:  GetResolver(),
+	}
+}
+
+// GetHTTPClient returns an http.Client configured with a dynamic TLS handshake timeout.
+// It clones the DefaultTransport to preserve environment proxies and HTTP/2 settings.
+func GetHTTPClient(timeout time.Duration) *http.Client {
+	initResolver()
+	var t *http.Transport
+	if dt, ok := http.DefaultTransport.(*http.Transport); ok {
+		t = dt.Clone()
+	} else {
+		t = &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	}
+
+	t.TLSHandshakeTimeout = max(10*time.Second, min(20*time.Second, timeout/3))
+	return &http.Client{
+		Transport: t,
+		Timeout:   timeout,
 	}
 }
 

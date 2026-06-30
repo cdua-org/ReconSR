@@ -87,7 +87,7 @@ func parseIPResponse(exec *schema.ModuleExecution, resp *netlasIPResponse, targe
 	if resp.Organization != "" {
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeOrganization,
-			Category: constants.CategoryNode,
+			Category: constants.CategoryProperty,
 			Value:    resp.Organization,
 			Source:   targetRef,
 			LocalID:  gen.NextID(),
@@ -205,7 +205,7 @@ func parseWhoisASN(exec *schema.ModuleExecution, asn *netlasWhoisASN, targetRef 
 		if asn.Name != "" {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeOrganization,
-				Category: constants.CategoryNode,
+				Category: constants.CategoryProperty,
 				Value:    asn.Name,
 				Context:  "ASN Holder",
 				Source:   asnRef,
@@ -216,7 +216,7 @@ func parseWhoisASN(exec *schema.ModuleExecution, asn *netlasWhoisASN, targetRef 
 			if validateCIDR(asn.CIDR) {
 				exec.Results = append(exec.Results, schema.ModuleResult{
 					Type:     constants.TypeCIDR,
-					Category: constants.CategoryProperty,
+					Category: constants.CategoryNode,
 					Value:    asn.CIDR,
 					Source:   asnRef,
 					LocalID:  gen.NextID(),
@@ -256,7 +256,7 @@ func resolveWhoisOrg(exec *schema.ModuleExecution, net *netlasWhoisIPNet, rootOr
 		orgID := gen.NextID()
 		exec.Results = append(exec.Results, schema.ModuleResult{
 			Type:     constants.TypeOrganization,
-			Category: constants.CategoryNode,
+			Category: constants.CategoryProperty,
 			Value:    orgName,
 			Context:  "Network Organization",
 			Source:   targetRef,
@@ -297,7 +297,7 @@ func parseWhoisNet(exec *schema.ModuleExecution, net *netlasWhoisIPNet, rootOrg 
 			}
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeCIDR,
-				Category: constants.CategoryProperty,
+				Category: constants.CategoryNode,
 				Value:    cidr,
 				Source:   orgRef,
 				LocalID:  cidrID,
@@ -412,8 +412,8 @@ func parseWhoisNetContacts(exec *schema.ModuleExecution, contacts *netlasWhoisIP
 	if contacts == nil {
 		return
 	}
-	ParseEmails(exec, contacts.Emails, constants.CategoryProperty, "", false, targetRef, gen)
-	ParsePhones(exec, contacts.Phones, constants.CategoryProperty, false, targetRef, gen)
+	ParseEmails(exec, contacts.Emails, constants.CategoryNode, "", false, targetRef, gen)
+	ParsePhones(exec, contacts.Phones, constants.CategoryNode, false, targetRef, gen)
 	parseWhoisNetPersons(exec, contacts.Persons, targetRef, gen)
 }
 

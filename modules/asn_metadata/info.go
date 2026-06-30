@@ -41,7 +41,7 @@ func getASNInfo(target string, gen *modutil.LocalIDGenerator) (execution schema.
 	if resp.Data.Holder != "" {
 		execution.Results = append(execution.Results, schema.ModuleResult{
 			Type:       constants.TypeOrganization,
-			Category:   constants.CategoryNode,
+			Category:   constants.CategoryProperty,
 			Value:      resp.Data.Holder,
 			Context:    "ASN Holder",
 			OutOfScope: true,
