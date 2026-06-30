@@ -493,8 +493,8 @@
                 transform: translateY(-1px);
             }
             .privacy-toggle-btn.active {
-                background: rgba(16, 185, 129, 0.15);
-                border-color: rgba(16, 185, 129, 0.4);
+                background: #064e3b;
+                border-color: #059669;
                 color: #6ee7b7;
                 box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);
             }
@@ -1326,6 +1326,27 @@
                         this.canvas.addEventListener('wheel', e => this._onWheel(e));
                         // Prevent context menu
                         this.canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+                        this.canvas.addEventListener('mouseleave', () => {
+                            let needsDraw = false;
+                            if (this.hoveredNodeId !== null) {
+                                this._trigger('blurNode', { node: this.hoveredNodeId });
+                                this.hoveredNodeId = null;
+                                needsDraw = true;
+                            }
+                            if (this.hoveredEdgeId !== null) {
+                                this._trigger('blurEdge', { edge: this.hoveredEdgeId });
+                                this.hoveredEdgeId = null;
+                                needsDraw = true;
+                            }
+                            if (this.tooltip) {
+                                this.tooltip.style.display = 'none';
+                            }
+                            this.canvas.style.cursor = 'grab';
+                            if (needsDraw) {
+                                this.draw();
+                            }
+                        });
 
                         // Handle mouse release outside canvas or window focus loss
                         const clearDragState = () => {
