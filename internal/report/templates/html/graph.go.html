@@ -360,7 +360,7 @@
                 position: absolute;
                 bottom: 15px;
                 left: 50%;
-                transform: translateX(-50%);
+                transform: translateX(-50%) translateY(0);
                 width: 65%;
                 background: rgba(30, 41, 59, 0.9);
                 border: 1px solid #334155;
@@ -372,6 +372,47 @@
                 flex-direction: row;
                 align-items: center;
                 pointer-events: auto;
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            #timeline-container.collapsed {
+                transform: translateX(-50%) translateY(calc(100% + 15px));
+            }
+            #timeline-toggle {
+                position: absolute;
+                bottom: 19px;
+                left: 25px;
+                z-index: 999;
+                pointer-events: auto;
+                background: #1e293b;
+                border: 2px solid #334155;
+                color: #94a3b8;
+                width: 40px;
+                height: 40px;
+                border-radius: 8px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                transition:
+                    background-color 0.2s,
+                    color 0.2s,
+                    border-color 0.2s,
+                    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                    bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            #timeline-toggle:hover {
+                color: #f1f5f9;
+                background: #334155;
+            }
+            #timeline-toggle.active {
+                color: #38bdf8;
+                border-color: #38bdf8;
+                background: #1e293b;
+            }
+            .timeline-toggle-icon {
+                width: 24px;
+                height: 24px;
             }
             .timeline-controls {
                 display: flex;
@@ -481,6 +522,7 @@
                 flex-direction: column;
                 gap: 10px;
                 z-index: 100;
+                transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             }
             #graph-navigation button {
                 background: #1e293b;
@@ -532,6 +574,12 @@
                 }
                 #sidebar-toggle.sidebar-open {
                     transform: translateX(260px);
+                }
+                #timeline-container:not(.collapsed) ~ #graph-navigation {
+                    bottom: 110px;
+                }
+                #timeline-container:not(.collapsed) ~ #timeline-toggle {
+                    bottom: 110px;
                 }
                 #timeline-container {
                     width: 90vw;
@@ -689,6 +737,7 @@
                     <div class="meta-item-controls">
                         <span class="stat-badge badge-hidden">000</span>
                         <div
+                            id="label-toggle-root"
                             class="icon-btn active label-toggle-btn"
                             data-type="root"
                             title="Toggle Label"
@@ -883,6 +932,7 @@
                 {{range .Stats}} {{if ne .Type "root"}}
                 <div class="meta-item-group">
                     <div
+                        id="category-expander-{{.Type}}"
                         class="meta-item{{if .Subtypes}} cursor-pointer{{end}}"
                         {{if
                         .Subtypes}}
@@ -909,6 +959,7 @@
                                 >{{.Count}}</span
                             >
                             <div
+                                id="label-toggle-{{.Type}}"
                                 class="icon-btn active label-toggle-btn"
                                 data-type="{{.Type}}"
                                 title="Toggle Label"
@@ -927,6 +978,7 @@
                                 </svg>
                             </div>
                             <div
+                                id="visibility-toggle-{{.Type}}"
                                 class="icon-btn active visibility-eye type-toggle-btn"
                                 data-type="{{.Type}}"
                                 title="Toggle Visibility"
@@ -965,6 +1017,7 @@
                                     >{{.Count}}</span
                                 >
                                 <div
+                                    id="subtype-label-toggle-{{$parentType}}-{{.Type}}"
                                     class="icon-btn active label-toggle-btn"
                                     data-type="{{$parentType}}:{{.Type}}"
                                     title="Toggle Label"
@@ -983,6 +1036,7 @@
                                     </svg>
                                 </div>
                                 <div
+                                    id="subtype-visibility-toggle-{{$parentType}}-{{.Type}}"
                                     class="icon-btn active visibility-eye type-toggle-btn"
                                     data-type="{{$parentType}}:{{.Type}}"
                                     title="Toggle Visibility"
@@ -1013,7 +1067,7 @@
             </div>
         </div>
 
-        <div id="timeline-container">
+        <div id="timeline-container" class="collapsed">
             <div class="timeline-controls mr-15">
                 <span
                     id="current-time-display"
@@ -1043,6 +1097,27 @@
                 </button>
             </div>
         </div>
+
+        <button
+            id="timeline-toggle"
+            onclick="toggleTimeline()"
+            title="Toggle Timeline"
+        >
+            <svg
+                class="timeline-toggle-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <circle cx="6" cy="12" r="2" fill="currentColor"></circle>
+                <circle cx="12" cy="12" r="2" fill="currentColor"></circle>
+                <circle cx="18" cy="12" r="2" fill="currentColor"></circle>
+            </svg>
+        </button>
 
         <div id="modal">
             <div class="modal-header">
@@ -1684,7 +1759,7 @@
                         const padding = 60;
                         let timelineHeight = 0;
                         const timelineContainer = document.getElementById('timeline-container');
-                        if (timelineContainer && window.getComputedStyle(timelineContainer).display !== 'none') {
+                        if (timelineContainer && window.getComputedStyle(timelineContainer).display !== 'none' && !timelineContainer.classList.contains('collapsed')) {
                             const rect = timelineContainer.getBoundingClientRect();
                             const actualHeight = rect.height > 0 ? rect.height : 50;
                             timelineHeight = actualHeight + 25;
@@ -1733,7 +1808,7 @@
                         const targetZoom = (options && typeof options.scale === 'number') ? options.scale : this.camera.zoom;
                         let timelineHeight = 0;
                         const timelineContainer = document.getElementById('timeline-container');
-                        if (timelineContainer && window.getComputedStyle(timelineContainer).display !== 'none') {
+                        if (timelineContainer && window.getComputedStyle(timelineContainer).display !== 'none' && !timelineContainer.classList.contains('collapsed')) {
                             const rect = timelineContainer.getBoundingClientRect();
                             const actualHeight = rect.height > 0 ? rect.height : 50;
                             timelineHeight = actualHeight + 25;
@@ -2552,6 +2627,18 @@
                                     }
                                 }
 
+                                function toggleTimeline() {
+                                    const timeline = document.getElementById('timeline-container');
+                                    const toggleBtn = document.getElementById('timeline-toggle');
+
+                                    timeline.classList.toggle('collapsed');
+                                    toggleBtn.classList.toggle('active');
+
+                                    if (network) {
+                                        network.draw();
+                                    }
+                                }
+
                                 function escapeHTML(str) {
                                     if (str === null || str === undefined) return "";
                                     const s = String(str);
@@ -2683,6 +2770,8 @@
                                 if (uniqueTimes.length <= 1) {
                                     const tc = document.getElementById('timeline-container');
                                     if (tc) tc.style.display = 'none';
+                                    const tt = document.getElementById('timeline-toggle');
+                                    if (tt) tt.style.display = 'none';
                                 }
 
                                 let minTime = uniqueTimes[0] || Date.now();
