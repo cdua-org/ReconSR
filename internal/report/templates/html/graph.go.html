@@ -26,7 +26,7 @@
             }
             #top-bar {
                 position: absolute;
-                top: 120px;
+                top: 140px;
                 left: 20px;
                 pointer-events: none;
                 display: flex;
@@ -614,14 +614,13 @@
             <div class="meta mb-2">
                 Generated: {{ .Timestamp }}
             </div>
-            <div class="meta mb-6">
-                Nodes: {{ .NodesCount }} | Properties: {{ .PropertiesCount
-                }}
+            <div class="meta mb-6" id="top-bar-stats">
+                <div>Nodes: {{ .NodesCount }}</div>
+                <div>Properties: {{ .PropertiesCount }}</div>
             </div>
         </div>
 
         <div id="top-bar">
-
             <button
                 id="sidebar-toggle"
                 onclick="toggleSidebar()"
@@ -823,7 +822,7 @@
                 </div>
                 <div class="meta-item">
                     <div class="meta-item-left">
-                        <span class="meta-label">Depth Limit Reached</span>
+                        <span class="meta-label">Depth Limit</span>
                     </div>
                     <div class="meta-item-controls">
                         <span class="stat-badge" id="limit-stat-badge"
@@ -1102,7 +1101,7 @@
         <button
             id="timeline-toggle"
             onclick="toggleTimeline()"
-            title="Toggle Timeline"
+            title="Timeline"
         >
             <svg
                 class="timeline-toggle-icon"
@@ -1151,6 +1150,28 @@
             let pristineHTML = '';
             document.addEventListener('DOMContentLoaded', function() {
                 pristineHTML = '<!doctype html>\n' + document.documentElement.outerHTML;
+
+                // Calculate active vs total counts for the header
+                const activeNodes = initialNodes.filter(n => !n.outOfScope && !n.depthLimitReached);
+                const activePropIds = new Set();
+                const collectPropertyIds = (propId) => {
+                    if (activePropIds.has(propId)) return;
+                    activePropIds.add(propId);
+                    const prop = allPropsMap[propId];
+                    if (prop && prop.properties) {
+                        prop.properties.forEach(childId => collectPropertyIds(childId));
+                    }
+                };
+                initialNodes.forEach(n => {
+                    if (!n.outOfScope && !n.depthLimitReached && n.properties) {
+                        n.properties.forEach(id => collectPropertyIds(id));
+                    }
+                });
+                const totalPropsCount = Object.keys(allPropsMap).length;
+                const statsEl = document.getElementById('top-bar-stats');
+                if (statsEl) {
+                    statsEl.innerHTML = `<div>Nodes: ${activeNodes.length} (${initialNodes.length} total)</div><div>Properties: ${activePropIds.size} (${totalPropsCount} total)</div>`;
+                }
             }, { once: true });
 
             class DataSet {
@@ -2819,7 +2840,7 @@
                                 const UI_STRINGS = {
                                     TOGGLE_ALL_VISIBILITY: 'Toggle All Visibility',
                                     TOGGLE_OOS_VISIBILITY: 'Toggle Out of Scope Visibility',
-                                    TOGGLE_LIMIT_VISIBILITY: 'Toggle Depth Limit Reached Visibility',
+                                    TOGGLE_LIMIT_VISIBILITY: 'Toggle Depth Limit Visibility',
                                     TOGGLE_TYPE_VISIBILITY: 'Toggle Visibility',
                                     TOGGLE_ALL: 'Toggle All',
                                     TOGGLE_VISIBILITY: 'Toggle Visibility'
@@ -3116,7 +3137,7 @@
 
                                         let titleParts = ["Type: " + node.group, "Value: " + lbl];
                                         if (node.outOfScope) titleParts.push("Out of Scope: Yes");
-                                        if (node.depthLimitReached) titleParts.push("Depth Limit Reached: Yes");
+                                        if (node.depthLimitReached) titleParts.push("Depth Limit: Yes");
 
                                         let currentX = node.x;
                                         let currentY = node.y;
@@ -3405,7 +3426,7 @@
                                 let currentVisibleTypeCounts = {};
                                 let currentEffectiveTotalTypeCounts = {};
                                 let showOOS = false;
-                                let showLimitReached = true;
+                                let showLimitReached = false;
 
                                 function syncVisibilityButtons(visibilityStats, visibleTypeCounts, effectiveTotalTypeCounts) {
                                     const setState = function(btn, visibleCount, totalCount, isGlobalOn, title) {
@@ -4281,7 +4302,7 @@
                                     if (limitCount > 0) {
                                         const limitState = isOut ? modalOutShowLimit : modalInShowLimit;
                                         priorityHtml += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
-                                        priorityHtml += '<span style="color: #cbd5e1; font-size: 0.85rem;">Depth Limit Reached</span>';
+                                        priorityHtml += '<span style="color: #cbd5e1; font-size: 0.85rem;">Depth Limit</span>';
                                         priorityHtml += '<div style="display: flex; align-items: center; gap: 12px;">';
                                         priorityHtml += '<span class="stat-badge" id="' + pfx + '-conn-limit-badge">' + limitCount + '</span>';
                                         priorityHtml += '<div class="icon-btn visibility-eye ' + (limitState ? 'active' : 'state-none') + '" id="' + pfx + '-conn-limit-btn" onclick="toggleModalLimit(' + isOut + ')" title="' + UI_STRINGS.TOGGLE_LIMIT_VISIBILITY + '">';
@@ -4990,7 +5011,7 @@
                                                 content += '</div>';
                                             } else if (node.depthLimitReached) {
                                                 content += '<div style="color: #fbbf24; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
-                                                content += '<span style="margin-right: 5px;">🛑</span> DEPTH LIMIT REACHED';
+                                                content += '<span style="margin-right: 5px;">🛑</span> DEPTH LIMIT';
                                                 content += '</div>';
                                             }
                                             content += '</div>';
@@ -5326,7 +5347,7 @@
 
             hiddenNodes.clear();
             showOOS = false;
-            showLimitReached = true;
+            showLimitReached = false;
 
             document.querySelectorAll('.type-toggle-btn').forEach(btn => {
                 btn.classList.remove('state-none', 'state-partial', 'state-filtered', 'state-all');
