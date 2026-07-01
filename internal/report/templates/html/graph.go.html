@@ -741,7 +741,7 @@
                             if (event.target.closest('.meta-item-controls'))
                                 return;
                             const st = this.nextElementSibling;
-                            const isHidden = st.style.display === 'none';
+                            const isHidden = st.style.display === 'none' || st.style.display === '';
                             st.style.display = isHidden ? 'block' : 'none';
                             this.querySelector('.expander').innerText = isHidden ? '▼' : '▶';
                         "
@@ -749,7 +749,7 @@
                     >
                         <div class="meta-item-left">
                             <span class="type-label"
-                                >{{ .RootType }}{{if .RootSubtypes}}<span class="expander">▶</span>{{end}}</span
+                                >{{ html .RootType }}{{if .RootSubtypes}}<span class="expander">▶</span>{{end}}</span
                             >
                         </div>
                         <div class="meta-item-controls">
@@ -811,7 +811,7 @@
                         {{range .RootSubtypes}}
                         <div class="meta-item">
                             <div class="meta-item-left subtype-left">
-                                <span class="subtype-label">{{ . }}</span>
+                                <span class="subtype-label">{{ html . }}</span>
                             </div>
                             <div class="meta-item-controls">
                                 <span class="stat-badge">1</span>
@@ -835,6 +835,7 @@
                                     </svg>
                                 </div>
                                 <div
+                                    id="focus-btn-root-{{ html . }}"
                                     class="icon-btn"
                                     title="Focus Root Target"
                                     onclick="focusNode(initialNodes.find((n) => n.group === 'root').id)"
@@ -1018,7 +1019,7 @@
                             if (event.target.closest('.meta-item-controls'))
                                 return;
                             const st = this.nextElementSibling;
-                            const isHidden = st.style.display === 'none';
+                            const isHidden = st.style.display === 'none' || st.style.display === '';
                             st.style.display = isHidden ? 'block' : 'none';
                             this.querySelector('.expander').innerText = isHidden ? '▼' : '▶';
                         "
@@ -1026,7 +1027,7 @@
                     >
                         <div class="meta-item-left">
                             <span class="type-label"
-                                >{{.Type}}{{if .Subtypes}}<span class="expander">▶</span>{{end}}</span
+                                >{{html .Type}}{{if .Subtypes}}<span class="expander">▶</span>{{end}}</span
                             >
                         </div>
                         <div class="meta-item-controls">
@@ -1085,7 +1086,7 @@
                         <div class="meta-item">
                             <div class="meta-item-left subtype-left">
                                 <span class="subtype-label"
-                                    >{{.Type}}</span>
+                                    >{{html .Type}}</span>
                             </div>
                             <div class="meta-item-controls">
                                 <span
@@ -1224,8 +1225,9 @@
             </button>
         </div>
 
+        <script type="text/plain" id="root-original-type-data">{{ .RootType }}</script>
         <script type="text/javascript">
-            const rootOriginalType = '{{ .RootType }}';
+            const rootOriginalType = document.getElementById('root-original-type-data')?.textContent || '';
             function getNodeDisplayType(node) {
                 if (node && node.group === 'root') {
                     return rootOriginalType ? `${rootOriginalType} (root)` : 'root';
@@ -4122,7 +4124,7 @@
 
                                 let copyBtnCounter = 0;
                                 function getCopyBtnHTML(textToCopy) {
-                                    const encoded = encodeURIComponent(textToCopy);
+                                    const encoded = encodeURIComponent(textToCopy).replace(/'/g, "\\'");
                                     const btnId = 'copy-value-btn-' + (++copyBtnCounter);
                                     return '<button id="' + btnId + '" title="Copy Value" style="background: transparent; border: none; color: #64748b; cursor: pointer; padding: 0; margin-left: 8px; display: inline-flex; align-items: center;" onmouseover="this.style.color=\'#38bdf8\'" onmouseout="this.style.color=\'#64748b\'" onclick="navigator.clipboard.writeText(decodeURIComponent(\'' + encoded + '\')); event.stopPropagation();"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>';
                                 }
@@ -4423,7 +4425,7 @@
                                         html += '<div class="meta-item-group" style="margin-bottom: 0;">';
                                         html += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0;' + (t.subtypes ? ' cursor: pointer;' : '') + '"';
                                         if (t.subtypes) {
-                                            html += ' onclick="if (event.target.closest(\'.meta-item-controls\')) return; const st = this.nextElementSibling; const isHidden = st.style.display === \'none\'; st.style.display = isHidden ? \'block\' : \'none\'; this.querySelector(\'.expander\').innerText = isHidden ? \'▼\' : \'▶\';"';
+                                            html += ' onclick="if (event.target.closest(\'.meta-item-controls\')) return; const st = this.nextElementSibling; const isHidden = st.style.display === \'none\' || st.style.display === \'\'; st.style.display = isHidden ? \'block\' : \'none\'; this.querySelector(\'.expander\').innerText = isHidden ? \'▼\' : \'▶\';"';
                                         }
                                         html += '>';
                                         html += '<span style="color: #cbd5e1; font-size: 0.85rem; font-family: monospace;">' + escapeHTML(t.type);
