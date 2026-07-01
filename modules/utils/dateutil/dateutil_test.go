@@ -21,6 +21,7 @@ func TestNormalizeDay(t *testing.T) {
 		{name: "slash format", raw: "2026/06/11 12:13:14", want: "2026-06-11", valid: true},
 		{name: "european format", raw: "12.06.2026 09:08:07", want: "2026-06-12", valid: true},
 		{name: "invalid", raw: "not-a-date", want: "", valid: false},
+		{name: "empty string", raw: "   ", want: "", valid: false},
 	}
 
 	for _, tt := range tests {
