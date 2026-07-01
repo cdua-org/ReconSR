@@ -332,6 +332,71 @@ func TestGetDialer(t *testing.T) {
 	}
 }
 
+func TestGetHTTPClient(t *testing.T) {
+	t.Run("default transport clone", func(t *testing.T) {
+		timeout := 45 * time.Second
+		client := GetHTTPClient(timeout)
+		if client == nil {
+			t.Fatal("expected client, got nil")
+		}
+		if client.Timeout != timeout {
+			t.Errorf("Expected Timeout %v, got %v", timeout, client.Timeout)
+		}
+		tr, ok := client.Transport.(*http.Transport)
+		if !ok {
+			t.Fatal("expected Transport to be *http.Transport")
+		}
+		if tr.TLSHandshakeTimeout != 15*time.Second {
+			t.Errorf("Expected TLSHandshakeTimeout 15s, got %v", tr.TLSHandshakeTimeout)
+		}
+	})
+
+	t.Run("default transport fallback", func(t *testing.T) {
+		orig := http.DefaultTransport
+		defer func() { http.DefaultTransport = orig }()
+
+		http.DefaultTransport = nil
+		timeout := 45 * time.Second
+		client := GetHTTPClient(timeout)
+		if client == nil {
+			t.Fatal("expected client, got nil")
+		}
+		if client.Timeout != timeout {
+			t.Errorf("Expected Timeout %v, got %v", timeout, client.Timeout)
+		}
+		tr, ok := client.Transport.(*http.Transport)
+		if !ok {
+			t.Fatal("expected Transport to be *http.Transport")
+		}
+		if tr.TLSHandshakeTimeout != 15*time.Second {
+			t.Errorf("Expected TLSHandshakeTimeout 15s, got %v", tr.TLSHandshakeTimeout)
+		}
+		if !tr.ForceAttemptHTTP2 {
+			t.Error("Expected ForceAttemptHTTP2 to be true")
+		}
+	})
+
+	t.Run("tls timeout bounds", func(t *testing.T) {
+		c1 := GetHTTPClient(15 * time.Second)
+		tr1, ok := c1.Transport.(*http.Transport)
+		if !ok {
+			t.Fatal("expected Transport to be *http.Transport")
+		}
+		if tr1.TLSHandshakeTimeout != 10*time.Second {
+			t.Errorf("Expected 10s bound, got %v", tr1.TLSHandshakeTimeout)
+		}
+
+		c2 := GetHTTPClient(90 * time.Second)
+		tr2, ok := c2.Transport.(*http.Transport)
+		if !ok {
+			t.Fatal("expected Transport to be *http.Transport")
+		}
+		if tr2.TLSHandshakeTimeout != 20*time.Second {
+			t.Errorf("Expected 20s bound, got %v", tr2.TLSHandshakeTimeout)
+		}
+	})
+}
+
 func TestDohStatusError_Error(t *testing.T) {
 	err := &dohStatusError{code: 502}
 	expected := "doh status 502"

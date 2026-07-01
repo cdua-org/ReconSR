@@ -704,10 +704,7 @@ func ResolveIP(ctx context.Context, target string) (ips []string, raw []byte, er
 		lastErr = err
 	}
 
-	if lastErr != nil {
-		return nil, nil, fmt.Errorf("all resolution attempts failed, last error: %w", lastErr)
-	}
-	return nil, nil, errors.New("all resolution attempts failed")
+	return nil, nil, fmt.Errorf("all resolution attempts failed, last error: %w", lastErr)
 }
 
 var errPlainNXDOMAIN = errors.New("nxdomain")
