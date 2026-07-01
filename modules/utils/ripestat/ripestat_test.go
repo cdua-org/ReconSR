@@ -2,6 +2,8 @@ package ripestat
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -381,5 +383,74 @@ func TestModels_SetRawJSON(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type mockTransport struct {
+	RoundTripFunc func(req *http.Request) (*http.Response, error)
+}
+
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m.RoundTripFunc(req)
+}
+
+type errReader struct {
+	readErr  error
+	closeErr error
+}
+
+func (e *errReader) Read(_ []byte) (n int, err error) {
+	if e.readErr != nil {
+		return 0, e.readErr
+	}
+	return 0, io.EOF
+}
+
+func (e *errReader) Close() error {
+	return e.closeErr
+}
+
+func TestAttemptQuery_NewRequestError(t *testing.T) {
+	err := attemptQuery(context.Background(), "http://127.0.0.1/\x7f", "test", "test", nil, 1)
+	if err == nil || !strings.Contains(err.Error(), "create request") {
+		t.Errorf("expected create request error, got: %v", err)
+	}
+}
+
+func TestAttemptQuery_BodyReadError(t *testing.T) {
+	orig := http.DefaultTransport
+	defer func() { http.DefaultTransport = orig }()
+
+	http.DefaultTransport = &mockTransport{
+		RoundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       &errReader{readErr: errors.New("mock read error")},
+			}, nil
+		},
+	}
+
+	err := attemptQuery(context.Background(), "http://test.local", "test", "test", nil, 1)
+	if err == nil || !strings.Contains(err.Error(), "read body") {
+		t.Errorf("expected read body error, got: %v", err)
+	}
+}
+
+func TestAttemptQuery_BodyCloseError(t *testing.T) {
+	orig := http.DefaultTransport
+	defer func() { http.DefaultTransport = orig }()
+
+	http.DefaultTransport = &mockTransport{
+		RoundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       &errReader{closeErr: errors.New("mock close error")},
+			}, nil
+		},
+	}
+
+	err := attemptQuery(context.Background(), "http://test.local", "test", "test", &APIResponse{}, 1)
+	if err == nil || !strings.Contains(err.Error(), "unmarshal:") {
+		t.Errorf("expected unmarshal error after bad body, got: %v", err)
 	}
 }
