@@ -18,7 +18,10 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-var hibpAPIBaseURL = "https://haveibeenpwned.com/api/v3"
+var (
+	hibpAPIBaseURL                        = "https://haveibeenpwned.com/api/v3"
+	httpClientTransport http.RoundTripper = http.DefaultTransport
+)
 
 type apiBreachEntry struct {
 	Name               string   `json:"Name"`
@@ -99,7 +102,10 @@ func (m *module) fetchPage(ctx context.Context, exec *schema.ModuleExecution, u 
 	req.Header.Set("User-Agent", resolver.GetRandomUserAgent())
 	req.Header.Set("hibp-api-key", m.apiKey)
 
-	client := &http.Client{Timeout: resolver.HTTPTimeout}
+	client := &http.Client{
+		Timeout:   resolver.HTTPTimeout,
+		Transport: httpClientTransport,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		dlog.Printf("%s error stage=do_request attempt=%d err=%v", constants.FuncGetEmailBreaches, attempt+1, err)

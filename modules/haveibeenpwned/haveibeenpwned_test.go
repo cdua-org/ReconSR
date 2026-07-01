@@ -2,6 +2,7 @@ package haveibeenpwned
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
@@ -231,4 +233,191 @@ func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
 			}
 		}
 	}
+}
+
+func TestModule_Coverage(t *testing.T) {
+	m := New()
+	if m.Name() != "haveibeenpwned" {
+		t.Errorf("expected haveibeenpwned, got %s", m.Name())
+	}
+
+	mod, ok := m.(*module)
+	if !ok {
+		t.Fatal("expected module to be *module")
+	}
+
+	mod.apiKey = ""
+	capOut, err := mod.Capabilities()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(capOut.Functions) != 0 {
+		t.Error("expected 0 functions when no API key")
+	}
+
+	mod.apiKey = "test_key"
+	capOut, err = mod.Capabilities()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(capOut.Functions) == 0 {
+		t.Error("expected functions with API key")
+	}
+
+	origDelay := resolver.HaveIBeenPwnedDelayMs
+	resolver.HaveIBeenPwnedDelayMs = 50
+	defer func() { resolver.HaveIBeenPwnedDelayMs = origDelay }()
+
+	mod.lastReqTime = time.Now()
+	mod.waitRateLimit()
+
+	input := schema.ModuleInput{
+		Target:    schema.Entity{Value: "test@example.com"},
+		Functions: []string{constants.FuncGetEmailBreaches, "unsupported_func"},
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	origURL := hibpAPIBaseURL
+	hibpAPIBaseURL = ts.URL
+	defer func() { hibpAPIBaseURL = origURL }()
+
+	out, err := mod.Exec(input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(out.Executions) != 2 {
+		t.Fatalf("expected 2 executions, got %d", len(out.Executions))
+	}
+
+	foundUnsupported := false
+	for _, e := range out.Executions {
+		if e.Function == "unsupported_func" {
+			foundUnsupported = true
+			if e.Error == nil || *e.Error == "" {
+				t.Error("expected error for unsupported func")
+			}
+		}
+	}
+	if !foundUnsupported {
+		t.Error("unsupported func execution not found")
+	}
+}
+
+func TestDemoCoverage(t *testing.T) {
+	m, ok := New().(*module)
+	if !ok {
+		t.Fatal("expected module to be *module")
+	}
+	gen := modutil.NewLocalIDGenerator()
+	exec := &schema.ModuleExecution{}
+
+	origRead := readDemoFile
+	readDemoFile = func(_ string) ([]byte, error) {
+		return nil, errors.New("mock read error")
+	}
+	m.demoFired.Store(false)
+	m.getEmailBreachesDemo(exec, "test@example.com", gen)
+	if exec.Error == nil || *exec.Error == "" {
+		t.Error("expected error for read fail")
+	}
+	readDemoFile = origRead
+
+	origUnmarshal := unmarshalJSON
+	unmarshalJSON = func(_ []byte, _ any) error {
+		return errors.New("mock unmarshal error")
+	}
+	m.demoFired.Store(false)
+	exec = &schema.ModuleExecution{}
+	m.getEmailBreachesDemo(exec, "test@example.com", gen)
+	if exec.Error == nil || *exec.Error == "" {
+		t.Error("expected error for unmarshal fail")
+	}
+	unmarshalJSON = origUnmarshal
+}
+
+type mockTransport struct {
+	roundTripFunc func(req *http.Request) (*http.Response, error)
+}
+
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if m.roundTripFunc != nil {
+		return m.roundTripFunc(req)
+	}
+	return nil, errors.New("not implemented")
+}
+
+type errReader struct{}
+
+func (errReader) Read(_ []byte) (int, error) { return 0, errors.New("mock read error") }
+func (errReader) Close() error               { return errors.New("mock close error") }
+
+func TestAPICoverage(t *testing.T) {
+	overrideRetries(t, 2)
+	origDelay := resolver.RetryBaseDelay
+	resolver.RetryBaseDelay = time.Millisecond
+	defer func() { resolver.RetryBaseDelay = origDelay }()
+
+	m := &module{apiKey: testAPIKey}
+
+	origURL := hibpAPIBaseURL
+	defer func() { hibpAPIBaseURL = origURL }()
+
+	origTransport := httpClientTransport
+	defer func() { httpClientTransport = origTransport }()
+
+	hibpAPIBaseURL = "http://\x7f"
+	m.getEmailBreaches(context.Background(), "user@example.com")
+
+	hibpAPIBaseURL = "http://127.0.0.1:0"
+	m.getEmailBreaches(context.Background(), "user@example.com")
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("{bad json")); err != nil {
+			t.Logf("write failed: %v", err)
+		}
+	}))
+	hibpAPIBaseURL = ts.URL
+	m.getEmailBreaches(context.Background(), "user@example.com")
+	ts.Close()
+
+	ts500 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	hibpAPIBaseURL = ts500.URL
+	m.getEmailBreaches(context.Background(), "user@example.com")
+	ts500.Close()
+
+	ts429bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("retry-after", "invalid")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	hibpAPIBaseURL = ts429bad.URL
+	m.getEmailBreaches(context.Background(), "user@example.com")
+	ts429bad.Close()
+
+	ts400 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		if _, err := w.Write([]byte(`{"message": "custom err"}`)); err != nil {
+			t.Logf("write failed: %v", err)
+		}
+	}))
+	hibpAPIBaseURL = ts400.URL
+	m.getEmailBreaches(context.Background(), "user@example.com")
+	ts400.Close()
+
+	httpClientTransport = &mockTransport{
+		roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       errReader{},
+			}, nil
+		},
+	}
+	hibpAPIBaseURL = "http://example.com"
+	m.getEmailBreaches(context.Background(), "user@example.com")
 }

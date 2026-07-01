@@ -120,7 +120,7 @@
     "IsVerified": true,
     "IsFabricated": false,
     "IsSensitive": false,
-    "IsRetired": false,
+    "IsRetired": true,
     "IsSpamList": false,
     "IsMalware": false,
     "IsSubscriptionFree": false,
