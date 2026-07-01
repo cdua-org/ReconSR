@@ -59,3 +59,10 @@ func TestSleepContext_Cancelled(t *testing.T) {
 		t.Error("SleepContext returned true for pre-cancelled context")
 	}
 }
+
+func TestRetryDelay_Default(t *testing.T) {
+	d := RetryDelay(ResponseAction(99), 0, 2*time.Second)
+	if d != 0 {
+		t.Errorf("Default: got %v, want 0", d)
+	}
+}
