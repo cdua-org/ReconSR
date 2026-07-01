@@ -23,6 +23,12 @@ func TestDecodeHexCAA(t *testing.T) {
 			expected: "",
 			wantErr:  true,
 		},
+		{
+			name:     "tag length mismatch",
+			input:    `\# 03 00 05 69`,
+			expected: "",
+			wantErr:  true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -90,3 +90,46 @@ func TestParseNAPTR(t *testing.T) {
 		})
 	}
 }
+
+func TestCleanSRVTarget(t *testing.T) {
+	tests := []struct {
+		name     string
+		target   string
+		expected string
+	}{
+		{
+			name:     "valid srv target with dot",
+			target:   "_sip._tcp.example.com.",
+			expected: "example.com",
+		},
+		{
+			name:     "valid srv target no dot",
+			target:   "_sip._tcp.example.org",
+			expected: "example.org",
+		},
+		{
+			name:     "short target",
+			target:   "_sip.example.com",
+			expected: "_sip.example.com",
+		},
+		{
+			name:     "no prefixes",
+			target:   "www.example.com",
+			expected: "www.example.com",
+		},
+		{
+			name:     "only one prefix",
+			target:   "_sip.tcp.example.com",
+			expected: "_sip.tcp.example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := CleanSRVTarget(tt.target)
+			if result != tt.expected {
+				t.Errorf("CleanSRVTarget(%q) = %q, want %q", tt.target, result, tt.expected)
+			}
+		})
+	}
+}

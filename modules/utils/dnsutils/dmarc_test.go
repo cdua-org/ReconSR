@@ -70,6 +70,11 @@ func TestParseDMARC(t *testing.T) {
 			name:     "empty value",
 			input:    "v=DMARC1; p=",
 		},
+		{
+			expected: noneRecord,
+			name:     "empty parts and malformed",
+			input:    "v=DMARC1; ; =bad; broken; p=none",
+		},
 	}
 
 	for _, tt := range tests {

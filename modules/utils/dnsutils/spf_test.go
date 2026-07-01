@@ -54,7 +54,7 @@ func TestParseSPF(t *testing.T) {
 		},
 		{
 			name:     "empty mechanism value skipped",
-			raw:      "v=spf1 include: mx: -all",
+			raw:      "v=spf1 ip4: ip6: include: mx: -all",
 			expected: nil,
 		},
 		{

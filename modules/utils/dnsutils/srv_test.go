@@ -30,6 +30,12 @@ func TestParseSRVHost(t *testing.T) {
 			expected: "",
 			wantErr:  true,
 		},
+		{
+			name:     "invalid - empty host",
+			input:    "10 50 5060 .",
+			expected: "",
+			wantErr:  true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -70,6 +70,13 @@ func TestDecodeWireFormat(t *testing.T) {
 			wantOK:     false,
 		},
 		{
+			name:       "empty hex spaces only",
+			raw:        "\\# 0   ",
+			minDataLen: 0,
+			wantData:   nil,
+			wantOK:     false,
+		},
+		{
 			name:       "sshfp typical valid",
 			raw:        "\\# 22 01 01 abcdef0123456789abcdef0123456789abcdef01",
 			minDataLen: 3,
