@@ -13,6 +13,11 @@ import (
 //go:embed testdata/domain_search_b2b.json
 var demoData embed.FS
 
+var (
+	readDemoFile  = demoData.ReadFile
+	unmarshalJSON = json.Unmarshal
+)
+
 // getDomainSearchDemo is a demo function that loads a local JSON fixture
 // instead of querying the Hunter.io API when the "demo-api-key" is used.
 func (m *module) getDomainSearchDemo(exec *schema.ModuleExecution, targetType, targetValue string, gen *modutil.LocalIDGenerator) schema.ModuleExecution {
@@ -30,14 +35,14 @@ func (m *module) getDomainSearchDemo(exec *schema.ModuleExecution, targetType, t
 		LocalID:  gen.NextID(),
 	})
 
-	data, err := demoData.ReadFile("testdata/domain_search_b2b.json")
+	data, err := readDemoFile("testdata/domain_search_b2b.json")
 	if err != nil {
 		modutil.SetError(exec, "read fixture err: %v", err)
 		return *exec
 	}
 
 	var parsedResp apiDomainSearchResponse
-	if err := json.Unmarshal(data, &parsedResp); err != nil {
+	if err := unmarshalJSON(data, &parsedResp); err != nil {
 		modutil.SetError(exec, "unmarshal fixture err: %v", err)
 		return *exec
 	}

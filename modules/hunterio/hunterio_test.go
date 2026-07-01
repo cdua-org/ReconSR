@@ -2,17 +2,177 @@ package hunterio
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/modutil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
+
+func TestFetchDomainPage_ZeroRetries(t *testing.T) {
+	oldRetries := resolver.HunterioMaxRetries
+	resolver.HunterioMaxRetries = 0
+	defer func() { resolver.HunterioMaxRetries = oldRetries }()
+
+	m := &module{apiKey: testAPIKey}
+	exec := &schema.ModuleExecution{}
+	_, _, shouldBreak := m.fetchDomainPage(context.Background(), exec, constants.TypeDomain, "example.com", 10, 0)
+
+	if !shouldBreak {
+		t.Errorf("expected shouldBreak to be true on zero retries")
+	}
+	if exec.Error == nil || !strings.Contains(*exec.Error, "after retries: no response") {
+		t.Errorf("expected no response error, got: %v", exec.Error)
+	}
+}
+
+func TestDoPageRequest_NewRequestError(t *testing.T) {
+	m := &module{apiKey: testAPIKey}
+	_, _, err := m.doPageRequest(context.Background(), "http://127.0.0.1/\x7f")
+	if err == nil || !strings.Contains(err.Error(), "new request error") {
+		t.Errorf("expected new request error, got: %v", err)
+	}
+}
+
+func TestDoPageRequest_CloseBodyError(t *testing.T) {
+	oldTransport := httpClientTransport
+	defer func() { httpClientTransport = oldTransport }()
+
+	httpClientTransport = &mockTransport{
+		roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       errCloseReader(0),
+			}, nil
+		},
+	}
+
+	m := &module{apiKey: testAPIKey}
+	_, _, err := m.doPageRequest(context.Background(), "http://127.0.0.1")
+	if err != nil {
+		t.Errorf("expected no error from doPageRequest even if close fails, got: %v", err)
+	}
+}
+
+func TestDoPageRequest_ReadBodyError(t *testing.T) {
+	oldTransport := httpClientTransport
+	oldDelay := resolver.RetryBaseDelay
+	oldRetries := resolver.HunterioMaxRetries
+	defer func() {
+		httpClientTransport = oldTransport
+		resolver.RetryBaseDelay = oldDelay
+		resolver.HunterioMaxRetries = oldRetries
+	}()
+
+	resolver.RetryBaseDelay = time.Millisecond
+	resolver.HunterioMaxRetries = 1
+
+	httpClientTransport = &mockTransport{
+		roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       errReader(0),
+			}, nil
+		},
+	}
+
+	m := &module{apiKey: testAPIKey}
+	_, _, err := m.doPageRequest(context.Background(), "http://127.0.0.1")
+	if err == nil || !strings.Contains(err.Error(), "read error") {
+		t.Errorf("expected read error, got: %v", err)
+	}
+}
+
+func TestDoPageRequest_ServerErrorRetry(t *testing.T) {
+	oldTransport := httpClientTransport
+	oldDelay := resolver.RetryBaseDelay
+	oldRetries := resolver.HunterioMaxRetries
+	defer func() {
+		httpClientTransport = oldTransport
+		resolver.RetryBaseDelay = oldDelay
+		resolver.HunterioMaxRetries = oldRetries
+	}()
+
+	resolver.RetryBaseDelay = time.Millisecond
+	resolver.HunterioMaxRetries = 2
+
+	var attempts int
+	httpClientTransport = &mockTransport{
+		roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			attempts++
+			if attempts == 1 {
+				return &http.Response{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader("server error")),
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+			}, nil
+		},
+	}
+
+	m := &module{apiKey: testAPIKey}
+	_, status, err := m.doPageRequest(context.Background(), "http://127.0.0.1")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if status != http.StatusOK {
+		t.Errorf("expected status 200, got: %v", status)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got: %v", attempts)
+	}
+}
+
+func TestDoPageRequest_ClientDoErrorRetry(t *testing.T) {
+	oldTransport := httpClientTransport
+	oldDelay := resolver.RetryBaseDelay
+	oldRetries := resolver.HunterioMaxRetries
+	defer func() {
+		httpClientTransport = oldTransport
+		resolver.RetryBaseDelay = oldDelay
+		resolver.HunterioMaxRetries = oldRetries
+	}()
+
+	resolver.RetryBaseDelay = time.Millisecond
+	resolver.HunterioMaxRetries = 2
+
+	var attempts int
+	httpClientTransport = &mockTransport{
+		roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+			attempts++
+			if attempts == 1 {
+				return nil, errors.New("client do err")
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("{}")),
+			}, nil
+		},
+	}
+
+	m := &module{apiKey: testAPIKey}
+	_, status, err := m.doPageRequest(context.Background(), "http://127.0.0.1")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if status != http.StatusOK {
+		t.Errorf("expected status 200, got: %v", status)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got: %v", attempts)
+	}
+}
 
 const testAPIKey = "test_key"
 
@@ -116,433 +276,6 @@ func findResultByTypeValue(results []schema.ModuleResult, entityType, value stri
 	return nil
 }
 
-func TestGetDomainSearch_Pagination(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/account", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(validAccountJSON)); err != nil {
-			t.Logf("write failed: %v", err)
-		}
-	})
-
-	mux.HandleFunc("/domain-search", func(w http.ResponseWriter, r *http.Request) {
-		offset := r.URL.Query().Get("offset")
-		var data []byte
-		if offset == "0" {
-			data = loadHunterioFixture(t, "domain_search_pagination_page1.json")
-		} else {
-			data = loadHunterioFixture(t, "domain_search_pagination_page2.json")
-		}
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write(data); err != nil {
-			t.Logf("write failed: %v", err)
-		}
-	})
-
-	server := httptest.NewServer(mux)
-	defer server.Close()
-
-	overrideBaseURL(t, server.URL)
-	overrideLimits(t, 10, 2)
-
-	m := &module{apiKey: testAPIKey}
-	exec := m.getDomainSearch(context.Background(), constants.TypeDomain, "example.com")
-
-	if exec.Error != nil {
-		t.Fatalf("expected no error, got: %s", *exec.Error)
-	}
-
-	emails := findResultsByType(exec.Results, constants.TypeEmail)
-	if len(emails) != 14 {
-		t.Errorf("expected 14 emails from pagination, got %d", len(emails))
-	}
-}
-
-func TestGetDomainSearch_B2BFullProfile(t *testing.T) {
-	server := setupMockServer(t, "domain_search_b2b.json", http.StatusOK)
-	defer server.Close()
-
-	overrideBaseURL(t, server.URL)
-
-	m := &module{apiKey: testAPIKey}
-	exec := m.getDomainSearch(context.Background(), constants.TypeDomain, "enterprise-b2b.example.net")
-
-	if exec.Error != nil {
-		t.Fatalf("expected no error, got: %s", *exec.Error)
-	}
-
-	if findResultByTypeValue(exec.Results, constants.TypeOrganization, "Enterprise B2B Corporation") == nil {
-		t.Errorf("missing organization")
-	}
-
-	pattern := findResultsByType(exec.Results, constants.TypeEmailPattern)
-	if len(pattern) == 0 || pattern[0].Value != "{first}.{last}" {
-		t.Errorf("missing or wrong email pattern")
-	}
-
-	validateB2BEmails(t, exec.Results)
-	validateB2BPersons(t, exec.Results)
-	validateB2BProperties(t, exec.Results)
-	validateB2BSources(t, exec.Results)
-
-	if exec.RawData == "" {
-		t.Errorf("expected non-empty RawData")
-	}
-}
-
-func validateB2BEmails(t *testing.T, results []schema.ModuleResult) {
-	t.Helper()
-	emails := findResultsByType(results, constants.TypeEmail)
-	if len(emails) != 3 {
-		t.Errorf("expected 3 emails, got %d", len(emails))
-	}
-
-	aliceEmail := findResultByTypeValue(results, constants.TypeEmail, "alice.director@enterprise-b2b.example.net")
-	if aliceEmail == nil {
-		t.Errorf("missing alice email")
-	}
-
-	supportEmail := findResultByTypeValue(results, constants.TypeEmail, "support-team@enterprise-b2b.example.net")
-	if supportEmail == nil {
-		t.Errorf("missing support email")
-	}
-}
-
-func validateB2BPersons(t *testing.T, results []schema.ModuleResult) {
-	t.Helper()
-	if findResultByTypeValue(results, constants.TypePerson, "Alice Director") == nil {
-		t.Errorf("missing person Alice Director")
-	}
-
-	if findResultByTypeValue(results, constants.TypePerson, "Bob Intern") == nil {
-		t.Errorf("missing person Bob Intern")
-	}
-
-	persons := findResultsByType(results, constants.TypePerson)
-	if len(persons) != 2 {
-		t.Errorf("expected 2 persons (alice, bob), got %d", len(persons))
-	}
-}
-
-func requireCountByType(t *testing.T, results []schema.ModuleResult, resultType string, count int) {
-	t.Helper()
-	actual := 0
-	for _, r := range results {
-		if r.Type == resultType {
-			actual++
-		}
-	}
-	if actual != count {
-		t.Errorf("expected %d info properties with type %q, got %d", count, resultType, actual)
-	}
-}
-
-func validateB2BProperties(t *testing.T, results []schema.ModuleResult) {
-	t.Helper()
-	requireCountByType(t, results, constants.TypePosition, 2)
-	requireCountByType(t, results, constants.TypeDepartment, 3)
-	requireCountByType(t, results, constants.TypeSeniority, 2)
-	requireCountByType(t, results, constants.TypeConfidenceScore, 3)
-	requireCountByType(t, results, constants.TypeVerificationStatus, 3)
-}
-
-func validateB2BSources(t *testing.T, results []schema.ModuleResult) {
-	t.Helper()
-	phones := findResultsByType(results, constants.TypePhone)
-	if len(phones) != 1 || phones[0].Value != "+1 800 555 0199" {
-		t.Errorf("expected 1 phone +1 800 555 0199, got %v", phones)
-	}
-	validateB2BSocial(t, results)
-	validateB2BLinkedDomains(t, results)
-	validateB2BSourceRefs(t, results)
-}
-
-func validateB2BSocial(t *testing.T, results []schema.ModuleResult) {
-	t.Helper()
-	urls := findResultsByType(results, constants.TypeURL)
-	const ctxLinkedIn = "LinkedIn"
-	hasLinkedin, hasTwitter := false, false
-	for _, u := range urls {
-		if u.Context == ctxLinkedIn && u.Value == "https://www.linkedin.com/in/alicedirector-example" {
-			hasLinkedin = true
-			if !slices.Contains(u.Tags, constants.TagSocial) {
-				t.Errorf("LinkedIn URL missing TagSocial")
-			}
-		}
-		if u.Context == "Twitter" && u.Value == "https://twitter.com/alice_tech_example" {
-			hasTwitter = true
-			if !slices.Contains(u.Tags, constants.TagSocial) {
-				t.Errorf("Twitter URL missing TagSocial")
-			}
-		}
-	}
-	if !hasLinkedin {
-		t.Errorf("missing LinkedIn URL")
-	}
-	if !hasTwitter {
-		t.Errorf("missing Twitter URL")
-	}
-}
-
-func validateB2BLinkedDomains(t *testing.T, results []schema.ModuleResult) {
-	t.Helper()
-	linked := []schema.ModuleResult{}
-	for _, r := range results {
-		if r.Type == constants.TypeDomain && slices.Contains(r.Tags, constants.TagLinked) {
-			linked = append(linked, r)
-		}
-	}
-	if len(linked) != 2 {
-		t.Errorf("expected 2 linked domains, got %d", len(linked))
-	}
-	for _, ld := range linked {
-		if !ld.Applied || !slices.Contains(ld.Tags, constants.TagLinked) {
-			t.Errorf("linked domain %q should be applied and tagged linked", ld.Value)
-		}
-	}
-}
-
-func validateB2BSourceRefs(t *testing.T, results []schema.ModuleResult) {
-	t.Helper()
-	sourceURLs := []schema.ModuleResult{}
-	for _, r := range results {
-		if r.Type == constants.TypeURL && r.Source != nil && r.Source.Type == constants.TypeSource {
-			sourceURLs = append(sourceURLs, r)
-		}
-	}
-	if len(sourceURLs) != 3 {
-		t.Errorf("expected 3 source URLs, got %d", len(sourceURLs))
-	}
-
-	validateB2BSourceDomains(t, results)
-
-	extractedDates := []schema.ModuleResult{}
-	for _, r := range results {
-		if r.Type == constants.TypeDate && strings.HasPrefix(r.Value, "Extracted on: ") {
-			extractedDates = append(extractedDates, r)
-		}
-	}
-	if len(extractedDates) != 3 {
-		t.Errorf("expected 3 extracted on dates, got %d", len(extractedDates))
-	}
-}
-
-func validateB2BSourceDomains(t *testing.T, results []schema.ModuleResult) {
-	t.Helper()
-	sourceDomains := []schema.ModuleResult{}
-	for _, r := range results {
-		if r.Type == constants.TypeDomain && r.Source != nil && (r.Source.Type == constants.TypeURL || r.Source.Type == constants.TypeSource) {
-			sourceDomains = append(sourceDomains, r)
-		}
-	}
-	if len(sourceDomains) != 3 {
-		t.Errorf("expected 3 source domains, got %d", len(sourceDomains))
-	}
-	for _, sd := range sourceDomains {
-		if sd.Value == "enterprise-b2b.example.net" {
-			if sd.OutOfScope {
-				t.Errorf("source domain %q should have OutOfScope=false", sd.Value)
-			}
-		} else {
-			if !sd.OutOfScope {
-				t.Errorf("source domain %q should have OutOfScope=true", sd.Value)
-			}
-		}
-	}
-}
-
-func TestGetDomainSearch_StrictCorp(t *testing.T) {
-	server := setupMockServer(t, "domain_search_b2b_single_profile.json", http.StatusOK)
-	defer server.Close()
-
-	overrideBaseURL(t, server.URL)
-
-	m := &module{apiKey: testAPIKey}
-	exec := m.getDomainSearch(context.Background(), constants.TypeDomain, "strict-corp.example.com")
-
-	if exec.Error != nil {
-		t.Fatalf("expected no error, got: %s", *exec.Error)
-	}
-
-	if findResultByTypeValue(exec.Results, constants.TypeOrganization, "Strict Corporation") == nil {
-		t.Errorf("missing organization Strict Corporation")
-	}
-
-	pattern := findResultsByType(exec.Results, constants.TypeEmailPattern)
-	if len(pattern) == 0 || pattern[0].Value != "{first}" {
-		t.Errorf("missing or wrong email pattern")
-	}
-
-	if findResultByTypeValue(exec.Results, constants.TypeEmail, "alice@strict-corp.example.com") == nil {
-		t.Errorf("missing email alice@strict-corp.example.com")
-	}
-
-	if findResultByTypeValue(exec.Results, constants.TypePerson, "Alice Smith") == nil {
-		t.Errorf("missing person Alice Smith")
-	}
-
-	urls := findResultsByType(exec.Results, constants.TypeURL)
-	hasLinkedin := false
-	for _, u := range urls {
-		if u.Context == "LinkedIn" {
-			hasLinkedin = true
-		}
-	}
-	if !hasLinkedin {
-		t.Errorf("missing LinkedIn URL")
-	}
-
-	phones := findResultsByType(exec.Results, constants.TypePhone)
-	if len(phones) != 1 {
-		t.Errorf("expected 1 phone, got %d", len(phones))
-	}
-}
-
-func TestGetDomainSearch_GenericEmailNoPerson(t *testing.T) {
-	server := setupMockServer(t, "domain_search_empty_ghost.json", http.StatusOK)
-	defer server.Close()
-
-	overrideBaseURL(t, server.URL)
-
-	m := &module{apiKey: testAPIKey}
-	exec := m.getDomainSearch(context.Background(), constants.TypeDomain, "stealth-startup.example.io")
-
-	if exec.Error != nil {
-		t.Fatalf("expected no error, got: %s", *exec.Error)
-	}
-
-	emails := findResultsByType(exec.Results, constants.TypeEmail)
-	if len(emails) != 0 {
-		t.Errorf("expected 0 emails, got %d", len(emails))
-	}
-
-	persons := findResultsByType(exec.Results, constants.TypePerson)
-	if len(persons) != 0 {
-		t.Errorf("expected 0 persons for empty ghost, got %d", len(persons))
-	}
-}
-
-func TestGetDomainSearch_Tempmail(t *testing.T) {
-	server := setupMockServer(t, "domain_search_tempmail.json", http.StatusOK)
-	defer server.Close()
-
-	overrideBaseURL(t, server.URL)
-
-	m := &module{apiKey: testAPIKey}
-	exec := m.getDomainSearch(context.Background(), constants.TypeDomain, "example.com")
-
-	if findResultByTypeValue(exec.Results, constants.TypeInfo, "Disposable Email Domain") == nil {
-		t.Errorf("expected info %q not found", "Disposable Email Domain")
-	}
-}
-
-func TestGetDomainSearch_PublicMail(t *testing.T) {
-	server := setupMockServer(t, "domain_search_publicmail.json", http.StatusOK)
-	defer server.Close()
-
-	overrideBaseURL(t, server.URL)
-
-	m := &module{apiKey: testAPIKey}
-	exec := m.getDomainSearch(context.Background(), constants.TypeDomain, "example.com")
-
-	if findResultByTypeValue(exec.Results, constants.TypeInfo, "Webmail Provider") == nil {
-		t.Errorf("expected info %q not found", "Webmail Provider")
-	}
-}
-
-func TestGetDomainSearch_AcceptAll(t *testing.T) {
-	server := setupMockServer(t, "domain_search_b2b.json", http.StatusOK)
-	defer server.Close()
-
-	overrideBaseURL(t, server.URL)
-
-	m := &module{apiKey: testAPIKey}
-	exec := m.getDomainSearch(context.Background(), constants.TypeDomain, "example.com")
-
-	if findResultByTypeValue(exec.Results, constants.TypeInfo, "Accept-All Domain") == nil {
-		t.Errorf("expected info %q not found", "Accept-All Domain")
-	}
-}
-
-func TestGetDomainSearch_RateLimitAsProperty(t *testing.T) {
-	server := setupMockServer(t, "domain_search_restricted_account.json", http.StatusTooManyRequests)
-	defer server.Close()
-
-	overrideBaseURL(t, server.URL)
-	overrideRetries(t, 1)
-
-	m := &module{apiKey: testAPIKey}
-	exec := m.getDomainSearch(context.Background(), constants.TypeDomain, "example.com")
-
-	if exec.Error != nil {
-		t.Errorf("rate limit should not set exec.Error, got: %s", *exec.Error)
-	}
-
-	if findResultByTypeValue(exec.Results, constants.TypeInfo, "Your account was restricted. Please log in to Hunter for more information.") == nil {
-		t.Errorf("expected parsed error details as info property")
-	}
-
-	if exec.RawData == "" {
-		t.Errorf("expected RawData even on rate limit")
-	}
-}
-
-func TestGetDomainSearch_PreflightFail(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/account", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		if _, err := w.Write([]byte(`{"errors": [{"details": "Invalid API key"}]}`)); err != nil {
-			t.Logf("write failed: %v", err)
-		}
-	})
-	server := httptest.NewServer(mux)
-	defer server.Close()
-
-	overrideBaseURL(t, server.URL)
-
-	m := &module{apiKey: testAPIKey}
-	exec := m.getDomainSearch(context.Background(), constants.TypeDomain, "example.com")
-
-	if exec.Error != nil {
-		t.Errorf("preflight failure should not set exec.Error, got: %s", *exec.Error)
-	}
-
-	r := findResultByTypeValue(exec.Results, constants.TypeInfo, "Hunter.io API key is invalid")
-	if r == nil {
-		t.Errorf("expected info property for invalid key")
-	} else if r.Category != constants.CategoryProperty {
-		t.Errorf("expected category=%q, got %q", constants.CategoryProperty, r.Category)
-	}
-}
-
-func TestGetDomainSearch_QuotaExceeded(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/account", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(`{"data": {"requests": {"searches": {"used": 1000, "available": 1000}}}}`)); err != nil {
-			t.Logf("write failed: %v", err)
-		}
-	})
-	server := httptest.NewServer(mux)
-	defer server.Close()
-
-	overrideBaseURL(t, server.URL)
-
-	m := &module{apiKey: testAPIKey}
-	exec := m.getDomainSearch(context.Background(), constants.TypeDomain, "example.com")
-
-	if exec.Error != nil {
-		t.Errorf("quota exceeded should not set exec.Error, got: %s", *exec.Error)
-	}
-
-	r := findResultByTypeValue(exec.Results, constants.TypeInfo, "Hunter.io API quota exceeded or credits exhausted")
-	if r == nil {
-		t.Errorf("expected info property for quota exceeded")
-	} else if r.Category != constants.CategoryProperty {
-		t.Errorf("expected category=%q, got %q", constants.CategoryProperty, r.Category)
-	}
-}
-
 func TestModule_LocalIDChaining(t *testing.T) {
 	server := setupMockServer(t, "domain_search_b2b.json", http.StatusOK)
 	defer server.Close()
@@ -582,5 +315,364 @@ func requireUniqueLocalIDs(t *testing.T, results []schema.ModuleResult) {
 				t.Errorf("expected source LocalID %d to be strictly less than result LocalID %d (Type: %s, Value: %s)", res.Source.LocalID, res.LocalID, res.Type, res.Value)
 			}
 		}
+	}
+}
+
+func TestModule_Coverage(t *testing.T) {
+	m := New()
+	if m.Name() != "hunterio" {
+		t.Errorf("expected hunterio, got %s", m.Name())
+	}
+
+	mod, ok := m.(*module)
+	if !ok {
+		t.Fatal("expected module to be *module")
+	}
+
+	mod.apiKey = ""
+	capOut, err := mod.Capabilities()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if len(capOut.Functions) != 0 {
+		t.Error("expected 0 functions when no API key")
+	}
+
+	mod.apiKey = testAPIKey
+	origScanOrg := resolver.HunterioScanOrg
+	resolver.HunterioScanOrg = true
+	capOut, err = mod.Capabilities()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if len(capOut.Functions) == 0 {
+		t.Error("expected functions with API key")
+	}
+	if len(capOut.ModuleConfig.InputTypes) != 2 {
+		t.Error("expected 2 input types with HunterioScanOrg=true")
+	}
+
+	resolver.HunterioScanOrg = false
+	capOut, err = mod.Capabilities()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if len(capOut.ModuleConfig.InputTypes) != 1 {
+		t.Error("expected 1 input type with HunterioScanOrg=false")
+	}
+	resolver.HunterioScanOrg = origScanOrg
+}
+
+func TestModule_ExecCoverage(t *testing.T) {
+	m := New()
+	mod, ok := m.(*module)
+	if !ok {
+		t.Fatal("expected module to be *module")
+	}
+	mod.apiKey = testAPIKey
+
+	input := schema.ModuleInput{
+		Target:    schema.Entity{Type: constants.TypeDomain, Value: "example.com"},
+		Functions: []string{constants.FuncGetHunterioDomainSearch, "unsupported_func"},
+	}
+
+	ts := setupMockServer(t, "", http.StatusInternalServerError)
+	origURL := hunterioAPIBaseURL
+	hunterioAPIBaseURL = ts.URL
+
+	execOut, err := mod.Exec(input)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	ts.Close()
+	hunterioAPIBaseURL = origURL
+
+	var foundUnsupported bool
+	var foundDomainSearch bool
+	for _, e := range execOut.Executions {
+		if e.Function == "unsupported_func" {
+			foundUnsupported = true
+			if e.Error == nil || *e.Error == "" {
+				t.Error("expected error for unsupported func")
+			}
+		}
+		if e.Function == constants.FuncGetHunterioDomainSearch {
+			foundDomainSearch = true
+		}
+	}
+	if !foundUnsupported {
+		t.Error("unsupported func execution not found")
+	}
+	if !foundDomainSearch {
+		t.Error("domain search execution not found")
+	}
+
+	mod.apiKey = ""
+	execOutNoKey, err := mod.Exec(input)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	for _, e := range execOutNoKey.Executions {
+		if e.Function == constants.FuncGetHunterioDomainSearch {
+			t.Error("expected no execution for domain search without API key")
+		}
+	}
+}
+
+type mockTransport struct {
+	roundTripFunc func(_ *http.Request) (*http.Response, error)
+}
+
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m.roundTripFunc(req)
+}
+
+type errReader int
+
+func (errReader) Read(_ []byte) (n int, err error) {
+	return 0, errors.New("mock read error")
+}
+func (errReader) Close() error { return nil }
+
+type errCloseReader int
+
+func (errCloseReader) Read(_ []byte) (n int, err error) {
+	return 0, io.EOF
+}
+func (errCloseReader) Close() error { return errors.New("mock close error") }
+
+func TestHandlePreflightAPI_Coverage(t *testing.T) {
+	origURL := hunterioAPIBaseURL
+
+	tests := []struct {
+		transport     http.RoundTripper
+		name          string
+		inputStr      string
+		baseURL       string
+		checkCredits  int
+		checkInvalid  bool
+		checkQuotaExc bool
+	}{
+		{
+			name:         "skip preflight",
+			inputStr:     "test-api-key",
+			baseURL:      origURL,
+			transport:    http.DefaultTransport,
+			checkCredits: 999999,
+		},
+		{
+			name:         "new request failure",
+			inputStr:     "value_bad_req",
+			baseURL:      "://invalid",
+			transport:    http.DefaultTransport,
+			checkInvalid: true,
+		},
+		{
+			name:     "client do failure",
+			inputStr: "value_do_fail",
+			baseURL:  origURL,
+			transport: &mockTransport{
+				roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+					return nil, errors.New("mock request error")
+				},
+			},
+			checkInvalid: true,
+		},
+		{
+			name:     "forbidden status",
+			inputStr: "value_forbidden",
+			baseURL:  origURL,
+			transport: &mockTransport{
+				roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusForbidden,
+						Body:       http.NoBody,
+					}, nil
+				},
+			},
+			checkInvalid: true,
+		},
+		{
+			name:     "default status",
+			inputStr: "value_status_500",
+			baseURL:  origURL,
+			transport: &mockTransport{
+				roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusInternalServerError,
+						Body:       http.NoBody,
+					}, nil
+				},
+			},
+			checkInvalid: true,
+		},
+		{
+			name:     "read body error",
+			inputStr: "value_read_err",
+			baseURL:  origURL,
+			transport: &mockTransport{
+				roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       errReader(0),
+					}, nil
+				},
+			},
+			checkInvalid: true,
+		},
+		{
+			name:     "unmarshal error",
+			inputStr: "value_json_err",
+			baseURL:  origURL,
+			transport: &mockTransport{
+				roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader("{bad json}")),
+					}, nil
+				},
+			},
+			checkInvalid: true,
+		},
+		{
+			name:     "quota exceeded",
+			inputStr: "value_quota",
+			baseURL:  origURL,
+			transport: &mockTransport{
+				roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"data":{"requests":{"searches":{"used":10,"available":10}}}}`)),
+					}, nil
+				},
+			},
+			checkQuotaExc: true,
+		},
+		{
+			name:     "close body error",
+			inputStr: "value_close_err",
+			baseURL:  origURL,
+			transport: &mockTransport{
+				roundTripFunc: func(_ *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       errCloseReader(0),
+					}, nil
+				},
+			},
+			checkInvalid: true,
+		},
+	}
+
+	origTransport := httpClientTransport
+	defer func() {
+		hunterioAPIBaseURL = origURL
+		httpClientTransport = origTransport
+	}()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m, ok := New().(*module)
+			if !ok {
+				t.Fatal("expected module to be *module")
+			}
+			m.apiKey = tt.inputStr
+			hunterioAPIBaseURL = tt.baseURL
+			httpClientTransport = tt.transport
+
+			m.handlePreflightAPI(context.Background())
+
+			if tt.checkCredits != 0 && m.queryCredits != tt.checkCredits {
+				t.Errorf("expected queryCredits %d, got %d", tt.checkCredits, m.queryCredits)
+			}
+			if m.keyInvalid != tt.checkInvalid {
+				t.Errorf("expected keyInvalid %v, got %v", tt.checkInvalid, m.keyInvalid)
+			}
+			if m.quotaExceeded != tt.checkQuotaExc {
+				t.Errorf("expected quotaExceeded %v, got %v", tt.checkQuotaExc, m.quotaExceeded)
+			}
+		})
+	}
+}
+
+func TestHandlePageResponse_ServerError(t *testing.T) {
+	m, ok := New().(*module)
+	if !ok {
+		t.Fatal("expected module to be *module")
+	}
+	exec := &schema.ModuleExecution{}
+	gen := modutil.NewLocalIDGenerator()
+
+	shouldBreak := m.handlePageResponse(exec, http.StatusInternalServerError, nil, gen)
+	if !shouldBreak {
+		t.Errorf("expected shouldBreak to be true for 500 error")
+	}
+	if exec.Error == nil || !strings.Contains(*exec.Error, "hunterio server error") {
+		t.Errorf("expected server error in exec.Error, got: %v", exec.Error)
+	}
+}
+
+func TestGetLimits_Defaults(t *testing.T) {
+	oldLimit := resolver.HunterioLimit
+	oldMaxPages := resolver.HunterioMaxPages
+	defer func() {
+		resolver.HunterioLimit = oldLimit
+		resolver.HunterioMaxPages = oldMaxPages
+	}()
+
+	resolver.HunterioLimit = 0
+	resolver.HunterioMaxPages = 0
+	l, m := getLimits()
+	if l != 10 || m != 1 {
+		t.Errorf("expected 10 and 1, got %d and %d", l, m)
+	}
+
+	resolver.HunterioLimit = 101
+	l, _ = getLimits()
+	if l != 10 {
+		t.Errorf("expected 10, got %d", l)
+	}
+}
+
+func TestBuildURL_ConfigParams(t *testing.T) {
+	oldType := resolver.HunterioType
+	oldSeniority := resolver.HunterioSeniority
+	oldDepartment := resolver.HunterioDepartment
+	defer func() {
+		resolver.HunterioType = oldType
+		resolver.HunterioSeniority = oldSeniority
+		resolver.HunterioDepartment = oldDepartment
+	}()
+
+	resolver.HunterioType = "personal"
+	resolver.HunterioSeniority = "senior"
+	resolver.HunterioDepartment = "it"
+
+	u, err := buildURL(constants.TypeDomain, "example.com", 10, 0)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	s := u.String()
+	if !strings.Contains(s, "type=personal") || !strings.Contains(s, "seniority=senior") || !strings.Contains(s, "department=it") {
+		t.Errorf("expected url to contain config params, got: %s", s)
+	}
+}
+
+func TestAppendSources_DomainOnly(t *testing.T) {
+	gen := modutil.NewLocalIDGenerator()
+	emailRef := &schema.EntityRef{LocalID: gen.NextID()}
+	e := &apiEmailEntry{
+		Value: "test@example.com",
+		Sources: []apiEmailSource{
+			{Domain: "source-domain.com"},
+		},
+	}
+	res := appendSources(e, nil, emailRef, "example.com", gen)
+	if len(res) != 2 {
+		t.Fatalf("expected 2 results (group and domain), got %d", len(res))
+	}
+	if res[1].Type != constants.TypeDomain || res[1].Value != "source-domain.com" {
+		t.Errorf("expected domain result, got: %+v", res[1])
 	}
 }

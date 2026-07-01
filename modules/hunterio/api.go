@@ -20,7 +20,10 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-var hunterioAPIBaseURL = "https://api.hunter.io/v2"
+var (
+	hunterioAPIBaseURL  = "https://api.hunter.io/v2"
+	httpClientTransport = http.DefaultTransport
+)
 
 // apiAccountResponse maps to the /v2/account endpoint response.
 type apiAccountResponse struct {
@@ -100,7 +103,10 @@ func (m *module) handlePreflightAPI(ctx context.Context) {
 	req.Header.Set("User-Agent", resolver.GetRandomUserAgent())
 	req.Header.Set("X-API-Key", m.apiKey)
 
-	client := &http.Client{Timeout: resolver.HTTPTimeout}
+	client := &http.Client{
+		Timeout:   resolver.HTTPTimeout,
+		Transport: httpClientTransport,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		dlog.Printf("%s error stage=preflight_do_request err=%v", constants.FuncGetHunterioDomainSearch, err)
@@ -410,7 +416,10 @@ func (m *module) doPageRequest(ctx context.Context, u string) (respBody []byte, 
 		req.Header.Set("User-Agent", resolver.GetRandomUserAgent())
 		req.Header.Set("X-API-Key", m.apiKey)
 
-		client := &http.Client{Timeout: resolver.HTTPTimeout}
+		client := &http.Client{
+			Timeout:   resolver.HTTPTimeout,
+			Transport: httpClientTransport,
+		}
 		resp, err := client.Do(req)
 		if err != nil {
 			dlog.Printf("%s error stage=do_request attempt=%d err=%v", constants.FuncGetHunterioDomainSearch, attempt+1, err)
@@ -438,6 +447,7 @@ func (m *module) doPageRequest(ctx context.Context, u string) (respBody []byte, 
 			time.Sleep(resolver.RetryBaseDelay * time.Duration(attempt+1))
 			continue
 		}
+		attemptErr = nil
 		break
 	}
 	return respBody, statusCode, attemptErr
