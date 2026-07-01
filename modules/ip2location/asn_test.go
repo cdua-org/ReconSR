@@ -40,3 +40,26 @@ func TestGetIPASN_Error(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
+
+func TestGetIPASN_Empty(t *testing.T) {
+	asnQueryFunc = func(_, _ string) (*ip2location.IP2Locationrecord, error) {
+		return &ip2location.IP2Locationrecord{
+			Asn:       "-",
+			As:        "-",
+			Ascidr:    "This parameter is unavailable for selected data file. Please upgrade the data file.",
+			Usagetype: "-",
+			Domain:    "-",
+		}, nil
+	}
+	defer func() { asnQueryFunc = defaultASNQuery }()
+
+	exec := getIPASN("192.0.2.1", "dummy.bin")
+
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %v", *exec.Error)
+	}
+
+	if len(exec.Results) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(exec.Results))
+	}
+}

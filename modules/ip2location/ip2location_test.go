@@ -1,6 +1,8 @@
 package ip2location
 
 import (
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ip2location/ip2location-go/v9"
@@ -189,4 +191,175 @@ func TestModule_LocalIDChaining_Proxy(t *testing.T) {
 	}
 
 	requireUniqueLocalIDs(t, exec.Results)
+}
+
+func TestModule_Capabilities_Empty(t *testing.T) {
+	m := &module{
+		geoDBPath:   "",
+		asnDBPath:   "",
+		proxyDBPath: "",
+	}
+	caps, err := m.Capabilities()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(caps.Functions) != 0 || len(caps.CustomFunctions) != 0 {
+		t.Errorf("expected empty capabilities, got %+v", caps)
+	}
+}
+
+func TestModule_Exec(t *testing.T) {
+	m := &module{
+		geoDBPath:   "dummy_geo",
+		asnDBPath:   "dummy_asn",
+		proxyDBPath: "dummy_proxy",
+	}
+	input := schema.ModuleInput{
+		Target: schema.Entity{Value: "192.0.2.1"},
+		Functions: []string{
+			constants.FuncGetGeoIP,
+			constants.FuncGetIPASN,
+			constants.FuncGetProxyCheck,
+			"unknown_func",
+		},
+	}
+	out, err := m.Exec(input)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(out.Executions) != 4 {
+		t.Fatalf("expected 4 executions, got %d", len(out.Executions))
+	}
+
+	for _, ex := range out.Executions {
+		if ex.Function == "unknown_func" {
+			if ex.Error == nil || !strings.Contains(*ex.Error, "unsupported function") {
+				t.Errorf("expected unsupported function error, got %+v", ex)
+			}
+		}
+	}
+
+	mEmpty := &module{}
+	outEmpty, errEmpty := mEmpty.Exec(input)
+	if errEmpty != nil {
+		t.Fatalf("expected no error for empty module, got %v", errEmpty)
+	}
+	if len(outEmpty.Executions) != 4 {
+		t.Fatalf("expected 4 executions for empty module, got %d", len(outEmpty.Executions))
+	}
+}
+
+func TestResolveDBPath(t *testing.T) {
+	originalCheck := checkFileExists
+	defer func() { checkFileExists = originalCheck }()
+
+	checkFileExists = func(path string) bool {
+		return strings.HasSuffix(path, "LITE.BIN")
+	}
+	res := resolveDBPath("PREMIUM.BIN", "LITE.BIN")
+	if !strings.HasSuffix(res, "LITE.BIN") {
+		t.Errorf("expected lite path, got %q", res)
+	}
+
+	checkFileExists = func(_ string) bool {
+		return false
+	}
+	res = resolveDBPath("PREMIUM.BIN", "LITE.BIN")
+	if res != "" {
+		t.Errorf("expected empty path, got %q", res)
+	}
+}
+
+func TestParseUsageType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"-", "-"},
+		{"This parameter is unavailable XYZ", "This parameter is unavailable XYZ"},
+		{"COM", "Commercial"},
+		{"COM/UNKNOWN", "Commercial / UNKNOWN"},
+		{"UNKNOWN", "UNKNOWN"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			res := ParseUsageType(tt.input)
+			if res != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, res)
+			}
+		})
+	}
+}
+
+func TestCheckFileExistsImpl(t *testing.T) {
+	// Should exist (this test file itself)
+	if !checkFileExistsImpl("ip2location_test.go") {
+		t.Errorf("expected ip2location_test.go to exist")
+	}
+
+	// Should not exist
+	if checkFileExistsImpl("this_file_does_not_exist_12345.bin") {
+		t.Errorf("expected file not to exist")
+	}
+}
+
+func TestDefaultQueryImpls_Error(t *testing.T) {
+	_, err := defaultGeoQueryImpl("dummy_non_existent.bin", "1.2.3.4")
+	if err == nil {
+		t.Errorf("expected error from defaultGeoQueryImpl, got nil")
+	}
+
+	_, err = defaultASNQueryImpl("dummy_non_existent.bin", "1.2.3.4")
+	if err == nil {
+		t.Errorf("expected error from defaultASNQueryImpl, got nil")
+	}
+
+	_, err = defaultProxyQueryImpl("dummy_non_existent.bin", "1.2.3.4")
+	if err == nil {
+		t.Errorf("expected error from defaultProxyQueryImpl, got nil")
+	}
+}
+
+func TestDefaultQueryImpls_Success(t *testing.T) {
+	geoOnce = sync.Once{}
+	asnOnce = sync.Once{}
+	proxyOnce = sync.Once{}
+
+	_, err := defaultGeoQueryImpl("testdata/geo.bin", "192.0.2.1")
+	if err != nil {
+		t.Errorf("unexpected error from defaultGeoQueryImpl: %v", err)
+	}
+
+	_, err = defaultASNQueryImpl("testdata/asn.bin", "192.0.2.1")
+	if err != nil {
+		t.Errorf("unexpected error from defaultASNQueryImpl: %v", err)
+	}
+
+	_, err = defaultProxyQueryImpl("testdata/proxy.bin", "192.0.2.1")
+	if err != nil {
+		t.Errorf("unexpected error from defaultProxyQueryImpl: %v", err)
+	}
+
+	// Test Get_all error path by closing the database and querying again.
+	geoDB.Close()
+	_, err = defaultGeoQueryImpl("testdata/geo.bin", "192.0.2.1")
+	if err == nil {
+		t.Errorf("expected error from defaultGeoQueryImpl with closed DB")
+	}
+
+	asnDB.Close()
+	_, err = defaultASNQueryImpl("testdata/asn.bin", "192.0.2.1")
+	if err == nil {
+		t.Errorf("expected error from defaultASNQueryImpl with closed DB")
+	}
+
+	err = proxyDB.Close()
+	if err != nil {
+		t.Errorf("failed to close proxy DB: %v", err)
+	}
+	_, err = defaultProxyQueryImpl("testdata/proxy.bin", "192.0.2.1")
+	if err == nil {
+		t.Errorf("expected error from defaultProxyQueryImpl with closed DB")
+	}
 }

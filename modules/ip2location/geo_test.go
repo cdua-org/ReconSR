@@ -64,3 +64,22 @@ func TestGetGeoIP_Error(t *testing.T) {
 		t.Fatalf("expected 0 results, got %d", len(exec.Results))
 	}
 }
+
+func TestGetGeoIP_MobileNetworkOnly(t *testing.T) {
+	geoQueryFunc = func(_, _ string) (*ip2location.IP2Locationrecord, error) {
+		return &ip2location.IP2Locationrecord{
+			Mobilebrand: "-",
+			Mcc:         "123",
+			Mnc:         "45",
+		}, nil
+	}
+	defer func() { geoQueryFunc = defaultGeoQuery }()
+
+	exec := getGeoIP("192.0.2.2", "dummy.bin")
+
+	if exec.Error != nil {
+		t.Fatalf("unexpected error: %v", *exec.Error)
+	}
+
+	requireResultWithContext(t, exec.Results, constants.TypeInfo, "MCC: 123, MNC: 45", "Mobile Network")
+}

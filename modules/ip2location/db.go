@@ -25,7 +25,7 @@ var (
 	errProxyDB error
 )
 
-var defaultGeoQuery = func(dbPath, ip string) (*ip2location.IP2Locationrecord, error) {
+func defaultGeoQueryImpl(dbPath, ip string) (*ip2location.IP2Locationrecord, error) {
 	geoOnce.Do(func() {
 		geoDB, errGeoDB = ip2location.OpenDB(dbPath)
 	})
@@ -39,7 +39,7 @@ var defaultGeoQuery = func(dbPath, ip string) (*ip2location.IP2Locationrecord, e
 	return &res, nil
 }
 
-var defaultASNQuery = func(dbPath, ip string) (*ip2location.IP2Locationrecord, error) {
+func defaultASNQueryImpl(dbPath, ip string) (*ip2location.IP2Locationrecord, error) {
 	asnOnce.Do(func() {
 		asnDB, errAsnDB = ip2location.OpenDB(dbPath)
 	})
@@ -53,7 +53,7 @@ var defaultASNQuery = func(dbPath, ip string) (*ip2location.IP2Locationrecord, e
 	return &res, nil
 }
 
-var defaultProxyQuery = func(dbPath, ip string) (*ip2proxy.IP2ProxyRecord, error) {
+func defaultProxyQueryImpl(dbPath, ip string) (*ip2proxy.IP2ProxyRecord, error) {
 	proxyOnce.Do(func() {
 		proxyDB, errProxyDB = ip2proxy.OpenDB(dbPath)
 	})
@@ -68,6 +68,12 @@ var defaultProxyQuery = func(dbPath, ip string) (*ip2proxy.IP2ProxyRecord, error
 }
 
 var (
+	defaultGeoQuery   = defaultGeoQueryImpl
+	defaultASNQuery   = defaultASNQueryImpl
+	defaultProxyQuery = defaultProxyQueryImpl
+)
+
+var (
 	geoQueryFunc   = defaultGeoQuery
 	asnQueryFunc   = defaultASNQuery
 	proxyQueryFunc = defaultProxyQuery
@@ -75,10 +81,12 @@ var (
 
 var dataDir = filepath.Join("data", "ip2location")
 
-var checkFileExists = func(path string) bool {
+func checkFileExistsImpl(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
+var checkFileExists = checkFileExistsImpl
 
 func resolveDBPath(premium, lite string) string {
 	premiumPath := filepath.Join(dataDir, premium)
@@ -108,22 +116,53 @@ func isUnavailableFloat(val float32) bool {
 	return val == 0.0
 }
 
+const (
+	netTypeCOM    = "COM"
+	netTypeORG    = "ORG"
+	netTypeGOV    = "GOV"
+	netTypeMIL    = "MIL"
+	netTypeEDU    = "EDU"
+	netTypeLIB    = "LIB"
+	netTypeCDN    = "CDN"
+	netTypeISP    = "ISP"
+	netTypeMOB    = "MOB"
+	netTypeISPMOB = "ISP/MOB"
+	netTypeDCH    = "DCH"
+	netTypeSES    = "SES"
+	netTypeAIC    = "AIC"
+	netTypeSESAIC = "SES/AIC"
+	netTypeRSV    = "RSV"
+
+	netTypeVPN = "VPN"
+	netTypeTOR = "TOR"
+	netTypePUB = "PUB"
+	netTypeWEB = "WEB"
+	netTypeRES = "RES"
+	netTypeCPN = "CPN"
+	netTypeEPN = "EPN"
+
+	threatScanner = "SCANNER"
+	threatBotnet  = "BOTNET"
+	threatSpam    = "SPAM"
+	threatBogon   = "BOGON"
+)
+
 var usageTypeMap = map[string]string{
-	"COM":     "Commercial",
-	"ORG":     "Organization",
-	"GOV":     "Government",
-	"MIL":     "Military",
-	"EDU":     "University/College/School",
-	"LIB":     "Library",
-	"CDN":     "Content Delivery Network",
-	"ISP":     "Fixed Line ISP",
-	"MOB":     "Mobile ISP",
-	"ISP/MOB": "Fixed Line or Mobile ISP",
-	"DCH":     "Data Center/Web Hosting/Transit",
-	"SES":     "Search Engine Spider",
-	"AIC":     "AI Crawlers",
-	"SES/AIC": "Search Engine Spider/AI Crawlers",
-	"RSV":     "Reserved",
+	netTypeCOM:    "Commercial",
+	netTypeORG:    "Organization",
+	netTypeGOV:    "Government",
+	netTypeMIL:    "Military",
+	netTypeEDU:    "University/College/School",
+	netTypeLIB:    "Library",
+	netTypeCDN:    "Content Delivery Network",
+	netTypeISP:    "Fixed Line ISP",
+	netTypeMOB:    "Mobile ISP",
+	netTypeISPMOB: "Fixed Line or Mobile ISP",
+	netTypeDCH:    "Data Center/Web Hosting/Transit",
+	netTypeSES:    "Search Engine Spider",
+	netTypeAIC:    "AI Crawlers",
+	netTypeSESAIC: "Search Engine Spider/AI Crawlers",
+	netTypeRSV:    "Reserved",
 }
 
 // ParseUsageType expands IP2Location abbreviations into human-readable strings.

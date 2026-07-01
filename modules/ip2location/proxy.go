@@ -118,21 +118,21 @@ func getProxyCheck(target, dbPath string) schema.ModuleExecution {
 
 func mapProxyTypeToTag(proxyType string) string {
 	switch proxyType {
-	case "VPN":
+	case netTypeVPN:
 		return constants.TagVPN
-	case "TOR":
+	case netTypeTOR:
 		return constants.TagTorExit
-	case "PUB", "WEB":
+	case netTypePUB, netTypeWEB:
 		return constants.TagProxy
-	case "DCH":
+	case netTypeDCH:
 		return constants.TagDataCenter
-	case "SES":
+	case netTypeSES:
 		return constants.TagCrawler
-	case "AIC":
+	case netTypeAIC:
 		return constants.TagAICrawler
-	case "RES":
+	case netTypeRES:
 		return constants.TagResidentialProxy
-	case "CPN", "EPN":
+	case netTypeCPN, netTypeEPN:
 		return constants.TagPrivacyNetwork
 	default:
 		return strings.ToLower(proxyType)
@@ -141,13 +141,13 @@ func mapProxyTypeToTag(proxyType string) string {
 
 func mapThreatToTag(threat string) string {
 	switch threat {
-	case "SCANNER":
+	case threatScanner:
 		return constants.TagScanner
-	case "BOTNET":
+	case threatBotnet:
 		return constants.TagSpamBotnet
-	case "SPAM":
+	case threatSpam:
 		return constants.TagSpam
-	case "BOGON":
+	case threatBogon:
 		return constants.TagBogon
 	default:
 		return strings.ToLower(threat)
