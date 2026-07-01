@@ -3,6 +3,7 @@ package preflightcheck
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -537,6 +538,15 @@ func TestDoPreFlightCheck_AllSOAFail(t *testing.T) {
 	origTimeout := resolver.PreflightTimeout
 	resolver.PreflightTimeout = 100 * time.Millisecond
 	defer func() { resolver.PreflightTimeout = origTimeout }()
+
+	origDial := dialUDP
+	defer func() { dialUDP = origDial }()
+	dialUDP = func(network string, laddr, raddr *net.UDPAddr) (net.Conn, error) {
+		if raddr != nil && raddr.Port == 53 {
+			return nil, errors.New("mock SOA failure")
+		}
+		return origDial(network, laddr, raddr)
+	}
 
 	domainChecks = sync.Map{}
 	dnsQueryCache = sync.Map{}

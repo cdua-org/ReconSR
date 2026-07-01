@@ -3,7 +3,9 @@ package preflightcheck
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"testing"
@@ -500,5 +502,92 @@ func TestRcodeToString(t *testing.T) {
 				t.Errorf("rcodeToString(%d) = %q; want %q", tc.rcode, actual, tc.expected)
 			}
 		})
+	}
+}
+
+type mockUDPConn struct {
+	net.Conn
+	closeErr    error
+	deadlineErr error
+	writeErr    error
+	readErr     error
+	readData    []byte
+}
+
+func (m *mockUDPConn) Close() error {
+	return m.closeErr
+}
+
+func (m *mockUDPConn) SetDeadline(_ time.Time) error {
+	return m.deadlineErr
+}
+
+func (m *mockUDPConn) Write(b []byte) (int, error) {
+	if m.writeErr != nil {
+		return 0, m.writeErr
+	}
+	return len(b), nil
+}
+
+func (m *mockUDPConn) Read(b []byte) (int, error) {
+	if m.readErr != nil {
+		return 0, m.readErr
+	}
+	n := copy(b, m.readData)
+	return n, nil
+}
+
+func TestPerformDirectSOAQuery_MockErrors(t *testing.T) {
+	origDial := dialUDP
+	defer func() { dialUDP = origDial }()
+
+	t.Run("dial error", func(t *testing.T) {
+		dialUDP = func(_ string, _, _ *net.UDPAddr) (net.Conn, error) {
+			return nil, errors.New("mock dial err")
+		}
+		_, err := performDirectSOAQuery(context.Background(), "example.com", "ns.example.com", "127.0.0.1:53")
+		if err == nil || !strings.Contains(err.Error(), "mock dial err") {
+			t.Errorf("expected dial error, got %v", err)
+		}
+	})
+
+	t.Run("setdeadline error", func(t *testing.T) {
+		dialUDP = func(_ string, _, _ *net.UDPAddr) (net.Conn, error) {
+			return &mockUDPConn{deadlineErr: errors.New("mock deadline err")}, nil
+		}
+		_, err := performDirectSOAQuery(context.Background(), "example.com", "ns.example.com", "127.0.0.1:53")
+		if err == nil || !strings.Contains(err.Error(), "mock deadline err") {
+			t.Errorf("expected deadline error, got %v", err)
+		}
+	})
+
+	t.Run("close error", func(t *testing.T) {
+		dialUDP = func(_ string, _, _ *net.UDPAddr) (net.Conn, error) {
+			return &mockUDPConn{
+				closeErr: errors.New("mock close err"),
+				readErr:  errors.New("mock read err"),
+			}, nil
+		}
+		_, err := performDirectSOAQuery(context.Background(), "example.com", "ns.example.com", "127.0.0.1:53")
+		if err == nil {
+			t.Errorf("expected read error, got nil")
+		}
+	})
+
+	t.Run("write error", func(t *testing.T) {
+		dialUDP = func(_ string, _, _ *net.UDPAddr) (net.Conn, error) {
+			return &mockUDPConn{writeErr: errors.New("mock write err")}, nil
+		}
+		_, err := performDirectSOAQuery(context.Background(), "example.com", "ns.example.com", "127.0.0.1:53")
+		if err == nil || !strings.Contains(err.Error(), "mock write err") {
+			t.Errorf("expected write error, got %v", err)
+		}
+	})
+}
+
+func TestDefaultDialUDP_Error(t *testing.T) {
+	_, err := defaultDialUDP("invalid_network", nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 53})
+	if err == nil {
+		t.Errorf("expected error from defaultDialUDP, got nil")
 	}
 }

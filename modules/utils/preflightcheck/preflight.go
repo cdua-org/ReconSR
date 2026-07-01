@@ -23,6 +23,19 @@ import (
 
 var log = debuglog.New("preflight")
 
+func defaultDialUDP(network string, laddr, raddr *net.UDPAddr) (net.Conn, error) {
+	conn, err := net.DialUDP(network, laddr, raddr)
+	if err != nil {
+		return nil, fmt.Errorf("dial udp: %w", err)
+	}
+	return conn, nil
+}
+
+var (
+	dialUDP = defaultDialUDP
+	timeNow = time.Now
+)
+
 var dnsQueryCache sync.Map
 
 // domainChecks implements singleflight: concurrent PreFlightCheck calls for the
@@ -309,7 +322,7 @@ func performDirectSOAQuery(_ context.Context, target, nsHost, nsIP string) (uint
 		return 0, fmt.Errorf("invalid IP address: %s", host)
 	}
 
-	conn, err := net.DialUDP("udp4", nil, &net.UDPAddr{
+	conn, err := dialUDP("udp4", nil, &net.UDPAddr{
 		IP:   ip,
 		Port: port,
 	})
@@ -322,7 +335,7 @@ func performDirectSOAQuery(_ context.Context, target, nsHost, nsIP string) (uint
 		}
 	}()
 
-	if deadlineErr := conn.SetDeadline(time.Now().Add(resolver.PreflightTimeout)); deadlineErr != nil {
+	if deadlineErr := conn.SetDeadline(timeNow().Add(resolver.PreflightTimeout)); deadlineErr != nil {
 		return 0, fmt.Errorf("failed to set deadline: %w", deadlineErr)
 	}
 
@@ -359,7 +372,7 @@ func buildDNSQuery(domain string) []byte {
 	var packet [dnsMaxPacketLen]byte
 	offset := 0
 
-	binary.BigEndian.PutUint16(packet[offset:], uint16(time.Now().UnixNano()&0xFFFF))
+	binary.BigEndian.PutUint16(packet[offset:], uint16(timeNow().UnixNano()&0xFFFF))
 	offset += 2
 
 	flags := uint16(0x0100)
@@ -438,6 +451,6 @@ func loadFromCache(key cacheKey) (cacheValue, bool) {
 func storeInCache(key cacheKey, rcode uint8) {
 	dnsQueryCache.Store(key, cacheValue{
 		rcode:     rcode,
-		timestamp: time.Now(),
+		timestamp: timeNow(),
 	})
 }
