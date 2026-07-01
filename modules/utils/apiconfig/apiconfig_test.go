@@ -89,6 +89,32 @@ func TestGetKey(t *testing.T) {
 			expectedKey:  "env_key_only",
 			expectedFile: true,
 		},
+		{
+			name: "MkdirAll error triggers fallback to default config",
+			setupMock: func(mockPath string) {
+				invalidDir := filepath.Join(filepath.Dir(mockPath), "invalid_dir")
+				if err := os.WriteFile(invalidDir, []byte("not a dir"), 0o600); err != nil {
+					t.Fatalf("failed to write invalid dir file: %v", err)
+				}
+				resetForTest(filepath.Join(invalidDir, "keys.txt"))
+			},
+			serviceName:  "HackerTarget",
+			expectedKey:  "",
+			expectedFile: false,
+		},
+		{
+			name: "WriteFile error triggers fallback and stderr output",
+			setupMock: func(mockPath string) {
+				readOnlyDir := filepath.Join(filepath.Dir(mockPath), "readonly")
+				if err := os.MkdirAll(readOnlyDir, 0o500); err != nil {
+					t.Fatalf("failed to mkdir read-only: %v", err)
+				}
+				resetForTest(filepath.Join(readOnlyDir, "keys.txt"))
+			},
+			serviceName:  "VirusTotal",
+			expectedKey:  "",
+			expectedFile: false,
+		},
 	}
 
 	for _, tt := range tests {
