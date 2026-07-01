@@ -12,66 +12,6 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-var mockGeoRecord = &ip2location.IP2Locationrecord{
-	Country_short: "EX",
-	Country_long:  "Exampleland",
-	Region:        "Exampleshire",
-	City:          "Exampleville",
-	Latitude:      51.509865,
-	Longitude:     -0.118092,
-	Zipcode:       "EX1 2AB",
-	Timezone:      "+00:00",
-	Isp:           "Example ISP Ltd",
-	Domain:        "example.net",
-	Netspeed:      "DSL",
-	Iddcode:       "44",
-	Areacode:      "020",
-	Mcc:           "234",
-	Mnc:           "15",
-	Mobilebrand:   "Example Telecom",
-	Elevation:     15,
-	Usagetype:     "ISP/MOB",
-	Addresstype:   "U",
-	Category:      "IAB19",
-	District:      "Example District",
-}
-
-var mockGeoRecordLite = &ip2location.IP2Locationrecord{
-	Country_short: "-",
-	Country_long:  "This parameter is unavailable for selected data file. Please upgrade the data file.",
-	Region:        "-",
-	City:          "This parameter is unavailable",
-	Latitude:      0.0,
-	Longitude:     0.0,
-	Elevation:     0.0,
-}
-
-var mockASNRecord = &ip2location.IP2Locationrecord{
-	Asn:         "12345",
-	As:          "Example Org",
-	Asdomain:    "example.org",
-	Asusagetype: "ORG",
-	Ascidr:      "192.0.2.0/24",
-}
-
-var mockProxyRecord = &ip2proxy.IP2ProxyRecord{
-	IsProxy:      1,
-	ProxyType:    "VPN",
-	Threat:       "SCANNER/SPAM",
-	FraudScore:   "99",
-	LastSeen:     "14",
-	Provider:     "Example VPN Provider",
-	CountryShort: "EX",
-	CountryLong:  "Exampleland",
-	Region:       "Exampleshire",
-	City:         "Exampleville",
-	Isp:          "Example ISP Ltd",
-	Domain:       "example.net",
-	UsageType:    "EDU",
-	Asn:          "AS12345",
-	As:           "Example Hosting",
-}
-
 func requireModuleResult(t *testing.T, results []schema.ModuleResult, resType, expectedValue string) {
 	t.Helper()
 	for _, r := range results {
@@ -293,12 +233,10 @@ func TestParseUsageType(t *testing.T) {
 }
 
 func TestCheckFileExistsImpl(t *testing.T) {
-	// Should exist (this test file itself)
 	if !checkFileExistsImpl("ip2location_test.go") {
 		t.Errorf("expected ip2location_test.go to exist")
 	}
 
-	// Should not exist
 	if checkFileExistsImpl("this_file_does_not_exist_12345.bin") {
 		t.Errorf("expected file not to exist")
 	}
@@ -341,7 +279,6 @@ func TestDefaultQueryImpls_Success(t *testing.T) {
 		t.Errorf("unexpected error from defaultProxyQueryImpl: %v", err)
 	}
 
-	// Test Get_all error path by closing the database and querying again.
 	geoDB.Close()
 	_, err = defaultGeoQueryImpl("testdata/geo.bin", "192.0.2.1")
 	if err == nil {
