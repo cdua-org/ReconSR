@@ -60,6 +60,8 @@ type reportTemplateData struct {
 	RawDataRegistryJSON string
 	AllProperties       string
 	InitialTargetID     int64
+	RootType            string
+	RootSubtypes        []string
 }
 
 func sanitizePath(name string) string {
@@ -165,7 +167,10 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 	rawDataCounter := int64(1)
 
 	asInt := func(s string) int64 {
-		i, _ := strconv.ParseInt(s, 10, 64)
+		i, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return 0
+		}
 		return i
 	}
 
@@ -454,9 +459,13 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 	}
 
 	var initialTargetID int64
+	var rootType string
+	var rootSubtypes []string
 	for id, n := range graph.Nodes {
 		if n.Value == graph.InitialTarget && n.Category != "property" {
 			initialTargetID = asInt(id)
+			rootType = n.Type
+			rootSubtypes = n.Subtypes
 			break
 		}
 	}
@@ -470,7 +479,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		Subtypes map[string]int
 	}
 
-	graphNodes := make([]interface{}, 0, len(nodesMap))
+	graphNodes := make([]any, 0, len(nodesMap))
 	statsMap := make(map[string]*typeStats)
 	outOfScopeCount := 0
 	limitReachedCount := 0
@@ -565,6 +574,8 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 		RawDataRegistryJSON: string(rawDataJSON),
 		AllProperties:       string(allPropsJSON),
 		InitialTargetID:     initialTargetID,
+		RootType:            rootType,
+		RootSubtypes:        rootSubtypes,
 	}
 
 	f, err := root.Create(relPath)
