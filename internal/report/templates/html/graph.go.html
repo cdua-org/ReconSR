@@ -3183,7 +3183,10 @@
                                     viewStart = viewMinTime;
                                     viewEnd = viewMaxTime;
                                     clampView();
+                                    currentSliderTime = maxTime;
+                                    timeDisplay.innerText = formatDateTime(currentSliderTime);
                                     drawTimeline();
+                                    applyTimeFilter();
                                 }
                                 function stepNext() {
                                     const nextTime = uniqueTimes.find(t => t > currentSliderTime);
@@ -5463,6 +5466,21 @@
                 nodeFontUpdates.push({ id: n.id, font: { size: 16 } });
             });
             if (nodeFontUpdates.length > 0) nodes.update(nodeFontUpdates);
+
+            if (typeof maxTime !== 'undefined') {
+                currentSliderTime = maxTime;
+            }
+            if (typeof viewMinTime !== 'undefined' && typeof viewMaxTime !== 'undefined') {
+                viewStart = viewMinTime;
+                viewEnd = viewMaxTime;
+                if (typeof clampView === 'function') clampView();
+            }
+            if (typeof timeDisplay !== 'undefined' && timeDisplay && typeof formatDateTime === 'function') {
+                timeDisplay.innerText = formatDateTime(currentSliderTime);
+            }
+            if (typeof drawTimeline === 'function') {
+                drawTimeline();
+            }
 
             applyTimeFilter();
             syncAllLabelButtons();
