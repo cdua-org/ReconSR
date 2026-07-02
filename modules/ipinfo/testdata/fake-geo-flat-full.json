@@ -1,0 +1,9 @@
+{
+  "ip": "192.0.2.15",
+  "city": "FlatCity",
+  "region": "FlatRegion",
+  "country_code": "ZZ",
+  "loc": "1.11,2.22",
+  "postal": "54321",
+  "timezone": "Flat/Zone"
+}

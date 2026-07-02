@@ -15,12 +15,14 @@ var demoData embed.FS
 const defaultDemoIP = "203.0.113.30"
 const defaultDemoFixture = "fake-max-dirty.json"
 
+var readDemoFile = demoData.ReadFile
+
 func (m *module) processCheckDemo(exec *schema.ModuleExecution, targetValue string, gen *modutil.LocalIDGenerator) {
 	dbg.Printf("%s demo target=%q", constants.FuncGetIPInfo, targetValue)
 
 	fileName := defaultDemoFixture
 
-	content, err := demoData.ReadFile("testdata/" + fileName)
+	content, err := readDemoFile("testdata/" + fileName)
 	if err != nil {
 		modutil.SetError(exec, "read testdata: %v", err)
 		return
