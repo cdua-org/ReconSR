@@ -31,14 +31,14 @@ func TestBuildRDAPURL(t *testing.T) {
 	if ianaRDAPServers == nil {
 		ianaRDAPServers = make(map[string]string)
 	}
-	ianaRDAPServers["mocktld"] = "https://rdap.mock.example/"
+	ianaRDAPServers["example"] = "https://rdap.mock.example/"
 
 	tests := []struct {
 		domain   string
 		expected string
 	}{
 		{"test.de", "https://rdap.denic.de/domain/test.de"},
-		{"test.mocktld", "https://rdap.mock.example/domain/test.mocktld"},
+		{"rdaptest.example", "https://rdap.mock.example/domain/rdaptest.example"},
 		{"test.unknown", "https://rdap.org/domain/test.unknown"},
 	}
 

@@ -34,13 +34,15 @@ func initRDAPServers() {
 	})
 }
 
+var newRequestWithContext = http.NewRequestWithContext
+
 func fetchIANABootstrap() []serviceEntry {
 	client := &http.Client{Timeout: resolver.HTTPTimeout}
 
 	ctx, cancel := context.WithTimeout(context.Background(), resolver.Timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://data.iana.org/rdap/dns.json", http.NoBody)
+	req, err := newRequestWithContext(ctx, http.MethodGet, "https://data.iana.org/rdap/dns.json", http.NoBody)
 	if err != nil {
 		return nil
 	}

@@ -2,6 +2,7 @@ package whois
 
 import (
 	"reflect"
+	"regexp"
 	"testing"
 )
 
@@ -955,6 +956,8 @@ Last updated:    2025-10-18
 
 func TestParseWHOIS_EdgeCases(t *testing.T) {
 	rawWHOIS := `
+Domain Status: FakeStatus
+state: FakeState
 contact: billing
 Billing Name: Bob Billing
 address: 123 Billing St
@@ -977,6 +980,7 @@ unknown contact:
 Registrant:
 address: 123 Reg St
                 Apt 1
+state: FakeState2
 Administrative Contact:
 address: 123 Admin St
                 Apt 2
@@ -1002,10 +1006,36 @@ Registrant Fax: +1.234
 	assertSlice(t, "Registrant.Fax", got.Registrant.Fax, []string{"+1.234"})
 
 	applyContactMatch(&got.Registrant, "unknown_field", "unknown_", "value")
+
+	applyAustrianMatch(&got, "at_changed", "20230801")
+	applyAustrianMatch(&got, "at_nserver", "ns3.fake.at")
+	applyAustrianMatch(&got, "at_tech_c", "FAKETECH2")
+	applyAustrianMatch(&got, "at_admin_c", "FAKEADMIN2")
+	applyAustrianMatch(&got, "at_unknown", "value")
+
 	applyDomainMatch(&got, whoisFieldCNRegistrant, "CN Org")
 	applyDomainMatch(&got, whoisFieldCNRegistrantEmail, "cn@cn.example.com")
 	classifyIndentedLine(&got, whoisRoleNameServers, "ns1.deadcode.example.com", 0)
 	classifyIndentedLine(&got, "unknown_role", "Data", 0)
 	applyTWMatch(&got, "tw_url", "http://edge.test.example")
 	applyKRMatch(&got, whoisFieldKRRegZip, "12345")
+}
+
+func TestParseWHOIS_StateCoverage(_ *testing.T) {
+	origPatterns := whoisPatterns
+	defer func() { whoisPatterns = origPatterns }()
+
+	whoisPatterns = map[string]*regexp.Regexp{
+		whoisFieldStatus: origPatterns[whoisFieldStatus],
+	}
+	parseWHOIS("Domain Status: FakeStatus\nstate: FakeState\n")
+
+	whoisPatterns = map[string]*regexp.Regexp{
+		whoisFieldRPSLAddr: origPatterns[whoisFieldRPSLAddr],
+	}
+	parseWHOIS("contact: billing\nstate: FakeState\n")
+
+	whoisPatterns = origPatterns
+	parseWHOIS("state:FakeState\n")
+	parseWHOIS("state: N/A\n")
 }

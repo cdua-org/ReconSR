@@ -1,3 +1,4 @@
+// Package whois provides parsing for WHOIS and RDAP responses.
 package whois
 
 import (
@@ -403,6 +404,16 @@ func queryRDAP(ctx context.Context, domain string) (map[string]any, error) {
 	return nil, lastErr
 }
 
+func defaultRDAPClientDo(client *http.Client, req *http.Request) (*http.Response, error) {
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http do: %w", err)
+	}
+	return resp, nil
+}
+
+var rdapClientDo = defaultRDAPClientDo
+
 func attemptRDAP(ctx context.Context, url string) (data map[string]any, retriable bool, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
@@ -419,7 +430,7 @@ func attemptRDAP(ctx context.Context, url string) (data map[string]any, retriabl
 		Timeout:   resolver.HTTPTimeout,
 	}
 
-	resp, err := client.Do(req)
+	resp, err := rdapClientDo(client, req)
 	if err != nil {
 		return nil, true, fmt.Errorf("rdap do request: %w", err)
 	}
@@ -484,9 +495,18 @@ func queryWHOIS(ctx context.Context, domain string) (string, error) {
 	return res, nil
 }
 
+func defaultDialContextFunc(ctx context.Context, network, address string) (net.Conn, error) {
+	conn, err := resolver.GetDialer().DialContext(ctx, network, address)
+	if err != nil {
+		return nil, fmt.Errorf("dial context: %w", err)
+	}
+	return conn, nil
+}
+
+var dialContextFunc = defaultDialContextFunc
+
 func dialWHOIS(ctx context.Context, server, query string) (string, error) {
 	query = formatWHOISQuery(server, query)
-	d := resolver.GetDialer()
 	var lastErr error
 
 	for attempt := 1; attempt <= resolver.MaxRetriesWhois; attempt++ {
@@ -494,7 +514,7 @@ func dialWHOIS(ctx context.Context, server, query string) (string, error) {
 			attemptCtx, cancel := context.WithTimeout(ctx, resolver.Timeout)
 			defer cancel()
 
-			conn, err := d.DialContext(attemptCtx, "tcp", net.JoinHostPort(server, whoisPort))
+			conn, err := dialContextFunc(attemptCtx, "tcp", net.JoinHostPort(server, whoisPort))
 			if err != nil {
 				return "", fmt.Errorf("dial error: %w", err)
 			}

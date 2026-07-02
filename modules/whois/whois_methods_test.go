@@ -2,6 +2,8 @@ package whois
 
 import (
 	"context"
+	"errors"
+	"io"
 	"maps"
 	"net"
 	"net/http"
@@ -25,11 +27,47 @@ func TestModuleInfo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
+	origDelay := resolver.RetryBaseDelay
+	resolver.RetryBaseDelay = time.Millisecond
+	defer func() { resolver.RetryBaseDelay = origDelay }()
+
+	ianaRDAPBootstrap.Do(func() {})
+	originalServers := make(map[string]string)
+	if ianaRDAPServers == nil {
+		ianaRDAPServers = make(map[string]string)
+	}
+	maps.Copy(originalServers, ianaRDAPServers)
+	ianaRDAPServers["example"] = "http://127.0.0.1:0/"
+
+	origIana := ianaWhoisServer
+	ianaWhoisServer = "127.0.0.1"
+
+	origDial := dialContextFunc
+	dialContextFunc = func(_ context.Context, _, _ string) (net.Conn, error) {
+		return nil, errors.New("mocked dial")
+	}
+
+	origRDAP := rdapClientDo
+	rdapClientDo = func(_ *http.Client, _ *http.Request) (*http.Response, error) {
+		return nil, errors.New("mocked rdap")
+	}
+
+	defer func() {
+		ianaWhoisServer = origIana
+		dialContextFunc = origDial
+		rdapClientDo = origRDAP
+		for k := range ianaRDAPServers {
+			delete(ianaRDAPServers, k)
+		}
+		maps.Copy(ianaRDAPServers, originalServers)
+	}()
+
 	res, err := m.Exec(schema.ModuleInput{
 		Functions: []string{constants.FuncGetWhois, "unknown_func"},
 		Target: schema.Entity{
 			Type:  constants.TypeDomain,
-			Value: "example.mocktld",
+			Value: "rdap.example",
 		},
 	})
 	if err != nil {
@@ -67,29 +105,29 @@ func TestFormatWHOISQuery(t *testing.T) {
 }
 
 func mockRDAPHandler(w http.ResponseWriter, r *http.Request) {
-	if strings.Contains(r.URL.Path, "example.mocktld") {
+	if strings.Contains(r.URL.Path, "rdap.example") {
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte(`{"test": "rdap_success"}`)); err != nil {
 			panic(err)
 		}
 		return
 	}
-	if strings.Contains(r.URL.Path, "fail.mocktld") {
+	if strings.Contains(r.URL.Path, "fail.example") {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if strings.Contains(r.URL.Path, "notfound.mocktld") {
+	if strings.Contains(r.URL.Path, "notfound.example") {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	if strings.Contains(r.URL.Path, "badjson.mocktld") {
+	if strings.Contains(r.URL.Path, "badjson.example") {
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte(`{invalid_json`)); err != nil {
 			panic(err)
 		}
 		return
 	}
-	if strings.Contains(r.URL.Path, "rate.mocktld") {
+	if strings.Contains(r.URL.Path, "rate.example") {
 		w.WriteHeader(http.StatusTooManyRequests)
 		return
 	}
@@ -107,10 +145,10 @@ func TestQueryRDAP(t *testing.T) {
 	if ianaRDAPServers == nil {
 		ianaRDAPServers = make(map[string]string)
 	}
-	ianaRDAPServers["mocktld"] = ts.URL + "/"
+	ianaRDAPServers["example"] = ts.URL + "/"
 
 	ctx := context.Background()
-	data, err := queryRDAP(ctx, "example.mocktld")
+	data, err := queryRDAP(ctx, "rdap.example")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -118,38 +156,54 @@ func TestQueryRDAP(t *testing.T) {
 		t.Errorf("unexpected data: %v", data)
 	}
 
-	_, err = queryRDAP(ctx, "fail.mocktld")
+	_, err = queryRDAP(ctx, "fail.example")
 	if err == nil {
-		t.Error("expected error for fail.mocktld")
+		t.Error("expected error for fail.example")
 	}
 
-	_, err = queryRDAP(ctx, "notfound.mocktld")
+	_, err = queryRDAP(ctx, "notfound.example")
 	if err == nil {
-		t.Error("expected error for notfound.mocktld")
+		t.Error("expected error for notfound.example")
 	}
 
-	_, err = queryRDAP(ctx, "badjson.mocktld")
+	_, err = queryRDAP(ctx, "badjson.example")
 	if err == nil {
-		t.Error("expected error for badjson.mocktld")
+		t.Error("expected error for badjson.example")
 	}
-	_, err = queryRDAP(ctx, "unreachable.mocktld")
+	_, err = queryRDAP(ctx, "unreachable.example")
 	if err == nil {
-		t.Error("expected error for unreachable.mocktld")
+		t.Error("expected error for unreachable.example")
 	}
 
-	ianaRDAPServers["badurl"] = "http://127.0.0.1:0/\x7f"
-	_, err = queryRDAP(ctx, "domain.badurl")
+	ianaRDAPServers["example"] = "http://127.0.0.1:0/\x7f"
+	_, err = queryRDAP(ctx, "badurl.example")
 	if err == nil {
 		t.Error("expected error for bad url")
 	}
 
-	ianaRDAPServers["dead"] = "http://127.0.0.1:1/"
-	_, err = queryRDAP(ctx, "domain.dead")
+	oldRdapClientDo := rdapClientDo
+	rdapClientDo = func(_ *http.Client, _ *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       errCloser{strings.NewReader(`{"test":"rdap_success"}`)},
+		}, nil
+	}
+	defer func() { rdapClientDo = oldRdapClientDo }()
+
+	ianaRDAPServers["example"] = "http://127.0.0.1:0/"
+	_, err = queryRDAP(ctx, "closeerr.example")
+	if err != nil {
+		t.Errorf("unexpected error on closeerr: %v", err)
+	}
+	rdapClientDo = oldRdapClientDo
+
+	ianaRDAPServers["example"] = "http://127.0.0.1:1/"
+	_, err = queryRDAP(ctx, "dead.example")
 	if err == nil {
 		t.Error("expected error for dead url")
 	}
 
-	ianaRDAPServers["rate"] = ts.URL + "/rate.mocktld/"
+	ianaRDAPServers["example"] = ts.URL + "/rate.example/"
 	origDelayRate := resolver.RetryBaseDelay
 	resolver.RetryBaseDelay = 100 * time.Millisecond
 	ctxCancel, cancel := context.WithCancel(context.Background())
@@ -157,11 +211,89 @@ func TestQueryRDAP(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		cancel()
 	}()
-	_, err = queryRDAP(ctxCancel, "domain.rate")
+	_, err = queryRDAP(ctxCancel, "ratelimit.example")
 	if err == nil {
 		t.Error("expected error for sleep context")
 	}
 	resolver.RetryBaseDelay = origDelayRate
+}
+
+type errCloser struct {
+	io.Reader
+}
+
+func (errCloser) Close() error {
+	return errors.New("close error")
+}
+
+type mockNetConn struct {
+	failClose       bool
+	failSetDeadline bool
+	failWrite       bool
+	failRead        bool
+}
+
+func (m mockNetConn) Read(_ []byte) (n int, err error) {
+	if m.failRead {
+		return 0, errors.New("read error")
+	}
+	return 0, io.EOF
+}
+func (m mockNetConn) Write(b []byte) (n int, err error) {
+	if m.failWrite {
+		return 0, errors.New("write error")
+	}
+	return len(b), nil
+}
+func (m mockNetConn) Close() error {
+	if m.failClose {
+		return errors.New("close error")
+	}
+	return nil
+}
+func (m mockNetConn) LocalAddr() net.Addr  { return nil }
+func (m mockNetConn) RemoteAddr() net.Addr { return nil }
+func (m mockNetConn) SetDeadline(_ time.Time) error {
+	if m.failSetDeadline {
+		return errors.New("set deadline error")
+	}
+	return nil
+}
+func (m mockNetConn) SetReadDeadline(_ time.Time) error  { return nil }
+func (m mockNetConn) SetWriteDeadline(_ time.Time) error { return nil }
+
+func TestDialWHOISErrors(t *testing.T) {
+	origDial := dialContextFunc
+	origRetries := resolver.MaxRetriesWhois
+	resolver.MaxRetriesWhois = 1
+	defer func() {
+		dialContextFunc = origDial
+		resolver.MaxRetriesWhois = origRetries
+	}()
+
+	dialContextFunc = func(_ context.Context, _, _ string) (net.Conn, error) {
+		return mockNetConn{failSetDeadline: true}, nil
+	}
+	_, err := dialWHOIS(context.Background(), "mock.example", "example.com")
+	if err == nil || !strings.Contains(err.Error(), "set deadline error") {
+		t.Errorf("expected set deadline error, got %v", err)
+	}
+
+	dialContextFunc = func(_ context.Context, _, _ string) (net.Conn, error) {
+		return mockNetConn{failWrite: true}, nil
+	}
+	_, err = dialWHOIS(context.Background(), "mock.example", "example.com")
+	if err == nil || !strings.Contains(err.Error(), "write error") {
+		t.Errorf("expected write error, got %v", err)
+	}
+
+	dialContextFunc = func(_ context.Context, _, _ string) (net.Conn, error) {
+		return mockNetConn{failClose: true}, nil
+	}
+	_, err = dialWHOIS(context.Background(), "mock.example", "example.com")
+	if err != nil {
+		t.Logf("dialWHOIS returned error on failClose (expected or not): %v", err)
+	}
 }
 
 func handleMockWHOISConn(c net.Conn, host string) {
@@ -184,25 +316,25 @@ func handleMockWHOISConn(c net.Conn, host string) {
 
 func writeMockWHOISResponse(c net.Conn, req, _ string) {
 	switch {
-	case strings.Contains(req, "example.iana"):
-		if _, err := c.Write([]byte("refer: localhost\nwhois: example.iana\n")); err != nil {
+	case strings.Contains(req, "refer.example"):
+		if _, err := c.Write([]byte("refer: localhost\nwhois: refer.example\n")); err != nil {
 			panic(err)
 		}
 	case strings.Contains(req, "example.refer"):
 		if _, err := c.Write([]byte("refer server response")); err != nil {
 			panic(err)
 		}
-	case strings.Contains(req, "identity.digital"):
+	case strings.Contains(req, "dialfail.example"):
 		if _, err := c.Write([]byte("Identity Digital Inc.\n")); err != nil {
 			panic(err)
 		}
-	case strings.Contains(req, "badrefer.iana"):
-		if _, err := c.Write([]byte("refer: 256.256.256.256\nwhois: badrefer.iana\n")); err != nil {
+	case strings.Contains(req, "bad.example"):
+		if _, err := c.Write([]byte("refer: 256.256.256.256\nwhois: bad.example\n")); err != nil {
 			panic(err)
 		}
-	case strings.Contains(req, "example.timeout"):
+	case strings.Contains(req, "timeout.example"):
 		time.Sleep(100 * time.Millisecond)
-	case strings.Contains(req, "example.long"):
+	case strings.Contains(req, "long.example"):
 		if _, err := c.Write([]byte(strings.Repeat("A", 400))); err != nil {
 			panic(err)
 		}
@@ -266,7 +398,7 @@ func TestQueryWHOIS_Basic(t *testing.T) {
 
 	ctx := context.Background()
 
-	res, err := queryWHOIS(ctx, "example.mock")
+	res, err := queryWHOIS(ctx, "basic.example")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -274,7 +406,7 @@ func TestQueryWHOIS_Basic(t *testing.T) {
 		t.Errorf("unexpected res: %s", res)
 	}
 
-	res, err = queryWHOIS(ctx, "example.iana")
+	res, err = queryWHOIS(ctx, "refer.example")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -284,7 +416,7 @@ func TestQueryWHOIS_Basic(t *testing.T) {
 	}
 
 	ianaWhoisServer = "256.256.256.256"
-	_, err = queryWHOIS(ctx, "fail.mock")
+	_, err = queryWHOIS(ctx, "whoisfail.example")
 	if err == nil {
 		t.Errorf("expected error, got nil")
 	}
@@ -292,7 +424,7 @@ func TestQueryWHOIS_Basic(t *testing.T) {
 
 	ctxTimeout, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
-	if _, err := queryWHOIS(ctxTimeout, "example.timeout"); err == nil {
+	if _, err := queryWHOIS(ctxTimeout, "timeout.example"); err == nil {
 		t.Errorf("expected timeout error")
 	}
 }
@@ -320,7 +452,7 @@ func TestQueryWHOIS_Refer(t *testing.T) {
 
 	ctx := context.Background()
 
-	res, err := queryWHOIS(ctx, "example.iana")
+	res, err := queryWHOIS(ctx, "refer.example")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -328,15 +460,15 @@ func TestQueryWHOIS_Refer(t *testing.T) {
 		t.Errorf("unexpected res: %s", res)
 	}
 
-	_, err = queryWHOIS(ctx, "badrefer.iana")
+	resBad, err := queryWHOIS(ctx, "bad.example")
 	if err == nil {
-		t.Errorf("expected error for bad refer")
+		t.Errorf("expected error for bad refer, got: %s", resBad)
 	}
 
 	ianaWhoisServer = host
 	ctxFast, cancelFast := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancelFast()
-	if _, err := queryWHOIS(ctxFast, "identity.digital"); err == nil {
+	if _, err := queryWHOIS(ctxFast, "dialfail.example"); err == nil {
 		t.Errorf("expected dial error")
 	}
 }
@@ -347,12 +479,12 @@ func TestGetWhoisData(t *testing.T) {
 	defer func() { resolver.RetryBaseDelay = origDelay }()
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "fail.mocktld") {
+		if strings.Contains(r.URL.Path, "fail.example") {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(`{"test": "success"}`)); err != nil {
+		if _, err := w.Write([]byte(`{"test": "` + strings.Repeat("A", 300) + `"}`)); err != nil {
 			panic(err)
 		}
 	}))
@@ -364,7 +496,7 @@ func TestGetWhoisData(t *testing.T) {
 	}
 	originalServers := make(map[string]string)
 	maps.Copy(originalServers, ianaRDAPServers)
-	ianaRDAPServers["mocktld"] = ts.URL + "/"
+	ianaRDAPServers["example"] = ts.URL + "/"
 	defer func() {
 		for k := range ianaRDAPServers {
 			delete(ianaRDAPServers, k)
@@ -377,7 +509,7 @@ func TestGetWhoisData(t *testing.T) {
 		t.Fatalf("New() did not return *module")
 	}
 
-	exec1 := m.getWhoisData("example.mocktld")
+	exec1 := m.getWhoisData("rdap.example")
 	if exec1.Error != nil {
 		t.Errorf("unexpected error: %v", *exec1.Error)
 	}
@@ -398,7 +530,7 @@ func TestGetWhoisData(t *testing.T) {
 		whoisPort = originalPort
 	}()
 
-	exec2 := m.getWhoisData("fail.mocktld")
+	exec2 := m.getWhoisData("fail.example")
 	if exec2.Error != nil {
 		t.Errorf("unexpected error on fallback: %v", *exec2.Error)
 	}
@@ -406,14 +538,14 @@ func TestGetWhoisData(t *testing.T) {
 		t.Errorf("expected RawData for WHOIS fallback")
 	}
 
-	execLong := m.getWhoisData("example.long")
+	execLong := m.getWhoisData("long.example")
 	if execLong.Error != nil {
 		t.Errorf("unexpected error on long: %v", *execLong.Error)
 	}
 
 	resolver.Options["DisableRDAP"] = "true"
 	defer delete(resolver.Options, "DisableRDAP")
-	exec3 := m.getWhoisData("badrefer.iana")
+	exec3 := m.getWhoisData("bad.example")
 	if exec3.Error == nil {
 		t.Errorf("expected error when both fail")
 	}

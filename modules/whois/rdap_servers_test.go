@@ -2,6 +2,7 @@ package whois
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -92,6 +93,16 @@ func TestFetchIANABootstrap_Failures(t *testing.T) {
 	}
 	if res := fetchIANABootstrap(); res != nil {
 		t.Errorf("expected nil, got %v", res)
+	}
+
+	oldNewRequest := newRequestWithContext
+	newRequestWithContext = func(_ context.Context, _ string, _ string, _ io.Reader) (*http.Request, error) {
+		return nil, errors.New("mock request error")
+	}
+	defer func() { newRequestWithContext = oldNewRequest }()
+
+	if res := fetchIANABootstrap(); res != nil {
+		t.Errorf("expected nil on request error, got %v", res)
 	}
 }
 

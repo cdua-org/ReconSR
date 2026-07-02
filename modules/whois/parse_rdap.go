@@ -1,4 +1,3 @@
-// Package whois provides parsing for WHOIS and RDAP responses.
 package whois
 
 import (
