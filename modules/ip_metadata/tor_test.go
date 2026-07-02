@@ -2,10 +2,13 @@ package ip_metadata
 
 import (
 	"context"
+	"net"
 	"slices"
 	"testing"
+	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
 func TestGetTorDataSupported(t *testing.T) {
@@ -74,4 +77,52 @@ func TestModule_LocalIDChaining_TOR(t *testing.T) {
 	}
 
 	requireUniqueLocalIDs(t, resKnown.Results)
+}
+
+func TestPerformAQuery(t *testing.T) {
+	oldPlain := plainLookupHost
+	defer func() { plainLookupHost = oldPlain }()
+
+	oldRetry := resolver.RetryBaseDelay
+	resolver.RetryBaseDelay = time.Millisecond
+	defer func() { resolver.RetryBaseDelay = oldRetry }()
+
+	t.Run("Success", func(t *testing.T) {
+		plainLookupHost = func(_ context.Context, _ *net.Resolver, _ string) ([]string, error) {
+			return []string{"192.0.2.1"}, nil
+		}
+		ips, err := performAQuery("198.51.100.2", "test.query", "test")
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+		if len(ips) != 1 || ips[0] != "192.0.2.1" {
+			t.Errorf("expected 192.0.2.1, got %v", ips)
+		}
+	})
+
+	t.Run("NXDOMAIN", func(t *testing.T) {
+		plainLookupHost = func(_ context.Context, _ *net.Resolver, _ string) ([]string, error) {
+			return nil, &net.DNSError{Err: "no such host", IsNotFound: true}
+		}
+		ips, err := performAQuery("198.51.100.2", "nxdomain.query", "test")
+		if err != nil {
+			t.Errorf("expected no error for nxdomain, got %v", err)
+		}
+		if len(ips) != 0 {
+			t.Errorf("expected nil ips, got %v", ips)
+		}
+	})
+
+	t.Run("Retries and fails", func(t *testing.T) {
+		plainLookupHost = func(_ context.Context, _ *net.Resolver, _ string) ([]string, error) {
+			return nil, context.DeadlineExceeded
+		}
+		ips, err := performAQuery("198.51.100.2", "timeout.query", "test")
+		if err == nil {
+			t.Error("expected timeout error, got nil")
+		}
+		if len(ips) != 0 {
+			t.Errorf("expected nil ips, got %v", ips)
+		}
+	})
 }

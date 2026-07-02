@@ -1,3 +1,4 @@
+// Package ip_metadata provides IP and ASN intelligence gathering.
 package ip_metadata
 
 import (

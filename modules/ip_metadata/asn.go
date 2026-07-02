@@ -1,4 +1,3 @@
-// Package ip_metadata provides IP and ASN intelligence gathering.
 package ip_metadata
 
 import (
@@ -24,7 +23,7 @@ func performTXTQuery(target, query, queryType string) ([]string, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), resolver.Timeout)
 			defer cancel()
 			var lookupErr error
-			names, lookupErr = resolver.GetResolver().LookupTXT(ctx, query)
+			names, lookupErr = plainLookupTXT(ctx, resolver.GetResolver(), query)
 			if lookupErr != nil {
 				return fmt.Errorf("lookup: %w", lookupErr)
 			}

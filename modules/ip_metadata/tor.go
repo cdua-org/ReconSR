@@ -29,7 +29,7 @@ func performAQuery(target, query, queryType string) ([]string, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), resolver.Timeout)
 			defer cancel()
 			var lookupErr error
-			ips, lookupErr = resolver.GetResolver().LookupHost(ctx, query)
+			ips, lookupErr = plainLookupHost(ctx, resolver.GetResolver(), query)
 			if lookupErr != nil {
 				return fmt.Errorf("lookup: %w", lookupErr)
 			}

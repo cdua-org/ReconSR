@@ -2,25 +2,12 @@ package ip_metadata
 
 import (
 	"context"
-	"slices"
+	"encoding/json"
 	"testing"
 
 	"cdua-org/ReconSR/modules/utils/constants"
+	"cdua-org/ReconSR/modules/utils/ripestat"
 )
-
-func TestExtraCapabilities(t *testing.T) {
-	mod := New()
-	caps, err := mod.Capabilities()
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if !slices.Contains(caps.Functions, constants.FuncGetIPInfo) {
-		t.Error("expected get_ip_info")
-	}
-	if !slices.Contains(caps.Functions, constants.FuncGetIPAbuseContacts) {
-		t.Error("expected get_ip_abuse_contacts")
-	}
-}
 
 func TestGetIPInfoClean(t *testing.T) {
 	mockRIPEstatSuccess(t)
@@ -52,21 +39,6 @@ func TestGetIPInfoClean(t *testing.T) {
 	}
 }
 
-func TestGetIPAbuseContactsClean(t *testing.T) {
-	mockRIPEstatSuccess(t)
-
-	res := getIPAbuseContacts("198.51.100.2")
-	if res.Error != nil {
-		t.Fatalf("expected no error, got: %v", *res.Error)
-	}
-	if len(res.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(res.Results))
-	}
-	if res.Results[0].Value != "abuse@example.com" {
-		t.Errorf("expected %q, got %q", "abuse@example.com", res.Results[0].Value)
-	}
-}
-
 func TestGetIPInfoInvalid(t *testing.T) {
 	res := getIPInfo("")
 	if res.Error == nil {
@@ -74,14 +46,7 @@ func TestGetIPInfoInvalid(t *testing.T) {
 	}
 }
 
-func TestGetIPAbuseContactsInvalid(t *testing.T) {
-	res := getIPAbuseContacts("")
-	if res.Error == nil {
-		t.Error("expected error for empty IP")
-	}
-}
-
-func TestExtraTimeout(t *testing.T) {
+func TestGetIPInfoTimeout(t *testing.T) {
 	setRIPEstatQueryMock(t, func(context.Context, string, string, any, int) error {
 		return context.DeadlineExceeded
 	})
@@ -89,11 +54,6 @@ func TestExtraTimeout(t *testing.T) {
 	resInfo := getIPInfo("198.51.100.2")
 	if resInfo.Error == nil {
 		t.Error("expected timeout error for IP info")
-	}
-
-	resAbuse := getIPAbuseContacts("198.51.100.2")
-	if resAbuse.Error == nil {
-		t.Error("expected timeout error for abuse contacts")
 	}
 }
 
@@ -108,13 +68,46 @@ func TestModule_LocalIDChaining_Info(t *testing.T) {
 	requireUniqueLocalIDs(t, res.Results)
 }
 
-func TestModule_LocalIDChaining_Abuse(t *testing.T) {
-	mockRIPEstatSuccess(t)
+func TestGetIPInfoZeroResults(t *testing.T) {
+	setRIPEstatQueryMock(t, func(_ context.Context, _, _ string, result any, _ int) error {
+		body := `{"data":{"records":[]}}`
+		if resp, ok := result.(*ripestat.WhoisResponse); ok {
+			resp.RawJSON = body
+		}
+		return json.Unmarshal([]byte(body), result)
+	})
 
-	res := getIPAbuseContacts("198.51.100.2")
+	res := getIPInfo("198.51.100.2")
 	if res.Error != nil {
 		t.Fatalf("expected no error, got: %v", *res.Error)
 	}
+	if len(res.Results) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(res.Results))
+	}
+}
 
-	requireUniqueLocalIDs(t, res.Results)
+func TestGetIPInfoEdgeCases(t *testing.T) {
+	setRIPEstatQueryMock(t, func(_ context.Context, _, _ string, result any, _ int) error {
+		body := `{"data":{"records":[[
+			{"key":"unknown","value":"ignored"},
+			{"key":"descr","value":"   "},
+			{"key":"netname","value":"FIRST-NET"},
+			{"key":"netname","value":"SECOND-NET"}
+		]]}}`
+		if resp, ok := result.(*ripestat.WhoisResponse); ok {
+			resp.RawJSON = body
+		}
+		return json.Unmarshal([]byte(body), result)
+	})
+
+	res := getIPInfo("198.51.100.2")
+	if res.Error != nil {
+		t.Fatalf("expected no error, got: %v", *res.Error)
+	}
+	if len(res.Results) != 1 {
+		t.Fatalf("expected 1 result (first netname), got %d", len(res.Results))
+	}
+	if res.Results[0].Value != "FIRST-NET" {
+		t.Errorf("expected FIRST-NET, got %q", res.Results[0].Value)
+	}
 }

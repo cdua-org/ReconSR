@@ -15,6 +15,18 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
+type ptrLookup struct {
+	target string
+}
+
+func (p ptrLookup) lookup(c context.Context, r *net.Resolver) ([]string, error) {
+	res, err := r.LookupAddr(c, p.target)
+	if err != nil {
+		err = fmt.Errorf("lookup addr error: %w", err)
+	}
+	return res, err
+}
+
 func performPTRQuery(target string) ([]string, error) {
 	var lastErr error
 	var names []string
@@ -33,9 +45,8 @@ func performPTRQuery(target string) ([]string, error) {
 			}
 
 			var lookupErr error
-			names, _, lookupErr = resolver.ResolveRecord(ctx, rev+suffix, 12, func(c context.Context, r *net.Resolver) ([]string, error) {
-				return r.LookupAddr(c, target)
-			})
+			p := ptrLookup{target: target}
+			names, _, lookupErr = ptrResolveRecordFunc(ctx, rev+suffix, 12, p.lookup)
 
 			if lookupErr != nil {
 				return fmt.Errorf("lookup: %w", lookupErr)
@@ -54,7 +65,7 @@ func performPTRQuery(target string) ([]string, error) {
 			return nil, nil
 		}
 
-		if strings.Contains(err.Error(), "unrecognized address") {
+		if strings.Contains(err.Error(), "invalid IP address") {
 			dbg.Printf("%s error target=%q stage=validate_input err=%v", constants.FuncGetPTR, target, err)
 			return nil, err
 		}
@@ -85,7 +96,7 @@ func getPTRData(target string) (execution schema.ModuleExecution) {
 	names, err := ptrQueryFunc(target)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "unrecognized address") {
+		if strings.Contains(err.Error(), "invalid IP address") {
 			errMsg := errInvalidIPFormat + target
 			execution.Error = &errMsg
 			return execution

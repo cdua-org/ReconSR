@@ -41,7 +41,7 @@ func TestGetRBLDataKnown(t *testing.T) {
 	}
 
 	mockAQueryResponses(t, map[string][]string{
-		".zen.spamhaus.org": {"127.0.0.3"},
+		".zen.spamhaus.org": {"127.0.0.3", "127.0.0.4"},
 	}, nil)
 
 	resKnown := getRBLData("203.0.113.25")
