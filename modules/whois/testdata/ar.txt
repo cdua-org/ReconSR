@@ -1,0 +1,15 @@
+domain:      ar.test.example
+registrant:  50037928906
+registrar:   nicar
+registered:  1999-06-08 00:00:00
+changed:     2025-06-09 15:37:19.837308
+expire:      2026-07-08 00:00:00
+
+contact:     50037928906
+name:        FAKE CORPORATE INC.
+registrar:   nicar
+created:     2013-10-29 00:00:00
+changed:     2026-03-26 14:55:08.507049
+
+nserver:     ns1.ar.test.example ()
+nserver:     ns2.ar.test.example ()

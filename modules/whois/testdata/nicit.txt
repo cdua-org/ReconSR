@@ -1,0 +1,47 @@
+Domain:             it.test.example
+Status:             ok
+Signed:             no
+Created:            2000-01-01 00:00:00
+Last Update:        2024-05-10 12:00:00
+Expire Date:        2027-01-01
+
+Registrant
+  Organization:     Fake Company S.p.A.
+  Address:          Via Luigi 10
+                    ROMA
+                    00100
+                    RM
+                    IT
+  Created:          2005-02-15 10:00:00
+  Last Update:      2020-03-20 15:00:00
+
+Admin Contact
+  Name:             Mario Rossi
+  Organization:     Fake Company S.p.A
+  Address:          Via Napoli 20
+                    MILANO
+                    20100
+                    MI
+                    IT
+  Created:          2005-02-15 10:05:00
+  Last Update:      2018-09-10 09:30:00
+
+Technical Contacts
+  Name:             Tech Support
+  Organization:     NetProvider Srl
+  Address:          Via Torino 5
+                    TORINO
+                    10100
+                    TO
+                    IT
+  Created:          2010-10-10 00:00:00
+
+Registrar
+  Organization:     NetReg S.r.l.
+  Name:             NETREG-IT
+  Web:              http://www.netreg.example.com
+  DNSSEC:           no
+
+Nameservers
+  ns1.it.test.example
+  ns2.it.test.example

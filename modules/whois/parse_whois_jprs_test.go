@@ -5,23 +5,7 @@ import (
 )
 
 func TestParseWHOIS_JPRS1(t *testing.T) {
-	rawWHOIS := `[ JPRS database provides information on network administration. ]
-Domain Information:
-a. [Domain Name]                FAKECORP.CO.JP
-g. [Organization]               Fake Corporation
-l. [Organization Type]          Corporation
-m. [Administrative Contact]     AB12345JP
-n. [Technical Contact]          CD67890JP
-n. [Technical Contact]          EF11111JP
-p. [Name Server]                ns1.jpns-alpha.example.net
-p. [Name Server]                ns2.jpns-alpha.example.net
-s. [Signing Key]
-[State]                         Connected (2028/06/30)
-[Registered Date]
-[Connected Date]                2015/07/01
-[Last Update]                   2026/03/15 10:30:00 (JST)
-`
-
+	rawWHOIS := loadFixture(t, "testdata/jprs_1.txt")
 	got := parseWHOIS(rawWHOIS)
 
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake Corporation"})
@@ -34,32 +18,7 @@ s. [Signing Key]
 }
 
 func TestParseWHOIS_JPRS2(t *testing.T) {
-	rawWHOIS := `Domain Information:
-[Domain Name]                   FAKESTORE.JP
-
-[Registrant]                    Fake Store Inc.
-
-[Name Server]                   ns1.jpns-beta.example.org
-[Name Server]                   ns2.jpns-beta.example.org
-[Signing Key]
-
-[Created on]                    2005/04/10
-[Expires on]                    2028/04/10
-[Status]                        Active
-[Lock Status]                   DomainTransferLocked
-[Last Updated]                  2026/02/20 09:15:00 (JST)
-
-Contact Information:
-[Name]                          Proxy Solutions Ltd. Fake
-[Email]                         proxy@fakeprivacy.example
-[Web Page]
-[Postal code]                   100-0001
-[Postal Address]                Fake Tower 5F, 1-2-3 Marunouchi
-                                Chiyoda-ku, Tokyo
-[Phone]                         +81.312345678
-[Fax]                           +81.312345679
-`
-
+	rawWHOIS := loadFixture(t, "testdata/jprs_2.txt")
 	got := parseWHOIS(rawWHOIS)
 
 	assertSlice(t, "Registrant.Organization", got.Registrant.Organization, []string{"Fake Store Inc."})

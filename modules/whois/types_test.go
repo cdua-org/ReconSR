@@ -73,11 +73,11 @@ func TestIsPrivacyService(t *testing.T) {
 		input    string
 		expected bool
 	}{
-		{"Domains By Proxy, LLC", true},
-		{"Whois Privacy Protection Service, Inc.", true},
-		{"Contact Privacy Inc. Customer Care", true},
+		{"Fake Privacy, LLC", true},
+		{"Mock Privacy Protection Service, Inc.", true},
+		{"Sample Privacy Inc. Customer Care", true},
 		{"Super Redacted Name", true},
-		{"Google LLC", false},
+		{"Fake Corporation", false},
 		{"", false},
 	}
 

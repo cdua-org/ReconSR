@@ -1,0 +1,40 @@
+% IANA WHOIS server
+% for more information on IANA, visit http://www.iana.org
+% This query returned 1 object
+
+domain:       FAKE
+
+organisation: Fake Registry Inc.
+address:      123 Fake Street
+address:      Faketown CA 99999
+address:      Example Republic
+
+contact:      administrative
+name:         Fake Admin
+organisation: Admin Relay Group
+address:      456 Admin Blvd
+address:      Adminville NY 10001
+address:      Fixture Federation
+phone:        +1 555 123 4567
+fax-no:       +1 555 123 4568
+e-mail:       admin@fake.example
+
+contact:      technical
+name:         Fake Tech
+organisation: Tech Transit Unit
+address:      789 Tech Lane
+address:      Techcity NY 10002
+address:      Sample Union
+phone:        +1 555 987 6543
+fax-no:       +1 555 987 6544
+e-mail:       tech@fake.example
+
+nserver:      ns1.root-fake.example.net 2001:db8::1 192.0.2.1
+nserver:      ns2.root-fake.example.net 2001:db8::2 192.0.2.2
+
+status:       ACTIVE
+remarks:      Registration information: https://www.fake.example
+
+created:      2014-11-20
+changed:      2025-04-11
+source:       IANA

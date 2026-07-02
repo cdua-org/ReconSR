@@ -1,93 +1,158 @@
 package whois
 
 import (
-	"slices"
+	"context"
+	"errors"
+	"maps"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"cdua-org/ReconSR/modules/utils/constants"
-	"cdua-org/ReconSR/modules/utils/modutil"
+	"cdua-org/ReconSR/modules/utils/resolver"
 	"cdua-org/ReconSR/schema"
 )
 
-func TestBuildMetadataResults_WhoisServerUsesDomainTag(t *testing.T) {
-	targetDomain := "target.client.example.net"
+func TestModuleInfo(t *testing.T) {
+	m := New()
+	if m.Name() != "whois" {
+		t.Errorf("expected whois, got %s", m.Name())
+	}
+	_, err := m.Capabilities()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	origDelay := resolver.RetryBaseDelay
+	resolver.RetryBaseDelay = time.Millisecond
+	defer func() { resolver.RetryBaseDelay = origDelay }()
+
+	ianaRDAPBootstrap.Do(func() {})
+	originalServers := make(map[string]string)
+	if ianaRDAPServers == nil {
+		ianaRDAPServers = make(map[string]string)
+	}
+	maps.Copy(originalServers, ianaRDAPServers)
+	ianaRDAPServers["example"] = "http://127.0.0.1:0/"
+
+	origIana := ianaWhoisServer
+	ianaWhoisServer = "127.0.0.1"
+
+	origDial := dialContextFunc
+	dialContextFunc = func(_ context.Context, _, _ string) (net.Conn, error) {
+		return nil, errors.New("mocked dial")
+	}
+
+	origRDAP := rdapClientDo
+	rdapClientDo = func(_ *http.Client, _ *http.Request) (*http.Response, error) {
+		return nil, errors.New("mocked rdap")
+	}
+
+	defer func() {
+		ianaWhoisServer = origIana
+		dialContextFunc = origDial
+		rdapClientDo = origRDAP
+		for k := range ianaRDAPServers {
+			delete(ianaRDAPServers, k)
+		}
+		maps.Copy(ianaRDAPServers, originalServers)
+	}()
+
+	res, err := m.Exec(schema.ModuleInput{
+		Functions: []string{constants.FuncGetWhois, "unknown_func"},
+		Target: schema.Entity{
+			Type:  constants.TypeDomain,
+			Value: "rdap.example",
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Executions) != 2 {
+		t.Errorf("expected 2 executions, got %d", len(res.Executions))
+	}
+	if res.Executions[1].Error == nil {
+		t.Errorf("expected error for unknown_func")
+	}
+}
+
+func TestGetWhoisData(t *testing.T) {
+	origDelay := resolver.RetryBaseDelay
+	resolver.RetryBaseDelay = time.Millisecond
+	defer func() { resolver.RetryBaseDelay = origDelay }()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "fail.example") {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(`{"test": "` + strings.Repeat("A", 300) + `"}`)); err != nil {
+			panic(err)
+		}
+	}))
+	defer ts.Close()
+
+	ianaRDAPBootstrap.Do(func() {})
+	if ianaRDAPServers == nil {
+		ianaRDAPServers = make(map[string]string)
+	}
+	originalServers := make(map[string]string)
+	maps.Copy(originalServers, ianaRDAPServers)
+	ianaRDAPServers["example"] = ts.URL + "/"
+	defer func() {
+		for k := range ianaRDAPServers {
+			delete(ianaRDAPServers, k)
+		}
+		maps.Copy(ianaRDAPServers, originalServers)
+	}()
+
 	m, ok := New().(*module)
 	if !ok {
 		t.Fatalf("New() did not return *module")
 	}
-	whoisServer := "WHOIS.BACKEND.EXAMPLE.COM"
-	anchor := &schema.EntityRef{Type: constants.TypeWhoisRegistrar, Value: "Registrar of " + targetDomain}
 
-	gen := modutil.NewLocalIDGenerator()
-	results := m.buildMetadataResults(&Metadata{WhoisServer: whoisServer}, targetDomain, "WHOIS", anchor, gen)
-	if len(results) != 1 {
-		t.Fatalf("buildMetadataResults() returned %d results, want 1", len(results))
+	exec1 := m.getWhoisData("rdap.example")
+	if exec1.Error != nil {
+		t.Errorf("unexpected error: %v", *exec1.Error)
 	}
 
-	got := results[0]
-	if got.Type != constants.TypeSubdomain {
-		t.Fatalf("Type = %q, want %q", got.Type, constants.TypeSubdomain)
+	host, port, l := startMockWHOIS(t)
+	defer func() {
+		if cerr := l.Close(); cerr != nil {
+			panic(cerr)
+		}
+	}()
+
+	originalIana := ianaWhoisServer
+	originalPort := whoisPort
+	ianaWhoisServer = host
+	whoisPort = port
+	defer func() {
+		ianaWhoisServer = originalIana
+		whoisPort = originalPort
+	}()
+
+	exec2 := m.getWhoisData("fail.example")
+	if exec2.Error != nil {
+		t.Errorf("unexpected error on fallback: %v", *exec2.Error)
 	}
-	if got.Category != constants.CategoryNode {
-		t.Fatalf("Category = %q, want %q", got.Category, constants.CategoryNode)
-	}
-	if got.Value != "whois.backend.example.com" {
-		t.Fatalf("Value = %q, want %q", got.Value, "whois.backend.example.com")
-	}
-	if !slices.Contains(got.Tags, constants.TagWhoisServer) {
-		t.Fatalf("Tags = %v, want to contain %q", got.Tags, constants.TagWhoisServer)
-	}
-	if got.Context != "Whois Server (WHOIS)" {
-		t.Fatalf("Context = %q, want %q", got.Context, "Whois Server (WHOIS)")
-	}
-	if !got.Applied {
-		t.Fatal("Applied = false, want true")
-	}
-	if !got.OutOfScope {
-		t.Fatal("OutOfScope = false, want true")
-	}
-	if got.Source == nil {
-		t.Fatal("Source = nil, want registrar anchor")
-	}
-	if *got.Source != *anchor {
-		t.Fatalf("Source = %+v, want %+v", *got.Source, *anchor)
+	if exec2.RawData == "" {
+		t.Errorf("expected RawData for WHOIS fallback")
 	}
 
-	expectedLocalID := 1
-	if got.LocalID != expectedLocalID {
-		t.Fatalf("LocalID = %d, want %d", got.LocalID, expectedLocalID)
-	}
-}
-
-func TestBuildResults_LocalIDChaining(t *testing.T) {
-	m := &module{}
-	targetDomain := "example.com"
-	metadata := &Metadata{
-		Registrant: Contact{
-			Name:         []string{"Alice Bob"},
-			Organization: []string{"Bob Corp"},
-		},
+	execLong := m.getWhoisData("long.example")
+	if execLong.Error != nil {
+		t.Errorf("unexpected error on long: %v", *execLong.Error)
 	}
 
-	gen := modutil.NewLocalIDGenerator()
-	results := m.buildResults(metadata, targetDomain, "WHOIS", gen)
-
-	if len(results) != 3 {
-		t.Fatalf("expected 3 results, got %d", len(results))
-	}
-
-	anchorID := 1
-	if results[0].LocalID != anchorID {
-		t.Errorf("anchor LocalID = %d, want %d", results[0].LocalID, anchorID)
-	}
-
-	personID := 2
-	if results[1].LocalID != personID {
-		t.Errorf("person LocalID = %d, want %d", results[1].LocalID, personID)
-	}
-
-	orgID := 3
-	if results[2].LocalID != orgID {
-		t.Errorf("org LocalID = %d, want %d", results[2].LocalID, orgID)
+	resolver.Options["DisableRDAP"] = "true"
+	defer delete(resolver.Options, "DisableRDAP")
+	exec3 := m.getWhoisData("bad.example")
+	if exec3.Error == nil {
+		t.Errorf("expected error when both fail")
 	}
 }

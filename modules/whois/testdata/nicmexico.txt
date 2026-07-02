@@ -1,0 +1,37 @@
+Domain Name:       fakeshop.test.example
+
+Created On:        2010-05-15
+Expiration Date:   2028-05-15
+Last Updated On:   2026-03-01
+Registrar:         FakeRegistrar
+URL:               http://www.fakeregistrar.example/
+
+Registrant:
+   Name:           Registry Desk Uno
+   City:           Faketown Norte
+   State:          Northstate Uno
+   Country:        Fakeland Norte
+
+Administrative Contact:
+   Name:           Admin Desk Dos
+   City:           Adminpolis Sur
+   State:          Southstate Dos
+   Country:        Fakeland Sur
+
+Technical Contact:
+   Name:           Tech Crew Tres
+   City:           Techvale Este
+   State:          Eaststate Tres
+   Country:        Fakeland Este
+
+Billing Contact:
+   Name:           Billing Team
+   City:           Otherville
+   State:          Otherstate
+   Country:        Fakeland Oeste
+
+Name Servers:
+   DNS:            ns1.fakeshop.example.net
+   DNS:            ns2.fakeshop.example.net
+
+DNSSEC DS Records:

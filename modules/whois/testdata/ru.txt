@@ -1,0 +1,18 @@
+% TCI Whois Service. Terms of use:
+% https://tcinet.example/documents/whois_ru_rf.pdf (in Russian)
+% https://tcinet.example/documents/whois_su.pdf (in Russian)
+
+domain:        RU.TEST.EXAMPLE
+nserver:       ns1.ru.test.example. 192.0.2.1, 2001:db8::1
+nserver:       ns2.ru.test.example. 198.51.100.1, 2001:db8:0:1::1
+state:         REGISTERED, DELEGATED, VERIFIED
+org:           FAKE, LLC.
+taxpayer-id:   1234567890
+registrar:     FAKE-REGISTRAR-RU
+admin-contact: https://www.fake-nic.example/whois
+created:       2000-01-01T10:00:00Z
+paid-till:     2028-01-01T10:00:00Z
+free-date:     2028-02-01
+source:        TCI
+
+Last updated on 2026-04-07T07:53:01Z

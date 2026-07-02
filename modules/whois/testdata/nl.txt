@@ -1,0 +1,23 @@
+Domain name: nl.test.example
+Status:      active
+
+Registrar:
+   Fake B.V.
+   Fake Street 123
+   1234AB Faketown
+   Netherlands
+
+Abuse Contact:
+   abuse@nl.test.example
+
+DNSSEC:      yes
+
+Domain nameservers:
+   ns1.nl.test.example
+   ns2.nl.test.example
+
+Creation Date: 1996-07-22
+
+Updated Date: 2025-03-13
+
+Record maintained by: SIDN BV

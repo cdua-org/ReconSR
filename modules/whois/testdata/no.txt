@@ -1,0 +1,13 @@
+Domain Information
+
+NORID Handle...............: FAKE69D-NORID
+Domain Name................: no.test.example
+Registrar Handle...........: REG99-NORID
+Tech-c Handle..............: NH1234R-NORID
+Name Server Handle.........: A1111H-NORID
+Name Server Handle.........: A2222H-NORID
+DNSSEC.....................: Signed
+
+Additional information:
+Created:         1999-11-15
+Last updated:    2025-10-18

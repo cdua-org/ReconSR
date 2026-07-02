@@ -1,0 +1,37 @@
+Domain Name: EXAMPLE.COM
+Registry Domain ID: 123456789_DOMAIN_COM-VRSN
+Registrar WHOIS Server: whois.icann.example.com
+Registrar URL: http://www.example.com
+Updated Date: 2023-01-01T12:00:00Z
+Creation Date: 2000-01-01T12:00:00Z
+Registry Expiry Date: 2025-01-01T12:00:00Z
+Registrar: Example Registrar, Inc.
+Registrar IANA ID: 9999
+Registrar Abuse Contact Email: abuse@example.com
+Registrar Abuse Contact Phone: +1.5555555555
+Domain Status: serverDeleteProhibited https://icann.org/epp#serverDeleteProhibited
+Name Server: NS1.ICANN.EXAMPLE.COM
+Name Server: NS2.EXAMPLE.COM
+DNSSEC: unsigned
+
+Registry Registrant ID:
+Registrant Name: John Doe
+Registrant Organization: Doe Inc
+Registrant Street: 123 Main St
+Registrant City: Anytown
+Registrant State/Province: CA
+Registrant Postal Code: 12345
+Registrant Country: US
+Registrant Phone: +1.5551234567
+Registrant Email: john@doe.example.com
+
+Admin Name: Jane Smith
+Admin Organization: Smith LLC
+Admin Street: 456 Elm St
+Admin Phone: +1.5559876543
+Admin Email: jane@smith.example.com
+
+Tech Name: Tech Guy
+Tech Organization: Tech Co
+Tech Phone: +1.5551112222
+Tech Email: tech@tech.example.com

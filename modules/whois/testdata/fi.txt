@@ -1,0 +1,32 @@
+domain.............: fi.test.example
+status.............: Registered
+created............: 1.1.1991 00:00:00
+expires............: 31.8.2030 00:00:00
+available..........: 30.9.2030 00:00:00
+modified...........: 17.3.2022 13:30:38
+RegistryLock.......: locked
+
+Nameservers
+
+nserver............: ns1.fi.test.example [192.0.2.1] [OK]
+nserver............: ns2.fi.test.example [OK]
+nserver............: ns-secondary.fi.test.example [192.0.2.2] [2001:db8::53] [OK]
+
+DNSSEC
+
+dnssec.............: no
+
+Holder
+
+name...............: Fake Registrant
+register number....: 1234567-8
+address............: Fake Street 1
+postal.............: 00100
+city...............: Fake City
+country............: Finland
+phone..............: +358.123456789
+holder email.......: admin@fi.test.example
+
+Registrar
+
+registrar..........: Fake Registrar

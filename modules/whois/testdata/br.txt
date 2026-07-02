@@ -1,0 +1,20 @@
+domain:      br.test.example
+owner:       Fake S.A.
+ownerid:     12.345.678/0001-99
+responsible: Contato da Entidade
+country:     BR
+owner-c:     FAK12
+tech-c:      TEC34
+nserver:     ns1.br.test.example
+created:     19960424 #7137
+changed:     20240827
+expires:     20340424
+status:      published
+
+nic-hdl-br:  FAK12
+person:      Admin Contact
+e-mail:      admin@br.test.example
+
+nic-hdl-br:  TEC34
+person:      Tech Contact
+e-mail:      tech@br.test.example

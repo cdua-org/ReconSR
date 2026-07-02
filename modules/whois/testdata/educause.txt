@@ -1,0 +1,33 @@
+Domain Name: TESTUNI.EXAMPLE
+
+Registrant:
+	Testland University
+	42 Campus Drive
+	Testville, TS 99001
+	US
+
+Administrative Contact:
+	Alice Tester
+	Campus Governance Group
+	Admin Bldg Room 101, 42 Campus Drive
+	Testville, TS 99001-1234
+	US
+	+1.5550001111
+	alice@testuni.example
+
+Technical Contact:
+	NetOps Team
+	Mock Network Services
+	NOC Room 202, 42 Campus Drive
+	Testville, TS 99001-1234
+	US
+	+1.5550002222
+	noc@testuni.example
+
+Name Servers:
+	NS1.TESTUNI.EXAMPLE
+	NS2.TESTUNI.EXAMPLE
+
+Domain record activated:    01-Jan-1990
+Domain record last updated: 15-Mar-2026
+Domain expires:             31-Dec-2027

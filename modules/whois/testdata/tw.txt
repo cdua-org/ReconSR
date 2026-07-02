@@ -1,0 +1,18 @@
+Domain Name: tw.test.example
+   Domain Status: clientTransferProhibited
+   Registrant:
+      Fake Taiwan Corp.
+      Fake Global Inc.
+      admin@tw.test.example
+      TW
+
+   Record expires on 2035-05-31 00:00:00 (UTC+8)
+   Record created on 1985-07-04 00:00:00 (UTC+8)
+
+   Domain servers in listed order:
+      ns1.tw.test.example      1.2.3.4
+      ns2.tw.test.example      5.6.7.8
+
+Registration Service Provider: FAKEPROVIDER
+Registration Service URL: http://registrar.tw2.test.example
+Registrar Abuse Contact Email: abuse@tw2.test.example

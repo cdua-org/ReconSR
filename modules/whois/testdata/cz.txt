@@ -1,0 +1,31 @@
+domain:       cz.test.example
+registrant:   REG-ID-123
+admin-c:      ADM-ID-456
+nsset:        NS-SET-789
+registrar:    REG-CZ-FAKE
+status:       Sponsoring registrar change forbidden
+registered:   07.10.1996 02:00:00
+changed:      05.09.2022 14:21:11
+expire:       29.10.2026
+
+contact:      REG-ID-123
+org:          Fake Registrant Organization
+name:         Jane Doe
+address:      Street 1
+address:      City A
+address:      12345
+address:      CZ
+e-mail:       owner@cz.test.example
+
+contact:      ADM-ID-456
+org:          Fake Admin Organization
+name:         John Smith
+address:      Street 2
+address:      City B
+address:      67890
+address:      CZ
+e-mail:       admin@cz.test.example
+
+nsset:        NS-SET-789
+nserver:      ns1.cz.test.example (1.2.3.4, 2a02:598::1)
+nserver:      ns2.cz.test.example (5.6.7.8, 2a02:598::2)

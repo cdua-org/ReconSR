@@ -1,0 +1,15 @@
+[ JPRS database provides information on network administration. ]
+Domain Information:
+a. [Domain Name]                FAKECORP.CO.JP
+g. [Organization]               Fake Corporation
+l. [Organization Type]          Corporation
+m. [Administrative Contact]     AB12345JP
+n. [Technical Contact]          CD67890JP
+n. [Technical Contact]          EF11111JP
+p. [Name Server]                ns1.jpns-alpha.example.net
+p. [Name Server]                ns2.jpns-alpha.example.net
+s. [Signing Key]
+[State]                         Connected (2028/06/30)
+[Registered Date]
+[Connected Date]                2015/07/01
+[Last Update]                   2026/03/15 10:30:00 (JST)

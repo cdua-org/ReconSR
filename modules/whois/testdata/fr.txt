@@ -1,0 +1,25 @@
+domain:      fr.test.example
+status:      ACTIVE
+eppstatus:   serverUpdateProhibited
+eppstatus:   clientTransferProhibited
+holder-c:    FAKE1-FRNIC
+admin-c:     FAKE2-FRNIC
+tech-c:      FAKE3-FRNIC
+registrar:   FAKE REGISTRAR
+Expiry Date: 2026-10-14T15:12:55Z
+created:     2001-02-01T23:00:00Z
++last-update: 2025-03-30T12:17:54.513642Z
+source:      FRNIC
+
+nserver:     ns1.fr.test.example
+nserver:     ns2.fr.test.example
+source:      FRNIC
+
+nic-hdl:     FAKE1-FRNIC
+type:        ORGANIZATION
+contact:     FAKE ORG
+address:     123 Fake Street
+address:     75000 Paris
+country:     FR
+phone:       +33.123456789
+e-mail:      holder@fr.test.example

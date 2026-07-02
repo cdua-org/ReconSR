@@ -1,0 +1,21 @@
+DOMAIN NAME:           pl.test.example
+registrant type:       organization
+nameservers:           ns1.pl.test.example. [192.0.2.1]
+                       ns2.pl.test.example. [198.51.100.1]
+created:               1998.04.28 13:00:00
+last modified:         2026.02.18 14:22:40
+renewal date:          2027.04.27 14:00:00
+
+option created:        2026.02.10 10:51:12
+option expiration date:2029.02.10 10:51:12
+
+dnssec:                Unsigned
+
+REGISTRAR:
+Fake Registrar Sp. z o.o.
+ul. Fake 4
+70-653 Faketown
+Polska/Poland
+Tel: +48.123456789
+https://pl.test.example/
+domena@pl.test.example

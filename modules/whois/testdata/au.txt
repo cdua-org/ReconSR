@@ -1,0 +1,21 @@
+Domain Name: au.test.example
+Registry Domain ID: 123456789-AU
+Registrar WHOIS Server: whois.auda.org.au
+Registrar URL: https://www.fake.example/contact
+Last Modified: 2026-02-23T11:19:19Z
+Registrar Name: Fake Registrar Pty Ltd
+Registrar Abuse Contact Email: abuse@fake.example
+Registrar Abuse Contact Phone: +61.123456789
+Reseller Name:
+Status: serverRenewProhibited https://identitydigital.au/whois-status-codes#serverRenewProhibited
+Status Reason: Not Currently Eligible For Renewal
+Registrant Contact ID: ce413d96bfdb-AU
+Registrant Contact Name: Fake Reg Contact
+Tech Contact ID: a49ec9b0b96a-AU
+Tech Contact Name: Fake Tech Contact
+Name Server: ns1.auda-fake.example.org
+Name Server: ns2.auda-fake.example.org
+DNSSEC: unsigned
+Registrant: FAKE COMPANY PTY LTD
+Registrant ID: ACN 123456789
+Eligibility Type: Company
