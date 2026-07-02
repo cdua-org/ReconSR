@@ -25,7 +25,10 @@ const (
 
 var dbg = debuglog.New("mailcrypto")
 
-var resolveRecord = resolver.ResolveRecord
+var (
+	resolveRecord      = resolver.ResolveRecord
+	preflightCheckFunc = preflightcheck.PreFlightCheck
+)
 
 // CommonEmailLocalParts are standard infrastructure email aliases used for discovery.
 var CommonEmailLocalParts = []string{
@@ -121,7 +124,7 @@ func handlePreflightDNS(ctx context.Context, domain string, target schema.Entity
 	execution := modutil.NewExecution(constants.FuncPreflightDNS)
 	gen := modutil.NewLocalIDGenerator()
 	dbg.Printf("%s target=%q domain=%q", constants.FuncPreflightDNS, target.Value, domain)
-	err := preflightcheck.PreFlightCheck(ctx, domain)
+	err := preflightCheckFunc(ctx, domain)
 	if err != nil {
 		if errors.Is(err, preflightcheck.ErrZoneBroken) {
 			execution.Results = append(execution.Results, schema.ModuleResult{
