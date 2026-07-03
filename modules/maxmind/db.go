@@ -29,7 +29,7 @@ var (
 	errProxyDB error
 )
 
-var defaultGeoQuery = func(dbPath, ipStr string) (*geoip2.City, error) {
+func defaultGeoQueryImpl(dbPath, ipStr string) (*geoip2.City, error) {
 	cityOnce.Do(func() {
 		cityDB, errCityDB = geoip2.Open(dbPath)
 	})
@@ -48,7 +48,7 @@ var defaultGeoQuery = func(dbPath, ipStr string) (*geoip2.City, error) {
 	return res, nil
 }
 
-var defaultEnterpriseQuery = func(dbPath, ipStr string) (*geoip2.Enterprise, error) {
+func defaultEnterpriseQueryImpl(dbPath, ipStr string) (*geoip2.Enterprise, error) {
 	entOnce.Do(func() {
 		entDB, errEntDB = geoip2.Open(dbPath)
 	})
@@ -67,7 +67,7 @@ var defaultEnterpriseQuery = func(dbPath, ipStr string) (*geoip2.Enterprise, err
 	return res, nil
 }
 
-var defaultASNQuery = func(dbPath, ipStr string) (*geoip2.ISP, *geoip2.ASN, error) {
+func defaultASNQueryImpl(dbPath, ipStr string) (*geoip2.ISP, *geoip2.ASN, error) {
 	asnOnce.Do(func() {
 		asnDB, errAsnDB = geoip2.Open(dbPath)
 	})
@@ -94,7 +94,7 @@ var defaultASNQuery = func(dbPath, ipStr string) (*geoip2.ISP, *geoip2.ASN, erro
 	return nil, res, nil
 }
 
-var defaultProxyQuery = func(dbPath, ipStr string) (*AnonymousPlusIP, error) {
+func defaultProxyQueryImpl(dbPath, ipStr string) (*AnonymousPlusIP, error) {
 	proxyOnce.Do(func() {
 		proxyDB, errProxyDB = maxminddb.Open(dbPath)
 	})
@@ -115,6 +115,13 @@ var defaultProxyQuery = func(dbPath, ipStr string) (*AnonymousPlusIP, error) {
 }
 
 var (
+	defaultEnterpriseQuery = defaultEnterpriseQueryImpl
+	defaultGeoQuery        = defaultGeoQueryImpl
+	defaultASNQuery        = defaultASNQueryImpl
+	defaultProxyQuery      = defaultProxyQueryImpl
+)
+
+var (
 	entQueryFunc   = defaultEnterpriseQuery
 	geoQueryFunc   = defaultGeoQuery
 	asnQueryFunc   = defaultASNQuery
@@ -123,10 +130,12 @@ var (
 
 var dataDir = filepath.Join("data", "maxmind")
 
-var checkFileExists = func(path string) bool {
+func checkFileExistsImpl(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
+var checkFileExists = checkFileExistsImpl
 
 func resolveDBPath(names ...string) string {
 	for _, name := range names {

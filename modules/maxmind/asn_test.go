@@ -2,6 +2,7 @@ package maxmind
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -82,5 +83,57 @@ func validateASNResults(t *testing.T, exec schema.ModuleExecution, mockResponse 
 	}
 	if mockResponse.ISP != "" && ispRes != mockResponse.ISP {
 		t.Errorf("expected ISP %s, got %s", mockResponse.ISP, ispRes)
+	}
+}
+
+func TestGetIPASN_Error(t *testing.T) {
+	origAsnQuery := asnQueryFunc
+	defer func() { asnQueryFunc = origAsnQuery }()
+
+	asnQueryFunc = func(_, _ string) (*geoip2.ISP, *geoip2.ASN, error) {
+		return nil, nil, errors.New("mock error")
+	}
+
+	exec := getIPASN("127.0.0.1", "mock.mmdb")
+	if exec.Error == nil {
+		t.Error("expected error, got nil")
+	}
+}
+
+func TestGetIPASN_ASNOnly(t *testing.T) {
+	origAsnQuery := asnQueryFunc
+	defer func() { asnQueryFunc = origAsnQuery }()
+
+	asnQueryFunc = func(_, _ string) (*geoip2.ISP, *geoip2.ASN, error) {
+		asn := &geoip2.ASN{
+			AutonomousSystemNumber:       12345,
+			AutonomousSystemOrganization: "Test Org",
+		}
+		return nil, asn, nil
+	}
+
+	exec := getIPASN("127.0.0.1", "mock.mmdb")
+	if exec.Error != nil {
+		t.Errorf("expected no error, got %v", *exec.Error)
+	}
+	if len(exec.Results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(exec.Results))
+	}
+}
+
+func TestGetIPASN_Empty(t *testing.T) {
+	origAsnQuery := asnQueryFunc
+	defer func() { asnQueryFunc = origAsnQuery }()
+
+	asnQueryFunc = func(_, _ string) (*geoip2.ISP, *geoip2.ASN, error) {
+		return nil, nil, nil
+	}
+
+	exec := getIPASN("127.0.0.1", "mock.mmdb")
+	if exec.Error != nil {
+		t.Errorf("expected no error, got %v", *exec.Error)
+	}
+	if len(exec.Results) != 0 {
+		t.Errorf("expected 0 results, got %d", len(exec.Results))
 	}
 }

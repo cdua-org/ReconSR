@@ -103,3 +103,80 @@ func TestModule_Exec(t *testing.T) {
 		t.Errorf("expected unsupported function error")
 	}
 }
+
+func TestModule_Capabilities_CityOnly(t *testing.T) {
+	origCheck := checkFileExists
+	defer func() { checkFileExists = origCheck }()
+
+	checkFileExists = func(_ string) bool {
+		return false
+	}
+
+	m := &module{
+		cityDBPath: "mock-city-2.mmdb",
+	}
+
+	caps, err := m.Capabilities()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(caps.Functions) != 1 || caps.Functions[0] != constants.FuncGetGeoIP {
+		t.Errorf("expected only FuncGetGeoIP, got %v", caps.Functions)
+	}
+}
+
+func TestModule_Exec_Full(t *testing.T) {
+	m := &module{
+		enterpriseDBPath: "mock-ent.mmdb",
+		cityDBPath:       "mock-city-3.mmdb",
+		asnDBPath:        "mock-asn.mmdb",
+		proxyDBPath:      "mock-proxy.mmdb",
+	}
+
+	data := schema.ModuleInput{
+		Target: schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.2"},
+		Functions: []string{
+			constants.FuncGetMMEnterpriseData,
+			constants.FuncGetIPASN,
+			constants.FuncGetProxyCheck,
+		},
+	}
+
+	out, err := m.Exec(data)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(out.Executions) != 3 {
+		t.Fatalf("expected 3 executions")
+	}
+}
+
+func TestModule_Exec_EmptyDBs(t *testing.T) {
+	m := &module{}
+
+	data := schema.ModuleInput{
+		Target: schema.Entity{Type: constants.TypeIPv4, Value: "192.0.2.3"},
+		Functions: []string{
+			constants.FuncGetMMEnterpriseData,
+			constants.FuncGetGeoIP,
+			constants.FuncGetIPASN,
+			constants.FuncGetProxyCheck,
+		},
+	}
+
+	out, err := m.Exec(data)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(out.Executions) != 4 {
+		t.Fatalf("expected 4 executions")
+	}
+
+	for _, exec := range out.Executions {
+		if exec.Error != nil {
+			t.Errorf("expected no error for %s with empty DB", exec.Function)
+		}
+	}
+}
