@@ -233,8 +233,8 @@ func TestParseUsageType(t *testing.T) {
 }
 
 func TestCheckFileExistsImpl(t *testing.T) {
-	if !checkFileExistsImpl("ip2location_test.go") {
-		t.Errorf("expected ip2location_test.go to exist")
+	if !checkFileExistsImpl("testdata/geo.bin") {
+		t.Errorf("expected testdata/geo.bin to exist")
 	}
 
 	if checkFileExistsImpl("this_file_does_not_exist_12345.bin") {
