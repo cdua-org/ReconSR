@@ -13,6 +13,8 @@ import (
 	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
+var classifyStatusFunc = httputil.ClassifyStatus
+
 func (m *module) enforceDelay(ctx context.Context) error {
 	if resolver.CirclMutexDelayMs <= 0 {
 		return nil
@@ -86,7 +88,7 @@ func (m *module) fetchCircl(ctx context.Context, apiURL, funcName, target string
 }
 
 func processCirclResponse(ctx context.Context, resp *http.Response, attempt int, apiURL, funcName, target string) (bool, error) {
-	action := httputil.ClassifyStatus(resp.StatusCode)
+	action := classifyStatusFunc(resp.StatusCode)
 	if action == httputil.Abort {
 		if resp.StatusCode == http.StatusNotFound {
 			dlog.Printf("%s not_found target=%q url=%q status=%d", funcName, target, apiURL, resp.StatusCode)

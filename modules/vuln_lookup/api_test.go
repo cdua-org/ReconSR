@@ -2,12 +2,16 @@ package vuln_lookup
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	"cdua-org/ReconSR/modules/utils/httputil"
 	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
@@ -129,6 +133,12 @@ func TestProcessCirclResponse_Paths(t *testing.T) {
 		t.Errorf("expected no retry and error for 400, got retry=%v, err=%v", retry, err)
 	}
 
+	resp404 := &http.Response{StatusCode: http.StatusNotFound}
+	retry, err = processCirclResponse(context.Background(), resp404, 1, "url", "func", "target")
+	if retry || err != nil {
+		t.Errorf("expected no retry and no error for 404, got retry=%v, err=%v", retry, err)
+	}
+
 	ctxCanceled, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -234,5 +244,64 @@ func TestFetchCircl_AbortError(t *testing.T) {
 	_, err := m.fetchCircl(context.Background(), srv.URL, "test", "target")
 	if err == nil {
 		t.Errorf("expected abort error")
+	}
+}
+
+func TestFetchCircl_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	m := &module{}
+	body, err := m.fetchCircl(context.Background(), srv.URL, "test", "target")
+	if err != nil {
+		t.Errorf("expected no error for 404, got %v", err)
+	}
+	if body != nil {
+		t.Errorf("expected nil body for 404, got %s", string(body))
+	}
+}
+
+type errCloseBody struct {
+	io.Reader
+}
+
+func (errCloseBody) Close() error {
+	return errors.New("close error")
+}
+
+type mockTransport struct{}
+
+func (m *mockTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       errCloseBody{Reader: strings.NewReader("test")},
+	}, nil
+}
+
+func TestFetchCircl_BodyCloseError(t *testing.T) {
+	origTransport := http.DefaultTransport
+	http.DefaultTransport = &mockTransport{}
+	defer func() { http.DefaultTransport = origTransport }()
+
+	m := &module{}
+	_, err := m.fetchCircl(context.Background(), "http://example.com", "test", "target")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestProcessCirclResponse_Fallthrough(t *testing.T) {
+	origClassify := classifyStatusFunc
+	classifyStatusFunc = func(_ int) httputil.ResponseAction {
+		return httputil.ResponseAction(999)
+	}
+	defer func() { classifyStatusFunc = origClassify }()
+
+	resp := &http.Response{StatusCode: 201}
+	retry, err := processCirclResponse(context.Background(), resp, 1, "url", "func", "target")
+	if retry || err == nil {
+		t.Errorf("expected no retry and error for unhandled action, got retry=%v, err=%v", retry, err)
 	}
 }
