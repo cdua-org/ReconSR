@@ -15,13 +15,17 @@ import (
 )
 
 var leakixAPIBaseURL = "https://leakix.net"
+var (
+	getHTTPClientFunc = resolver.GetHTTPClient
+	sleepFunc         = time.Sleep
+)
 
 func (m *leakixModule) waitRateLimit() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	elapsed := time.Since(m.lastReqTime)
 	if elapsed < 1050*time.Millisecond {
-		time.Sleep(1050*time.Millisecond - elapsed)
+		sleepFunc(1050*time.Millisecond - elapsed)
 	}
 	m.lastReqTime = time.Now()
 }
@@ -62,7 +66,7 @@ func (m *leakixModule) executeHTTPRequest(exec *schema.ModuleExecution, u string
 
 	dbg.Printf("%s request_prepared target=%q has_api_key=%t", exec.Function, targetValue, m.apiKey != "")
 
-	client := resolver.GetHTTPClient(resolver.LeakIXTimeout)
+	client := getHTTPClientFunc(resolver.LeakIXTimeout)
 	resp, err := client.Do(req)
 	if err != nil {
 		dbg.Printf("%s error stage=do_request err=%v", exec.Function, err)
@@ -116,9 +120,9 @@ func sleepOnRateLimit(resp *http.Response) {
 	limitedFor := resp.Header.Get("x-limited-for")
 	if limitedFor != "" {
 		if d, err := time.ParseDuration(limitedFor); err == nil && d > 0 {
-			time.Sleep(d)
+			sleepFunc(d)
 			return
 		}
 	}
-	time.Sleep(1050 * time.Millisecond)
+	sleepFunc(1050 * time.Millisecond)
 }

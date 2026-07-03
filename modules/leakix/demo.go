@@ -1,7 +1,7 @@
 package leakix
 
 import (
-	"embed"
+	_ "embed"
 	"encoding/json"
 
 	"cdua-org/ReconSR/modules/utils/constants"
@@ -9,8 +9,14 @@ import (
 	"cdua-org/ReconSR/schema"
 )
 
-//go:embed testdata/service_domain_response.json testdata/service_ip_response.json testdata/subdomains_response.json
-var demoData embed.FS
+//go:embed testdata/service_domain_response.json
+var demoDomainResponse []byte
+
+//go:embed testdata/service_ip_response.json
+var demoIPResponse []byte
+
+//go:embed testdata/subdomains_response.json
+var demoSubdomainsResponse []byte
 
 // getLeakixDomainDemo is a demo function that loads a local JSON fixture
 // instead of querying the LeakIX API when the "demo-api-key" is used.
@@ -29,19 +35,13 @@ func (m *leakixModule) getLeakixDomainDemo(exec *schema.ModuleExecution, target 
 		LocalID:  gen.NextID(),
 	})
 
-	data, err := demoData.ReadFile("testdata/service_domain_response.json")
-	if err != nil {
-		modutil.SetError(exec, "read fixture err: %v", err)
-		return *exec
-	}
-
-	resp, err := parseLeakixResponse(data)
+	resp, err := parseLeakixResponse(demoDomainResponse)
 	if err != nil {
 		modutil.SetError(exec, "parse json: %v", err)
 		return *exec
 	}
 	formatLeakixResults(exec, resp, target, gen)
-	modutil.SetRawFromBytes(exec, data)
+	modutil.SetRawFromBytes(exec, demoDomainResponse)
 
 	dbg.Printf("%s success stage=demo_parsed", constants.FuncGetLeakIXDomain)
 
@@ -65,19 +65,13 @@ func (m *leakixModule) getLeakixIPDemo(exec *schema.ModuleExecution, target sche
 		LocalID:  gen.NextID(),
 	})
 
-	data, err := demoData.ReadFile("testdata/service_ip_response.json")
-	if err != nil {
-		modutil.SetError(exec, "read fixture err: %v", err)
-		return *exec
-	}
-
-	resp, err := parseLeakixResponse(data)
+	resp, err := parseLeakixResponse(demoIPResponse)
 	if err != nil {
 		modutil.SetError(exec, "parse json: %v", err)
 		return *exec
 	}
 	formatLeakixResults(exec, resp, target, gen)
-	modutil.SetRawFromBytes(exec, data)
+	modutil.SetRawFromBytes(exec, demoIPResponse)
 
 	dbg.Printf("%s success stage=demo_parsed", constants.FuncGetLeakIXIP)
 
@@ -101,20 +95,14 @@ func (m *leakixModule) getLeakixSubdomainsDemo(exec *schema.ModuleExecution, tar
 		LocalID:  gen.NextID(),
 	})
 
-	data, err := demoData.ReadFile("testdata/subdomains_response.json")
-	if err != nil {
-		modutil.SetError(exec, "read fixture err: %v", err)
-		return *exec
-	}
-
 	var resp []SubdomainResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
+	if err := json.Unmarshal(demoSubdomainsResponse, &resp); err != nil {
 		modutil.SetError(exec, "parse json: %v", err)
 		return *exec
 	}
 
 	formatLeakixSubdomains(exec, resp, target.Value, gen)
-	modutil.SetRawFromBytes(exec, data)
+	modutil.SetRawFromBytes(exec, demoSubdomainsResponse)
 
 	dbg.Printf("%s success stage=demo_parsed", constants.FuncGetLeakIXSubdomains)
 	return *exec
