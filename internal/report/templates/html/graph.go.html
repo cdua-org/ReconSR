@@ -26,7 +26,7 @@
             }
             #top-bar {
                 position: absolute;
-                top: 140px;
+                top: 180px;
                 left: 20px;
                 pointer-events: none;
                 display: flex;
@@ -359,9 +359,8 @@
             #timeline-container {
                 position: absolute;
                 bottom: 15px;
-                left: 50%;
-                transform: translateX(-50%) translateY(0);
-                width: 65%;
+                left: 80px;
+                right: 240px;
                 background: rgba(30, 41, 59, 0.9);
                 border: 1px solid #334155;
                 border-radius: 8px;
@@ -373,13 +372,14 @@
                 align-items: center;
                 pointer-events: auto;
                 transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                transform: translateY(0);
             }
             #timeline-container.collapsed {
-                transform: translateX(-50%) translateY(calc(100% + 15px));
+                transform: translateY(calc(100% + 15px));
             }
             #timeline-toggle {
                 position: absolute;
-                bottom: 19px;
+                bottom: 15px;
                 left: 25px;
                 z-index: 999;
                 pointer-events: auto;
@@ -516,19 +516,21 @@
 
             #graph-navigation {
                 position: fixed;
-                bottom: 25px;
+                bottom: 15px;
                 right: 25px;
                 display: flex;
                 flex-direction: column;
+                align-items: center;
                 gap: 10px;
                 z-index: 100;
-                transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             }
             #graph-navigation button {
                 background: #1e293b;
                 border: 1px solid #334155;
                 color: #f1f5f9;
-                padding: 8px 16px;
+                width: 36px;
+                height: 36px;
+                padding: 0;
                 border-radius: 8px;
                 display: flex;
                 align-items: center;
@@ -541,6 +543,83 @@
                 background: #334155;
                 border-color: #475569;
                 transform: translateY(-1px);
+            }
+            #minimap-container {
+                position: fixed;
+                bottom: 15px;
+                right: 75px;
+                width: 150px;
+                height: 150px;
+                background: rgba(15, 23, 42, 0.85);
+                backdrop-filter: blur(8px);
+                border: 2px solid #334155;
+                border-radius: 8px;
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+                z-index: 99;
+                overflow: hidden;
+                pointer-events: auto;
+                cursor: crosshair;
+            }
+            #minimap-canvas {
+                width: 100%;
+                height: 100%;
+                display: block;
+            }
+            #zoom-slider {
+                -webkit-appearance: slider-vertical;
+                writing-mode: vertical-lr;
+                direction: rtl;
+                width: 8px;
+                height: 80px;
+                background: #334155;
+                outline: none;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                accent-color: #38bdf8;
+                padding: 0;
+                margin: 5px 0;
+            }
+            #zoom-slider::-webkit-slider-runnable-track {
+                background: #334155;
+                border-radius: 4px;
+                width: 8px;
+            }
+            #zoom-slider::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                background: #38bdf8;
+                border-radius: 50%;
+                width: 16px;
+                height: 16px;
+                margin-left: -4px;
+                cursor: pointer;
+                border: 2px solid #1e293b;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                transition: background-color 0.15s, transform 0.15s;
+            }
+            #zoom-slider::-webkit-slider-thumb:hover {
+                background: #7dd3fc;
+                transform: scale(1.1);
+            }
+            #zoom-slider::-moz-range-track {
+                background: #334155;
+                border-radius: 4px;
+                width: 8px;
+            }
+            #zoom-slider::-moz-range-thumb {
+                background: #38bdf8;
+                border-radius: 50%;
+                width: 16px;
+                height: 16px;
+                cursor: pointer;
+                border: 2px solid #1e293b;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                transition: background-color 0.15s, transform 0.15s;
+            }
+            #zoom-slider::-moz-range-thumb:hover {
+                background: #7dd3fc;
+                transform: scale(1.1);
             }
             .mb-0 { margin-bottom: 0; }
             .mb-2 { margin-bottom: 2px; }
@@ -575,19 +654,29 @@
                 #sidebar-toggle.sidebar-open {
                     transform: translateX(260px);
                 }
-                #timeline-container:not(.collapsed) ~ #graph-navigation {
-                    bottom: 110px;
-                }
-                #timeline-container:not(.collapsed) ~ #timeline-toggle {
-                    bottom: 110px;
+                #minimap-container {
+                    display: none;
                 }
                 #timeline-container {
+                    position: absolute;
+                    left: 50%;
+                    right: auto;
+                    transform: translateX(-50%) translateY(0);
                     width: 90vw;
                     bottom: 10px;
                     padding: 6px 8px;
                     flex-wrap: wrap;
                     justify-content: space-between;
                     gap: 6px;
+                }
+                #timeline-container.collapsed {
+                    transform: translateX(-50%) translateY(calc(100% + 15px));
+                }
+                #timeline-container:not(.collapsed) ~ #timeline-toggle {
+                    bottom: 110px;
+                }
+                #timeline-container:not(.collapsed) ~ #graph-navigation {
+                    bottom: 110px;
                 }
                 #timeline-canvas-wrapper {
                     width: 100%;
@@ -1213,10 +1302,15 @@
 
         <div id="graph-container"></div>
 
+        <div id="minimap-container">
+            <canvas id="minimap-canvas" width="300" height="300"></canvas>
+        </div>
+
         <div id="graph-navigation">
             <button onclick="zoomIn()" id="zoom-in-btn" title="Zoom In">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
+            <input type="range" id="zoom-slider" min="0.02" max="4.00" step="0.01" value="1.00" orient="vertical" title="Zoom Slider" oninput="onZoomSliderInput(this.value)" />
             <button onclick="zoomOut()" id="zoom-out-btn" title="Zoom Out">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
@@ -2436,6 +2530,115 @@
                         });
 
                         ctx.restore();
+                        this.drawMinimap();
+                    }
+
+                    zoomToScale(newZoom) {
+                        newZoom = Math.max(0.02, Math.min(newZoom, 4.0));
+                        const dpr = window.devicePixelRatio || 1;
+                        const w = this.canvas.width / dpr;
+                        const h = this.canvas.height / dpr;
+                        const graphCenter = this.screenToGraph(w / 2, h / 2);
+                        this.camera.zoom = newZoom;
+                        this.camera.x = -graphCenter.x * newZoom;
+                        this.camera.y = -graphCenter.y * newZoom;
+                        this.draw();
+                        this._trigger('zoom', null);
+                    }
+
+                    drawMinimap() {
+                        const minimapCanvas = document.getElementById('minimap-canvas');
+                        if (!minimapCanvas) return;
+                        const mw = 300;
+                        const mh = 300;
+                        const ctx = minimapCanvas.getContext('2d');
+                        if (!ctx) return;
+
+                        ctx.clearRect(0, 0, mw, mh);
+
+                        const nodes = this.nodesDataSet.get().filter(n => !n.hidden);
+                        const edges = this.edgesDataSet.get().filter(e => !e.hidden);
+                        if (nodes.length === 0) return;
+
+                        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                        nodes.forEach(n => {
+                            const x = n.x || 0;
+                            const y = n.y || 0;
+                            if (x < minX) minX = x;
+                            if (x > maxX) maxX = x;
+                            if (y < minY) minY = y;
+                            if (y > maxY) maxY = y;
+                        });
+
+                        if (minX === Infinity) {
+                            minX = -500; maxX = 500; minY = -500; maxY = 500;
+                        }
+
+                        const pad = 40;
+                        minX -= pad; maxX += pad; minY -= pad; maxY += pad;
+
+                        const graphW = maxX - minX;
+                        const graphH = maxY - minY;
+                        const miniScale = Math.min(mw / (graphW || 1), mh / (graphH || 1));
+
+                        const cx = (minX + maxX) / 2;
+                        const cy = (minY + maxY) / 2;
+                        const miniTx = mw / 2 - cx * miniScale;
+                        const miniTy = mh / 2 - cy * miniScale;
+
+                        const toMiniX = (x) => x * miniScale + miniTx;
+                        const toMiniY = (y) => y * miniScale + miniTy;
+
+                        ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+                        ctx.lineWidth = 1;
+                        const nodeMap = new Map();
+                        nodes.forEach(n => nodeMap.set(n.id, n));
+
+                        ctx.beginPath();
+                        edges.forEach(edge => {
+                            const fromNode = nodeMap.get(edge.from);
+                            const toNode = nodeMap.get(edge.to);
+                            if (fromNode && toNode) {
+                                ctx.moveTo(toMiniX(fromNode.x || 0), toMiniY(fromNode.y || 0));
+                                ctx.lineTo(toMiniX(toNode.x || 0), toMiniY(toNode.y || 0));
+                            }
+                        });
+                        ctx.stroke();
+
+                        nodes.forEach(node => {
+                            ctx.beginPath();
+                            let color = '#38bdf8';
+                            if (node.color) {
+                                if (typeof node.color === 'string') color = node.color;
+                                else if (node.color.background) color = node.color.background;
+                            }
+                            ctx.fillStyle = color;
+                            const size = 3;
+                            ctx.arc(toMiniX(node.x || 0), toMiniY(node.y || 0), size, 0, Math.PI * 2);
+                            ctx.fill();
+                        });
+
+                        const dpr = window.devicePixelRatio || 1;
+                        const mainW = this.canvas.width / dpr;
+                        const mainH = this.canvas.height / dpr;
+
+                        const nwCorner = this.screenToGraph(0, 0);
+                        const seCorner = this.screenToGraph(mainW, mainH);
+
+                        const vX1 = toMiniX(nwCorner.x);
+                        const vY1 = toMiniY(nwCorner.y);
+                        const vX2 = toMiniX(seCorner.x);
+                        const vY2 = toMiniY(seCorner.y);
+
+                        ctx.strokeStyle = '#ef4444';
+                        ctx.lineWidth = 1.5;
+                        ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
+                        ctx.beginPath();
+                        ctx.rect(vX1, vY1, vX2 - vX1, vY2 - vY1);
+                        ctx.fill();
+                        ctx.stroke();
+
+                        this.minimapTransform = { scale: miniScale, tx: miniTx, ty: miniTy };
                     }
                 }
 
@@ -3355,6 +3558,53 @@
                                 }
 
                                 network.on("zoom", updateZoomVisibility);
+                                 network.on("zoom", () => {
+                                     const scale = network.getScale();
+                                     const slider = document.getElementById('zoom-slider');
+                                     if (slider) {
+                                         slider.value = scale.toFixed(2);
+                                     }
+                                 });
+
+                                 const minimapCanvas = document.getElementById('minimap-canvas');
+                                 if (minimapCanvas) {
+                                     let isPanningMinimap = false;
+
+                                     const panMainCameraToMinimap = (e) => {
+                                         if (!network || !network.minimapTransform) return;
+                                         const rect = minimapCanvas.getBoundingClientRect();
+                                         const mx = (e.clientX - rect.left) * (300 / rect.width);
+                                         const my = (e.clientY - rect.top) * (300 / rect.height);
+
+                                         const { scale, tx, ty } = network.minimapTransform;
+                                         const gx = (mx - tx) / scale;
+                                         const gy = (my - ty) / scale;
+
+                                         const dpr = window.devicePixelRatio || 1;
+                                         const w = network.canvas.width / dpr;
+                                         const h = network.canvas.height / dpr;
+
+                                         network.camera.x = -gx * network.camera.zoom;
+                                         network.camera.y = -gy * network.camera.zoom;
+
+                                         network.draw();
+                                     };
+
+                                     minimapCanvas.addEventListener('mousedown', (e) => {
+                                         isPanningMinimap = true;
+                                         panMainCameraToMinimap(e);
+                                     });
+
+                                     window.addEventListener('mousemove', (e) => {
+                                         if (isPanningMinimap) {
+                                             panMainCameraToMinimap(e);
+                                         }
+                                     });
+
+                                     window.addEventListener('mouseup', () => {
+                                         isPanningMinimap = false;
+                                     });
+                                 }
 
                                 const originalColors = {};
                                 const initialUpdates = [];
@@ -5321,7 +5571,10 @@
                                             } else {
                                                 const sourceNode = nodes.get(edge.from);
                                                 if (sourceNode) {
-                                                    let sourceLabel = sourceNode.label;
+                                                    let sourceLabel = originalNodesData.has(sourceNode.id) ? originalNodesData.get(sourceNode.id).label : sourceNode.label;
+                                                    if (isPrivacyMode) {
+                                                        sourceLabel = maskValueByType(sourceNode.group, sourceLabel);
+                                                    }
 
                                                     const focusBtnHtml = '<button id="focus-btn-src-' + sourceNode.id + '" class="raw-data-btn focus-btn" title="Focus on this object" style="position: absolute; right: 10px; top: 10px; margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + sourceNode.id + ')">Focus</button>';
 
@@ -5401,6 +5654,11 @@
                                     }
                                 });
 
+        function onZoomSliderInput(value) {
+            if (network) {
+                network.zoomToScale(parseFloat(value));
+            }
+        }
         function zoomIn() {
             if (network) {
                 const rect = network.canvas.getBoundingClientRect();
