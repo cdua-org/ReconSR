@@ -1245,7 +1245,8 @@
                 const collectPropertyIds = (propId) => {
                     if (activePropIds.has(propId)) return;
                     activePropIds.add(propId);
-                    const prop = allPropsMap[propId];
+                    const propsMap = window.allPropsMap || {};
+                    const prop = propsMap[propId];
                     if (prop && prop.properties) {
                         prop.properties.forEach(childId => collectPropertyIds(childId));
                     }
@@ -1255,7 +1256,7 @@
                         n.properties.forEach(id => collectPropertyIds(id));
                     }
                 });
-                const totalPropsCount = Object.keys(allPropsMap).length;
+                const totalPropsCount = window.allPropsMap ? Object.keys(window.allPropsMap).length : 0;
                 const statsEl = document.getElementById('top-bar-stats');
                 if (statsEl) {
                     statsEl.innerHTML = `<div>Nodes: ${activeNodes.length} (${initialNodes.length} total)</div><div>Properties: ${activePropIds.size} (${totalPropsCount} total)</div>`;
@@ -2804,7 +2805,8 @@
 
                         {{define "footer"}}] ;
 
-                                const allPropsMap = {{ .AllProperties }};
+                                window.allPropsMap = {{ .AllProperties }};
+                                const allPropsMap = window.allPropsMap;
                                 const ROOT_NODE_ID = {{ .InitialTargetID }};
 
                                 // Handle fallback layout if coordinates are not present initially (e.g. legacy files)
