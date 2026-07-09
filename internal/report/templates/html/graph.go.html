@@ -1157,14 +1157,14 @@
                             <div class="meta-item-controls">
                                 <span
                                     class="stat-badge type-stat-badge"
-                                    data-type="{{$parentType}}:{{.Type}}"
+                                    data-type="{{html $parentType}}:{{html .Type}}"
                                     data-total-count="{{.Count}}"
                                     >{{.Count}}</span
                                 >
                                 <div
-                                    id="subtype-label-toggle-{{$parentType}}-{{.Type}}"
+                                    id="subtype-label-toggle-{{html $parentType}}-{{html .Type}}"
                                     class="icon-btn active label-toggle-btn"
-                                    data-type="{{$parentType}}:{{.Type}}"
+                                    data-type="{{html $parentType}}:{{html .Type}}"
                                     title="Toggle Label"
                                 >
                                     <svg
@@ -1181,9 +1181,9 @@
                                     </svg>
                                 </div>
                                 <div
-                                    id="subtype-visibility-toggle-{{$parentType}}-{{.Type}}"
+                                    id="subtype-visibility-toggle-{{html $parentType}}-{{html .Type}}"
                                     class="icon-btn active visibility-eye type-toggle-btn"
-                                    data-type="{{$parentType}}:{{.Type}}"
+                                    data-type="{{html $parentType}}:{{html .Type}}"
                                     title="Toggle Visibility"
                                 >
                                     <svg
@@ -3115,6 +3115,40 @@
                                         el.style.display = (el.style.display === 'block') ? 'none' : 'block';
                                     }
                                 }
+                                function toggleFullPropValue(id, btn) {
+                                     const el = document.getElementById(id);
+                                     if (el) {
+                                         const isFull = el.getAttribute('data-is-full') === 'true';
+                                         if (isFull) {
+                                             el.style.whiteSpace = 'nowrap';
+                                             el.setAttribute('data-is-full', 'false');
+                                             btn.innerText = '▶';
+                                         } else {
+                                             el.style.whiteSpace = 'normal';
+                                             el.setAttribute('data-is-full', 'true');
+                                             btn.innerText = '▼';
+                                         }
+                                     }
+                                 }
+                                 function checkPropertiesOverflow() {
+                                     const elements = document.querySelectorAll('.prop-value-text');
+                                     elements.forEach(el => {
+                                         const id = el.id.replace('prop-text-', '');
+                                         const btn = document.getElementById('toggle-more-' + id);
+                                         if (btn) {
+                                             const prevWS = el.style.whiteSpace;
+                                             el.style.whiteSpace = 'nowrap';
+                                             const isOverflowing = el.scrollWidth > el.clientWidth;
+                                             el.style.whiteSpace = prevWS;
+                                             
+                                             if (isOverflowing) {
+                                                 btn.style.display = 'inline-flex';
+                                             } else {
+                                                 btn.style.display = 'none';
+                                             }
+                                         }
+                                     });
+                                 }
 
                                 function updateBadge(el, visible, total) {
                                     const element = (typeof el === 'string') ? document.getElementById(el) : el;
@@ -4360,18 +4394,19 @@
                                 }
 
                                 function toggleSection(id) {
-                                    const el = document.getElementById(id);
-                                    const icon = document.getElementById(id + '-icon');
-                                    if (el) {
-                                        if (el.style.display === 'none') {
-                                            el.style.display = 'block';
-                                            if (icon) icon.innerText = '▼';
-                                        } else {
-                                            el.style.display = 'none';
-                                            if (icon) icon.innerText = '▶';
-                                        }
-                                    }
-                                }
+                                     const el = document.getElementById(id);
+                                     const icon = document.getElementById(id + '-icon');
+                                     if (el) {
+                                         if (el.style.display === 'none') {
+                                             el.style.display = 'block';
+                                             if (icon) icon.innerText = '▼';
+                                             checkPropertiesOverflow();
+                                         } else {
+                                             el.style.display = 'none';
+                                             if (icon) icon.innerText = '▶';
+                                         }
+                                     }
+                                 }
 
                                  let currentBlinkInterval = null;
                                  let currentBlinkingNode = null;
@@ -5146,7 +5181,7 @@
                                     updatePropertiesUI();
                                 }
 
-                                function renderPropNode(prop, executions, depth, isParentVisibleExplicit, targetGroupType = "", parentFunction = "") {
+                                function renderPropNode(prop, executions, depth, isParentVisibleExplicit, targetGroupType = "", parentType = "") {
                                     const isExplicitlyVisible = !currentHiddenPropTypes.has(prop.type);
                                     const isVisibleExplicit = isParentVisibleExplicit || isExplicitlyVisible;
 
@@ -5158,17 +5193,18 @@
                                     if (prop.properties && Array.isArray(prop.properties) && prop.properties.length > 0) {
                                         let childGroups = Object.create(null);
                                         prop.properties.forEach(child => {
-                                            let cfn = child.function || 'unknown';
-                                            if (!childGroups[cfn]) childGroups[cfn] = [];
-                                            childGroups[cfn].push(child);
+                                            let ctype = child.type || 'unknown';
+                                            if (!childGroups[ctype]) childGroups[ctype] = [];
+                                            childGroups[ctype].push(child);
                                         });
 
-                                        for (let cfn in childGroups) {
+                                        let sortedChildTypes = Object.keys(childGroups).sort();
+                                        for (let ctype of sortedChildTypes) {
                                             let groupHtml = '';
                                             let groupHasVisible = false;
 
-                                            childGroups[cfn].forEach(child => {
-                                                const childRes = renderPropNode(child, currentExecutions, depth + 1, isVisibleExplicit, targetGroupType, cfn);
+                                            childGroups[ctype].forEach(child => {
+                                                const childRes = renderPropNode(child, currentExecutions, depth + 1, isVisibleExplicit, targetGroupType, ctype);
                                                 if (childRes.hasVisible) {
                                                     groupHasVisible = true;
                                                     groupHtml += childRes.html;
@@ -5178,22 +5214,15 @@
                                             if (!groupHasVisible) continue;
                                             hasVisibleChild = true;
 
-                                            const currentFn = prop.function || parentFunction;
-                                            if (cfn !== 'unknown' && cfn !== currentFn) {
-                                                const listId = 'list-prop-' + Math.random().toString(36).substr(2, 9);
+                                            if (ctype !== 'unknown') {
+                                                const listId = 'list-prop-' + Math.random().toString(36).slice(2, 11);
                                                 let blockHtml = '<div class="prop-container-nested">';
                                                 blockHtml += '<div class="prop-header-nested" id="header-' + listId + '" onclick="toggleSection(\'' + listId + '\')">';
-                                                blockHtml += '<span class="prop-title" style="color: #a78bfa; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(cfn) + '</span>';
+                                                blockHtml += '<span class="prop-title" style="color: #a78bfa; font-size: 0.75rem; text-transform: uppercase; font-weight: bold;">' + escapeHTML(ctype) + '</span>';
                                                 blockHtml += '<div style="display: flex; align-items: center; gap: 12px;">';
-                                                let rawHtml = getRawDataHTML(cfn, currentExecutions, childGroups[cfn][0]);
-                                                if (rawHtml.btn) {
-                                                    blockHtml += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
-                                                }
-                                                blockHtml += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
+                                                blockHtml += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▶</span>';
                                                 blockHtml += '</div></div>';
-
-                                                if (rawHtml.content) blockHtml += rawHtml.content;
-                                                blockHtml += '<div id="' + listId + '" style="display: block;">' + groupHtml + '</div></div>';
+                                                blockHtml += '<div id="' + listId + '" style="display: none;">' + groupHtml + '</div></div>';
                                                 childrenHtml += blockHtml;
                                             } else {
                                                 childrenHtml += groupHtml;
@@ -5208,26 +5237,44 @@
                                         return { html: '', hasVisible: false };
                                     }
 
-                                    const opacityStyle = isTransit ? 'opacity: 0.6;' : '';
+                                    const opacityStyle = isTransit ? 'opacity: 0.5;' : '';
                                     const borderStyle = isTransit ? 'border-left: 3px dashed #64748b;' : 'border-left: 3px solid #a78bfa;';
 
-                                    let displayValue = prop.value;
+                                     let displayValue = prop.value;
+                                     const uniqueId = 'prop-val-' + Math.random().toString(36).slice(2, 11);
 
-                                    let htmlStr = '<div style="margin-bottom: 8px; padding: 8px; background: #1e293b; border-radius: 0 4px 4px 0; ' + borderStyle + ' ' + opacityStyle + '">';
-                                    htmlStr += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
-                                    htmlStr += '<span style="color: ' + (isTransit ? '#94a3b8' : '#38bdf8') + '; font-weight: bold;">' + escapeHTML(prop.type) + '</span>';
-                                    htmlStr += '</div>';
-                                    htmlStr += '<div style="color: ' + (isTransit ? '#cbd5e1' : '#f1f5f9') + '; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(String(displayValue)) + '</span>' + getCopyBtnHTML(String(displayValue)) + '</div>';
+                                     let htmlStr = '<div style="margin-bottom: 8px; padding: 8px; background: #1e293b; border-radius: 0 4px 4px 0; ' + borderStyle + '">';
+                                     let textHtml = '<span id="prop-text-' + uniqueId + '" class="prop-value-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; flex-grow: 0; flex-shrink: 1; min-width: 0; word-break: break-all; padding-right: 4px; vertical-align: top;">' + escapeHTML(String(displayValue)) + '</span>';
+                                     let toggleBtnHtml = '<button class="raw-data-btn" id="toggle-more-' + uniqueId + '" style="display: none; padding: 2px 5px; font-size: 0.65rem; align-items: center; justify-content: center; height: 18px; margin: 0; flex-shrink: 0;" onclick="toggleFullPropValue(\'prop-text-' + uniqueId + '\', this)">▶</button>';
+
+                                     htmlStr += '<div style="color: ' + (isTransit ? '#cbd5e1' : '#f1f5f9') + '; font-size: 0.95rem; display: flex; align-items: flex-start; justify-content: flex-start; width: 100%; gap: 4px; margin-bottom: 4px; ' + opacityStyle + '">';
+                                     htmlStr += textHtml;
+                                     htmlStr += '<div style="display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: 2px; vertical-align: top;">' + toggleBtnHtml + getCopyBtnHTML(String(displayValue)) + '</div>';
+                                     htmlStr += '</div>';
 
                                     let metaHtml = '';
                                     if (prop.contexts && prop.contexts.length > 0) {
-                                        metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(prop.contexts.join(', ')) + '</div>';
+                                        metaHtml += '<div style="margin-top: 4px;">Context: <span style="color: #e2e8f0;">' + escapeHTML(prop.contexts.join(', ')) + '</span></div>';
                                     }
-                                    if (prop.firstSeen) {
-                                        metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(prop.firstSeen) + '</div>';
+                                    if (prop.function) {
+                                        metaHtml += '<div style="margin-top: 2px;">Function: <span style="color: #a78bfa; font-family: monospace;">' + escapeHTML(prop.function) + '</span></div>';
                                     }
+                                    if (prop.firstSeen || prop.lastSeen) {
+                                        let times = [];
+                                        if (prop.firstSeen) times.push('First: ' + formatDateTime(prop.firstSeen));
+                                        if (prop.lastSeen) times.push('Last: ' + formatDateTime(prop.lastSeen));
+                                        metaHtml += '<div style="margin-top: 2px; color: #64748b;">' + times.join(' | ') + '</div>';
+                                    }
+                                    let rawHtml = getRawDataHTML(prop.function, currentExecutions, prop);
+                                    if (rawHtml.btn) {
+                                        metaHtml += '<div style="margin-top: 6px;">' + rawHtml.btn + '</div>';
+                                    }
+
                                     if (metaHtml) {
-                                        htmlStr += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
+                                        htmlStr += '<div style="font-size: 0.75rem; color: #94a3b8; ' + opacityStyle + '">' + metaHtml + '</div>';
+                                    }
+                                    if (rawHtml.content) {
+                                        htmlStr += rawHtml.content;
                                     }
 
                                     if (childrenHtml) {
@@ -5244,51 +5291,46 @@
                                     let htmlStr = "";
                                     let propGroups = {};
                                     props.forEach(prop => {
-                                        let fn = prop.function || 'unknown';
-                                        if (!propGroups[fn]) propGroups[fn] = [];
-                                        propGroups[fn].push(prop);
+                                        let type = prop.type || 'unknown';
+                                        if (!propGroups[type]) propGroups[type] = [];
+                                        propGroups[type].push(prop);
                                     });
 
-                                    for (let fn in propGroups) {
-                                        let fnChildrenHtml = '';
-                                        let fnHasVisible = false;
+                                    let sortedTypes = Object.keys(propGroups).sort();
+                                    for (let type of sortedTypes) {
+                                        let typeChildrenHtml = '';
+                                        let typeHasVisible = false;
 
-                                        propGroups[fn].forEach(prop => {
-                                            const res = renderPropNode(prop, executions, 0, false, rootNodeType, fn);
+                                        propGroups[type].forEach(prop => {
+                                            const res = renderPropNode(prop, executions, 0, false, rootNodeType, type);
                                             if (res.hasVisible) {
-                                                fnHasVisible = true;
-                                                fnChildrenHtml += res.html;
+                                                typeHasVisible = true;
+                                                typeChildrenHtml += res.html;
                                             }
                                         });
 
-                                        if (!fnHasVisible) continue;
+                                        if (!typeHasVisible) continue;
 
-                                        const listId = 'list-prop-' + Math.random().toString(36).substr(2, 9);
+                                        const listId = 'list-prop-' + Math.random().toString(36).slice(2, 11);
                                         htmlStr += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
 
-                                        htmlStr += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
-                                        htmlStr += '<span class="prop-title" style="color: #a78bfa; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
-                                        htmlStr += '<div style="display: flex; align-items: center; gap: 12px;">';
-                                        let rawHtml = getRawDataHTML(fn, executions, propGroups[fn][0]);
-                                        if (rawHtml.btn) {
-                                            htmlStr += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
-                                        }
-                                        htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
-                                        htmlStr += '</div></div>';
-
-                                        if (rawHtml.content) htmlStr += rawHtml.content;
-                                        htmlStr += '<div id="' + listId + '">' + fnChildrenHtml + '</div></div>';
+                                        htmlStr += '<div class="prop-header" id="header-' + listId + '" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
+                                        htmlStr += '<span class="prop-title" style="color: #38bdf8; font-size: 0.75rem; text-transform: uppercase; font-weight: bold;">' + escapeHTML(type) + '</span>';
+                                        htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▶</span>';
+                                        htmlStr += '</div>';
+                                        htmlStr += '<div id="' + listId + '" style="display: none;">' + typeChildrenHtml + '</div></div>';
                                     }
                                     return htmlStr;
                                 }
 
                                 function updatePropertiesUI() {
                                     const container = document.getElementById('properties-content-container');
-                                    if (container && currentModalPropsData && currentModalId) {
-                                        const rootNode = nodes.get(currentModalId);
-                                        const rootNodeType = rootNode ? rootNode.group : "";
-                                        container.innerHTML = renderPropertiesRoot(currentModalPropsData, currentModalExecutionsData, rootNodeType);
-                                    }
+                                     if (container && currentModalPropsData && currentModalId) {
+                                         const rootNode = nodes.get(currentModalId);
+                                         const rootNodeType = rootNode ? rootNode.group : "";
+                                         container.innerHTML = renderPropertiesRoot(currentModalPropsData, currentModalExecutionsData, rootNodeType);
+                                         checkPropertiesOverflow();
+                                     }
 
                                     if (!currentModalPropsData) return;
                                     const typesData = getPropertyTypesData(currentModalPropsData);
@@ -5579,8 +5621,9 @@
                                             document.getElementById('modal').style.display = 'block';
 
                                             // Initialize filter icon states after elements are added to the DOM
-                                            if (currentModalOutEdgesData) updateConnFilterUIState(true);
-                                            if (currentModalInEdgesData) updateConnFilterUIState(false);
+                                             if (currentModalOutEdgesData) updateConnFilterUIState(true);
+                                             if (currentModalInEdgesData) updateConnFilterUIState(false);
+                                             checkPropertiesOverflow();
                                         }
                                     }
                                     else if (params.edges.length > 0) {
