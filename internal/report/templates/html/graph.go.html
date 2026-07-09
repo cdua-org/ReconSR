@@ -169,18 +169,6 @@
                 align-items: center;
                 gap: 8px;
             }
-            .meta-item input[type="checkbox"] {
-                cursor: pointer;
-                width: 16px;
-                height: 16px;
-                accent-color: #38bdf8;
-            }
-            .meta-item label {
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                flex-grow: 1;
-            }
             .stat-badge {
                 background: #334155;
                 color: #f8fafc;
@@ -261,22 +249,7 @@
                 font-weight: bold;
                 margin-bottom: 5px;
             }
-            .detail-value {
-                color: #f1f5f9;
-                font-size: 0.95rem;
-            }
-            .detail-value.code {
-                color: #f1f5f9;
-                font-family: monospace;
-                background: #1e293b;
-                padding: 10px;
-                border-radius: 4px;
-                display: block;
-                white-space: pre-wrap;
-                word-break: break-all;
-                margin-top: 8px;
-                border: 1px solid #334155;
-            }
+
 
             .raw-data-btn {
                 background: #334155;
@@ -621,24 +594,28 @@
                 background: #7dd3fc;
                 transform: scale(1.1);
             }
-            .mb-0 { margin-bottom: 0; }
+            #lasso-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                z-index: 3;
+            }
             .mb-2 { margin-bottom: 2px; }
             .mb-6 { margin-bottom: 6px; }
-            .mb-10 { margin-bottom: 10px; }
             .mr-15 { margin-right: 15px; }
             .ml-15 { margin-left: 15px; }
             .ml-0 { margin-left: 0 !important; }
             .cursor-pointer { cursor: pointer; }
-            .flex-gap-8 { display: flex; gap: 8px; }
             .flex-between { display: flex; justify-content: space-between; align-items: center; }
             .meta-label { color: #cbd5e1; font-size: 0.95rem; }
             .icon-placeholder { width: 18px; display: inline-block; }
-            .badge-hidden { visibility: hidden; }
             .sidebar-toggle-icon { width: 24px; height: 24px; }
             .sidebar-toggle-icon.hide-initially { display: none; }
             .sidebar-toggle-icon.show-initially { display: block; }
             .meta-item-group { margin-bottom: 10px; }
-            .root-target-label { color: #cbd5e1; font-size: 0.95rem; font-weight: bold; text-transform: capitalize; }
             .type-label { color: #cbd5e1; font-size: 0.95rem; text-transform: capitalize; }
             .expander { font-size: 0.7em; margin-left: 6px; color: #64748b; }
             .subtypes-container { display: none; margin-top: 0px; }
@@ -1301,6 +1278,7 @@
         </div>
 
         <div id="graph-container"></div>
+        <canvas id="lasso-overlay"></canvas>
 
         <div id="minimap-container">
             <canvas id="minimap-canvas" width="300" height="300"></canvas>
@@ -1492,8 +1470,13 @@
                         this.selectedEdgeId = null;
                         this.focusAnimationId = null;
 
+                        // Multi-select set; selectedNodeId is kept in sync for compat.
+                        this.selectedNodeIds = new Set();
+                        // Lasso state: null when inactive.
+                        this.lassoState = null;
+
                         // Event Listeners
-                        this.eventListeners = { click: [], hoverNode: [], blurNode: [], zoom: [] };
+                        this.eventListeners = { click: [], hoverNode: [], blurNode: [], hoverEdge: [], blurEdge: [], zoom: [] };
 
                         // Initialize Canvas Size
                         this._resize();
@@ -1725,19 +1708,60 @@
 
                         const nodeId = this._getNodeAt(screenX, screenY);
                         if (nodeId !== null) {
-                            this.draggedNodeId = nodeId;
-                            this.selectedNodeId = nodeId;
-                            this.selectedEdgeId = null;
-                            const graphPos = this.screenToGraph(screenX, screenY);
-                            const node = this.nodesDataSet.get(nodeId);
-                            this.dragState = {
-                                isDraggingNode: true,
-                                nodeOffsetX: (node.x || 0) - graphPos.x,
-                                nodeOffsetY: (node.y || 0) - graphPos.y,
-                                startX: screenX,
-                                startY: screenY
-                            };
+                            if (e.ctrlKey || e.metaKey) {
+                                if (this.selectedNodeIds.has(nodeId)) {
+                                    this.selectedNodeIds.delete(nodeId);
+                                } else {
+                                    this.selectedNodeIds.add(nodeId);
+                                }
+                                this.selectedNodeId = this.selectedNodeIds.size > 0
+                                    ? [...this.selectedNodeIds][this.selectedNodeIds.size - 1]
+                                    : null;
+                                this.selectedEdgeId = null;
+                                this.draw();
+                            } else {
+                                if (this.selectedNodeIds.has(nodeId) && this.selectedNodeIds.size > 1) {
+                                    this.draggedNodeId = nodeId;
+                                    const graphPos = this.screenToGraph(screenX, screenY);
+                                    const groupOffsets = new Map();
+                                    this.selectedNodeIds.forEach(id => {
+                                        const n = this.nodesDataSet.get(id);
+                                        if (n) groupOffsets.set(id, { dx: (n.x || 0) - graphPos.x, dy: (n.y || 0) - graphPos.y });
+                                    });
+                                    if (groupOffsets.size === 0) return;
+                                    this.dragState = {
+                                        isDraggingNode: true,
+                                        groupOffsets,
+                                        startX: screenX,
+                                        startY: screenY
+                                    };
+                                } else {
+                                    this.selectedNodeIds = new Set([nodeId]);
+                                    this.selectedNodeId = nodeId;
+                                    this.selectedEdgeId = null;
+                                    this.draggedNodeId = nodeId;
+                                    const graphPos = this.screenToGraph(screenX, screenY);
+                                    const node = this.nodesDataSet.get(nodeId);
+                                    if (!node) return;
+                                    this.dragState = {
+                                        isDraggingNode: true,
+                                        nodeOffsetX: (node.x || 0) - graphPos.x,
+                                        nodeOffsetY: (node.y || 0) - graphPos.y,
+                                        startX: screenX,
+                                        startY: screenY
+                                    };
+                                }
+                            }
                             this.canvas.style.cursor = 'grabbing';
+                        } else if (e.ctrlKey || e.metaKey) {
+                            // Ctrl+drag on empty space: additive lasso.
+                            this.lassoState = {
+                                startX: screenX, startY: screenY,
+                                curX: screenX, curY: screenY,
+                                additive: true
+                            };
+                            this.dragState = { isLasso: true, startX: screenX, startY: screenY };
+                            this.canvas.style.cursor = 'crosshair';
                         } else {
                             this.dragState = {
                                 isDraggingCamera: true,
@@ -1755,14 +1779,30 @@
                         const screenX = e.clientX - rect.left;
                         const screenY = e.clientY - rect.top;
 
+                        if (this.dragState.isLasso && this.lassoState) {
+                            // Additive Ctrl-lasso in progress.
+                            this.lassoState.curX = screenX;
+                            this.lassoState.curY = screenY;
+                            this._drawLassoOverlay();
+                            if (this.tooltip) this.tooltip.style.display = 'none';
+                            return;
+                        }
+
                         if (this.dragState.isDraggingNode && this.draggedNodeId !== null) {
                             const graphPos = this.screenToGraph(screenX, screenY);
-                            const updatedNode = {
-                                id: this.draggedNodeId,
-                                x: graphPos.x + this.dragState.nodeOffsetX,
-                                y: graphPos.y + this.dragState.nodeOffsetY
-                            };
-                            this.nodesDataSet.update(updatedNode);
+                            if (this.dragState.groupOffsets && this.dragState.groupOffsets.size > 1) {
+                                const updates = [];
+                                this.dragState.groupOffsets.forEach((off, id) => {
+                                    updates.push({ id, x: graphPos.x + off.dx, y: graphPos.y + off.dy });
+                                });
+                                this.nodesDataSet.update(updates);
+                            } else {
+                                this.nodesDataSet.update({
+                                    id: this.draggedNodeId,
+                                    x: graphPos.x + (this.dragState.nodeOffsetX || 0),
+                                    y: graphPos.y + (this.dragState.nodeOffsetY || 0)
+                                });
+                            }
                             this.canvas.style.cursor = 'grabbing';
                             if (this.tooltip) this.tooltip.style.display = 'none';
                         } else if (this.dragState.isDraggingCamera) {
@@ -1833,12 +1873,84 @@
                         }
                     }
 
+                    _drawLassoOverlay() {
+                        const overlay = document.getElementById('lasso-overlay');
+                        if (!overlay || !this.lassoState) return;
+
+                        const rect = this.canvas.getBoundingClientRect();
+                        if (overlay.width !== rect.width || overlay.height !== rect.height) {
+                            overlay.width = rect.width;
+                            overlay.height = rect.height;
+                        }
+
+                        const ctx = overlay.getContext('2d');
+                        ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+                        const x = Math.min(this.lassoState.startX, this.lassoState.curX);
+                        const y = Math.min(this.lassoState.startY, this.lassoState.curY);
+                        const w = Math.abs(this.lassoState.curX - this.lassoState.startX);
+                        const h = Math.abs(this.lassoState.curY - this.lassoState.startY);
+
+                        ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+                        ctx.fillRect(x, y, w, h);
+                        ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
+                        ctx.lineWidth = 1.5;
+                        ctx.setLineDash([5, 4]);
+                        ctx.strokeRect(x, y, w, h);
+                        ctx.setLineDash([]);
+                    }
+
+                    _clearLassoOverlay() {
+                        const overlay = document.getElementById('lasso-overlay');
+                        if (!overlay) return;
+                        const ctx = overlay.getContext('2d');
+                        ctx.clearRect(0, 0, overlay.width, overlay.height);
+                    }
+
                     _onMouseUp(e) {
                         const rect = this.canvas.getBoundingClientRect();
                         const screenX = e.clientX - rect.left;
                         const screenY = e.clientY - rect.top;
 
-                        if (this.dragState.isDraggingNode && this.draggedNodeId !== null) {
+                        if (this.dragState.isLasso && this.lassoState) {
+                            // Finalize lasso selection.
+                            this._clearLassoOverlay();
+                            const lx0 = Math.min(this.lassoState.startX, this.lassoState.curX);
+                            const ly0 = Math.min(this.lassoState.startY, this.lassoState.curY);
+                            const lx1 = Math.max(this.lassoState.startX, this.lassoState.curX);
+                            const ly1 = Math.max(this.lassoState.startY, this.lassoState.curY);
+
+                            const captured = new Set();
+                            this.nodesDataSet.get().forEach(node => {
+                                if (node.hidden) return;
+                                const sp = this.graphToScreen(node.x || 0, node.y || 0);
+                                const dpr = window.devicePixelRatio || 1;
+                                const sx = sp.x / dpr;
+                                const sy = sp.y / dpr;
+                                if (sx >= lx0 && sx <= lx1 && sy >= ly0 && sy <= ly1) {
+                                    captured.add(node.id);
+                                }
+                            });
+
+                            if (this.lassoState.additive) {
+                                captured.forEach(id => this.selectedNodeIds.add(id));
+                            } else {
+                                this.selectedNodeIds = captured;
+                            }
+                            this.selectedNodeId = this.selectedNodeIds.size > 0
+                                ? [...this.selectedNodeIds][0]
+                                : null;
+                            this.selectedEdgeId = null;
+                            this.lassoState = null;
+                            this.draw();
+                            this._trigger('click', {
+                                nodes: [...this.selectedNodeIds],
+                                edges: [],
+                                event: e,
+                                isLasso: true
+                            });
+
+                        } else if (this.dragState.isDraggingNode && this.draggedNodeId !== null) {
                             const dx = screenX - this.dragState.startX;
                             const dy = screenY - this.dragState.startY;
                             const moved = Math.sqrt(dx * dx + dy * dy);
@@ -1855,6 +1967,7 @@
                             if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
                                 const edgeId = this._getEdgeAt(screenX, screenY);
                                 if (edgeId !== null) {
+                                    this.selectedNodeIds = new Set();
                                     this.selectedNodeId = null;
                                     this.selectedEdgeId = edgeId;
                                     this.draw();
@@ -1864,6 +1977,7 @@
                                         event: e
                                     });
                                 } else {
+                                    this.selectedNodeIds = new Set();
                                     this.selectedNodeId = null;
                                     this.selectedEdgeId = null;
                                     this.draw();
@@ -1878,10 +1992,11 @@
 
                         this.dragState = {};
                         this.draggedNodeId = null;
+                        this.lassoState = null;
 
                         const nodeId = this._getNodeAt(screenX, screenY);
-                        const edgeId = this._getEdgeAt(screenX, screenY);
-                        if (nodeId !== null || edgeId !== null) {
+                        const edgeId2 = this._getEdgeAt(screenX, screenY);
+                        if (nodeId !== null || edgeId2 !== null) {
                             this.canvas.style.cursor = 'pointer';
                         } else {
                             this.canvas.style.cursor = 'grab';
@@ -2018,7 +2133,8 @@
                         this.draw();
                     }
                     selectNodes(nodeIds) {
-                        this.selectedNodeId = (nodeIds && nodeIds.length > 0) ? nodeIds[0] : null;
+                        this.selectedNodeIds = new Set(nodeIds || []);
+                        this.selectedNodeId = this.selectedNodeIds.size > 0 ? [...this.selectedNodeIds][0] : null;
                         this.selectedEdgeId = null;
                         this.draw();
                     }
@@ -2155,7 +2271,7 @@
                                 }
                             }
 
-                            const isSelected = this.selectedNodeId === edge.from || this.selectedNodeId === edge.to || this.selectedEdgeId === edge.id;
+                            const isSelected = this.selectedEdgeId === edge.id;
                             const isHovered = this.hoveredEdgeId === edge.id || this.hoveredNodeId === edge.from || this.hoveredNodeId === edge.to;
                             let strokeColor = baseColor;
                             if (isSelected) {
@@ -2336,7 +2452,7 @@
                             }
 
                             const size = node.size || 20;
-                            const isSelected = this.selectedNodeId === node.id;
+                            const isSelected = this.selectedNodeIds.has(node.id);
                             const isHovered = this.hoveredNodeId === node.id;
 
                             let bg = '#475569';
@@ -2427,10 +2543,15 @@
                                 ctx.beginPath();
                                 ctx.arc(x, y, size, 0, Math.PI * 2);
                                 ctx.fill();
+                                if (isSelected) {
+                                    ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
+                                    ctx.lineWidth = 3 / this.camera.zoom;
+                                    ctx.stroke();
+                                }
                             } else {
                                 ctx.fillStyle = bg;
                                 ctx.strokeStyle = border;
-                                ctx.lineWidth = isSelected ? 3 : 2;
+                                ctx.lineWidth = (isSelected ? 3 : 2) / this.camera.zoom;
 
                                 const useShadows = (this.camera.zoom >= 0.35);
                                 if (useShadows) {
@@ -2475,28 +2596,29 @@
 
                                 if (isSelected || isHovered) {
                                     ctx.save();
+                                    const zoom = this.camera.zoom;
                                     ctx.shadowColor = isSelected ? 'rgba(56, 189, 248, 0.8)' : 'rgba(255, 255, 255, 0.5)';
                                     ctx.shadowBlur = isSelected ? 12 : 8;
                                     ctx.shadowOffsetX = 0;
                                     ctx.shadowOffsetY = 0;
                                     ctx.strokeStyle = isSelected ? 'rgba(56, 189, 248, 0.4)' : 'rgba(255, 255, 255, 0.15)';
-                                    ctx.lineWidth = isSelected ? 6 : 4;
+                                    ctx.lineWidth = (isSelected ? 6 : 4) / zoom;
                                     ctx.beginPath();
                                     if (node.group === 'root' || node.shape === 'diamond') {
-                                        const os = size + (isSelected ? 4 : 3);
+                                        const os = size + (isSelected ? 4 : 3) / zoom;
                                         ctx.moveTo(x, y - os);
                                         ctx.lineTo(x + os, y);
                                         ctx.lineTo(x, y + os);
                                         ctx.lineTo(x - os, y);
                                         ctx.closePath();
                                     } else if (node.shape === 'triangle') {
-                                        const os = size + (isSelected ? 4 : 3);
+                                        const os = size + (isSelected ? 4 : 3) / zoom;
                                         ctx.moveTo(x, y - os);
                                         ctx.lineTo(x + os, y + os);
                                         ctx.lineTo(x - os, y + os);
                                         ctx.closePath();
                                     } else if (node.shape === 'hexagon') {
-                                        const os = size + (isSelected ? 4 : 3);
+                                        const os = size + (isSelected ? 4 : 3) / zoom;
                                         for (let i = 0; i < 6; i++) {
                                             const angle = (i * Math.PI) / 3;
                                             const hx = x + os * Math.cos(angle);
@@ -2506,7 +2628,7 @@
                                         }
                                         ctx.closePath();
                                     } else {
-                                        ctx.arc(x, y, size + (isSelected ? 4 : 3), 0, Math.PI * 2);
+                                        ctx.arc(x, y, size + (isSelected ? 4 : 3) / zoom, 0, Math.PI * 2);
                                     }
                                     ctx.stroke();
                                     ctx.restore();
@@ -4215,6 +4337,7 @@
                                     currentModalId = null;
                                     if (network) {
                                         network.selectedNodeId = null;
+                                        network.selectedNodeIds = new Set();
                                         network.selectedEdgeId = null;
                                         network.draw();
                                     }
@@ -5264,6 +5387,7 @@
                                 network.on("click", function (params) {
                                     let clickedId = null;
                                     let clickedType = null;
+                                    if (params.isLasso || params.nodes.length > 1) return;
                                     if (params.nodes.length > 0) {
                                         clickedId = params.nodes[0];
                                         clickedType = 'node';
