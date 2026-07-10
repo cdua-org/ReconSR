@@ -5079,25 +5079,26 @@
                                         const sortedSubtypes = [...node.subtypes].sort();
                                         subBadgeHtml = sortedSubtypes.map(st => '<span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle; border: 1px solid #334155;">' + escapeHTML(st) + '</span>').join('');
                                     }
-                                    const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle;">HIDDEN</span>' : '';
                                     const focusBtnId = isIncoming ? 'focus-btn-from-' + item.nodeId : 'focus-btn-to-' + item.nodeId;
-                                    const focusBtnHtml = !isHidden ? '<button id="' + focusBtnId + '" class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + item.nodeId + ')">Focus</button>' : '';
-                                    const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
+                                    const rightActionHtml = isHidden
+                                        ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; vertical-align: middle;">HIDDEN</span>'
+                                        : '<button id="' + focusBtnId + '" class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + item.nodeId + ')">Focus</button>';
+                                     const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
 
-                                    const borderLeftColor = isIncoming ? '#8b5cf6' : '#10b981';
-                                    let html = '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid ' + borderLeftColor + '; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
-                                    
-                                    html += '<div style="color: #f1f5f9; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px; margin-bottom: 4px;">';
-                                    html += '<div style="display: flex; align-items: center; gap: 4px; flex-shrink: 1; min-width: 0;">';
-                                    html += '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; min-width: 0; word-break: break-all; padding-right: 4px; vertical-align: top;">' + escapeHTML(item.label) + '</span>';
-                                    html += getCopyBtnHTML(item.label);
-                                    html += '</div>';
-                                    html += '<div style="flex-shrink: 0; margin-left: 6px;">' + focusBtnHtml + '</div>';
-                                    html += '</div>';
+                                     const borderLeftColor = isIncoming ? '#8b5cf6' : '#10b981';
+                                     let html = '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid ' + borderLeftColor + '; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
+                                     
+                                     html += '<div style="color: #f1f5f9; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px; margin-bottom: 4px;">';
+                                     html += '<div style="display: flex; align-items: center; gap: 4px; flex-shrink: 1; min-width: 0;">';
+                                     html += '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; min-width: 0; word-break: break-all; padding-right: 4px; vertical-align: top;">' + escapeHTML(item.label) + '</span>';
+                                     html += getCopyBtnHTML(item.label);
+                                     html += '</div>';
+                                     html += '<div style="flex-shrink: 0; margin-left: 6px;">' + rightActionHtml + '</div>';
+                                     html += '</div>';
 
-                                    if (subBadgeHtml || badgeHtml) {
-                                        html += '<div style="margin-top: 4px; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px;">' + subBadgeHtml + badgeHtml + '</div>';
-                                    }
+                                     if (subBadgeHtml) {
+                                         html += '<div style="margin-top: 4px; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px;">' + subBadgeHtml + '</div>';
+                                     }
 
                                     let metaHtml = '';
                                     if (isOOS) {
