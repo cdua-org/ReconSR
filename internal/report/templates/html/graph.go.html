@@ -4578,11 +4578,19 @@
                                     const showLimit = isOut ? modalOutShowLimit : modalInShowLimit;
                                     const hiddenNodes = isOut ? modalHiddenOutNodes : modalHiddenInNodes;
 
+                                    const seenTypes = new Set();
+                                    const seenSubtypes = new Set();
+
                                     for (let fn in groups) {
                                         groups[fn].forEach(e => {
                                             const targetId = isOut ? e.to : e.from;
                                             const n = nodes.get(targetId);
                                             const type = n ? n.group : 'unknown';
+                                            let label = n ? n.label : targetId;
+
+                                            const typeKey = type + ':' + label;
+                                            if (seenTypes.has(typeKey)) return;
+                                            seenTypes.add(typeKey);
 
                                             counts[type] = (counts[type] || 0) + 1;
 
@@ -4607,14 +4615,18 @@
 
                                             if (n && n.subtypes) {
                                                 n.subtypes.forEach(st => {
-                                                    const key = type + ':' + st;
-                                                    stCounts[key] = (stCounts[key] || 0) + 1;
-                                                    if (isEffectivelyVisible) {
-                                                        stEffCounts[key] = (stEffCounts[key] || 0) + 1;
-                                                    }
-                                                    if (isVisible) {
-                                                        stVisCounts[key] = (stVisCounts[key] || 0) + 1;
-                                                    }
+                                                     const key = type + ':' + st;
+                                                     const subKey = key + ':' + label;
+                                                     if (seenSubtypes.has(subKey)) return;
+                                                     seenSubtypes.add(subKey);
+
+                                                     stCounts[key] = (stCounts[key] || 0) + 1;
+                                                     if (isEffectivelyVisible) {
+                                                         stEffCounts[key] = (stEffCounts[key] || 0) + 1;
+                                                     }
+                                                     if (isVisible) {
+                                                         stVisCounts[key] = (stVisCounts[key] || 0) + 1;
+                                                     }
                                                 });
                                             }
                                         });
@@ -4777,12 +4789,23 @@
 
                                     let oosCount = 0;
                                     let limitCount = 0;
+                                    const seenOOS = new Set();
+                                    const seenLimit = new Set();
                                     for (let fn in groups) {
                                         groups[fn].forEach(e => {
                                             const targetId = isOut ? e.to : e.from;
                                             const n = nodes.get(targetId);
-                                            if (n && n.outOfScope) oosCount++;
-                                            if (n && n.depthLimitReached) limitCount++;
+                                            if (n) {
+                                                let label = n.label || targetId;
+                                                if (n.outOfScope && !seenOOS.has(label)) {
+                                                    seenOOS.add(label);
+                                                    oosCount++;
+                                                }
+                                                if (n.depthLimitReached && !seenLimit.has(label)) {
+                                                    seenLimit.add(label);
+                                                    limitCount++;
+                                                }
+                                            }
                                         });
                                     }
 
@@ -4901,17 +4924,22 @@
                                     let oosVisibleCount = 0;
                                     let limitCount = 0;
                                     let limitVisibleCount = 0;
+                                    const seenOOS = new Set();
+                                    const seenLimit = new Set();
                                     for (let fn in groups) {
                                         groups[fn].forEach(e => {
                                             const targetId = isOut ? e.to : e.from;
                                             const n = nodes.get(targetId);
                                             if (n) {
+                                                let label = n.label || targetId;
                                                 const isNodeVisible = !hiddenNodes.has(n.id);
-                                                if (n.outOfScope) {
+                                                if (n.outOfScope && !seenOOS.has(label)) {
+                                                    seenOOS.add(label);
                                                     oosCount++;
                                                     if (isNodeVisible) oosVisibleCount++;
                                                 }
-                                                if (n.depthLimitReached) {
+                                                if (n.depthLimitReached && !seenLimit.has(label)) {
+                                                    seenLimit.add(label);
                                                     limitCount++;
                                                     if (isNodeVisible) limitVisibleCount++;
                                                 }
@@ -5009,187 +5037,192 @@
                                     });
                                 }
 
-                                function renderOutConnectionsRoot(groups, executions) {
-                                    let allEdges = [];
-                                    for (let fn in groups) { allEdges = allEdges.concat(groups[fn]); }
-                                    let typeGroups = {};
-                                    allEdges.forEach(e => {
-                                        const targetNode = nodes.get(e.to);
-                                        const targetGroup = targetNode ? getNodeDisplayType(targetNode) : 'unknown';
-                                        if (!typeGroups[targetGroup]) typeGroups[targetGroup] = [];
-                                        typeGroups[targetGroup].push(e);
+
+                                function groupConnections(edges, isIncoming, showOOS, showLimit, hiddenNodes) {
+                                    let nameGroups = {};
+                                    edges.forEach(e => {
+                                        const nodeId = isIncoming ? e.from : e.to;
+                                        const node = nodes.get(nodeId);
+                                        if (node && hiddenNodes.has(node.id)) return;
+
+                                        let label = node ? node.label : nodeId;
+                                        const isOOS = node ? node.outOfScope : false;
+                                        const isLimit = node ? node.depthLimitReached : false;
+                                        const isHidden = node ? node.hidden : false;
+
+                                        if (isOOS && !showOOS) return;
+                                        if (isLimit && !showLimit) return;
+
+                                        if (!nameGroups[label]) {
+                                            nameGroups[label] = {
+                                                label: label,
+                                                nodeId: nodeId,
+                                                node: node,
+                                                isOOS: isOOS,
+                                                isLimit: isLimit,
+                                                isHidden: isHidden,
+                                                edges: []
+                                            };
+                                        }
+                                        nameGroups[label].edges.push(e);
                                     });
-                                    let htmlStr = '';
-                                    let sortedTypes = Object.keys(typeGroups).sort();
-                                    for (let type of sortedTypes) {
-                                        let groups = typeGroups;
-                                        let fn = type;
-                                        let fnChildrenHtml = '';
-                                        let fnHasVisible = false;
-
-                                        groups[fn].forEach(e => {
-                                            const targetNode = nodes.get(e.to);
-                                            const targetGroup = targetNode ? getNodeDisplayType(targetNode) : 'unknown';
-                                            if (targetNode && modalHiddenOutNodes.has(targetNode.id)) return;
-
-                                            let targetLabel = targetNode ? targetNode.label : e.to;
-                                            const isOOS = targetNode ? targetNode.outOfScope : false;
-                                            const isLimit = targetNode ? targetNode.depthLimitReached : false;
-                                            const isHidden = targetNode ? targetNode.hidden : false;
-
-                                            if (isOOS && !modalOutShowOOS) return;
-                                            if (isLimit && !modalOutShowLimit) return;
-
-                                            fnHasVisible = true;
-
-                                            let subBadgeHtml = '';
-                                            if (targetNode && targetNode.subtypes && targetNode.subtypes.length > 0) {
-                                                const sortedSubtypes = [...targetNode.subtypes].sort();
-                                                subBadgeHtml = sortedSubtypes.map(st => '<span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle; border: 1px solid #334155;">' + escapeHTML(st) + '</span>').join('');
-                                            }
-                                            const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle;">HIDDEN</span>' : '';
-                                            const focusBtnHtml = !isHidden ? '<button id="focus-btn-to-' + e.to + '" class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + e.to + ')">Focus</button>' : '';
-                                            const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
-
-                                            fnChildrenHtml += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #10b981; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
-                                            
-                                            fnChildrenHtml += '<div style="color: #f1f5f9; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px; margin-bottom: 4px;">';
-                                            fnChildrenHtml += '<div style="display: flex; align-items: center; gap: 4px; flex-shrink: 1; min-width: 0;">';
-                                            fnChildrenHtml += '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; min-width: 0; word-break: break-all; padding-right: 4px; vertical-align: top;">' + escapeHTML(targetLabel) + '</span>';
-                                            fnChildrenHtml += getCopyBtnHTML(targetLabel);
-                                            fnChildrenHtml += '</div>';
-                                            fnChildrenHtml += '<div style="flex-shrink: 0; margin-left: 6px;">' + focusBtnHtml + '</div>';
-                                            fnChildrenHtml += '</div>';
-
-                                            if (subBadgeHtml || badgeHtml) {
-                                                fnChildrenHtml += '<div style="margin-top: 4px; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px;">' + subBadgeHtml + badgeHtml + '</div>';
-                                            }
-
-                                            let metaHtml = '';
-                                            if (isOOS) {
-                                                metaHtml += '<div style="color: #ef4444; font-weight: bold; margin-top: 4px;">⚠️ OUT OF SCOPE</div>';
-                                            }
-                                            if (e.contexts && e.contexts.length > 0) {
-                                                metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(e.contexts.join(', ')) + '</div>';
-                                            }
-                                            if (e.function) {
-                                                metaHtml += '<div style="margin-top: 2px;">Function: <span style="color: #a78bfa; font-family: monospace;">' + escapeHTML(e.function) + '</span></div>';
-                                            }
-                                            if (e.firstSeen) {
-                                                metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(e.firstSeen) + '</div>';
-                                            }
-                                            let rawHtml = getRawDataHTML(e.function, executions, e);
-                                            if (rawHtml.btn) {
-                                                metaHtml += '<div style="margin-top: 6px;">' + rawHtml.btn + '</div>';
-                                            }
-                                            if (metaHtml) {
-                                                fnChildrenHtml += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
-                                            }
-                                            if (rawHtml.content) {
-                                                fnChildrenHtml += rawHtml.content;
-                                            }
-                                            fnChildrenHtml += '</div>';
-                                        });
-
-                                        if (!fnHasVisible) continue;
-
-                                        const listId = 'list-out-' + Math.random().toString(36).slice(2, 11);
-                                        htmlStr += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
-                                        htmlStr += '<div class="prop-header" id="header-' + listId + '" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
-                                        htmlStr += '<span class="prop-title" style="color: #10b981; font-size: 0.75rem; text-transform: uppercase; font-weight: bold;">' + escapeHTML(fn) + '</span>';
-                                        htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▶</span>';
-                                        htmlStr += '</div>';
-                                        htmlStr += '<div id="' + listId + '" style="display: none;">' + fnChildrenHtml + '</div></div>';
-                                    }
-                                    return htmlStr;
+                                    return Object.values(nameGroups);
                                 }
 
-                                function renderInConnectionsRoot(groups) {
-                                    let allEdges = [];
-                                    for (let fn in groups) { allEdges = allEdges.concat(groups[fn]); }
-                                    typeGroups = {};
-                                    allEdges.forEach(e => {
-                                        const sourceNode2 = nodes.get(e.from);
-                                        const sourceGroup = sourceNode2 ? getNodeDisplayType(sourceNode2) : 'unknown';
-                                        if (!typeGroups[sourceGroup]) typeGroups[sourceGroup] = [];
-                                        typeGroups[sourceGroup].push(e);
+                                function renderConnectionCard(item, executions, isIncoming) {
+                                    const node = item.node;
+                                    const isHidden = item.isHidden;
+                                    const isOOS = item.isOOS;
+
+                                    let subBadgeHtml = '';
+                                    if (node && node.subtypes && node.subtypes.length > 0) {
+                                        const sortedSubtypes = [...node.subtypes].sort();
+                                        subBadgeHtml = sortedSubtypes.map(st => '<span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle; border: 1px solid #334155;">' + escapeHTML(st) + '</span>').join('');
+                                    }
+                                    const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle;">HIDDEN</span>' : '';
+                                    const focusBtnId = isIncoming ? 'focus-btn-from-' + item.nodeId : 'focus-btn-to-' + item.nodeId;
+                                    const focusBtnHtml = !isHidden ? '<button id="' + focusBtnId + '" class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + item.nodeId + ')">Focus</button>' : '';
+                                    const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
+
+                                    const borderLeftColor = isIncoming ? '#8b5cf6' : '#10b981';
+                                    let html = '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid ' + borderLeftColor + '; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
+                                    
+                                    html += '<div style="color: #f1f5f9; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px; margin-bottom: 4px;">';
+                                    html += '<div style="display: flex; align-items: center; gap: 4px; flex-shrink: 1; min-width: 0;">';
+                                    html += '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; min-width: 0; word-break: break-all; padding-right: 4px; vertical-align: top;">' + escapeHTML(item.label) + '</span>';
+                                    html += getCopyBtnHTML(item.label);
+                                    html += '</div>';
+                                    html += '<div style="flex-shrink: 0; margin-left: 6px;">' + focusBtnHtml + '</div>';
+                                    html += '</div>';
+
+                                    if (subBadgeHtml || badgeHtml) {
+                                        html += '<div style="margin-top: 4px; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px;">' + subBadgeHtml + badgeHtml + '</div>';
+                                    }
+
+                                    let metaHtml = '';
+                                    if (isOOS) {
+                                        metaHtml += '<div style="color: #ef4444; font-weight: bold; margin-top: 4px;">⚠️ OUT OF SCOPE</div>';
+                                    }
+
+                                    let mergedContexts = [];
+                                    item.edges.forEach(e => {
+                                        if (e.contexts) mergedContexts = mergedContexts.concat(e.contexts);
                                     });
-                                    let htmlStr = '';
-                                    let sortedTypes = Object.keys(typeGroups).sort();
-                                    for (let type of sortedTypes) {
-                                        let groups = typeGroups;
-                                        let fn = type;
-                                        let fnChildrenHtml = '';
-                                        let fnHasVisible = false;
-                                        let sourceExecutions = null;
+                                    let uniqueContexts = [...new Set(mergedContexts)];
+                                    if (uniqueContexts.length > 0) {
+                                        metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(uniqueContexts.join(' | ')) + '</div>';
+                                    }
 
-                                        groups[fn].forEach(e => {
-                                            const sourceNode2 = nodes.get(e.from);
-                                            const sourceGroup = sourceNode2 ? getNodeDisplayType(sourceNode2) : 'unknown';
-                                            if (sourceNode2 && modalHiddenInNodes.has(sourceNode2.id)) return;
-
-                                            let sourceLabel = sourceNode2 ? sourceNode2.label : e.from;
-                                            const isOOS = sourceNode2 ? sourceNode2.outOfScope : false;
-                                            const isLimit = sourceNode2 ? sourceNode2.depthLimitReached : false;
-                                            const isHidden = sourceNode2 ? sourceNode2.hidden : false;
-
-                                            if (isOOS && !modalInShowOOS) return;
-                                            if (isLimit && !modalInShowLimit) return;
-
-                                            fnHasVisible = true;
-                                            if (!sourceExecutions && sourceNode2 && sourceNode2.executions) {
-                                                sourceExecutions = sourceNode2.executions;
-                                            }
-
-                                            let subBadgeHtml = '';
-                                            if (sourceNode2 && sourceNode2.subtypes && sourceNode2.subtypes.length > 0) {
-                                                const sortedSubtypes = [...sourceNode2.subtypes].sort();
-                                                subBadgeHtml = sortedSubtypes.map(st => '<span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle; border: 1px solid #334155;">' + escapeHTML(st) + '</span>').join('');
-                                            }
-                                            const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle;">HIDDEN</span>' : '';
-                                            const focusBtnHtml = !isHidden ? '<button id="focus-btn-from-' + e.from + '" class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + e.from + ')">Focus</button>' : '';
-                                            const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
-
-                                            fnChildrenHtml += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #8b5cf6; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
-                                            
-                                            fnChildrenHtml += '<div style="color: #f1f5f9; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px; margin-bottom: 4px;">';
-                                            fnChildrenHtml += '<div style="display: flex; align-items: center; gap: 4px; flex-shrink: 1; min-width: 0;">';
-                                            fnChildrenHtml += '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; min-width: 0; word-break: break-all; padding-right: 4px; vertical-align: top;">' + escapeHTML(sourceLabel) + '</span>';
-                                            fnChildrenHtml += getCopyBtnHTML(sourceLabel);
-                                            fnChildrenHtml += '</div>';
-                                            fnChildrenHtml += '<div style="flex-shrink: 0; margin-left: 6px;">' + focusBtnHtml + '</div>';
-                                            fnChildrenHtml += '</div>';
-
-                                            if (subBadgeHtml || badgeHtml) {
-                                                fnChildrenHtml += '<div style="margin-top: 4px; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px;">' + subBadgeHtml + badgeHtml + '</div>';
-                                            }
-
-                                            let metaHtml = '';
-                                            if (isOOS) {
-                                                metaHtml += '<div style="color: #ef4444; font-weight: bold; margin-top: 4px;">⚠️ OUT OF SCOPE</div>';
-                                            }
-                                            if (e.contexts && e.contexts.length > 0) {
-                                                metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(e.contexts.join(', ')) + '</div>';
-                                            }
-                                            if (e.function) {
-                                                metaHtml += '<div style="margin-top: 2px;">Function: <span style="color: #a78bfa; font-family: monospace;">' + escapeHTML(e.function) + '</span></div>';
-                                            }
-                                            if (e.firstSeen) {
-                                                metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(e.firstSeen) + '</div>';
-                                            }
-                                            let executions = sourceNode2 ? sourceNode2.executions : null;
-                                            let rawHtml = getRawDataHTML(e.function, executions, e);
+                                    let functionsList = [];
+                                    let buttonPairs = [];
+                                    let rawContentsHtml = '';
+                                    item.edges.forEach(e => {
+                                        if (e.function) {
+                                            functionsList.push(e.function);
+                                            let execs = isIncoming ? (node ? node.executions : null) : executions;
+                                            let rawHtml = getRawDataHTML(e.function, execs, e);
                                             if (rawHtml.btn) {
-                                                metaHtml += '<div style="margin-top: 6px;">' + rawHtml.btn + '</div>';
-                                            }
-                                            if (metaHtml) {
-                                                fnChildrenHtml += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
+                                                let innerButtons = rawHtml.btn
+                                                    .replace('<div style="display: flex; align-items: center; gap: 6px;">', '')
+                                                    .replace('<span style="color: #94a3b8; font-size: 0.7rem; text-transform: uppercase;">Raw Data:</span>', '')
+                                                    .replace(/<\/div>$/, '');
+                                                buttonPairs.push('<span style="display: inline-flex; align-items: center; gap: 6px;">' + innerButtons + '</span>');
                                             }
                                             if (rawHtml.content) {
-                                                fnChildrenHtml += rawHtml.content;
+                                                rawContentsHtml += rawHtml.content;
                                             }
-                                            fnChildrenHtml += '</div>';
-                                        });
+                                        }
+                                    });
+
+                            let uniqueFunctions = [...new Set(functionsList)].sort();
+                            if (uniqueFunctions.length > 0) {
+                                metaHtml += '<div style="margin-top: 2px;">Functions: <span style="color: #a78bfa; font-family: monospace;">' + escapeHTML(uniqueFunctions.join(' | ')) + '</span></div>';
+                            }
+
+                            let firstSeens = item.edges.map(e => e.firstSeen).filter(t => t);
+                            if (firstSeens.length > 0) {
+                                let minFirstSeen = Math.min(...firstSeens);
+                                metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(minFirstSeen) + '</div>';
+                            }
+
+                            if (buttonPairs.length > 0) {
+                                let buttonsHtml = '<div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px;">';
+                                buttonsHtml += '<span style="color: #94a3b8; font-size: 0.7rem; text-transform: uppercase;">Raw Data:</span>';
+                                buttonsHtml += buttonPairs.join(' <span style="color: #475569; margin: 0 4px;">|</span> ');
+                                buttonsHtml += '</div>';
+                                metaHtml += buttonsHtml;
+                            }
+
+                            if (metaHtml) {
+                                html += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
+                            }
+                            if (rawContentsHtml) {
+                                html += rawContentsHtml;
+                            }
+                            html += '</div>';
+                            return html;
+                        }
+
+                        function renderOutConnectionsRoot(groups, executions) {
+                            let allEdges = [];
+                            for (let fn in groups) { allEdges = allEdges.concat(groups[fn]); }
+                            let typeGroups = {};
+                            allEdges.forEach(e => {
+                                const targetNode = nodes.get(e.to);
+                                const targetGroup = targetNode ? getNodeDisplayType(targetNode) : 'unknown';
+                                if (!typeGroups[targetGroup]) typeGroups[targetGroup] = [];
+                                typeGroups[targetGroup].push(e);
+                            });
+                            let htmlStr = '';
+                            let sortedTypes = Object.keys(typeGroups).sort();
+                            for (let type of sortedTypes) {
+                                let groups = typeGroups;
+                                let fn = type;
+                                let fnChildrenHtml = '';
+                                let fnHasVisible = false;
+
+                                const grouped = groupConnections(groups[fn], false, modalOutShowOOS, modalOutShowLimit, modalHiddenOutNodes);
+                                grouped.forEach(item => {
+                                    fnHasVisible = true;
+                                    fnChildrenHtml += renderConnectionCard(item, executions, false);
+                                });
+
+                                if (!fnHasVisible) continue;
+
+                                const listId = 'list-out-' + Math.random().toString(36).slice(2, 11);
+                                htmlStr += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
+                                htmlStr += '<div class="prop-header" id="header-' + listId + '" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
+                                htmlStr += '<span class="prop-title" style="color: #10b981; font-size: 0.75rem; text-transform: uppercase; font-weight: bold;">' + escapeHTML(fn) + '</span>';
+                                htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▶</span>';
+                                htmlStr += '</div>';
+                                htmlStr += '<div id="' + listId + '" style="display: none;">' + fnChildrenHtml + '</div></div>';
+                            }
+                            return htmlStr;
+                        }
+
+                        function renderInConnectionsRoot(groups) {
+                            let allEdges = [];
+                            for (let fn in groups) { allEdges = allEdges.concat(groups[fn]); }
+                            let typeGroups = {};
+                            allEdges.forEach(e => {
+                                const sourceNode2 = nodes.get(e.from);
+                                const sourceGroup = sourceNode2 ? getNodeDisplayType(sourceNode2) : 'unknown';
+                                if (!typeGroups[sourceGroup]) typeGroups[sourceGroup] = [];
+                                typeGroups[sourceGroup].push(e);
+                            });
+                            let htmlStr = '';
+                            let sortedTypes = Object.keys(typeGroups).sort();
+                            for (let type of sortedTypes) {
+                                let groups = typeGroups;
+                                let fn = type;
+                                let fnChildrenHtml = '';
+                                let fnHasVisible = false;
+
+                                const grouped = groupConnections(groups[fn], true, modalInShowOOS, modalInShowLimit, modalHiddenInNodes);
+                                grouped.forEach(item => {
+                                    fnHasVisible = true;
+                                    fnChildrenHtml += renderConnectionCard(item, null, true);
+                                });
 
                                         if (!fnHasVisible) continue;
 
