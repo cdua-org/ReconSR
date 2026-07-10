@@ -5141,9 +5141,18 @@
                             }
 
                             let firstSeens = item.edges.map(e => e.firstSeen).filter(t => t);
-                            if (firstSeens.length > 0) {
-                                let minFirstSeen = Math.min(...firstSeens);
-                                metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(minFirstSeen) + '</div>';
+                            let lastSeens = item.edges.map(e => e.lastSeen).filter(t => t);
+                            if (firstSeens.length > 0 || lastSeens.length > 0) {
+                                let times = [];
+                                if (firstSeens.length > 0) {
+                                    let minFirstSeen = Math.min(...firstSeens);
+                                    times.push('First: ' + formatDateTime(minFirstSeen));
+                                }
+                                if (lastSeens.length > 0) {
+                                    let maxLastSeen = Math.max(...lastSeens);
+                                    times.push('Last: ' + formatDateTime(maxLastSeen));
+                                }
+                                metaHtml += '<div style="margin-top: 2px;">' + times.join(' | ') + '</div>';
                             }
 
                             if (buttonPairs.length > 0) {
@@ -5183,6 +5192,12 @@
                                 let fnHasVisible = false;
 
                                 const grouped = groupConnections(groups[fn], false, modalOutShowOOS, modalOutShowLimit, modalHiddenOutNodes);
+                                grouped.sort((a, b) => {
+                                    if (a.isHidden !== b.isHidden) {
+                                        return a.isHidden ? 1 : -1;
+                                    }
+                                    return a.label.localeCompare(b.label);
+                                });
                                 grouped.forEach(item => {
                                     fnHasVisible = true;
                                     fnChildrenHtml += renderConnectionCard(item, executions, false);
@@ -5220,6 +5235,12 @@
                                 let fnHasVisible = false;
 
                                 const grouped = groupConnections(groups[fn], true, modalInShowOOS, modalInShowLimit, modalHiddenInNodes);
+                                grouped.sort((a, b) => {
+                                    if (a.isHidden !== b.isHidden) {
+                                        return a.isHidden ? 1 : -1;
+                                    }
+                                    return a.label.localeCompare(b.label);
+                                });
                                 grouped.forEach(item => {
                                     fnHasVisible = true;
                                     fnChildrenHtml += renderConnectionCard(item, null, true);
@@ -5291,6 +5312,13 @@
                                         for (let ctype of sortedChildTypes) {
                                             let groupHtml = '';
                                             let groupHasVisible = false;
+
+                                            childGroups[ctype].sort((a, b) => {
+                                                const aHidden = !!(a.hidden || a.isHidden);
+                                                const bHidden = !!(b.hidden || b.isHidden);
+                                                if (aHidden !== bHidden) return aHidden ? 1 : -1;
+                                                return String(a.value || '').localeCompare(String(b.value || ''));
+                                            });
 
                                             childGroups[ctype].forEach(child => {
                                                 const childRes = renderPropNode(child, currentExecutions, depth + 1, isVisibleExplicit, targetGroupType, ctype);
@@ -5389,6 +5417,13 @@
                                     for (let type of sortedTypes) {
                                         let typeChildrenHtml = '';
                                         let typeHasVisible = false;
+
+                                        propGroups[type].sort((a, b) => {
+                                            const aHidden = !!(a.hidden || a.isHidden);
+                                            const bHidden = !!(b.hidden || b.isHidden);
+                                            if (aHidden !== bHidden) return aHidden ? 1 : -1;
+                                            return String(a.value || '').localeCompare(String(b.value || ''));
+                                        });
 
                                         propGroups[type].forEach(prop => {
                                             const res = renderPropNode(prop, executions, 0, false, rootNodeType, type);
