@@ -5010,8 +5010,20 @@
                                 }
 
                                 function renderOutConnectionsRoot(groups, executions) {
+                                    let allEdges = [];
+                                    for (let fn in groups) { allEdges = allEdges.concat(groups[fn]); }
+                                    let typeGroups = {};
+                                    allEdges.forEach(e => {
+                                        const targetNode = nodes.get(e.to);
+                                        const targetGroup = targetNode ? getNodeDisplayType(targetNode) : 'unknown';
+                                        if (!typeGroups[targetGroup]) typeGroups[targetGroup] = [];
+                                        typeGroups[targetGroup].push(e);
+                                    });
                                     let htmlStr = '';
-                                    for (let fn in groups) {
+                                    let sortedTypes = Object.keys(typeGroups).sort();
+                                    for (let type of sortedTypes) {
+                                        let groups = typeGroups;
+                                        let fn = type;
                                         let fnChildrenHtml = '';
                                         let fnHasVisible = false;
 
@@ -5030,15 +5042,28 @@
 
                                             fnHasVisible = true;
 
-                                            const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
+                                            let subBadgeHtml = '';
+                                            if (targetNode && targetNode.subtypes && targetNode.subtypes.length > 0) {
+                                                const sortedSubtypes = [...targetNode.subtypes].sort();
+                                                subBadgeHtml = sortedSubtypes.map(st => '<span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle; border: 1px solid #334155;">' + escapeHTML(st) + '</span>').join('');
+                                            }
+                                            const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle;">HIDDEN</span>' : '';
                                             const focusBtnHtml = !isHidden ? '<button id="focus-btn-to-' + e.to + '" class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + e.to + ')">Focus</button>' : '';
                                             const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
 
                                             fnChildrenHtml += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #10b981; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
-                                            fnChildrenHtml += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
-                                            fnChildrenHtml += '<span>' + escapeHTML(targetGroup) + badgeHtml + '</span>';
-                                            fnChildrenHtml += focusBtnHtml + '</div>';
-                                            fnChildrenHtml += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(targetLabel) + '</span>' + getCopyBtnHTML(targetLabel) + '</div>';
+                                            
+                                            fnChildrenHtml += '<div style="color: #f1f5f9; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px; margin-bottom: 4px;">';
+                                            fnChildrenHtml += '<div style="display: flex; align-items: center; gap: 4px; flex-shrink: 1; min-width: 0;">';
+                                            fnChildrenHtml += '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; min-width: 0; word-break: break-all; padding-right: 4px; vertical-align: top;">' + escapeHTML(targetLabel) + '</span>';
+                                            fnChildrenHtml += getCopyBtnHTML(targetLabel);
+                                            fnChildrenHtml += '</div>';
+                                            fnChildrenHtml += '<div style="flex-shrink: 0; margin-left: 6px;">' + focusBtnHtml + '</div>';
+                                            fnChildrenHtml += '</div>';
+
+                                            if (subBadgeHtml || badgeHtml) {
+                                                fnChildrenHtml += '<div style="margin-top: 4px; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px;">' + subBadgeHtml + badgeHtml + '</div>';
+                                            }
 
                                             let metaHtml = '';
                                             if (isOOS) {
@@ -5047,39 +5072,53 @@
                                             if (e.contexts && e.contexts.length > 0) {
                                                 metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(e.contexts.join(', ')) + '</div>';
                                             }
+                                            if (e.function) {
+                                                metaHtml += '<div style="margin-top: 2px;">Function: <span style="color: #a78bfa; font-family: monospace;">' + escapeHTML(e.function) + '</span></div>';
+                                            }
                                             if (e.firstSeen) {
                                                 metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(e.firstSeen) + '</div>';
                                             }
+                                            let rawHtml = getRawDataHTML(e.function, executions, e);
+                                            if (rawHtml.btn) {
+                                                metaHtml += '<div style="margin-top: 6px;">' + rawHtml.btn + '</div>';
+                                            }
                                             if (metaHtml) {
                                                 fnChildrenHtml += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
+                                            }
+                                            if (rawHtml.content) {
+                                                fnChildrenHtml += rawHtml.content;
                                             }
                                             fnChildrenHtml += '</div>';
                                         });
 
                                         if (!fnHasVisible) continue;
 
-                                        const listId = 'list-out-' + Math.random().toString(36).substr(2, 9);
+                                        const listId = 'list-out-' + Math.random().toString(36).slice(2, 11);
                                         htmlStr += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
-                                        htmlStr += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
-                                        htmlStr += '<span class="prop-title" style="color: #10b981; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
-                                        htmlStr += '<div style="display: flex; align-items: center; gap: 12px;">';
-                                        let rawHtml = getRawDataHTML(fn, executions);
-                                        if (rawHtml.btn) {
-                                            htmlStr += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
-                                        }
-                                        htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
-                                        htmlStr += '</div></div>';
-                                        if (rawHtml.content) {
-                                            htmlStr += rawHtml.content;
-                                        }
-                                        htmlStr += '<div id="' + listId + '">' + fnChildrenHtml + '</div></div>';
+                                        htmlStr += '<div class="prop-header" id="header-' + listId + '" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
+                                        htmlStr += '<span class="prop-title" style="color: #10b981; font-size: 0.75rem; text-transform: uppercase; font-weight: bold;">' + escapeHTML(fn) + '</span>';
+                                        htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▶</span>';
+                                        htmlStr += '</div>';
+                                        htmlStr += '<div id="' + listId + '" style="display: none;">' + fnChildrenHtml + '</div></div>';
                                     }
                                     return htmlStr;
                                 }
 
                                 function renderInConnectionsRoot(groups) {
+                                    let allEdges = [];
+                                    for (let fn in groups) { allEdges = allEdges.concat(groups[fn]); }
+                                    typeGroups = {};
+                                    allEdges.forEach(e => {
+                                        const sourceNode2 = nodes.get(e.from);
+                                        const sourceGroup = sourceNode2 ? getNodeDisplayType(sourceNode2) : 'unknown';
+                                        if (!typeGroups[sourceGroup]) typeGroups[sourceGroup] = [];
+                                        typeGroups[sourceGroup].push(e);
+                                    });
                                     let htmlStr = '';
-                                    for (let fn in groups) {
+                                    let sortedTypes = Object.keys(typeGroups).sort();
+                                    for (let type of sortedTypes) {
+                                        let groups = typeGroups;
+                                        let fn = type;
                                         let fnChildrenHtml = '';
                                         let fnHasVisible = false;
                                         let sourceExecutions = null;
@@ -5102,15 +5141,28 @@
                                                 sourceExecutions = sourceNode2.executions;
                                             }
 
-                                            const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-left: 8px; vertical-align: middle;">HIDDEN</span>' : '';
+                                            let subBadgeHtml = '';
+                                            if (sourceNode2 && sourceNode2.subtypes && sourceNode2.subtypes.length > 0) {
+                                                const sortedSubtypes = [...sourceNode2.subtypes].sort();
+                                                subBadgeHtml = sortedSubtypes.map(st => '<span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle; border: 1px solid #334155;">' + escapeHTML(st) + '</span>').join('');
+                                            }
+                                            const badgeHtml = isHidden ? '<span style="background: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle;">HIDDEN</span>' : '';
                                             const focusBtnHtml = !isHidden ? '<button id="focus-btn-from-' + e.from + '" class="raw-data-btn focus-btn" title="Focus on this object" style="margin: 0; background: #38bdf8; color: #0f172a; border: none; padding: 2px 8px;" onclick="focusNode(' + e.from + ')">Focus</button>' : '';
                                             const opacityStyle = isHidden ? 'opacity: 0.7;' : '';
 
                                             fnChildrenHtml += '<div style="margin-bottom: 12px; padding: 8px; background: #1e293b; border-left: 3px solid #8b5cf6; border-radius: 0 4px 4px 0; ' + opacityStyle + '">';
-                                            fnChildrenHtml += '<div style="font-size: 0.85rem; color: #94a3b8; display:flex; align-items:center; justify-content: space-between; margin-bottom: 4px;">';
-                                            fnChildrenHtml += '<span>' + escapeHTML(sourceGroup) + badgeHtml + '</span>';
-                                            fnChildrenHtml += focusBtnHtml + '</div>';
-                                            fnChildrenHtml += '<div style="color: #f1f5f9; font-size: 0.95rem; word-break: break-all; display: flex; align-items: flex-start;"><span>' + escapeHTML(sourceLabel) + '</span>' + getCopyBtnHTML(sourceLabel) + '</div>';
+                                            
+                                            fnChildrenHtml += '<div style="color: #f1f5f9; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px; margin-bottom: 4px;">';
+                                            fnChildrenHtml += '<div style="display: flex; align-items: center; gap: 4px; flex-shrink: 1; min-width: 0;">';
+                                            fnChildrenHtml += '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; min-width: 0; word-break: break-all; padding-right: 4px; vertical-align: top;">' + escapeHTML(sourceLabel) + '</span>';
+                                            fnChildrenHtml += getCopyBtnHTML(sourceLabel);
+                                            fnChildrenHtml += '</div>';
+                                            fnChildrenHtml += '<div style="flex-shrink: 0; margin-left: 6px;">' + focusBtnHtml + '</div>';
+                                            fnChildrenHtml += '</div>';
+
+                                            if (subBadgeHtml || badgeHtml) {
+                                                fnChildrenHtml += '<div style="margin-top: 4px; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px;">' + subBadgeHtml + badgeHtml + '</div>';
+                                            }
 
                                             let metaHtml = '';
                                             if (isOOS) {
@@ -5119,32 +5171,35 @@
                                             if (e.contexts && e.contexts.length > 0) {
                                                 metaHtml += '<div style="margin-top: 4px;">Context: ' + escapeHTML(e.contexts.join(', ')) + '</div>';
                                             }
+                                            if (e.function) {
+                                                metaHtml += '<div style="margin-top: 2px;">Function: <span style="color: #a78bfa; font-family: monospace;">' + escapeHTML(e.function) + '</span></div>';
+                                            }
                                             if (e.firstSeen) {
                                                 metaHtml += '<div style="margin-top: 2px;">First Seen: ' + formatDateTime(e.firstSeen) + '</div>';
                                             }
+                                            let executions = sourceNode2 ? sourceNode2.executions : null;
+                                            let rawHtml = getRawDataHTML(e.function, executions, e);
+                                            if (rawHtml.btn) {
+                                                metaHtml += '<div style="margin-top: 6px;">' + rawHtml.btn + '</div>';
+                                            }
                                             if (metaHtml) {
                                                 fnChildrenHtml += '<div style="font-size: 0.75rem; color: #64748b;">' + metaHtml + '</div>';
+                                            }
+                                            if (rawHtml.content) {
+                                                fnChildrenHtml += rawHtml.content;
                                             }
                                             fnChildrenHtml += '</div>';
                                         });
 
                                         if (!fnHasVisible) continue;
 
-                                        const listId = 'list-in-' + Math.random().toString(36).substr(2, 9);
+                                        const listId = 'list-in-' + Math.random().toString(36).slice(2, 11);
                                         htmlStr += '<div class="prop-container" style="background: #0f172a; padding: 8px; margin-bottom: 8px; border: 1px solid #334155; border-radius: 4px;">';
-                                        htmlStr += '<div class="prop-header" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
-                                        htmlStr += '<span class="prop-title" style="color: #8b5cf6; font-size: 0.75rem; text-transform: lowercase;">' + escapeHTML(fn) + '</span>';
-                                        htmlStr += '<div style="display: flex; align-items: center; gap: 12px;">';
-                                        let rawHtml = getRawDataHTML(fn, sourceExecutions);
-                                        if (rawHtml.btn) {
-                                            htmlStr += '<div onclick="event.stopPropagation()">' + rawHtml.btn + '</div>';
-                                        }
-                                        htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▼</span>';
-                                        htmlStr += '</div></div>';
-                                        if (rawHtml.content) {
-                                            htmlStr += rawHtml.content;
-                                        }
-                                        htmlStr += '<div id="' + listId + '">' + fnChildrenHtml + '</div></div>';
+                                        htmlStr += '<div class="prop-header" id="header-' + listId + '" style="margin-bottom: 8px; border-bottom: 1px dashed #334155; padding-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleSection(\'' + listId + '\')">';
+                                        htmlStr += '<span class="prop-title" style="color: #8b5cf6; font-size: 0.75rem; text-transform: uppercase; font-weight: bold;">' + escapeHTML(fn) + '</span>';
+                                        htmlStr += '<span id="' + listId + '-icon" style="color: #94a3b8; font-size: 0.75rem;">▶</span>';
+                                        htmlStr += '</div>';
+                                        htmlStr += '<div id="' + listId + '" style="display: none;">' + fnChildrenHtml + '</div></div>';
                                     }
                                     return htmlStr;
                                 }
