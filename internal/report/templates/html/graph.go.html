@@ -5369,6 +5369,12 @@
                                      htmlStr += '<div style="display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: 2px; vertical-align: top;">' + toggleBtnHtml + getCopyBtnHTML(String(displayValue)) + '</div>';
                                      htmlStr += '</div>';
 
+                                     if (prop.subtypes && prop.subtypes.length > 0) {
+                                         const sortedSubtypes = [...prop.subtypes].sort();
+                                         const badges = sortedSubtypes.map(st => '<span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; margin-right: 6px; vertical-align: middle; border: 1px solid #334155;">' + escapeHTML(st) + '</span>').join('');
+                                         htmlStr += '<div style="margin-top: 4px; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px; ' + opacityStyle + '">' + badges + '</div>';
+                                     }
+
                                     let metaHtml = '';
                                     if (prop.contexts && prop.contexts.length > 0) {
                                         metaHtml += '<div style="margin-top: 4px;">Context: <span style="color: #e2e8f0;">' + escapeHTML(prop.contexts.join(', ')) + '</span></div>';

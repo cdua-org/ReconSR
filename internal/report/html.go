@@ -86,6 +86,7 @@ type graphProperty struct {
 	LastSeen   int64    `json:"lastSeen,omitempty"`
 	RawDataID  int64    `json:"rawDataId,omitempty"`
 	Executions map[string]int64 `json:"executions,omitempty"`
+	Subtypes   []string `json:"subtypes,omitempty"`
 }
 
 type graphNode struct {
@@ -282,6 +283,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 					p.Function = edge.FunctionName
 					p.FirstSeen = edgeTime
 					p.LastSeen = edgeTime
+					p.Subtypes = targetNode.Subtypes
 				} else {
 					if edgeTime < p.FirstSeen {
 						p.FirstSeen = edgeTime
@@ -311,6 +313,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 					LastSeen:  edgeTime,
 					Contexts:  contexts,
 					RawDataID:  dataID,
+					Subtypes:  targetNode.Subtypes,
 				}
 			}
 		}
