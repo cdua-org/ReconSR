@@ -4539,7 +4539,7 @@
                                     return '<button id="' + btnId + '" title="Copy Value" style="background: transparent; border: none; color: #64748b; cursor: pointer; padding: 0; margin-left: 8px; display: inline-flex; align-items: center;" onmouseover="this.style.color=\'#38bdf8\'" onmouseout="this.style.color=\'#64748b\'" onclick="navigator.clipboard.writeText(decodeURIComponent(\'' + encoded + '\')); event.stopPropagation();"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>';
                                 }
 
-                                let currentHiddenPropTypes = new Set();
+                                let currentHiddenPropIds = new Set();
                                 let currentModalPropsData = null;
                                 let currentModalExecutionsData = null;
 
@@ -5261,38 +5261,131 @@
 
                                 function getPropertyTypesData(props) {
                                     const counts = {};
-                                    function traverse(p) {
-                                        if (!p) return;
-                                        counts[p.type] = (counts[p.type] || 0) + 1;
-                                        if (p.properties && Array.isArray(p.properties)) p.properties.forEach(traverse);
+                                    const visibleCounts = {};
+                                    const stCounts = {};
+                                    const stVisCounts = {};
+
+                                    function isPropVisible(p, parentVisible) {
+                                        const explicitlyVisible = !currentHiddenPropIds.has(p.id);
+                                        return parentVisible || explicitlyVisible;
                                     }
-                                    if (props && Array.isArray(props)) props.forEach(traverse);
-                                    return Object.keys(counts).sort().map(k => ({ type: k, count: counts[k] }));
+
+                                    function traverse(p, parentVisible) {
+                                        if (!p) return;
+                                        const type = p.type || 'unknown';
+                                        counts[type] = (counts[type] || 0) + 1;
+                                        
+                                        const isVisible = isPropVisible(p, parentVisible);
+                                        if (isVisible) {
+                                            visibleCounts[type] = (visibleCounts[type] || 0) + 1;
+                                        }
+
+                                        if (p.subtypes && Array.isArray(p.subtypes)) {
+                                            p.subtypes.forEach(st => {
+                                                const key = type + ':' + st;
+                                                stCounts[key] = (stCounts[key] || 0) + 1;
+                                                if (isVisible) {
+                                                    stVisCounts[key] = (stVisCounts[key] || 0) + 1;
+                                                }
+                                            });
+                                        }
+
+                                        if (p.properties && Array.isArray(p.properties)) {
+                                            p.properties.forEach(child => traverse(child, isVisible));
+                                        }
+                                    }
+
+                                    if (props && Array.isArray(props)) props.forEach(p => traverse(p, false));
+
+                                    return Object.keys(counts).sort().map(k => {
+                                        const subKeys = Object.keys(stCounts).filter(sk => sk.startsWith(k + ':')).sort();
+                                        const subtypes = subKeys.map(sk => ({
+                                            type: sk,
+                                            name: sk.split(':')[1],
+                                            count: stCounts[sk],
+                                            visibleCount: stVisCounts[sk] || 0
+                                        }));
+
+                                        return {
+                                            type: k,
+                                            count: counts[k],
+                                            visibleCount: visibleCounts[k] || 0,
+                                            subtypes: subtypes.length > 0 ? subtypes : null
+                                        };
+                                    });
                                 }
 
                                 function togglePropTypeFilter(type) {
-                                    if (currentHiddenPropTypes.has(type)) {
-                                        currentHiddenPropTypes.delete(type);
-                                    } else {
-                                        currentHiddenPropTypes.add(type);
+                                    if (!currentModalPropsData) return;
+                                    
+                                    const matchingProps = [];
+                                    function collectMatching(p) {
+                                        if (!p) return;
+                                        const scopes = [p.type];
+                                        if (p.subtypes) p.subtypes.forEach(st => scopes.push(p.type + ':' + st));
+                                        
+                                        if (scopes.includes(type)) {
+                                            matchingProps.push(p);
+                                        }
+                                        if (p.properties && Array.isArray(p.properties)) {
+                                            p.properties.forEach(collectMatching);
+                                        }
                                     }
+                                    currentModalPropsData.forEach(collectMatching);
+
+                                    let visibleCount = 0;
+                                    matchingProps.forEach(p => {
+                                        if (!currentHiddenPropIds.has(p.id)) {
+                                            visibleCount++;
+                                        }
+                                    });
+
+                                    const actionHide = visibleCount > 0;
+                                    matchingProps.forEach(p => {
+                                        if (actionHide) {
+                                            currentHiddenPropIds.add(p.id);
+                                        } else {
+                                            currentHiddenPropIds.delete(p.id);
+                                        }
+                                    });
+
                                     updatePropertiesUI();
                                 }
 
                                 function toggleAllPropFilters() {
                                     if (!currentModalPropsData) return;
-                                    const typesData = getPropertyTypesData(currentModalPropsData);
-                                    const anyVisible = typesData.some(t => !currentHiddenPropTypes.has(t.type));
-
-                                    currentHiddenPropTypes.clear();
-                                    if (anyVisible) {
-                                        typesData.forEach(t => currentHiddenPropTypes.add(t.type));
+                                    
+                                    const allProps = [];
+                                    function collectAll(p) {
+                                        if (!p) return;
+                                        allProps.push(p);
+                                        if (p.properties && Array.isArray(p.properties)) {
+                                            p.properties.forEach(collectAll);
+                                        }
                                     }
+                                    currentModalPropsData.forEach(collectAll);
+
+                                    let visibleCount = 0;
+                                    allProps.forEach(p => {
+                                        if (!currentHiddenPropIds.has(p.id)) {
+                                            visibleCount++;
+                                        }
+                                    });
+
+                                    const actionHide = visibleCount > 0;
+                                    allProps.forEach(p => {
+                                        if (actionHide) {
+                                            currentHiddenPropIds.add(p.id);
+                                        } else {
+                                            currentHiddenPropIds.delete(p.id);
+                                        }
+                                    });
+
                                     updatePropertiesUI();
                                 }
 
                                 function renderPropNode(prop, executions, depth, isParentVisibleExplicit, targetGroupType = "", parentType = "") {
-                                    const isExplicitlyVisible = !currentHiddenPropTypes.has(prop.type);
+                                    const isExplicitlyVisible = !currentHiddenPropIds.has(prop.id);
                                     const isVisibleExplicit = isParentVisibleExplicit || isExplicitlyVisible;
 
                                     let childrenHtml = '';
@@ -5462,69 +5555,138 @@
                                          checkPropertiesOverflow();
                                      }
 
-                                    if (!currentModalPropsData) return;
-                                    const typesData = getPropertyTypesData(currentModalPropsData);
-                                    const anyVisible = typesData.some(t => !currentHiddenPropTypes.has(t.type));
+                                     if (!currentModalPropsData) return;
+                                     const typesData = getPropertyTypesData(currentModalPropsData);
+                                     
+                                     let allCount = 0;
+                                     let allVisibleCount = 0;
+                                     typesData.forEach(t => {
+                                         allCount += t.count;
+                                         allVisibleCount += t.visibleCount;
+                                     });
 
-                                    const allEye = document.getElementById('prop-filter-all-eye');
-                                    if (allEye) {
-                                        allEye.classList.remove('state-none', 'state-all', 'state-partial');
-                                        if (anyVisible && currentHiddenPropTypes.size === 0) allEye.classList.add('state-all');
-                                        else if (anyVisible) allEye.classList.add('state-partial');
-                                        else allEye.classList.add('state-none');
-                                    }
+                                     const setIconStateHTML = function(visibleCount, totalCount) {
+                                         if (totalCount <= 0) return 'state-none';
+                                         if (visibleCount >= totalCount) return 'state-all';
+                                         if (visibleCount <= 0) return 'state-none';
+                                         return 'state-partial';
+                                     };
 
-                                    const filterBtnIcon = document.getElementById('prop-filter-btn-icon');
-                                    if (filterBtnIcon) {
-                                        filterBtnIcon.style.color = currentHiddenPropTypes.size > 0 ? '#38bdf8' : '#64748b';
-                                    }
+                                     const allEye = document.getElementById('prop-filter-all-eye');
+                                     if (allEye) {
+                                         allEye.classList.remove('state-none', 'state-all', 'state-partial');
+                                         allEye.classList.add(setIconStateHTML(allVisibleCount, allCount));
+                                     }
 
-                                    typesData.forEach(t => {
-                                        const isHidden = currentHiddenPropTypes.has(t.type);
-                                        const eyeId = 'prop-filter-eye-' + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
-                                        const eye = document.getElementById(eyeId);
-                                        if (eye) {
-                                            if (isHidden) {
-                                                eye.classList.remove('active');
-                                                eye.classList.add('state-none');
-                                            } else {
-                                                eye.classList.add('active');
-                                                eye.classList.remove('state-none');
-                                            }
-                                        }
-                                        const badgeId = 'prop-filter-badge-' + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
-                                        updateBadge(badgeId, isHidden ? 0 : t.count, t.count);
-                                    });
+                                     const filterBtnIcon = document.getElementById('prop-filter-btn-icon');
+                                     if (filterBtnIcon) {
+                                         filterBtnIcon.style.color = currentHiddenPropIds.size > 0 ? '#38bdf8' : '#64748b';
+                                     }
+
+                                     typesData.forEach(t => {
+                                         const tState = setIconStateHTML(t.visibleCount, t.count);
+                                         const eyeId = 'prop-filter-eye-' + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
+                                         const eye = document.getElementById(eyeId);
+                                         if (eye) {
+                                             eye.classList.remove('state-all', 'state-partial', 'state-none', 'active');
+                                             eye.classList.add(tState);
+                                             if (tState !== 'state-none') eye.classList.add('active');
+                                         }
+                                         const badgeId = 'prop-filter-badge-' + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
+                                         updateBadge(badgeId, t.visibleCount, t.count);
+
+                                         if (t.subtypes) {
+                                             t.subtypes.forEach(st => {
+                                                 const stState = setIconStateHTML(st.visibleCount, st.count);
+                                                 const stEyeId = 'prop-filter-eye-' + btoa(encodeURIComponent(st.type)).replace(/=/g, '');
+                                                 const stEye = document.getElementById(stEyeId);
+                                                 if (stEye) {
+                                                     stEye.classList.remove('state-all', 'state-partial', 'state-none', 'active');
+                                                     stEye.classList.add(stState);
+                                                     if (stState !== 'state-none') stEye.classList.add('active');
+                                                 }
+                                                 const stBadgeId = 'prop-filter-badge-' + btoa(encodeURIComponent(st.type)).replace(/=/g, '');
+                                                 updateBadge(stBadgeId, st.visibleCount, st.count);
+                                             });
+                                         }
+                                     });
                                 }
 
                                 function renderPropertiesFilterPanelHTML(props) {
                                     const typesData = getPropertyTypesData(props);
-                                    const anyVisible = typesData.some(t => !currentHiddenPropTypes.has(t.type));
+                                    
+                                    let allCount = 0;
+                                    let allVisibleCount = 0;
+                                    typesData.forEach(t => {
+                                        allCount += t.count;
+                                        allVisibleCount += t.visibleCount;
+                                    });
+
+                                    const setIconStateHTML = function(visibleCount, totalCount) {
+                                        if (totalCount <= 0) return 'state-none';
+                                        if (visibleCount >= totalCount) return 'state-all';
+                                        if (visibleCount <= 0) return 'state-none';
+                                        return 'state-partial';
+                                    };
+
+                                    let allEyeState = setIconStateHTML(allVisibleCount, allCount);
 
                                     let html = '<div id="prop-filter-panel" style="display: none; background: #0f172a; border: 1px solid #334155; padding: 12px; border-radius: 6px; margin-bottom: 15px;">';
 
                                     html += '<div class="meta-item" style="margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">';
                                     html += '<span style="color: #f1f5f9; font-size: 0.85rem; font-weight: bold; text-transform: uppercase;">All Properties</span>';
-                                    html += '<div class="icon-btn ' + (anyVisible && currentHiddenPropTypes.size === 0 ? 'state-all' : (anyVisible ? 'state-partial' : 'state-none')) + '" id="prop-filter-all-eye" onclick="toggleAllPropFilters()" title="' + UI_STRINGS.TOGGLE_ALL_VISIBILITY + '">';
+                                    html += '<div class="icon-btn ' + allEyeState + '" id="prop-filter-all-eye" onclick="toggleAllPropFilters()" title="' + UI_STRINGS.TOGGLE_ALL_VISIBILITY + '">';
                                     html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
                                     html += '</div></div>';
 
                                     html += '<div style="display: flex; flex-direction: column; gap: 8px;">';
                                     typesData.forEach(t => {
-                                        const isHidden = currentHiddenPropTypes.has(t.type);
+                                        const tState = setIconStateHTML(t.visibleCount, t.count);
                                         const eyeId = 'prop-filter-eye-' + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
                                         const badgeId = 'prop-filter-badge-' + btoa(encodeURIComponent(t.type)).replace(/=/g, '');
-                                        const visibleCount = isHidden ? 0 : t.count;
-                                        const badgeText = isHidden ? ('0 / ' + t.count) : String(t.count);
-                                        const badgeTitle = 'Visible: ' + visibleCount + ' | Hidden: ' + (t.count - visibleCount) + ' | Total: ' + t.count;
 
-                                        html += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0;">';
-                                        html += '<span style="color: #cbd5e1; font-size: 0.85rem; font-family: monospace;">' + escapeHTML(t.type) + '</span>';
-                                        html += '<div style="display: flex; align-items: center; gap: 12px;">';
-                                        html += '<span class="stat-badge" id="' + badgeId + '" title="' + badgeTitle + '">' + badgeText + '</span>';
-                                        html += '<div class="icon-btn visibility-eye ' + (isHidden ? 'state-none' : 'active') + '" id="' + eyeId + '" onclick="togglePropTypeFilter(\'' + escapeHTML(t.type.replace(/'/g, "\\'")) + '\')" title="' + UI_STRINGS.TOGGLE_VISIBILITY + '">';
+                                        const tBadgeText = (t.visibleCount < t.count) ? (t.visibleCount + ' / ' + t.count) : String(t.count);
+                                        const tBadgeTitle = 'Visible: ' + t.visibleCount + ' | Hidden: ' + (t.count - t.visibleCount) + ' | Total: ' + t.count;
+
+                                        html += '<div class="meta-item-group" style="margin-bottom: 0;">';
+                                        html += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0;' + (t.subtypes ? ' cursor: pointer;' : '') + '"';
+                                        if (t.subtypes) {
+                                            html += ' onclick="if (event.target.closest(\'.meta-item-controls\')) return; const st = this.nextElementSibling; const isHidden = st.style.display === \'none\' || st.style.display === \'\'; st.style.display = isHidden ? \'block\' : \'none\'; this.querySelector(\'.expander\').innerText = isHidden ? \'▼\' : \'▶\';"';
+                                        }
+                                        html += '>';
+                                        html += '<span style="color: #cbd5e1; font-size: 0.85rem; font-family: monospace;">' + escapeHTML(t.type);
+                                        if (t.subtypes) {
+                                            html += '<span class="expander" style="font-size: 0.7em; margin-left: 6px; color: #64748b;">▶</span>';
+                                        }
+                                        html += '</span>';
+
+                                        html += '<div class="meta-item-controls" style="display: flex; align-items: center; gap: 12px;">';
+                                        html += '<span class="stat-badge" id="' + badgeId + '" title="' + tBadgeTitle + '">' + tBadgeText + '</span>';
+                                        html += '<div class="icon-btn visibility-eye ' + tState + '" id="' + eyeId + '" onclick="togglePropTypeFilter(\'' + escapeHTML(t.type.replace(/'/g, "\\'")) + '\')" title="' + UI_STRINGS.TOGGLE_VISIBILITY + '">';
                                         html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
                                         html += '</div></div></div>';
+
+                                        if (t.subtypes) {
+                                            html += '<div class="subtypes-container" style="display: none; margin-top: 8px;">';
+                                            t.subtypes.forEach(st => {
+                                                const stState = setIconStateHTML(st.visibleCount, st.count);
+                                                const stEyeId = 'prop-filter-eye-' + btoa(encodeURIComponent(st.type)).replace(/=/g, '');
+                                                const stBadgeId = 'prop-filter-badge-' + btoa(encodeURIComponent(st.type)).replace(/=/g, '');
+
+                                                const stBadgeText = (st.visibleCount < st.count) ? (st.visibleCount + ' / ' + st.count) : String(st.count);
+                                                const stBadgeTitle = 'Visible: ' + st.visibleCount + ' | Hidden: ' + (st.count - st.visibleCount) + ' | Total: ' + st.count;
+
+                                                html += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-left: 15px; border-left: 2px solid #334155; margin-left: 5px;">';
+                                                html += '<span style="color: #94a3b8; font-size: 0.8rem; font-family: monospace;">' + escapeHTML(st.name) + '</span>';
+                                                html += '<div style="display: flex; align-items: center; gap: 12px;">';
+                                                html += '<span class="stat-badge" id="' + stBadgeId + '" title="' + stBadgeTitle + '">' + stBadgeText + '</span>';
+                                                html += '<div class="icon-btn visibility-eye ' + stState + '" id="' + stEyeId + '" onclick="togglePropTypeFilter(\'' + escapeHTML(st.type.replace(/'/g, "\\'")) + '\')" title="' + UI_STRINGS.TOGGLE_VISIBILITY + '">';
+                                                html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+                                                html += '</div></div></div>';
+                                            });
+                                            html += '</div>';
+                                        }
+                                        html += '</div>';
                                     });
                                     html += '</div></div>';
                                     return html;
@@ -5656,7 +5818,7 @@
                                             content += '</div>';
 
                                             if (node.properties && node.properties.length > 0) {
-                                                currentHiddenPropTypes.clear();
+                                                currentHiddenPropIds.clear();
                                                 currentModalPropsData = node.properties;
                                                 currentModalExecutionsData = node.executions;
 
