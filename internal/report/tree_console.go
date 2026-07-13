@@ -56,7 +56,11 @@ func (c *ConsoleTreeFormatter) FormatNode(prefix, marker, nodeType string, subty
 		} else {
 			b.WriteString("[" + colorCyan + strings.ToUpper(nodeType) + colorReset + "]")
 			for _, st := range subtypes {
-				b.WriteString("[" + colorCyan + strings.ToUpper(st) + colorReset + "]")
+				b.WriteByte('[')
+				b.WriteString(colorCyan)
+				b.WriteString(strings.ToUpper(st))
+				b.WriteString(colorReset)
+				b.WriteByte(']')
 			}
 			b.WriteByte(' ')
 		}
@@ -93,7 +97,7 @@ func (c *ConsoleTreeFormatter) FormatNode(prefix, marker, nodeType string, subty
 }
 
 // FormatProperty formats an entity property node.
-func (c *ConsoleTreeFormatter) FormatProperty(basePrefix, startChar, propIndent, propType, value, connInfo string, isOutOfScope, isSeen bool) string {
+func (c *ConsoleTreeFormatter) FormatProperty(basePrefix, startChar, propIndent, propType string, subtypes []string, value, connInfo string, isOutOfScope, isSeen bool) string {
 	var b strings.Builder
 
 	b.WriteString(basePrefix)
@@ -102,11 +106,18 @@ func (c *ConsoleTreeFormatter) FormatProperty(basePrefix, startChar, propIndent,
 	b.WriteString("• [")
 
 	if propType == "invalid" {
-		b.WriteString(colorRed + i18n.T["LBL_INVALID"])
+		b.WriteString(colorRed + i18n.T["LBL_INVALID"] + colorReset + "] [")
 	} else {
-		b.WriteString(colorYellow + strings.ToUpper(propType))
+		b.WriteString(colorYellow + strings.ToUpper(propType) + colorReset + "]")
+		for _, st := range subtypes {
+			b.WriteByte('[')
+			b.WriteString(colorYellow)
+			b.WriteString(strings.ToUpper(st))
+			b.WriteString(colorReset)
+			b.WriteByte(']')
+		}
+		b.WriteString(" [")
 	}
-	b.WriteString(colorReset + "] [")
 
 	if isOutOfScope {
 		b.WriteString(colorBlue)

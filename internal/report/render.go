@@ -14,6 +14,7 @@ type propertyInfo struct {
 	Value      string
 	Context    string
 	OutOfScope bool
+	Subtypes   []string
 }
 
 type contextGroup struct {
@@ -141,6 +142,7 @@ func RenderResultsTree(out io.Writer, graph *schema.ProjectGraph, f TreeFormatte
 					Value:      targetNode.Value,
 					Context:    strings.Join(details, " | "),
 					OutOfScope: targetNode.OutOfScope,
+					Subtypes:   targetNode.Subtypes,
 				})
 			}
 		} else {
@@ -363,7 +365,7 @@ func printProperties(out io.Writer, f TreeFormatter, nodeID string, basePrefix s
 		isSeen := visited[prop.ID]
 		visited[prop.ID] = true
 
-		formatted := f.FormatProperty(basePrefix, startChar, propIndent, prop.Type, prop.Value, prop.Context, prop.OutOfScope, isSeen)
+		formatted := f.FormatProperty(basePrefix, startChar, propIndent, prop.Type, prop.Subtypes, prop.Value, prop.Context, prop.OutOfScope, isSeen)
 		fmt.Fprintln(out, formatted)
 
 		if isSeen {

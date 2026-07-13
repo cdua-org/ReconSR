@@ -10,5 +10,5 @@ type TreeFormatter interface {
 	FormatCategoryFooter() string
 
 	FormatNode(prefix, marker, nodeType string, subtypes []string, value, connInfo string, isOutOfScope, isLimitReached, isSeen bool) string
-	FormatProperty(basePrefix, startChar, propIndent, propType, value, connInfo string, isOutOfScope, isSeen bool) string
+	FormatProperty(basePrefix, startChar, propIndent, propType string, subtypes []string, value, connInfo string, isOutOfScope, isSeen bool) string
 }

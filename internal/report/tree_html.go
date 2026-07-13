@@ -7,7 +7,7 @@ import (
 	"html"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -213,7 +213,7 @@ func GenerateTreeHTML(graph *schema.ProjectGraph) (string, error) {
 		}
 	}
 
-	nodesMap := make(map[string]bool)
+	nodesMap := make(map[string]bool, len(graph.Nodes))
 	nodeStatsFiltered := make(map[string]int)
 
 	for _, edge := range graph.Edges {
@@ -240,7 +240,7 @@ func GenerateTreeHTML(graph *schema.ProjectGraph) (string, error) {
 
 	nodesCount := len(nodesMap)
 
-	var nodeKeys []string
+	nodeKeys := make([]string, 0, len(nodeStatsFiltered))
 	hasInvalidNode := false
 	for t := range nodeStatsFiltered {
 		if t == "invalid" {
@@ -249,7 +249,7 @@ func GenerateTreeHTML(graph *schema.ProjectGraph) (string, error) {
 			nodeKeys = append(nodeKeys, t)
 		}
 	}
-	sort.Strings(nodeKeys)
+	slices.Sort(nodeKeys)
 	if hasInvalidNode {
 		nodeKeys = append(nodeKeys, "invalid")
 	}
@@ -260,7 +260,7 @@ func GenerateTreeHTML(graph *schema.ProjectGraph) (string, error) {
 		fmt.Fprintf(&nodesListBuilder, `<div class="stat-item"><span style="text-transform: capitalize;">%s</span><span class="stat-count">%d</span></div>`, html.EscapeString(t), count)
 	}
 
-	var propKeys []string
+	propKeys := make([]string, 0, len(propStats))
 	hasInvalidProp := false
 	for t := range propStats {
 		if t == "invalid" {
@@ -269,7 +269,7 @@ func GenerateTreeHTML(graph *schema.ProjectGraph) (string, error) {
 			propKeys = append(propKeys, t)
 		}
 	}
-	sort.Strings(propKeys)
+	slices.Sort(propKeys)
 	if hasInvalidProp {
 		propKeys = append(propKeys, "invalid")
 	}
@@ -349,7 +349,11 @@ func (h *HTMLTreeFormatter) FormatNode(prefix, marker, nodeType string, subtypes
 		} else {
 			b.WriteString("[" + htmlSpanCyan + strings.ToUpper(html.EscapeString(nodeType)) + htmlSpanEnd + "]")
 			for _, st := range subtypes {
-				b.WriteString("[" + htmlSpanCyan + strings.ToUpper(html.EscapeString(st)) + htmlSpanEnd + "]")
+				b.WriteByte('[')
+				b.WriteString(htmlSpanCyan)
+				b.WriteString(strings.ToUpper(html.EscapeString(st)))
+				b.WriteString(htmlSpanEnd)
+				b.WriteByte(']')
 			}
 			b.WriteByte(' ')
 		}
@@ -386,7 +390,7 @@ func (h *HTMLTreeFormatter) FormatNode(prefix, marker, nodeType string, subtypes
 }
 
 // FormatProperty formats an entity property node.
-func (h *HTMLTreeFormatter) FormatProperty(basePrefix, startChar, propIndent, propType, value, connInfo string, isOutOfScope, isSeen bool) string {
+func (h *HTMLTreeFormatter) FormatProperty(basePrefix, startChar, propIndent, propType string, subtypes []string, value, connInfo string, isOutOfScope, isSeen bool) string {
 	var b strings.Builder
 
 	b.WriteString(basePrefix)
@@ -395,11 +399,18 @@ func (h *HTMLTreeFormatter) FormatProperty(basePrefix, startChar, propIndent, pr
 	b.WriteString("• [")
 
 	if propType == "invalid" {
-		b.WriteString(htmlSpanRed + i18n.T["LBL_INVALID"])
+		b.WriteString(htmlSpanRed + i18n.T["LBL_INVALID"] + htmlSpanEnd + "] [")
 	} else {
-		b.WriteString(htmlSpanYellow + strings.ToUpper(html.EscapeString(propType)))
+		b.WriteString(htmlSpanYellow + strings.ToUpper(html.EscapeString(propType)) + htmlSpanEnd + "]")
+		for _, st := range subtypes {
+			b.WriteByte('[')
+			b.WriteString(htmlSpanYellow)
+			b.WriteString(strings.ToUpper(html.EscapeString(st)))
+			b.WriteString(htmlSpanEnd)
+			b.WriteByte(']')
+		}
+		b.WriteString(" [")
 	}
-	b.WriteString(htmlSpanEnd + "] [")
 
 	if isOutOfScope {
 		b.WriteString(htmlSpanBlue)
