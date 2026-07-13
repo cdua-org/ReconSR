@@ -4883,8 +4883,8 @@
                                                 const stBadgeText = (st.visibleCount < st.effectiveCount) ? (st.visibleCount + ' / ' + st.effectiveCount) : String(st.effectiveCount);
                                                 const stBadgeTitle = 'Visible: ' + st.visibleCount + ' | Hidden: ' + (st.effectiveCount - st.visibleCount) + ' | Total: ' + st.effectiveCount;
 
-                                                html += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-left: 15px; border-left: 2px solid #334155; margin-left: 5px;">';
-                                                html += '<span style="color: #94a3b8; font-size: 0.8rem; font-family: monospace;">' + escapeHTML(st.name) + '</span>';
+                                                html += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">';
+                                                html += '<span style="color: #94a3b8; font-size: 0.8rem; font-family: monospace; padding-left: 15px; border-left: 2px solid #334155; margin-left: 5px; display: inline-block;">' + escapeHTML(st.name) + '</span>';
                                                 html += '<div style="display: flex; align-items: center; gap: 12px;">';
                                                 html += '<span class="stat-badge" id="' + stBadgeId + '" title="' + stBadgeTitle + '">' + stBadgeText + '</span>';
                                                 html += '<div class="icon-btn visibility-eye ' + stState + '" id="' + stEyeId + '" onclick="' + toggleTypeFn + '(\'' + escapeHTML(st.type.replace(/'/g, "\\'")) + '\')" title="' + UI_STRINGS.TOGGLE_TYPE_VISIBILITY + '">';
@@ -5676,8 +5676,8 @@
                                                 const stBadgeText = (st.visibleCount < st.count) ? (st.visibleCount + ' / ' + st.count) : String(st.count);
                                                 const stBadgeTitle = 'Visible: ' + st.visibleCount + ' | Hidden: ' + (st.count - st.visibleCount) + ' | Total: ' + st.count;
 
-                                                html += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-left: 15px; border-left: 2px solid #334155; margin-left: 5px;">';
-                                                html += '<span style="color: #94a3b8; font-size: 0.8rem; font-family: monospace;">' + escapeHTML(st.name) + '</span>';
+                                                html += '<div class="meta-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">';
+                                                html += '<span style="color: #94a3b8; font-size: 0.8rem; font-family: monospace; padding-left: 15px; border-left: 2px solid #334155; margin-left: 5px; display: inline-block;">' + escapeHTML(st.name) + '</span>';
                                                 html += '<div style="display: flex; align-items: center; gap: 12px;">';
                                                 html += '<span class="stat-badge" id="' + stBadgeId + '" title="' + stBadgeTitle + '">' + stBadgeText + '</span>';
                                                 html += '<div class="icon-btn visibility-eye ' + stState + '" id="' + stEyeId + '" onclick="togglePropTypeFilter(\'' + escapeHTML(st.type.replace(/'/g, "\\'")) + '\')" title="' + UI_STRINGS.TOGGLE_VISIBILITY + '">';
