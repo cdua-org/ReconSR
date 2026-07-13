@@ -23,7 +23,12 @@ import (
 
 // Layout tuning parameters
 const (
-	layoutIdealDistance     = 50.0 // Base spring length (k)
+	layoutIdealDistanceSmall  = 120.0 // Base spring length (k) for small graphs
+	layoutIdealDistanceMedium = 80.0  // Base spring length (k) for medium graphs
+	layoutIdealDistanceLarge  = 50.0  // Base spring length (k) for large graphs
+	layoutThresholdSmall  = 100  // Threshold for small graphs
+	layoutThresholdMedium = 1000 // Threshold for medium graphs
+
 	layoutRootRadius        = 45.0 // Collision radius for the root node
 	layoutMaxHubRadius      = 45.0 // Maximum allowed collision radius for any hub
 	layoutBaseNodeRadius    = 15.0 // Base collision radius for standard nodes
@@ -701,7 +706,14 @@ func applyForceLayout(ctx context.Context, nodes map[int64]graphNode, edges map[
 		localK   float64
 	}
 	edgeList := make([]edgeIdx, 0, len(edges))
-	k := layoutIdealDistance
+	var k float64
+	if nodeCount <= layoutThresholdSmall {
+		k = layoutIdealDistanceSmall
+	} else if nodeCount <= layoutThresholdMedium {
+		k = layoutIdealDistanceMedium
+	} else {
+		k = layoutIdealDistanceLarge
+	}
 	for _, e := range edges {
 		fi, fiOk := idxOf[e.From]
 		ti, tiOk := idxOf[e.To]
