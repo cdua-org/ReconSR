@@ -10,7 +10,7 @@ require (
 	github.com/oschwald/maxminddb-golang v1.13.1
 	golang.org/x/net v0.57.0
 	golang.org/x/sys v0.47.0
-	modernc.org/sqlite v1.53.0
+	modernc.org/sqlite v1.54.0
 )
 
 require (
