@@ -3168,6 +3168,12 @@
                                 const allPropsMap = window.allPropsMap;
                                 const ROOT_NODE_ID = {{ .InitialTargetID }};
 
+                                initialNodes.forEach(n => {
+                                    if (n.outOfScope && n.depthLimitReached) {
+                                        n.depthLimitReached = false;
+                                    }
+                                });
+
                                 // Handle fallback layout if coordinates are not present initially (e.g. legacy files)
                                  let rootNodeX = 0, rootNodeY = 0;
                                  const rootNodeObj = initialNodes.find(n => n.group === 'root') || initialNodes[0];
@@ -5073,6 +5079,7 @@
                                     const node = item.node;
                                     const isHidden = item.isHidden;
                                     const isOOS = item.isOOS;
+                                    const isLimit = item.isLimit;
 
                                     let subBadgeHtml = '';
                                     if (node && node.subtypes && node.subtypes.length > 0) {
@@ -5103,6 +5110,8 @@
                                     let metaHtml = '';
                                     if (isOOS) {
                                         metaHtml += '<div style="color: #ef4444; font-weight: bold; margin-top: 4px;">⚠️ OUT OF SCOPE</div>';
+                                    } else if (isLimit) {
+                                        metaHtml += '<div style="color: #fbbf24; font-weight: bold; margin-top: 4px;">🛑 DEPTH LIMIT</div>';
                                     }
 
                                     let mergedContexts = [];
@@ -5963,6 +5972,10 @@
                                                         content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
                                                         content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
                                                         content += '</div>';
+                                                    } else if (sourceNode.depthLimitReached) {
+                                                        content += '<div style="color: #fbbf24; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
+                                                        content += '<span style="margin-right: 5px;">🛑</span> DEPTH LIMIT';
+                                                        content += '</div>';
                                                     }
                                                     content += '</div>';
                                                 }
@@ -6023,6 +6036,10 @@
                                                             content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
                                                             content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
                                                             content += '</div>';
+                                                        } else if (targetNode.depthLimitReached) {
+                                                            content += '<div style="color: #fbbf24; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
+                                                            content += '<span style="margin-right: 5px;">🛑</span> DEPTH LIMIT';
+                                                            content += '</div>';
                                                         }
                                                         content += '</div>';
                                                     }
@@ -6044,6 +6061,10 @@
                                                     if (sourceNode.outOfScope) {
                                                         content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
                                                         content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
+                                                        content += '</div>';
+                                                    } else if (sourceNode.depthLimitReached) {
+                                                        content += '<div style="color: #fbbf24; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
+                                                        content += '<span style="margin-right: 5px;">🛑</span> DEPTH LIMIT';
                                                         content += '</div>';
                                                     }
                                                     content += '</div>';
@@ -6099,6 +6120,10 @@
                                                     if (targetNode.outOfScope) {
                                                         content += '<div style="color: #ef4444; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
                                                         content += '<span style="margin-right: 5px;">⚠️</span> OUT OF SCOPE';
+                                                        content += '</div>';
+                                                    } else if (targetNode.depthLimitReached) {
+                                                        content += '<div style="color: #fbbf24; font-size: 0.85rem; font-weight: bold; margin-top: 10px; display: flex; align-items: center;">';
+                                                        content += '<span style="margin-right: 5px;">🛑</span> DEPTH LIMIT';
                                                         content += '</div>';
                                                     }
                                                     content += '</div>';
