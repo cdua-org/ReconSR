@@ -268,7 +268,7 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 		}
 
 		for i, p := range projects {
-			fmt.Printf("%d. %s %s (%s: %s)\n", i+2, i18n.T["OPT_CONTINUE_PROJECT"], p.Name, i18n.T["LBL_CREATED"], p.CreatedAt.Format("2006-01-02 15:04:05"))
+			fmt.Printf("%d. %s %s (%s: %s, %s: %s)\n", i+2, i18n.T["OPT_CONTINUE_PROJECT"], p.Name, i18n.T["LBL_CREATED"], p.CreatedAt.Format("2006-01-02 15:04:05"), i18n.T["LBL_SIZE"], formatBytes(p.SizeBytes))
 		}
 
 		exitIdx := len(projects) + 2
@@ -518,5 +518,23 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 			return &stop
 		}
 		fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
+	}
+}
+
+func formatBytes(bytes int64) string {
+	const (
+		kb = 1024
+		mb = kb * 1024
+		gb = mb * 1024
+	)
+	switch {
+	case bytes >= gb:
+		return fmt.Sprintf("%.2f GB", float64(bytes)/float64(gb))
+	case bytes >= mb:
+		return fmt.Sprintf("%.2f MB", float64(bytes)/float64(mb))
+	case bytes >= kb:
+		return fmt.Sprintf("%.2f KB", float64(bytes)/float64(kb))
+	default:
+		return fmt.Sprintf("%d B", bytes)
 	}
 }

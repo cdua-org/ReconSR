@@ -106,6 +106,10 @@ func SyncMasterDB(ctx context.Context, regs []schema.ModuleRegistration) (err er
 		return err
 	}
 
+	if err := syncProjectsDB(ctx, db); err != nil {
+		return err
+	}
+
 	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS modules;"); err != nil {
 		return err
 	}
@@ -171,6 +175,107 @@ func SyncMasterDB(ctx context.Context, regs []schema.ModuleRegistration) (err er
 	return nil
 }
 
+func syncProjectsDB(ctx context.Context, masterDB *sql.DB) error {
+	if err := os.MkdirAll(StorageProjectsDir, 0750); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(StorageProjectsDir)
+	if err != nil {
+		return err
+	}
+
+	diskProjects := make(map[string]struct{})
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".db") {
+			continue
+		}
+		dbID := strings.TrimSuffix(entry.Name(), ".db")
+		diskProjects[dbID] = struct{}{}
+	}
+
+	rows, err := masterDB.QueryContext(ctx, "SELECT id, db_identifier FROM projects")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	type projectRecord struct {
+		id           int64
+		dbIdentifier string
+	}
+	var dbProjects []projectRecord
+	masterProjectsMap := make(map[string]int64)
+
+	for rows.Next() {
+		var pr projectRecord
+		if err := rows.Scan(&pr.id, &pr.dbIdentifier); err != nil {
+			return err
+		}
+		dbProjects = append(dbProjects, pr)
+		masterProjectsMap[pr.dbIdentifier] = pr.id
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, pr := range dbProjects {
+		if _, exists := diskProjects[pr.dbIdentifier]; !exists {
+			if _, err := masterDB.ExecContext(ctx, "DELETE FROM projects WHERE id = ?", pr.id); err != nil {
+				return err
+			}
+		}
+	}
+
+	for dbID := range diskProjects {
+		if _, exists := masterProjectsMap[dbID]; !exists {
+			projectDBPath := filepath.Join(StorageProjectsDir, dbID+".db")
+			targetType, targetValue, name := inspectProjectDB(ctx, projectDBPath, dbID)
+
+			info, statErr := os.Stat(projectDBPath)
+			var createdAt string
+			if statErr == nil {
+				createdAt = info.ModTime().UTC().Format("2006-01-02 15:04:05")
+			} else {
+				createdAt = time.Now().UTC().Format("2006-01-02 15:04:05")
+			}
+
+			insertQuery := `INSERT INTO projects (name, db_identifier, initial_target_type, initial_target_value, status, created_at)
+			                VALUES (?, ?, ?, ?, 'active', ?)`
+			if _, err := masterDB.ExecContext(ctx, insertQuery, name, dbID, targetType, targetValue, createdAt); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func inspectProjectDB(ctx context.Context, dbPath string, dbID string) (targetType, targetValue, name string) {
+	targetType = "unknown"
+	targetValue = "unknown"
+	name = dbID
+
+	projDB, err := openDB(dbPath)
+	if err != nil {
+		return
+	}
+	defer projDB.Close()
+
+	query := `SELECT e.type, d.value
+	          FROM entities e
+	          JOIN dictionary d ON e.value_id = d.id
+	          WHERE e.category = 'node'
+	          ORDER BY e.id ASC LIMIT 1`
+	var t, v string
+	if err := projDB.QueryRowContext(ctx, query).Scan(&t, &v); err == nil && t != "" && v != "" {
+		targetType = t
+		targetValue = v
+		name = v
+	}
+	return
+}
+
 // FindProjects searches for projects and checks module support for a target type in the master database.
 func FindProjects(ctx context.Context, targetType, targetValue string) (projects []schema.ProjectInfo, hasModules bool, hasActiveFuncs bool, err error) {
 	dbPath := filepath.Join(StorageBaseDir, MasterDBName)
@@ -215,6 +320,10 @@ func FindProjects(ctx context.Context, targetType, targetValue string) (projects
 			}
 		}
 		p.CreatedAt = parsedTime
+		projectDBPath := filepath.Join(StorageProjectsDir, p.DBIdentifier+".db")
+		if info, statErr := os.Stat(projectDBPath); statErr == nil {
+			p.SizeBytes = info.Size()
+		}
 		ref, err := AllocateWorkspaceRoute(p.DBIdentifier)
 		if err != nil {
 			return nil, false, false, err

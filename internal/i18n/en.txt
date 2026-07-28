@@ -4,6 +4,7 @@
 LBL_USAGE=Usage
 LBL_TARGET_HINT=target
 LBL_CREATED=Created
+LBL_SIZE=Size
 LBL_PROJECT_STATUS=Project Status Report
 LBL_PROJECT=Project
 LBL_RESULTS_FOR=Results for
