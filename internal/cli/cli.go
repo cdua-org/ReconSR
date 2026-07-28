@@ -450,6 +450,8 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 			}
 		}
 
+		fmt.Println("\n" + colorYellow + "[!] " + i18n.T["MSG_CONFIG_INFO"] + colorReset)
+
 		fmt.Println("\n" + colorCyan + colorBold + "--- " + i18n.T["MSG_PROJ_ACTION"] + " ---" + colorReset)
 		fmt.Printf("1. %s\n", i18n.T["OPT_FULL_RESCAN"])
 		optIdx := 2
@@ -484,6 +486,12 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 		fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
 		choice := readUserInput()
 		fmt.Println("--------------------------------------------------")
+
+		if choice == "0" {
+			handleModuleConfiguration(ctx)
+			continue
+		}
+
 		var idx int
 		if _, err := fmt.Sscanf(choice, "%d", &idx); err != nil {
 			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
