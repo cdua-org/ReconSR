@@ -3,6 +3,7 @@ package i18n
 
 import (
 	"bufio"
+	"bytes"
 	"embed"
 	"errors"
 	"os"
@@ -15,6 +16,14 @@ var defaultLang embed.FS
 
 // T is the global translation map.
 var T = make(map[string]string)
+
+// Get returns the localized string for key, or an update warning if empty/missing.
+func Get(key string) string {
+	if val, ok := T[key]; ok && strings.TrimSpace(val) != "" {
+		return val
+	}
+	return "[UPDATE LANG FILE: " + key + "]"
+}
 
 // Setup ensures the default language file exists in the lang directory and loads it.
 func Setup(langPath string) error {
@@ -42,6 +51,25 @@ func LoadLanguage(path string) (err error) {
 		return errors.New("invalid path")
 	}
 
+	defaultKeys := make(map[string]struct{})
+	defaultContent, err := defaultLang.ReadFile("en.txt")
+	if err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(bytes.NewReader(defaultContent))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if parts := strings.SplitN(line, "=", 2); len(parts) == 2 {
+			k := strings.TrimSpace(parts[0])
+			if k != "" && !strings.HasPrefix(k, "#") {
+				defaultKeys[k] = struct{}{}
+			}
+		}
+	}
+	if scanErr := scanner.Err(); scanErr != nil {
+		return scanErr
+	}
+
 	file, fErr := os.Open(cleanPath)
 	if fErr != nil {
 		return fErr
@@ -53,12 +81,23 @@ func LoadLanguage(path string) (err error) {
 		}
 	}()
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
+	fileScanner := bufio.NewScanner(file)
+	for fileScanner.Scan() {
+		line := fileScanner.Text()
 		if parts := strings.SplitN(line, "=", 2); len(parts) == 2 {
-			T[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+			k := strings.TrimSpace(parts[0])
+			v := strings.TrimSpace(parts[1])
+			if k != "" {
+				T[k] = v
+			}
 		}
 	}
-	return scanner.Err()
+
+	for k := range defaultKeys {
+		if val, exists := T[k]; !exists || strings.TrimSpace(val) == "" {
+			T[k] = "[UPDATE LANG FILE: " + k + "]"
+		}
+	}
+
+	return fileScanner.Err()
 }
