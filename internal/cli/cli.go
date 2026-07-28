@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -129,7 +130,7 @@ func printProjectStats(ctx context.Context) {
 		if len(statsByCat) > 0 {
 			fmt.Printf(colorCyan+"Total entities: %d"+colorReset+"\n", totalEntities)
 
-			var catKeys []string
+			catKeys := make([]string, 0, len(statsByCat))
 			for cat := range statsByCat {
 				catKeys = append(catKeys, cat)
 			}
@@ -142,7 +143,7 @@ func printProjectStats(ctx context.Context) {
 					continue
 				}
 
-				var keys []string
+				keys := make([]string, 0, len(stats))
 				hasInvalid := false
 				for t := range stats {
 					if t == "invalid" {
@@ -181,7 +182,7 @@ func GetRawTarget(args []string) string {
 		target := readUserInput()
 		if target == "" {
 			fmt.Println(i18n.T["LBL_USAGE"] + ": " + args[0] + " <" + i18n.T["LBL_TARGET_HINT"] + ">")
-			os.Exit(1)
+			return ""
 		}
 		return target
 	}
@@ -190,17 +191,20 @@ func GetRawTarget(args []string) string {
 
 // HandleUserInput manages the UI loop for projects and actions.
 func HandleUserInput(ctx context.Context, rawInput string) bool {
+	if rawInput == "" {
+		return false
+	}
 	targetType, targetValue, err := controller.ValidateTarget("auto", rawInput)
 	if err != nil {
-		switch err {
-		case controller.ErrOutOfScope:
+		switch {
+		case errors.Is(err, controller.ErrOutOfScope):
 			fmt.Println(colorRed + i18n.T["ERR_OUT_OF_SCOPE"] + colorReset)
-		case controller.ErrUnsupportedType:
+		case errors.Is(err, controller.ErrUnsupportedType):
 			fmt.Println(colorRed + i18n.T["ERR_UNSUPPORTED_TYPE"] + colorReset)
 		default:
 			fmt.Println(colorRed + i18n.T["ERR_INVALID_FORMAT"] + colorReset)
 		}
-		os.Exit(1)
+		return false
 	}
 
 	for {
@@ -219,12 +223,16 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 
 		fmt.Printf("\n%s%s: %s%s%s%s (%s)\n", colorCyan, i18n.T["LBL_TARGET"], colorReset, colorBold, targetValue, colorReset, targetType)
 
-		tM, aM, tF, aF, _ := controller.GetSystemStatus(ctx)
+		tM, aM, tF, aF, err := controller.GetSystemStatus(ctx)
+		if err != nil {
+			fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
+			continue
+		}
 		fmt.Printf("%s%s:%s %d/%d %s, %d/%d %s\n", colorCyan, i18n.T["MSG_ACTIVE_TOOLS"], colorReset, aM, tM, i18n.T["LBL_MODS"], aF, tF, i18n.T["LBL_FUNCS"])
 		projects, hasModules, hasActiveFuncs, err := controller.GetProjects(ctx, targetType, targetValue)
 		if err != nil {
 			fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
-			os.Exit(1)
+			return false
 		}
 
 		if !hasModules {
@@ -292,9 +300,10 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 			continue
 		}
 
-		if idx == exitIdx {
+		switch {
+		case idx == exitIdx:
 			return false
-		} else if idx == 1 {
+		case idx == 1:
 			if !hasActiveFuncs {
 				fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
 				continue
@@ -307,9 +316,9 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 			controller.SetActiveProject(newID)
 			printReconStatus(false)
 			return true
-		} else if idx >= 2 && idx <= len(projects)+1 {
+		case idx >= 2 && idx <= len(projects)+1:
 			controller.SetActiveProject(projects[idx-2].DBIdentifier)
-		} else {
+		default:
 			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
 		}
 	}
@@ -498,7 +507,8 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 			continue
 		}
 
-		if idx == 1 {
+		switch {
+		case idx == 1:
 			if err := controller.ResetProjectLog(ctx, projectID, true, false); err != nil {
 				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
 				continue
@@ -508,34 +518,37 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 				continue
 			}
 			return true, false
-		} else if contOpt > 0 && idx == contOpt {
+		case contOpt > 0 && idx == contOpt:
 			if err := controller.SetResumeSession(ctx, projectID, true, false); err != nil {
 				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
 				continue
 			}
 			return true, false
-		} else if retryOpt > 0 && idx == retryOpt {
+		case retryOpt > 0 && idx == retryOpt:
 			if err := controller.SetResumeSession(ctx, projectID, false, true); err != nil {
 				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
 				continue
 			}
 			return true, false
-		} else if idx == resOpt {
+		case idx == resOpt:
 			ShowResultsMenu(ctx)
 			continue
-		} else if idx == deleteOpt {
-			if deleted, stopApp := handleDeleteProject(ctx, projectID); stopApp {
+		case idx == deleteOpt:
+			deleted, stopApp := handleDeleteProject(ctx, projectID)
+			if stopApp {
 				return false, true
-			} else if deleted {
+			}
+			if deleted {
 				return false, false
 			}
 			continue
-		} else if idx == backOpt {
+		case idx == backOpt:
 			return false, false
-		} else if idx == exitOpt {
+		case idx == exitOpt:
 			return false, true
+		default:
+			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
 		}
-		fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
 	}
 }
 
