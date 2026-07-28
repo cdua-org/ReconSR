@@ -279,3 +279,11 @@ func PauseRecon() {
 func ResumeRecon() {
 	dispatcher.SetPause(false)
 }
+
+// DeleteProject removes a project by its identifier.
+func DeleteProject(ctx context.Context, projectID string) error {
+	if currentProjID == projectID {
+		ClearActiveProject()
+	}
+	return repository.DeleteProject(ctx, projectID)
+}

@@ -205,11 +205,13 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 
 	for {
 		if projectID := controller.GetActiveProjectID(); projectID != "" {
-			if run := handleProjectActions(ctx, projectID, targetType, targetValue); run != nil {
-				if *run {
-					printReconStatus(false)
-				}
-				return *run
+			run, stop := handleProjectActions(ctx, projectID, targetType, targetValue)
+			if stop {
+				return false
+			}
+			if run {
+				printReconStatus(false)
+				return true
 			}
 			controller.ClearActiveProject()
 			continue
@@ -422,12 +424,12 @@ func handleModuleConfiguration(ctx context.Context) {
 	}
 }
 
-func handleProjectActions(ctx context.Context, projectID, targetType, targetValue string) *bool {
+func handleProjectActions(ctx context.Context, projectID, targetType, targetValue string) (run bool, stop bool) {
 	for {
 		pending, errs, err := controller.GetProjectStatus(ctx, projectID)
 		if err != nil {
 			fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
-			return nil
+			return false, false
 		}
 
 		fmt.Println("\n" + colorCyan + colorBold + "--- " + i18n.T["LBL_PROJECT_STATUS"] + " ---" + colorReset)
@@ -451,7 +453,7 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 		fmt.Println("\n" + colorCyan + colorBold + "--- " + i18n.T["MSG_PROJ_ACTION"] + " ---" + colorReset)
 		fmt.Printf("1. %s\n", i18n.T["OPT_FULL_RESCAN"])
 		optIdx := 2
-		var contOpt, retryOpt, resOpt, backOpt, exitOpt int
+		var contOpt, retryOpt, resOpt, backOpt, deleteOpt, exitOpt int
 
 		if len(pending) > 0 {
 			contOpt = optIdx
@@ -466,6 +468,10 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 
 		resOpt = optIdx
 		fmt.Printf("%d. %s\n", optIdx, i18n.T["OPT_SHOW_RESULTS"])
+		optIdx++
+
+		deleteOpt = optIdx
+		fmt.Printf("%d. %s\n", optIdx, i18n.T["OPT_DELETE_PROJECT"])
 		optIdx++
 
 		backOpt = optIdx
@@ -484,9 +490,6 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 			continue
 		}
 
-		run := true
-		stop := false
-
 		if idx == 1 {
 			if err := controller.ResetProjectLog(ctx, projectID, true, false); err != nil {
 				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
@@ -496,28 +499,65 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
 				continue
 			}
-			return &run
+			return true, false
 		} else if contOpt > 0 && idx == contOpt {
 			if err := controller.SetResumeSession(ctx, projectID, true, false); err != nil {
 				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
 				continue
 			}
-			return &run
+			return true, false
 		} else if retryOpt > 0 && idx == retryOpt {
 			if err := controller.SetResumeSession(ctx, projectID, false, true); err != nil {
 				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
 				continue
 			}
-			return &run
+			return true, false
 		} else if idx == resOpt {
 			ShowResultsMenu(ctx)
 			continue
+		} else if idx == deleteOpt {
+			if deleted, stopApp := handleDeleteProject(ctx, projectID); stopApp {
+				return false, true
+			} else if deleted {
+				return false, false
+			}
+			continue
 		} else if idx == backOpt {
-			return nil
+			return false, false
 		} else if idx == exitOpt {
-			return &stop
+			return false, true
 		}
 		fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
+	}
+}
+
+func handleDeleteProject(ctx context.Context, projectID string) (bool, bool) {
+	for {
+		fmt.Println("\n" + colorCyan + colorBold + "--- " + i18n.T["OPT_DELETE_PROJECT"] + " ---" + colorReset)
+		fmt.Println(colorRed + i18n.T["MSG_DELETE_WARNING"] + colorReset)
+		fmt.Println(colorYellow + i18n.T["MSG_DELETE_CONFIRM"] + colorReset)
+		fmt.Println("1. " + i18n.T["OPT_BACK"])
+		fmt.Println("2. " + i18n.T["OPT_EXIT"])
+		fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
+
+		choice := readUserInput()
+		fmt.Println("--------------------------------------------------")
+
+		switch choice {
+		case "delete":
+			if err := controller.DeleteProject(ctx, projectID); err != nil {
+				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
+				return false, false
+			}
+			fmt.Println(colorGreen + i18n.T["MSG_PROJECT_DELETED"] + colorReset)
+			return true, false
+		case "1":
+			return false, false
+		case "2":
+			return false, true
+		default:
+			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
+		}
 	}
 }
 

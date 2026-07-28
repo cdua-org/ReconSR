@@ -40,6 +40,7 @@ OPT_CONTINUE_PENDING=Continue unexecuted modules
 OPT_RETRY_ERRORS=Retry modules with errors
 OPT_SHOW_RESULTS=Show results
 OPT_BACK=Back
+OPT_DELETE_PROJECT=Delete project
 OPT_EXIT=Exit
 OPT_TREE_CONSOLE=Results Tree (Console)
 OPT_TREE_HTML=Results Tree (HTML)
@@ -58,6 +59,9 @@ OPT_SHORT_GRAPH=Graph (HTML)
 # ==========================================
 # MESSAGES
 # ==========================================
+MSG_DELETE_WARNING=Warning: This action cannot be undone!
+MSG_DELETE_CONFIRM=Write 'delete' to confirm deletion.
+MSG_PROJECT_DELETED=Project deleted successfully.
 MSG_PROJECTS_EXIST_1=Projects already exist for target
 MSG_PROJECTS_EXIST_2=What would you like to do?
 MSG_REPORT_SAVED=Report saved

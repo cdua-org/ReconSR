@@ -2843,3 +2843,45 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 		RawDataRegistry: rawByID,
 	}, nil
 }
+
+// DeleteProject removes a project from the master database and deletes its SQLite database file.
+func DeleteProject(ctx context.Context, projectID string) (err error) {
+	internalName, err := ResolveWorkspaceRoute(projectID)
+	if err != nil {
+		internalName = projectID
+	}
+	cleanName := filepath.Base(filepath.Clean(internalName))
+
+	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
+	masterDB, mdbErr := openDB(masterDBPath)
+	if mdbErr != nil {
+		return mdbErr
+	}
+	defer func() {
+		cerr := masterDB.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
+	if _, err := masterDB.ExecContext(ctx, "DELETE FROM projects WHERE db_identifier = ?", cleanName); err != nil {
+		return err
+	}
+
+	activeRoutes.mu.Lock()
+	delete(activeRoutes.routes, projectID)
+	activeRoutes.mu.Unlock()
+
+	projectDBPath := filepath.Join(StorageProjectsDir, cleanName+".db")
+	if err := os.Remove(projectDBPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.Remove(projectDBPath + "-wal"); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.Remove(projectDBPath + "-shm"); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}
