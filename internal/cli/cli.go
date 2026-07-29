@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"cdua-org/ReconSR/internal/controller"
@@ -175,18 +176,73 @@ func ShowReconCompleteBanner(ctx context.Context) {
 	fmt.Println(colorGreen + colorBold + "--------------------------------------------------" + colorReset)
 }
 
-// GetRawTarget extracts the target from args.
-func GetRawTarget(args []string) string {
-	if len(args) < 2 {
-		fmt.Printf("\n%s%s %s", colorGreen, i18n.T["LBL_INPUT_TARGET_PROMPT"]+":", colorReset)
-		target := readUserInput()
-		if target == "" {
-			fmt.Println(i18n.T["LBL_USAGE"] + ": " + args[0] + " <" + i18n.T["LBL_TARGET_HINT"] + ">")
-			return ""
-		}
-		return target
+// GetRawTarget extracts the target from args or presents a menu of existing targets when no target argument is provided.
+func GetRawTarget(ctx context.Context, osArgs []string) string {
+	if len(osArgs) >= 2 {
+		return osArgs[1]
 	}
-	return args[1]
+
+	targets, err := controller.GetExistingTargets(ctx)
+	if err != nil {
+		fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
+		targets = nil
+	}
+
+	for {
+		fmt.Println("\n" + colorCyan + colorBold + "--- " + i18n.T["LBL_TARGET"] + " ---" + colorReset)
+		fmt.Println("1. " + i18n.T["OPT_NEW_PROJECT"])
+
+		for i, t := range targets {
+			fmt.Printf("%d. %s\n", i+2, t.Value)
+		}
+
+		exitIdx := len(targets) + 2
+		fmt.Printf("%d. %s\n", exitIdx, i18n.T["OPT_EXIT"])
+		fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
+
+		choice := readUserInput()
+		fmt.Println("--------------------------------------------------")
+
+		idx, err := strconv.Atoi(strings.TrimSpace(choice))
+		if err != nil {
+			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
+			continue
+		}
+
+		switch {
+		case idx == 1:
+			fmt.Printf("\n%s%s %s", colorGreen, i18n.T["LBL_INPUT_TARGET_PROMPT"]+":", colorReset)
+			target := strings.TrimSpace(readUserInput())
+			if target == "" {
+				fmt.Println(colorRed + i18n.T["ERR_INVALID_FORMAT"] + colorReset)
+				continue
+			}
+			_, _, vErr := controller.ValidateTarget("auto", target)
+			if vErr != nil {
+				printTargetError(vErr)
+				continue
+			}
+			return target
+		case idx >= 2 && idx <= len(targets)+1:
+			return targets[idx-2].Value
+		case idx == exitIdx:
+			os.Exit(0)
+		default:
+			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
+		}
+	}
+}
+
+func resolveTarget(ctx context.Context, rawInput string) (string, string, error) {
+	existingTargets, err := controller.GetExistingTargets(ctx)
+	if err == nil {
+		for _, item := range existingTargets {
+			if item.Value == rawInput {
+				return item.Type, item.Value, nil
+			}
+		}
+	}
+	return controller.ValidateTarget("auto", rawInput)
 }
 
 // HandleUserInput manages the UI loop for projects and actions.
@@ -194,21 +250,20 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 	if rawInput == "" {
 		return false
 	}
-	targetType, targetValue, err := controller.ValidateTarget("auto", rawInput)
-	if err != nil {
-		switch {
-		case errors.Is(err, controller.ErrOutOfScope):
-			fmt.Println(colorRed + i18n.T["ERR_OUT_OF_SCOPE"] + colorReset)
-		case errors.Is(err, controller.ErrUnsupportedType):
-			fmt.Println(colorRed + i18n.T["ERR_UNSUPPORTED_TYPE"] + colorReset)
-		default:
-			fmt.Println(colorRed + i18n.T["ERR_INVALID_FORMAT"] + colorReset)
-		}
-		return false
-	}
+
+	var targetType, targetValue string
 
 	for {
 		if projectID := controller.GetActiveProjectID(); projectID != "" {
+			if targetValue == "" {
+				if graph, gErr := controller.GetActiveGraph(ctx, false); gErr == nil && graph != nil && graph.InitialTarget != "" {
+					if tType, tVal, rErr := resolveTarget(ctx, graph.InitialTarget); rErr == nil {
+						targetType = tType
+						targetValue = tVal
+						rawInput = tVal
+					}
+				}
+			}
 			run, stop := handleProjectActions(ctx, projectID, targetType, targetValue)
 			if stop {
 				return false
@@ -218,7 +273,15 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 				return true
 			}
 			controller.ClearActiveProject()
+			rawInput = targetValue
 			continue
+		}
+
+		var err error
+		targetType, targetValue, err = resolveTarget(ctx, rawInput)
+		if err != nil {
+			printTargetError(err)
+			return false
 		}
 
 		fmt.Printf("\n%s%s: %s%s%s%s (%s)\n", colorCyan, i18n.T["LBL_TARGET"], colorReset, colorBold, targetValue, colorReset, targetType)
@@ -244,7 +307,8 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 			fmt.Println(colorRed + i18n.T["ERR_NO_ACTIVE_FUNCS"] + colorReset)
 			fmt.Println("\n" + colorYellow + "[!] " + i18n.T["MSG_CONFIG_INFO"] + colorReset)
 
-			fmt.Printf("\n1. %s\n", i18n.T["OPT_EXIT"])
+			fmt.Printf("\n1. %s\n", i18n.T["OPT_BACK"])
+			fmt.Printf("2. %s\n", i18n.T["OPT_EXIT"])
 			fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
 
 			choice := readUserInput()
@@ -255,17 +319,25 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 				continue
 			}
 
-			var idx int
-			if _, err := fmt.Sscanf(choice, "%d", &idx); err != nil {
+			idx, err := strconv.Atoi(strings.TrimSpace(choice))
+			if err != nil {
 				fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
 				continue
 			}
 
-			if idx == 1 {
+			switch idx {
+			case 1:
+				rawInput = GetRawTarget(ctx, []string{os.Args[0]})
+				if rawInput == "" {
+					return false
+				}
+				continue
+			case 2:
 				return false
+			default:
+				fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
+				continue
 			}
-			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
-			continue
 		}
 
 		fmt.Println("\n" + colorYellow + "[!] " + i18n.T["MSG_CONFIG_INFO"] + colorReset)
@@ -281,31 +353,41 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 			fmt.Printf("%d. %s %s (%s: %s, %s: %s)\n", i+2, i18n.T["OPT_CONTINUE_PROJECT"], p.Name, i18n.T["LBL_CREATED"], p.CreatedAt.Format("2006-01-02 15:04:05"), i18n.T["LBL_SIZE"], formatBytes(p.SizeBytes))
 		}
 
-		exitIdx := len(projects) + 2
+		backIdx := len(projects) + 2
+		exitIdx := len(projects) + 3
+		fmt.Printf("%d. %s\n", backIdx, i18n.T["OPT_BACK"])
 		fmt.Printf("%d. %s\n", exitIdx, i18n.T["OPT_EXIT"])
 		fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
 
 		choice := readUserInput()
 		fmt.Println("--------------------------------------------------")
 
-		var idx int
-		// Special handling for '0' (configuration)
 		if choice == "0" {
 			handleModuleConfiguration(ctx)
 			continue
 		}
 
-		if _, err := fmt.Sscanf(choice, "%d", &idx); err != nil {
+		idx, err := strconv.Atoi(strings.TrimSpace(choice))
+		if err != nil {
 			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
 			continue
 		}
 
 		switch {
+		case idx == backIdx:
+			rawInput = GetRawTarget(ctx, []string{os.Args[0]})
+			if rawInput == "" {
+				return false
+			}
+			continue
 		case idx == exitIdx:
-			return false
+			os.Exit(0)
 		case idx == 1:
 			if !hasActiveFuncs {
 				fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
+				continue
+			}
+			if !checkTargetScope(targetType, targetValue) {
 				continue
 			}
 			newID, err := controller.CreateNewProject(ctx, targetType, targetValue)
@@ -314,10 +396,12 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 				continue
 			}
 			controller.SetActiveProject(newID)
+			rawInput = targetValue
 			printReconStatus(false)
 			return true
 		case idx >= 2 && idx <= len(projects)+1:
 			controller.SetActiveProject(projects[idx-2].DBIdentifier)
+			rawInput = projects[idx-2].InitialTargetValue
 		default:
 			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
 		}
@@ -382,8 +466,8 @@ func handleModuleConfiguration(ctx context.Context) {
 		fmt.Printf("\n%s%s: %s", colorGreen, i18n.T["LBL_CHOICE_PROMPT"], colorReset)
 		choice := readUserInput()
 
-		var idx int
-		if _, err := fmt.Sscanf(choice, "%d", &idx); err != nil {
+		idx, err := strconv.Atoi(strings.TrimSpace(choice))
+		if err != nil {
 			continue
 		}
 
@@ -431,6 +515,29 @@ func handleModuleConfiguration(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func printTargetError(err error) {
+	if err == nil {
+		return
+	}
+	switch {
+	case errors.Is(err, controller.ErrOutOfScope):
+		fmt.Println(colorRed + i18n.T["ERR_OUT_OF_SCOPE"] + colorReset)
+	case errors.Is(err, controller.ErrUnsupportedType):
+		fmt.Println(colorRed + i18n.T["ERR_UNSUPPORTED_TYPE"] + colorReset)
+	default:
+		fmt.Println(colorRed + i18n.T["ERR_INVALID_FORMAT"] + colorReset)
+	}
+}
+
+func checkTargetScope(targetType, targetValue string) bool {
+	_, _, err := controller.ValidateTarget(targetType, targetValue)
+	if err != nil {
+		printTargetError(err)
+		return false
+	}
+	return true
 }
 
 func handleProjectActions(ctx context.Context, projectID, targetType, targetValue string) (run bool, stop bool) {
@@ -501,14 +608,17 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 			continue
 		}
 
-		var idx int
-		if _, err := fmt.Sscanf(choice, "%d", &idx); err != nil {
+		idx, err := strconv.Atoi(strings.TrimSpace(choice))
+		if err != nil {
 			fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
 			continue
 		}
 
 		switch {
 		case idx == 1:
+			if !checkTargetScope(targetType, targetValue) {
+				continue
+			}
 			if err := controller.ResetProjectLog(ctx, projectID, true, false); err != nil {
 				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
 				continue
@@ -519,12 +629,18 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 			}
 			return true, false
 		case contOpt > 0 && idx == contOpt:
+			if !checkTargetScope(targetType, targetValue) {
+				continue
+			}
 			if err := controller.SetResumeSession(ctx, projectID, true, false); err != nil {
 				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
 				continue
 			}
 			return true, false
 		case retryOpt > 0 && idx == retryOpt:
+			if !checkTargetScope(targetType, targetValue) {
+				continue
+			}
 			if err := controller.SetResumeSession(ctx, projectID, false, true); err != nil {
 				fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
 				continue

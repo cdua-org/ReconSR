@@ -111,6 +111,13 @@ func ValidateTarget(targetType, rawInput string) (string, string, error) {
 	return res.Type, res.Value, nil
 }
 
+type TargetItem = repository.TargetItem
+
+// GetExistingTargets returns all distinct initial targets from the repository.
+func GetExistingTargets(ctx context.Context) ([]TargetItem, error) {
+	return repository.GetExistingTargets(ctx)
+}
+
 // GetProjects searches for existing projects and checks module support by target.
 func GetProjects(ctx context.Context, targetType, targetValue string) ([]schema.ProjectInfo, bool, bool, error) {
 	return repository.FindProjects(ctx, targetType, targetValue)

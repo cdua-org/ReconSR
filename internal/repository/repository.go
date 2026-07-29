@@ -276,6 +276,52 @@ func inspectProjectDB(ctx context.Context, dbPath string, dbID string) (targetTy
 	return
 }
 
+// TargetItem represents an initial target type and value pair from the master database.
+type TargetItem struct {
+	Type  string
+	Value string
+}
+
+// GetExistingTargets retrieves all distinct initial targets from active projects in the master database.
+func GetExistingTargets(ctx context.Context) (targets []TargetItem, err error) {
+	dbPath := filepath.Join(StorageBaseDir, MasterDBName)
+	db, dbErr := openDB(dbPath)
+	if dbErr != nil {
+		return nil, dbErr
+	}
+	defer func() {
+		cerr := db.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
+	query := `SELECT DISTINCT initial_target_type, initial_target_value FROM projects WHERE status = 'active' ORDER BY initial_target_value ASC`
+	rows, rErr := db.QueryContext(ctx, query)
+	if rErr != nil {
+		return nil, rErr
+	}
+	defer func() {
+		cerr := rows.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
+	for rows.Next() {
+		var item TargetItem
+		if sErr := rows.Scan(&item.Type, &item.Value); sErr != nil {
+			return nil, sErr
+		}
+		targets = append(targets, item)
+	}
+	if sErr := rows.Err(); sErr != nil {
+		return nil, sErr
+	}
+
+	return targets, nil
+}
+
 // FindProjects searches for projects and checks module support for a target type in the master database.
 func FindProjects(ctx context.Context, targetType, targetValue string) (projects []schema.ProjectInfo, hasModules bool, hasActiveFuncs bool, err error) {
 	dbPath := filepath.Join(StorageBaseDir, MasterDBName)

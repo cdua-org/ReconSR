@@ -18,7 +18,7 @@ func main() {
 	}
 
 	cli.ShowBanner(ctx)
-	rawTarget := cli.GetRawTarget(os.Args)
+	rawTarget := cli.GetRawTarget(ctx, os.Args)
 
 	for cli.HandleUserInput(ctx, rawTarget) {
 		done := make(chan struct{})
