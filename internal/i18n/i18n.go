@@ -9,17 +9,25 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 //go:embed en.txt
 var defaultLang embed.FS
 
-// T is the global translation map.
-var T = make(map[string]string)
+var (
+	mu sync.RWMutex
+	// T is the global translation map.
+	T = make(map[string]string)
+)
 
 // Get returns the localized string for key, or an update warning if empty/missing.
 func Get(key string) string {
-	if val, ok := T[key]; ok && strings.TrimSpace(val) != "" {
+	mu.RLock()
+	val, ok := T[key]
+	mu.RUnlock()
+
+	if ok && strings.TrimSpace(val) != "" {
 		return val
 	}
 	return "[UPDATE LANG FILE: " + key + "]"
@@ -27,42 +35,59 @@ func Get(key string) string {
 
 // Setup ensures the default language file exists in the lang directory and loads it.
 func Setup(langPath string) error {
-	dir := filepath.Dir(langPath)
+	cleanPath := filepath.Clean(langPath)
+	if filepath.IsAbs(cleanPath) || strings.HasPrefix(cleanPath, "..") {
+		return errors.New("invalid path")
+	}
+
+	dir := filepath.Dir(cleanPath)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return err
 	}
 
-	if _, err := os.Stat(langPath); os.IsNotExist(err) {
+	if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
 		content, err := defaultLang.ReadFile("en.txt")
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(langPath, content, 0600); err != nil {
+		if err := os.WriteFile(cleanPath, content, 0600); err != nil {
 			return err
 		}
 	}
-	return LoadLanguage(langPath)
+	return LoadLanguage(cleanPath)
 }
 
-// LoadLanguage reads the specified language file and populates the translation map.
+// LoadLanguage reads the specified language file, populates the translation map, and appends missing default keys.
 func LoadLanguage(path string) (err error) {
 	cleanPath := filepath.Clean(path)
 	if filepath.IsAbs(cleanPath) || strings.HasPrefix(cleanPath, "..") {
 		return errors.New("invalid path")
 	}
 
-	defaultKeys := make(map[string]struct{})
-	defaultContent, err := defaultLang.ReadFile("en.txt")
-	if err != nil {
-		return err
+	defaultContent, readErr := defaultLang.ReadFile("en.txt")
+	if readErr != nil {
+		return readErr
 	}
+
+	type langEntry struct {
+		key  string
+		val  string
+		line string
+	}
+
+	var defaultEntries []langEntry
 	scanner := bufio.NewScanner(bytes.NewReader(defaultContent))
 	for scanner.Scan() {
 		line := scanner.Text()
 		if parts := strings.SplitN(line, "=", 2); len(parts) == 2 {
 			k := strings.TrimSpace(parts[0])
+			v := strings.TrimSpace(parts[1])
 			if k != "" && !strings.HasPrefix(k, "#") {
-				defaultKeys[k] = struct{}{}
+				defaultEntries = append(defaultEntries, langEntry{
+					key:  k,
+					val:  v,
+					line: line,
+				})
 			}
 		}
 	}
@@ -70,34 +95,78 @@ func LoadLanguage(path string) (err error) {
 		return scanErr
 	}
 
-	file, fErr := os.Open(cleanPath)
-	if fErr != nil {
-		return fErr
+	fileContent, fileErr := os.ReadFile(cleanPath)
+	if fileErr != nil {
+		return fileErr
 	}
-	defer func() {
-		closeErr := file.Close()
-		if err == nil {
-			err = closeErr
-		}
-	}()
 
-	fileScanner := bufio.NewScanner(file)
+	existingKeys := make(map[string]struct{})
+	localMap := make(map[string]string, len(defaultEntries))
+
+	fileScanner := bufio.NewScanner(bytes.NewReader(fileContent))
 	for fileScanner.Scan() {
 		line := fileScanner.Text()
 		if parts := strings.SplitN(line, "=", 2); len(parts) == 2 {
 			k := strings.TrimSpace(parts[0])
 			v := strings.TrimSpace(parts[1])
-			if k != "" {
-				T[k] = v
+			if k != "" && !strings.HasPrefix(k, "#") {
+				existingKeys[k] = struct{}{}
+				localMap[k] = v
 			}
 		}
 	}
+	if scanErr := fileScanner.Err(); scanErr != nil {
+		return scanErr
+	}
 
-	for k := range defaultKeys {
-		if val, exists := T[k]; !exists || strings.TrimSpace(val) == "" {
-			T[k] = "[UPDATE LANG FILE: " + k + "]"
+	var missing []langEntry
+	for _, entry := range defaultEntries {
+		if _, exists := existingKeys[entry.key]; !exists {
+			missing = append(missing, entry)
+			localMap[entry.key] = entry.val
 		}
 	}
 
-	return fileScanner.Err()
+	mu.Lock()
+	for k, v := range localMap {
+		T[k] = v
+	}
+	mu.Unlock()
+
+	if len(missing) > 0 {
+		var buf bytes.Buffer
+		if len(fileContent) > 0 && fileContent[len(fileContent)-1] != '\n' {
+			buf.WriteByte('\n')
+		}
+
+		newKeysHeader := "# NEW KEYS"
+		if !bytes.Contains(fileContent, []byte(newKeysHeader)) {
+			buf.WriteString("\n# ==========================================\n")
+			buf.WriteString("# NEW KEYS\n")
+			buf.WriteString("# ==========================================\n")
+		}
+
+		for _, entry := range missing {
+			buf.WriteString(entry.line)
+			buf.WriteByte('\n')
+		}
+
+		f, openErr := os.OpenFile(cleanPath, os.O_WRONLY|os.O_APPEND, 0600)
+		if openErr != nil {
+			return openErr
+		}
+		defer func() {
+			closeErr := f.Close()
+			if err == nil && closeErr != nil {
+				err = closeErr
+			}
+		}()
+
+		_, err = f.Write(buf.Bytes())
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
