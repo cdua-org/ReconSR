@@ -871,7 +871,7 @@ func nextResolvedPropertyLayer(batch *storeBatch, pending map[batchEntityID]stru
 func loadStoredEntity(ctx context.Context, tx *sql.Tx, entityID int64) (storedEntity, error) {
 	var entity storedEntity
 	var anchorValue sql.NullString
-	query := `SELECT e.id, e.type, d.value, e.category, e.out_of_scope, e.depth_strict,
+	query := `SELECT e.id, e.type, d.value, e.category, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict,
 	                 COALESCE(a.depth_relaxed, e.depth_relaxed), e.is_anchor, ad.value
 	          FROM entities e
 	          JOIN dictionary d ON e.value_id = d.id
@@ -992,7 +992,7 @@ func loadNodeStates(ctx context.Context, tx *sql.Tx, batch *storeBatch, states [
 			args = append(args, item.entity.entityType, item.entity.value)
 		}
 
-		query := `SELECT e.id, e.type, d.value, e.out_of_scope, e.depth_strict,
+		query := `SELECT e.id, e.type, d.value, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict,
 		                 COALESCE(a.depth_relaxed, e.depth_relaxed), e.is_anchor, ad.value
 		          FROM entities e
 		          JOIN dictionary d ON e.value_id = d.id
@@ -1399,7 +1399,7 @@ func loadExistingEntities(ctx context.Context, tx *sql.Tx, entities map[string]e
 			args = append(args, entity.entityType, entity.value)
 		}
 
-		query := `SELECT e.type, d.value, e.out_of_scope, e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed), e.category, e.is_anchor
+		query := `SELECT e.type, d.value, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed), e.category, e.is_anchor
 		          FROM entities e
 		          JOIN dictionary d ON e.value_id = d.id
 		          LEFT JOIN entities a ON e.anchor_id = a.id
@@ -1545,7 +1545,20 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 		states[item.sourceID].isAnchor = false
 		targetState := &states[item.targetID]
 		targetState.isAnchor = false
-		targetState.outOfScope = targetState.outOfScope || batchModel.item(item.targetID).outOfScope || item.result.OutOfScope
+
+		targetEntity := batchModel.item(item.targetID).entity
+		if targetEntity.entityType == "subdomain" && item.result.OutOfScope {
+			if anchorID, ok := batchModel.nodeIndex[nodeKey{entityType: AnchorEntityType, value: item.result.Anchor}]; ok && states[anchorID].dbID == 1 {
+				targetState.outOfScope = targetState.outOfScope || batchModel.item(item.targetID).outOfScope
+			} else {
+				targetState.outOfScope = true
+				if anchorID, ok := batchModel.nodeIndex[nodeKey{entityType: AnchorEntityType, value: item.result.Anchor}]; ok {
+					states[anchorID].outOfScope = true
+				}
+			}
+		} else {
+			targetState.outOfScope = targetState.outOfScope || batchModel.item(item.targetID).outOfScope || item.result.OutOfScope
+		}
 	}
 
 	for i := 0; i < len(batchModel.entities); i++ {
@@ -2156,7 +2169,7 @@ func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.P
 		JOIN master.modules m ON e.type = m.input_type
 		LEFT JOIN entity_function_log efl
 		  ON e.id = efl.entity_id AND m.module_name = efl.module_name AND m.function = efl.function_name
-		WHERE efl.entity_id IS NULL AND m.function != '' AND e.out_of_scope = FALSE AND e.is_anchor = 0 AND m.is_enabled = 1
+		WHERE efl.entity_id IS NULL AND m.function != '' AND e.out_of_scope = FALSE AND COALESCE(a.out_of_scope, FALSE) = FALSE AND e.is_anchor = 0 AND m.is_enabled = 1
 			ORDER BY e.id, m.module_name, m.function`
 
 	rows, rErr := db.QueryContext(ctx, pendingQuery)
@@ -2197,7 +2210,7 @@ func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.P
 		JOIN entities e ON e.id = efl.entity_id
 		LEFT JOIN entities a ON e.anchor_id = a.id
 		JOIN master.modules m ON efl.module_name = m.module_name AND efl.function_name = m.function
-		WHERE efl.is_success = 0 AND e.out_of_scope = FALSE AND m.is_enabled = 1
+		WHERE efl.is_success = 0 AND e.out_of_scope = FALSE AND COALESCE(a.out_of_scope, FALSE) = FALSE AND m.is_enabled = 1
 		ORDER BY e.id, efl.module_name, efl.function_name`
 	rowsErr, reErr := db.QueryContext(ctx, errorQuery)
 	if reErr != nil {
@@ -2306,24 +2319,24 @@ func GetResumePayload(ctx context.Context, projectID string, resumePending, retr
 	var queryParts []string
 	if resumePending {
 		queryParts = append(queryParts, `
-			SELECT DISTINCT e.id, e.type, d.value, e.out_of_scope, e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
+			SELECT DISTINCT e.id, e.type, d.value, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 			FROM entities e
 			JOIN dictionary d ON e.value_id = d.id
 			LEFT JOIN entities a ON e.anchor_id = a.id
 			JOIN master.modules m ON e.type = m.input_type
 			LEFT JOIN entity_function_log efl
 			  ON e.id = efl.entity_id AND m.module_name = efl.module_name AND m.function = efl.function_name
-			WHERE efl.entity_id IS NULL AND m.function != '' AND e.out_of_scope = FALSE AND e.is_anchor = 0 AND m.is_enabled = 1`)
+			WHERE efl.entity_id IS NULL AND m.function != '' AND e.out_of_scope = FALSE AND COALESCE(a.out_of_scope, FALSE) = FALSE AND e.is_anchor = 0 AND m.is_enabled = 1`)
 	}
 	if retryErrors {
 		queryParts = append(queryParts, `
-			SELECT DISTINCT e.id, e.type, d.value, e.out_of_scope, e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
+			SELECT DISTINCT e.id, e.type, d.value, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 			FROM entities e
 			JOIN dictionary d ON e.value_id = d.id
 			LEFT JOIN entities a ON e.anchor_id = a.id
 			JOIN entity_function_log efl ON e.id = efl.entity_id
 			JOIN master.modules m ON efl.module_name = m.module_name AND efl.function_name = m.function
-			WHERE efl.is_success = 0 AND e.out_of_scope = FALSE AND m.is_enabled = 1`)
+			WHERE efl.is_success = 0 AND e.out_of_scope = FALSE AND COALESCE(a.out_of_scope, FALSE) = FALSE AND m.is_enabled = 1`)
 	}
 
 	if len(queryParts) == 0 {
@@ -2572,8 +2585,8 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 
 	query := `
 		SELECT
-			e1.id, e1.type, d1.value, e1.category, e1.out_of_scope, e1.depth_strict, COALESCE(a1.depth_relaxed, e1.depth_relaxed),
-			e2.id, e2.type, d2.value, e2.category, e2.out_of_scope, e2.depth_strict, COALESCE(a2.depth_relaxed, e2.depth_relaxed),
+			e1.id, e1.type, d1.value, e1.category, (e1.out_of_scope OR COALESCE(a1.out_of_scope, FALSE)), e1.depth_strict, COALESCE(a1.depth_relaxed, e1.depth_relaxed),
+			e2.id, e2.type, d2.value, e2.category, (e2.out_of_scope OR COALESCE(a2.out_of_scope, FALSE)), e2.depth_strict, COALESCE(a2.depth_relaxed, e2.depth_relaxed),
 			o.module_name, o.function_name, o.context, o.created_at
 		FROM relations r
 		JOIN entities e1 ON r.source_entity_id = e1.id
@@ -2831,7 +2844,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 	}
 
 	orphanQuery := `
-		SELECT e.id, e.type, d.value, e.category, e.out_of_scope, e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
+		SELECT e.id, e.type, d.value, e.category, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 		FROM entities e
 		JOIN dictionary d ON e.value_id = d.id
 		LEFT JOIN entities a ON e.anchor_id = a.id
