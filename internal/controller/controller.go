@@ -4,11 +4,13 @@ import (
 	"cdua-org/ReconSR/internal/dispatcher"
 	"cdua-org/ReconSR/internal/repository"
 	"cdua-org/ReconSR/internal/scopemanager"
+	"cdua-org/ReconSR/internal/updater"
 	"cdua-org/ReconSR/internal/validator"
 	"cdua-org/ReconSR/schema"
 	"context"
 	"errors"
 	"os"
+	"time"
 )
 
 var (
@@ -293,4 +295,11 @@ func DeleteProject(ctx context.Context, projectID string) error {
 		ClearActiveProject()
 	}
 	return repository.DeleteProject(ctx, projectID)
+}
+
+// CheckAppUpdate retrieves the latest release information via updater.
+func CheckAppUpdate(ctx context.Context) (*updater.ReleaseInfo, error) {
+	ctxTimeout, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	return updater.FetchLatestRelease(ctxTimeout, nil)
 }

@@ -107,6 +107,15 @@ func ShowBanner(ctx context.Context) {
 	fmt.Printf(colorCyan+"  :: %s %s ::"+colorReset+"\n", AppName, AppVersion)
 	fmt.Printf(colorCyan+"  :: %s ::"+colorReset+"\n", AppDesc)
 	fmt.Printf(colorCyan+"  :: %s ::"+colorReset+"\n", AppStage)
+
+	if AppVersion != "dev" {
+		release, err := controller.CheckAppUpdate(ctx)
+		if err == nil && release != nil && release.TagName != "" && release.TagName != AppVersion {
+			fmt.Println()
+			fmt.Printf(colorYellow+colorBold+"  [!] %s: %s (current: %s)"+colorReset+"\n", i18n.T["MSG_NEW_VERSION"], release.TagName, AppVersion)
+			fmt.Printf(colorYellow+"      %s: reconsr update"+colorReset+"\n", i18n.T["MSG_RUN_COMMAND"])
+		}
+	}
 	fmt.Println()
 
 	fmt.Println(colorCyan + colorBold + "[ " + i18n.T["LBL_SYS_INFO"] + " ]" + colorReset)

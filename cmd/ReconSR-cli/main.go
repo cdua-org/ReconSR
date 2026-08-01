@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 	"os"
-	"time"
 
 	"cdua-org/ReconSR/internal/boot"
 	"cdua-org/ReconSR/internal/cli"
@@ -17,10 +15,7 @@ func main() {
 	ctx := context.Background()
 
 	if len(os.Args) > 1 && os.Args[1] == "update" {
-		client := &http.Client{
-			Timeout: 30 * time.Second,
-		}
-		if err := updater.Update(ctx, client, cli.AppVersion); err != nil {
+		if err := updater.Update(ctx, nil, cli.AppVersion); err != nil {
 			log.Fatalf("Update error: %v", err)
 		}
 		os.Exit(0)

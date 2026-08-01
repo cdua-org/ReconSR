@@ -74,7 +74,7 @@ var (
 	tempFileClose        = defaultTempFileClose
 )
 
-type releaseInfo struct {
+type ReleaseInfo struct {
 	TagName string `json:"tag_name"`
 	Assets  []struct {
 		Name               string `json:"name"`
@@ -83,7 +83,10 @@ type releaseInfo struct {
 	} `json:"assets"`
 }
 
-func fetchLatestRelease(ctx context.Context, client *http.Client) (*releaseInfo, error) {
+func fetchLatestRelease(ctx context.Context, client *http.Client) (*ReleaseInfo, error) {
+	if client == nil {
+		client = &http.Client{}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpointUpdate, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -103,15 +106,21 @@ func fetchLatestRelease(ctx context.Context, client *http.Client) (*releaseInfo,
 		return nil, fmt.Errorf("unexpected status from GitHub API: %d", resp.StatusCode)
 	}
 
-	var release releaseInfo
+	var release ReleaseInfo
 	if decodeErr := json.NewDecoder(resp.Body).Decode(&release); decodeErr != nil {
 		return nil, fmt.Errorf("failed to parse GitHub API response: %w", decodeErr)
 	}
 	return &release, nil
 }
 
+// FetchLatestRelease is the exported alias for fetchLatestRelease.
+var FetchLatestRelease = fetchLatestRelease
+
 // Update downloads and applies the latest update.
 func Update(ctx context.Context, client *http.Client, currentVersion string) error {
+	if client == nil {
+		client = &http.Client{}
+	}
 	if currentVersion == "dev" {
 		fmt.Fprintln(os.Stderr, "Error: update not available for development builds")
 		return nil
@@ -124,7 +133,7 @@ func Update(ctx context.Context, client *http.Client, currentVersion string) err
 	}
 
 	fetchSpinner := spinner.Start(ctx, "Fetching latest version from GitHub...", nil, 0)
-	release, err := fetchLatestRelease(ctx, client)
+	release, err := FetchLatestRelease(ctx, client)
 	fetchSpinner()
 	if err != nil {
 		return err
@@ -191,6 +200,9 @@ func Update(ctx context.Context, client *http.Client, currentVersion string) err
 }
 
 func downloadAndVerifyAsset(ctx context.Context, client *http.Client, url, expectedDigest string) ([]byte, error) {
+	if client == nil {
+		client = &http.Client{}
+	}
 	dlReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create download request: %w", err)

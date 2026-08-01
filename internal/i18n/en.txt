@@ -112,3 +112,9 @@ ERR_EXAMPLE_DOMAIN=Expected format: example.com
 ERR_EXAMPLE_IP=Expected format: 192.168.1.1
 ERR_NO_MODULES=No modules are currently registered to analyze the target type
 ERR_NO_ACTIVE_FUNCS=No active functions enabled for this target type
+
+# ==========================================
+# UPDATE NOTICES
+# ==========================================
+MSG_NEW_VERSION=New version available
+MSG_RUN_COMMAND=Run command to update
