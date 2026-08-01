@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cdua-org/ReconSR/internal/cli/spinner"
 	"cdua-org/ReconSR/internal/controller"
 	"cdua-org/ReconSR/internal/i18n"
 	"cdua-org/ReconSR/internal/report"
@@ -49,28 +50,35 @@ func ShowResultsMenu(ctx context.Context) {
 			}
 			report.RenderResultsTree(os.Stdout, graph, &report.ConsoleTreeFormatter{})
 		case "2":
+			stopSpinner := spinner.Start(ctx, i18n.T["OPT_TREE_HTML"], nil, 0)
 			graph, err := controller.GetActiveGraph(ctx, false)
 			if err != nil {
+				stopSpinner()
 				fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
 				continue
 			}
 			filename, err := report.GenerateTreeHTML(graph)
+			stopSpinner()
 			if err != nil {
 				fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
 			} else {
 				fmt.Printf("\n%s: %s\n", i18n.T["MSG_REPORT_SAVED"], filename)
 			}
 		case "3":
-			fmt.Println("\n" + i18n.T["MSG_GENERATING_GRAPH"])
 			graph, err := controller.GetActiveGraph(ctx, true)
 			if err != nil {
 				fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
 				continue
 			}
+
 			if len(graph.Nodes) >= 5000 {
 				fmt.Println(colorYellow + i18n.T["MSG_LARGE_GRAPH_WARNING"] + colorReset)
 			}
+
+			stopSpinner := spinner.Start(ctx, i18n.T["MSG_GENERATING_GRAPH"], nil, 0)
 			filename, err := report.GenerateHTML(ctx, graph)
+			stopSpinner()
+
 			if err != nil {
 				fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
 			} else {
