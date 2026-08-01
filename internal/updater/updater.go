@@ -19,7 +19,7 @@ import (
 	"runtime"
 	"strings"
 
-	"cdua-org/ReconSR/internal/spinner"
+	"cdua-org/ReconSR/internal/cli/spinner"
 )
 
 var endpointUpdate = "https://api.github.com/repos/cdua-org/ReconSR/releases/latest"

@@ -85,8 +85,7 @@ func (s *Spinner) run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			s.printFrame(start, i)
-			_, err := fmt.Fprintln(s.out)
-			_ = err
+			fmt.Fprintln(s.out)
 			return
 		case <-ticker.C:
 			s.printFrame(start, i)
@@ -96,11 +95,14 @@ func (s *Spinner) run(ctx context.Context) {
 }
 
 func (s *Spinner) printFrame(start time.Time, i int) {
-	c := int32(0)
-	if s.completed != nil {
-		c = s.completed.Load()
-	}
 	elapsed := s.timeSource().Sub(start).Round(time.Second)
-	_, err := fmt.Fprintf(s.out, "\r\033[K%s %s [%d/%d] (Elapsed: %s)", s.frames[i%len(s.frames)], s.label, c, s.total, elapsed)
-	_ = err
+	if s.total > 0 {
+		c := int32(0)
+		if s.completed != nil {
+			c = s.completed.Load()
+		}
+		fmt.Fprintf(s.out, "\r\033[K%s %s [%d/%d] (Elapsed: %s)", s.frames[i%len(s.frames)], s.label, c, s.total, elapsed)
+		return
+	}
+	fmt.Fprintf(s.out, "\r\033[K%s %s (Elapsed: %s)", s.frames[i%len(s.frames)], s.label, elapsed)
 }
