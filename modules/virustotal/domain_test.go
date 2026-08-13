@@ -249,7 +249,7 @@ func assertDomainCertificateExtraction(t *testing.T, results []schema.ModuleResu
 	})
 
 	requireResult(t, results, "certificate not after property", func(result schema.ModuleResult) bool {
-		return result.Type == constants.TypeCertNotAfter && strings.Contains(result.Value, "2027-01-31")
+		return result.Type == constants.TypeCertNotAfter && strings.Contains(result.Value, "4000-01-31")
 	})
 }
 
@@ -271,8 +271,8 @@ func assertSubdomainCertificateScope(t *testing.T, results []schema.ModuleResult
 	vpnCertExpiry := requireResult(t, results, "vpn subdomain cert not_after", func(result schema.ModuleResult) bool {
 		return result.Type == constants.TypeCertNotAfter && result.Source != nil && result.Source.Value == fixtureVPNSubdomain
 	})
-	if !strings.Contains(vpnCertExpiry.Value, "2027-03-15") {
-		t.Fatalf("expected vpn subdomain cert expiration 2027-03-15, got %+v", vpnCertExpiry)
+	if !strings.Contains(vpnCertExpiry.Value, "4000-03-15") {
+		t.Fatalf("expected vpn subdomain cert expiration 4000-03-15, got %+v", vpnCertExpiry)
 	}
 
 	assertNoResult(t, results, "subdomain SAN leakage", func(result schema.ModuleResult) bool {
