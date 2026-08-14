@@ -1,6 +1,6 @@
 module cdua-org/ReconSR
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/ip2location/ip2location-go/v9 v9.8.0
