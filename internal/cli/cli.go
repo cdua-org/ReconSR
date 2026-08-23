@@ -234,7 +234,7 @@ func GetRawTarget(ctx context.Context, osArgs []string) string {
 				fmt.Println(colorRed + i18n.T["ERR_INVALID_FORMAT"] + colorReset)
 				continue
 			}
-			_, _, vErr := controller.ValidateTarget("auto", target)
+			_, _, vErr := controller.ValidateTarget(ctx, "auto", target)
 			if vErr != nil {
 				printTargetError(vErr)
 				continue
@@ -259,7 +259,7 @@ func resolveTarget(ctx context.Context, rawInput string) (string, string, error)
 			}
 		}
 	}
-	return controller.ValidateTarget("auto", rawInput)
+	return controller.ValidateTarget(ctx, "auto", rawInput)
 }
 
 // HandleUserInput manages the UI loop for projects and actions.
@@ -404,7 +404,7 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 				fmt.Println(colorRed + i18n.T["ERR_INVALID_CHOICE"] + colorReset)
 				continue
 			}
-			if !checkTargetScope(targetType, targetValue) {
+			if !checkTargetScope(ctx, targetType, targetValue) {
 				continue
 			}
 			newID, err := controller.CreateNewProject(ctx, targetType, targetValue)
@@ -548,8 +548,8 @@ func printTargetError(err error) {
 	}
 }
 
-func checkTargetScope(targetType, targetValue string) bool {
-	_, _, err := controller.ValidateTarget(targetType, targetValue)
+func checkTargetScope(ctx context.Context, targetType, targetValue string) bool {
+	_, _, err := controller.ValidateTarget(ctx, targetType, targetValue)
 	if err != nil {
 		printTargetError(err)
 		return false
@@ -633,7 +633,7 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 
 		switch {
 		case idx == 1:
-			if !checkTargetScope(targetType, targetValue) {
+			if !checkTargetScope(ctx, targetType, targetValue) {
 				continue
 			}
 			if err := controller.ResetProjectLog(ctx, projectID, true, false); err != nil {
@@ -646,7 +646,7 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 			}
 			return true, false
 		case contOpt > 0 && idx == contOpt:
-			if !checkTargetScope(targetType, targetValue) {
+			if !checkTargetScope(ctx, targetType, targetValue) {
 				continue
 			}
 			if err := controller.SetResumeSession(ctx, projectID, true, false); err != nil {
@@ -655,7 +655,7 @@ func handleProjectActions(ctx context.Context, projectID, targetType, targetValu
 			}
 			return true, false
 		case retryOpt > 0 && idx == retryOpt:
-			if !checkTargetScope(targetType, targetValue) {
+			if !checkTargetScope(ctx, targetType, targetValue) {
 				continue
 			}
 			if err := controller.SetResumeSession(ctx, projectID, false, true); err != nil {

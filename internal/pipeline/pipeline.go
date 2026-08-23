@@ -9,16 +9,11 @@ import (
 	"cdua-org/ReconSR/internal/dispatcher"
 	"cdua-org/ReconSR/internal/processor"
 	"cdua-org/ReconSR/internal/repository"
-	"cdua-org/ReconSR/internal/scopemanager"
 	"cdua-org/ReconSR/schema"
 )
 
 // Run initializes the channels and waitgroups, routing the data through the system.
 func Run(ctx context.Context) {
-	if err := scopemanager.Load(ctx); err != nil {
-		log.Printf("Warning: failed to load scope: %v", err)
-	}
-
 	injection := controller.GetInjection()
 	if injection == nil {
 		return

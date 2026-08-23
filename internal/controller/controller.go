@@ -100,7 +100,11 @@ func ClearActiveProject() {
 }
 
 // ValidateTarget checks if the input is valid and returns its type, value, and anchor.
-func ValidateTarget(targetType, rawInput string) (string, string, error) {
+func ValidateTarget(ctx context.Context, targetType, rawInput string) (string, string, error) {
+	if err := scopemanager.Load(ctx); err != nil {
+		return "", "", err
+	}
+
 	res, err := validator.Validate(targetType, rawInput)
 	if err != nil {
 		return "", "", err
@@ -127,6 +131,10 @@ func GetProjects(ctx context.Context, targetType, targetValue string) ([]schema.
 
 // GetProjectStatus analyzes pending tasks and errors for a specific project.
 func GetProjectStatus(ctx context.Context, projectID string) ([]string, []string, error) {
+	if err := scopemanager.Load(ctx); err != nil {
+		return nil, nil, err
+	}
+
 	pendingTasks, errorTasks, err := repository.GetProjectStatus(ctx, projectID)
 	if err != nil {
 		return nil, nil, err
