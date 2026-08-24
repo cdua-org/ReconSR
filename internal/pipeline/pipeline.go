@@ -41,7 +41,13 @@ func Run(ctx context.Context) {
 	}
 
 	go func() {
-		repoWritersWg.Wait()
+		for {
+			repoWritersWg.Wait()
+
+			if !controller.CheckAndResumeScope(ctx, dispatchChan, &repoWritersWg) {
+				break
+			}
+		}
 		close(repoChan)
 	}()
 

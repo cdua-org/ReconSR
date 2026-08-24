@@ -375,3 +375,54 @@ func SyncScopeWithDB(ctx context.Context, projectID string) (unblockedEntities [
 	return unblockedEntities, nil
 }
 
+// CheckAndResumeScope checks for scope changes and sends unblocked entities to the pipeline if available.
+func CheckAndResumeScope(ctx context.Context, dispatchChan chan<- *schema.RepoToDispatcherData, writersWg *sync.WaitGroup) bool {
+	if ctx.Err() != nil || currentProjID == "" {
+		return false
+	}
+
+	changed, err := scopemanager.Load(ctx)
+	if err != nil {
+		return false
+	}
+
+	syncedMu.Lock()
+	if changed {
+		syncedProjects = make(map[string]bool)
+	}
+	needsSync := !syncedProjects[currentProjID]
+	syncedMu.Unlock()
+
+	if !needsSync {
+		return false
+	}
+
+	unblockedEntities, err := SyncScopeWithDB(ctx, currentProjID)
+	if err != nil {
+		return false
+	}
+
+	syncedMu.Lock()
+	syncedProjects[currentProjID] = true
+	syncedMu.Unlock()
+
+	if len(unblockedEntities) == 0 {
+		return false
+	}
+
+	payload, err := repository.GetResumePayload(ctx, currentProjID, true, false)
+	if err != nil || payload == nil || len(payload.Batch) == 0 {
+		return false
+	}
+
+	tokens := len(payload.Batch)
+	writersWg.Add(tokens)
+	select {
+	case <-ctx.Done():
+		writersWg.Add(-tokens)
+		return false
+	case dispatchChan <- payload:
+		return true
+	}
+}
+
