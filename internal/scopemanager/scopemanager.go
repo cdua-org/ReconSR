@@ -5,10 +5,14 @@ package scopemanager
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -38,6 +42,9 @@ var (
 	// allowedGeneric stores exception exact matches for other types
 	allowedGeneric map[string]map[string]struct{}
 
+	lastDirFingerprint string
+	lastSemanticHash   string
+
 	mu sync.RWMutex
 )
 
@@ -61,11 +68,60 @@ func Setup(ctx context.Context) error {
 			return err
 		}
 	}
-	return Load(ctx)
+	_, err = Load(ctx)
+	return err
 }
 
 // Load reads all scope configuration files from the scope directory into memory.
-func Load(ctx context.Context) error {
+// It returns true if rules were modified since the last load.
+func Load(ctx context.Context) (changed bool, err error) {
+	entries, err := os.ReadDir(scopeDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			mu.Lock()
+			defer mu.Unlock()
+			if lastSemanticHash == "" {
+				return false, nil
+			}
+			blockedDotDomains = make(map[string]struct{})
+			blockedNets = make([]*net.IPNet, 0)
+			blockedGeneric = make(map[string]map[string]struct{})
+			allowedDotDomains = make(map[string]struct{})
+			allowedNets = make([]*net.IPNet, 0)
+			allowedGeneric = make(map[string]map[string]struct{})
+			lastDirFingerprint = ""
+			lastSemanticHash = ""
+			return true, nil
+		}
+		return false, err
+	}
+
+	var fpBuilder strings.Builder
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".txt") {
+			continue
+		}
+		info, iErr := entry.Info()
+		if iErr != nil {
+			return false, iErr
+		}
+		fpBuilder.WriteString(fmt.Sprintf("%s:%d:%d;", entry.Name(), info.Size(), info.ModTime().UnixNano()))
+	}
+	currentFingerprint := fpBuilder.String()
+
+	mu.RLock()
+	if lastDirFingerprint != "" && currentFingerprint == lastDirFingerprint {
+		mu.RUnlock()
+		return false, nil
+	}
+	mu.RUnlock()
+
+	root, err := os.OpenRoot(".")
+	if err != nil {
+		return false, err
+	}
+	defer root.Close()
+
 	newBlockedDotDomains := make(map[string]struct{})
 	newBlockedNets := make([]*net.IPNet, 0)
 	newBlockedGeneric := make(map[string]map[string]struct{})
@@ -74,37 +130,35 @@ func Load(ctx context.Context) error {
 	newAllowedNets := make([]*net.IPNet, 0)
 	newAllowedGeneric := make(map[string]map[string]struct{})
 
-	root, err := os.OpenRoot(".")
-	if err != nil {
-		return err
-	}
-	defer root.Close()
-
-	entries, err := os.ReadDir(scopeDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".txt") {
 			continue
 		}
 
 		path := filepath.Join(scopeDir, entry.Name())
-		allowed, blocked, err := parseRawFile(ctx, root, path, "")
-		if err != nil {
-			return err
+		allowed, blocked, pErr := parseRawFile(ctx, root, path, "")
+		if pErr != nil {
+			return false, pErr
 		}
 
 		processRaw(allowed, newAllowedDotDomains, &newAllowedNets, newAllowedGeneric)
 		processRaw(blocked, newBlockedDotDomains, &newBlockedNets, newBlockedGeneric)
 	}
 
+	newSemanticHash := computeSemanticHash(
+		newBlockedDotDomains, newAllowedDotDomains,
+		newBlockedNets, newAllowedNets,
+		newBlockedGeneric, newAllowedGeneric,
+	)
+
 	mu.Lock()
 	defer mu.Unlock()
+
+	lastDirFingerprint = currentFingerprint
+
+	if lastSemanticHash != "" && lastSemanticHash == newSemanticHash {
+		return false, nil
+	}
 
 	blockedDotDomains = newBlockedDotDomains
 	blockedNets = newBlockedNets
@@ -114,7 +168,67 @@ func Load(ctx context.Context) error {
 	allowedNets = newAllowedNets
 	allowedGeneric = newAllowedGeneric
 
-	return nil
+	lastSemanticHash = newSemanticHash
+	return true, nil
+}
+
+func computeSemanticHash(
+	bDot, aDot map[string]struct{},
+	bNets, aNets []*net.IPNet,
+	bGen, aGen map[string]map[string]struct{},
+) string {
+	h := sha256.New()
+
+	writeMap := func(prefix string, m map[string]struct{}) {
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+		for _, k := range keys {
+			h.Write([]byte(prefix + ":" + k + "\n"))
+		}
+	}
+
+	writeNets := func(prefix string, nets []*net.IPNet) {
+		strs := make([]string, 0, len(nets))
+		for _, n := range nets {
+			if n != nil {
+				strs = append(strs, n.String())
+			}
+		}
+		slices.Sort(strs)
+		for _, s := range strs {
+			h.Write([]byte(prefix + ":" + s + "\n"))
+		}
+	}
+
+	writeGeneric := func(prefix string, gen map[string]map[string]struct{}) {
+		sections := make([]string, 0, len(gen))
+		for sec := range gen {
+			sections = append(sections, sec)
+		}
+		slices.Sort(sections)
+		for _, sec := range sections {
+			keys := make([]string, 0, len(gen[sec]))
+			for k := range gen[sec] {
+				keys = append(keys, k)
+			}
+			slices.Sort(keys)
+			for _, k := range keys {
+				h.Write([]byte(prefix + ":" + sec + ":" + k + "\n"))
+			}
+		}
+	}
+
+	writeMap("bDot", bDot)
+	writeMap("aDot", aDot)
+	writeNets("bNets", bNets)
+	writeNets("aNets", aNets)
+	writeGeneric("bGen", bGen)
+	writeGeneric("aGen", aGen)
+
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // parseRawFile reads the file and sorts items into raw string maps by section.
@@ -298,3 +412,46 @@ func IsOutOfScope(entityType, value string) bool {
 
 	return false
 }
+
+// IsExplicitlyAllowed checks if the entity matches an explicit allow exception rule.
+func IsExplicitlyAllowed(entityType, value string) bool {
+	value = strings.ToLower(value)
+	mu.RLock()
+	defer mu.RUnlock()
+
+	switch entityType {
+	case "domain", "subdomain":
+		dotVal := "." + value
+		current := dotVal
+		for {
+			if _, ok := allowedDotDomains[current]; ok {
+				return true
+			}
+
+			idx := strings.IndexByte(current[1:], '.')
+			if idx == -1 {
+				break
+			}
+			current = current[idx+1:]
+		}
+	case "ip", "ipv4", "ipv6", "ipv4_ambiguous":
+		ip := net.ParseIP(value)
+		if ip == nil {
+			return false
+		}
+		for _, aNet := range allowedNets {
+			if aNet.Contains(ip) {
+				return true
+			}
+		}
+	default:
+		if typeMap, ok := allowedGeneric[entityType]; ok {
+			if _, allowed := typeMap[value]; allowed {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+

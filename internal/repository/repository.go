@@ -428,7 +428,7 @@ func CreateProjectDB(ctx context.Context, targetType, targetValue, anchor string
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			type TEXT NOT NULL,
 			value_id INTEGER NOT NULL REFERENCES dictionary(id),
-			out_of_scope BOOLEAN DEFAULT FALSE,
+			out_of_scope BOOLEAN DEFAULT NULL,
 			category TEXT NOT NULL DEFAULT 'node',
 			depth_strict INTEGER DEFAULT 0,
 			depth_relaxed INTEGER DEFAULT 0,
@@ -871,7 +871,7 @@ func nextResolvedPropertyLayer(batch *storeBatch, pending map[batchEntityID]stru
 func loadStoredEntity(ctx context.Context, tx *sql.Tx, entityID int64) (storedEntity, error) {
 	var entity storedEntity
 	var anchorValue sql.NullString
-	query := `SELECT e.id, e.type, d.value, e.category, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict,
+	query := `SELECT e.id, e.type, d.value, e.category, COALESCE(e.out_of_scope, a.out_of_scope, 0), e.depth_strict,
 	                 COALESCE(a.depth_relaxed, e.depth_relaxed), e.is_anchor, ad.value
 	          FROM entities e
 	          JOIN dictionary d ON e.value_id = d.id
@@ -992,7 +992,7 @@ func loadNodeStates(ctx context.Context, tx *sql.Tx, batch *storeBatch, states [
 			args = append(args, item.entity.entityType, item.entity.value)
 		}
 
-		query := `SELECT e.id, e.type, d.value, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict,
+		query := `SELECT e.id, e.type, d.value, COALESCE(e.out_of_scope, a.out_of_scope, 0), e.depth_strict,
 		                 COALESCE(a.depth_relaxed, e.depth_relaxed), e.is_anchor, ad.value
 		          FROM entities e
 		          JOIN dictionary d ON e.value_id = d.id
@@ -1293,7 +1293,7 @@ func upsertPropertyLayer(ctx context.Context, tx *sql.Tx, batch *storeBatch, ids
 		                        category = excluded.category,
 		                        depth_strict = MIN(depth_strict, excluded.depth_strict),
 		                        depth_relaxed = MIN(depth_relaxed, excluded.depth_relaxed)
-		                      RETURNING id, type, value_id, parent_id, out_of_scope, depth_strict, depth_relaxed`, strings.Join(placeholders, ","))
+		                      RETURNING id, type, value_id, parent_id, COALESCE(out_of_scope, 0), depth_strict, depth_relaxed`, strings.Join(placeholders, ","))
 		rows, err := tx.QueryContext(ctx, query, values...)
 		if err != nil {
 			return err
@@ -1399,7 +1399,7 @@ func loadExistingEntities(ctx context.Context, tx *sql.Tx, entities map[string]e
 			args = append(args, entity.entityType, entity.value)
 		}
 
-		query := `SELECT e.type, d.value, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed), e.category, e.is_anchor
+		query := `SELECT e.type, d.value, COALESCE(e.out_of_scope, a.out_of_scope, 0), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed), e.category, e.is_anchor
 		          FROM entities e
 		          JOIN dictionary d ON e.value_id = d.id
 		          LEFT JOIN entities a ON e.anchor_id = a.id
@@ -2089,7 +2089,7 @@ func upsertAndGetEntities(ctx context.Context, tx *sql.Tx, aggMap map[string]*en
 			values = append(values, agg.entity.Type, agg.entity.Value)
 		}
 
-		query := `SELECT e.id, e.type, d.value, e.out_of_scope, e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
+		query := `SELECT e.id, e.type, d.value, COALESCE(e.out_of_scope, a.out_of_scope, 0), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 		          FROM entities e
 		          JOIN dictionary d ON e.value_id = d.id
 		          LEFT JOIN entities a ON e.anchor_id = a.id
@@ -2169,7 +2169,7 @@ func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.P
 		JOIN master.modules m ON e.type = m.input_type
 		LEFT JOIN entity_function_log efl
 		  ON e.id = efl.entity_id AND m.module_name = efl.module_name AND m.function = efl.function_name
-		WHERE efl.entity_id IS NULL AND m.function != '' AND e.out_of_scope = FALSE AND COALESCE(a.out_of_scope, FALSE) = FALSE AND e.is_anchor = 0 AND m.is_enabled = 1
+		WHERE efl.entity_id IS NULL AND m.function != '' AND COALESCE(e.out_of_scope, a.out_of_scope, 0) = 0 AND e.is_anchor = 0 AND m.is_enabled = 1
 			ORDER BY e.id, m.module_name, m.function`
 
 	rows, rErr := db.QueryContext(ctx, pendingQuery)
@@ -2210,7 +2210,7 @@ func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.P
 		JOIN entities e ON e.id = efl.entity_id
 		LEFT JOIN entities a ON e.anchor_id = a.id
 		JOIN master.modules m ON efl.module_name = m.module_name AND efl.function_name = m.function
-		WHERE efl.is_success = 0 AND e.out_of_scope = FALSE AND COALESCE(a.out_of_scope, FALSE) = FALSE AND m.is_enabled = 1
+		WHERE efl.is_success = 0 AND COALESCE(e.out_of_scope, a.out_of_scope, 0) = 0 AND m.is_enabled = 1
 		ORDER BY e.id, efl.module_name, efl.function_name`
 	rowsErr, reErr := db.QueryContext(ctx, errorQuery)
 	if reErr != nil {
@@ -2319,24 +2319,24 @@ func GetResumePayload(ctx context.Context, projectID string, resumePending, retr
 	var queryParts []string
 	if resumePending {
 		queryParts = append(queryParts, `
-			SELECT DISTINCT e.id, e.type, d.value, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
+			SELECT DISTINCT e.id, e.type, d.value, COALESCE(e.out_of_scope, a.out_of_scope, 0), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 			FROM entities e
 			JOIN dictionary d ON e.value_id = d.id
 			LEFT JOIN entities a ON e.anchor_id = a.id
 			JOIN master.modules m ON e.type = m.input_type
 			LEFT JOIN entity_function_log efl
 			  ON e.id = efl.entity_id AND m.module_name = efl.module_name AND m.function = efl.function_name
-			WHERE efl.entity_id IS NULL AND m.function != '' AND e.out_of_scope = FALSE AND COALESCE(a.out_of_scope, FALSE) = FALSE AND e.is_anchor = 0 AND m.is_enabled = 1`)
+			WHERE efl.entity_id IS NULL AND m.function != '' AND COALESCE(e.out_of_scope, a.out_of_scope, 0) = 0 AND e.is_anchor = 0 AND m.is_enabled = 1`)
 	}
 	if retryErrors {
 		queryParts = append(queryParts, `
-			SELECT DISTINCT e.id, e.type, d.value, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
+			SELECT DISTINCT e.id, e.type, d.value, COALESCE(e.out_of_scope, a.out_of_scope, 0), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 			FROM entities e
 			JOIN dictionary d ON e.value_id = d.id
 			LEFT JOIN entities a ON e.anchor_id = a.id
 			JOIN entity_function_log efl ON e.id = efl.entity_id
 			JOIN master.modules m ON efl.module_name = m.module_name AND efl.function_name = m.function
-			WHERE efl.is_success = 0 AND e.out_of_scope = FALSE AND COALESCE(a.out_of_scope, FALSE) = FALSE AND m.is_enabled = 1`)
+			WHERE efl.is_success = 0 AND COALESCE(e.out_of_scope, a.out_of_scope, 0) = 0 AND m.is_enabled = 1`)
 	}
 
 	if len(queryParts) == 0 {
@@ -2585,8 +2585,8 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 
 	query := `
 		SELECT
-			e1.id, e1.type, d1.value, e1.category, (e1.out_of_scope OR COALESCE(a1.out_of_scope, FALSE)), e1.depth_strict, COALESCE(a1.depth_relaxed, e1.depth_relaxed),
-			e2.id, e2.type, d2.value, e2.category, (e2.out_of_scope OR COALESCE(a2.out_of_scope, FALSE)), e2.depth_strict, COALESCE(a2.depth_relaxed, e2.depth_relaxed),
+			e1.id, e1.type, d1.value, e1.category, COALESCE(e1.out_of_scope, a1.out_of_scope, 0), e1.depth_strict, COALESCE(a1.depth_relaxed, e1.depth_relaxed),
+			e2.id, e2.type, d2.value, e2.category, COALESCE(e2.out_of_scope, a2.out_of_scope, 0), e2.depth_strict, COALESCE(a2.depth_relaxed, e2.depth_relaxed),
 			o.module_name, o.function_name, o.context, o.created_at
 		FROM relations r
 		JOIN entities e1 ON r.source_entity_id = e1.id
@@ -2844,7 +2844,7 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 	}
 
 	orphanQuery := `
-		SELECT e.id, e.type, d.value, e.category, (e.out_of_scope OR COALESCE(a.out_of_scope, FALSE)), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
+		SELECT e.id, e.type, d.value, e.category, COALESCE(e.out_of_scope, a.out_of_scope, 0), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 		FROM entities e
 		JOIN dictionary d ON e.value_id = d.id
 		LEFT JOIN entities a ON e.anchor_id = a.id
@@ -2944,3 +2944,154 @@ func DeleteProject(ctx context.Context, projectID string) (err error) {
 
 	return nil
 }
+
+// EntityItem represents an entity with its ID, type, and value.
+type EntityItem struct {
+	ID    int64
+	Type  string
+	Value string
+}
+
+// GetScopeAuditEntities retrieves explicitly allowed (Packet A) and all blocked (Packet B) entities for scope audit.
+func GetScopeAuditEntities(ctx context.Context, projectID string) (allowed []EntityItem, blocked []EntityItem, err error) {
+	internalName, err := ResolveWorkspaceRoute(projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
+	db, dbErr := openDB(dbPath)
+	if dbErr != nil {
+		return nil, nil, dbErr
+	}
+	defer func() {
+		cerr := db.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
+	allowedQuery := `SELECT e.id, e.type, d.value FROM entities e JOIN dictionary d ON e.value_id = d.id WHERE e.out_of_scope = 0`
+	rowsAllowed, aErr := db.QueryContext(ctx, allowedQuery)
+	if aErr != nil {
+		return nil, nil, aErr
+	}
+	defer func() {
+		cerr := rowsAllowed.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
+	for rowsAllowed.Next() {
+		var item EntityItem
+		if sErr := rowsAllowed.Scan(&item.ID, &item.Type, &item.Value); sErr != nil {
+			return nil, nil, sErr
+		}
+		allowed = append(allowed, item)
+	}
+	if rErr := rowsAllowed.Err(); rErr != nil {
+		return nil, nil, rErr
+	}
+
+	blockedQuery := `SELECT e.id, e.type, d.value FROM entities e JOIN dictionary d ON e.value_id = d.id LEFT JOIN entities a ON e.anchor_id = a.id WHERE COALESCE(e.out_of_scope, a.out_of_scope, 0) = 1`
+	rowsBlocked, bErr := db.QueryContext(ctx, blockedQuery)
+	if bErr != nil {
+		return allowed, nil, bErr
+	}
+	defer func() {
+		cerr := rowsBlocked.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
+	for rowsBlocked.Next() {
+		var item EntityItem
+		if sErr := rowsBlocked.Scan(&item.ID, &item.Type, &item.Value); sErr != nil {
+			return nil, nil, sErr
+		}
+		blocked = append(blocked, item)
+	}
+	if rErr := rowsBlocked.Err(); rErr != nil {
+		return nil, nil, rErr
+	}
+
+	return allowed, blocked, nil
+}
+
+// UpdateEntitiesScope updates the out_of_scope status for entities in batches.
+func UpdateEntitiesScope(ctx context.Context, projectID string, toNullIDs, toOneIDs, toZeroIDs []int64) (err error) {
+	if len(toNullIDs) == 0 && len(toOneIDs) == 0 && len(toZeroIDs) == 0 {
+		return nil
+	}
+
+	internalName, err := ResolveWorkspaceRoute(projectID)
+	if err != nil {
+		return err
+	}
+
+	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
+	db, dbErr := openDB(dbPath)
+	if dbErr != nil {
+		return dbErr
+	}
+	defer func() {
+		cerr := db.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
+	tx, txErr := db.BeginTx(ctx, nil)
+	if txErr != nil {
+		return txErr
+	}
+	defer func() {
+		rErr := tx.Rollback()
+		if rErr != nil && !errors.Is(rErr, sql.ErrTxDone) {
+			if err == nil {
+				err = rErr
+			}
+		}
+	}()
+
+	if err = updateScopeBatch(ctx, tx, toNullIDs, nil); err != nil {
+		return err
+	}
+	if err = updateScopeBatch(ctx, tx, toOneIDs, 1); err != nil {
+		return err
+	}
+	if err = updateScopeBatch(ctx, tx, toZeroIDs, 0); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func updateScopeBatch(ctx context.Context, tx *sql.Tx, ids []int64, val any) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	const batchSize = sqliteMaxParams - 1
+	for i := 0; i < len(ids); i += batchSize {
+		end := i + batchSize
+		if end > len(ids) {
+			end = len(ids)
+		}
+		chunk := ids[i:end]
+		placeholders := make([]string, len(chunk))
+		args := make([]any, 0, len(chunk)+1)
+		args = append(args, val)
+		for j, id := range chunk {
+			placeholders[j] = "?"
+			args = append(args, id)
+		}
+		query := fmt.Sprintf("UPDATE entities SET out_of_scope = ? WHERE id IN (%s)", strings.Join(placeholders, ","))
+		if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+

@@ -10,12 +10,15 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync"
 	"time"
 )
 
 var (
-	activeSession *schema.PipelineInjection
-	currentProjID string
+	activeSession  *schema.PipelineInjection
+	currentProjID  string
+	syncedProjects = make(map[string]bool)
+	syncedMu       sync.Mutex
 )
 
 var (
@@ -72,7 +75,7 @@ func GetActiveProjectStats(ctx context.Context) (int, map[string]map[string]int,
 	}
 
 	totalEntities := 0
-	totalsByCat := make(map[string]int)
+	totalsByCat := make(map[string]int, len(stats))
 	for cat, types := range stats {
 		for _, count := range types {
 			totalsByCat[cat] += count
@@ -101,7 +104,7 @@ func ClearActiveProject() {
 
 // ValidateTarget checks if the input is valid and returns its type, value, and anchor.
 func ValidateTarget(ctx context.Context, targetType, rawInput string) (string, string, error) {
-	if err := scopemanager.Load(ctx); err != nil {
+	if _, err := scopemanager.Load(ctx); err != nil {
 		return "", "", err
 	}
 
@@ -131,8 +134,25 @@ func GetProjects(ctx context.Context, targetType, targetValue string) ([]schema.
 
 // GetProjectStatus analyzes pending tasks and errors for a specific project.
 func GetProjectStatus(ctx context.Context, projectID string) ([]string, []string, error) {
-	if err := scopemanager.Load(ctx); err != nil {
+	changed, err := scopemanager.Load(ctx)
+	if err != nil {
 		return nil, nil, err
+	}
+
+	syncedMu.Lock()
+	if changed {
+		syncedProjects = make(map[string]bool)
+	}
+	needsSync := !syncedProjects[projectID]
+	syncedMu.Unlock()
+
+	if needsSync {
+		if _, err := SyncScopeWithDB(ctx, projectID); err != nil {
+			return nil, nil, err
+		}
+		syncedMu.Lock()
+		syncedProjects[projectID] = true
+		syncedMu.Unlock()
 	}
 
 	pendingTasks, errorTasks, err := repository.GetProjectStatus(ctx, projectID)
@@ -183,12 +203,12 @@ func GetProjectStatus(ctx context.Context, projectID string) ([]string, []string
 		}
 	}
 
-	var pending []string
+	pending := make([]string, 0, len(pendingMap))
 	for p := range pendingMap {
 		pending = append(pending, p)
 	}
 
-	var errs []string
+	errs := make([]string, 0, len(errorMap))
 	for e := range errorMap {
 		errs = append(errs, e)
 	}
@@ -302,6 +322,9 @@ func DeleteProject(ctx context.Context, projectID string) error {
 	if currentProjID == projectID {
 		ClearActiveProject()
 	}
+	syncedMu.Lock()
+	delete(syncedProjects, projectID)
+	syncedMu.Unlock()
 	return repository.DeleteProject(ctx, projectID)
 }
 
@@ -311,3 +334,44 @@ func CheckAppUpdate(ctx context.Context) (*updater.ReleaseInfo, error) {
 	defer cancel()
 	return updater.FetchLatestRelease(ctxTimeout, nil)
 }
+
+// SyncScopeWithDB synchronizes the database entities' scope status with in-memory scope rules.
+func SyncScopeWithDB(ctx context.Context, projectID string) (unblockedEntities []schema.EntityRef, err error) {
+	allowed, blocked, err := repository.GetScopeAuditEntities(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	toNullIDs := make([]int64, 0, len(allowed))
+	toOneIDs := make([]int64, 0, len(allowed))
+	toZeroIDs := make([]int64, 0, len(blocked))
+	unblockedEntities = make([]schema.EntityRef, 0, len(blocked))
+
+	for _, item := range allowed {
+		if scopemanager.IsExplicitlyAllowed(item.Type, item.Value) {
+			continue
+		}
+		if scopemanager.IsOutOfScope(item.Type, item.Value) {
+			toOneIDs = append(toOneIDs, item.ID)
+		} else {
+			toNullIDs = append(toNullIDs, item.ID)
+		}
+	}
+
+	for _, item := range blocked {
+		if scopemanager.IsExplicitlyAllowed(item.Type, item.Value) {
+			toZeroIDs = append(toZeroIDs, item.ID)
+			unblockedEntities = append(unblockedEntities, schema.EntityRef{
+				Type:  item.Type,
+				Value: item.Value,
+			})
+		}
+	}
+
+	if err = repository.UpdateEntitiesScope(ctx, projectID, toNullIDs, toOneIDs, toZeroIDs); err != nil {
+		return nil, err
+	}
+
+	return unblockedEntities, nil
+}
+
