@@ -228,6 +228,10 @@ func Process(data *schema.ProcessorInputData, out chan<- *schema.ProcessorToRepo
 				}
 			}
 
+			if res.OutOfScope && scopemanager.IsExplicitlyAllowed(targetRef.Type, targetRef.Value) {
+				res.OutOfScope = false
+			}
+
 			resKey := resAggKey{Type: targetRef.Type, Value: targetRef.Value, LocalID: res.LocalID}
 			if aggregatedGroups[srcRefVal] == nil {
 				aggregatedGroups[srcRefVal] = make(map[resAggKey]*schema.ProcessorToRepoValidResult)
