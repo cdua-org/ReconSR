@@ -425,4 +425,3 @@ func CheckAndResumeScope(ctx context.Context, dispatchChan chan<- *schema.RepoTo
 		return true
 	}
 }
-

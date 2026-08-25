@@ -26,15 +26,15 @@ const (
 	layoutIdealDistanceSmall  = 120.0 // Base spring length (k) for small graphs
 	layoutIdealDistanceMedium = 80.0  // Base spring length (k) for medium graphs
 	layoutIdealDistanceLarge  = 50.0  // Base spring length (k) for large graphs
-	layoutThresholdSmall  = 100  // Threshold for small graphs
-	layoutThresholdMedium = 1000 // Threshold for medium graphs
+	layoutThresholdSmall      = 100   // Threshold for small graphs
+	layoutThresholdMedium     = 1000  // Threshold for medium graphs
 
-	layoutRootRadius        = 45.0 // Collision radius for the root node
-	layoutMaxHubRadius      = 45.0 // Maximum allowed collision radius for any hub
-	layoutBaseNodeRadius    = 15.0 // Base collision radius for standard nodes
-	layoutPhysicsIterations = 350  // Number of main physics iterations
-	layoutCollisionPasses   = 350  // Number of collision resolution passes
-	layoutParallelThreshold = 80   // Minimum node count to engage parallel repulsion
+	layoutRootRadius            = 45.0    // Collision radius for the root node
+	layoutMaxHubRadius          = 45.0    // Maximum allowed collision radius for any hub
+	layoutBaseNodeRadius        = 15.0    // Base collision radius for standard nodes
+	layoutPhysicsIterations     = 350     // Number of main physics iterations
+	layoutCollisionPasses       = 350     // Number of collision resolution passes
+	layoutParallelThreshold     = 80      // Minimum node count to engage parallel repulsion
 	layoutApproxRepulsionDistSq = 40000.0 // Threshold squared distance (200*200) to use fast repulsion approximation
 )
 
@@ -80,18 +80,18 @@ func sanitizePath(name string) string {
 }
 
 type graphProperty struct {
-	ID         int64    `json:"id"`
-	Type       string   `json:"type"`
-	Value      string   `json:"value"`
-	Properties []int64  `json:"properties,omitempty"`
-	Contexts   []string `json:"contexts,omitempty"`
-	Module     string   `json:"module,omitempty"`
-	Function   string   `json:"function,omitempty"`
-	FirstSeen  int64    `json:"firstSeen,omitempty"`
-	LastSeen   int64    `json:"lastSeen,omitempty"`
-	RawDataID  int64    `json:"rawDataId,omitempty"`
+	ID         int64            `json:"id"`
+	Type       string           `json:"type"`
+	Value      string           `json:"value"`
+	Properties []int64          `json:"properties,omitempty"`
+	Contexts   []string         `json:"contexts,omitempty"`
+	Module     string           `json:"module,omitempty"`
+	Function   string           `json:"function,omitempty"`
+	FirstSeen  int64            `json:"firstSeen,omitempty"`
+	LastSeen   int64            `json:"lastSeen,omitempty"`
+	RawDataID  int64            `json:"rawDataId,omitempty"`
 	Executions map[string]int64 `json:"executions,omitempty"`
-	Subtypes   []string `json:"subtypes,omitempty"`
+	Subtypes   []string         `json:"subtypes,omitempty"`
 }
 
 type graphNode struct {
@@ -317,7 +317,7 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 					FirstSeen: edgeTime,
 					LastSeen:  edgeTime,
 					Contexts:  contexts,
-					RawDataID:  dataID,
+					RawDataID: dataID,
 					Subtypes:  targetNode.Subtypes,
 				}
 			}
@@ -510,8 +510,8 @@ func GenerateHTML(ctx context.Context, graph *schema.ProjectGraph) (string, erro
 			n.Group = "root"
 			graphNodes = append(graphNodes, highlightedNode{
 				graphNode: n,
-				Shape:   "diamond",
-				Size:    35,
+				Shape:     "diamond",
+				Size:      35,
 				Color: map[string]string{
 					"border":     "#fbbf24",
 					"background": "#d97706",
@@ -779,7 +779,7 @@ func applyForceLayout(ctx context.Context, nodes map[int64]graphNode, edges map[
 				overlap := sumR - dist
 				var force float64
 				if overlap > 0 {
-					force = (k*k) + (overlap * 100.0)
+					force = (k * k) + (overlap * 100.0)
 				} else {
 					sd := max(dist-sumR, 1.0)
 					force = (k * k) / sd

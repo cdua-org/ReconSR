@@ -17,9 +17,9 @@ var (
 
 // Result encapsulates the outcome of a validation operation.
 type Result struct {
-	Type      string
-	Value     string
-	Anchor    string
+	Type   string
+	Value  string
+	Anchor string
 }
 
 // ValidateTag ensures a tag contains only [a-z0-9_.-] characters.
@@ -144,9 +144,9 @@ func validateDomain(value string) (Result, error) {
 	}
 
 	return Result{
-		Type:      correctedType,
-		Value:     asciiDomain,
-		Anchor:    orgDomain,
+		Type:   correctedType,
+		Value:  asciiDomain,
+		Anchor: orgDomain,
 	}, nil
 }
 
@@ -321,9 +321,9 @@ func validateEmail(value string) (Result, error) {
 	}
 
 	return Result{
-		Type:      resType,
-		Value:     localPart + "@" + domainValue,
-		Anchor:    orgDomain,
+		Type:   resType,
+		Value:  localPart + "@" + domainValue,
+		Anchor: orgDomain,
 	}, nil
 }
 

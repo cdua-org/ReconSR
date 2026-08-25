@@ -454,4 +454,3 @@ func IsExplicitlyAllowed(entityType, value string) bool {
 
 	return false
 }
-

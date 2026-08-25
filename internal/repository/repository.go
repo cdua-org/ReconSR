@@ -3094,4 +3094,3 @@ func updateScopeBatch(ctx context.Context, tx *sql.Tx, ids []int64, val any) err
 	}
 	return nil
 }
-
