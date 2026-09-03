@@ -1,6 +1,6 @@
 module cdua-org/ReconSR
 
-go 1.27.0
+go 1.27.1
 
 require (
 	github.com/ip2location/ip2location-go/v9 v9.8.0
@@ -10,7 +10,7 @@ require (
 	github.com/oschwald/maxminddb-golang v1.13.1
 	golang.org/x/net v0.58.0
 	golang.org/x/sys v0.47.0
-	modernc.org/sqlite v1.57.0
+	modernc.org/sqlite v1.58.0
 )
 
 require (
@@ -25,7 +25,7 @@ require (
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	lukechampine.com/uint128 v1.3.0 // indirect
-	modernc.org/libc v1.75.6 // indirect
+	modernc.org/libc v1.75.7 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
