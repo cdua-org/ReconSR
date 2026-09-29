@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -122,13 +122,9 @@ func ShowBanner(ctx context.Context) {
 
 	fmt.Printf("  + %-20s %s\n", i18n.T["MSG_INIT_CORE"]+":", colorGreen+i18n.T["MSG_STATUS_READY"]+colorReset)
 
-	totalMods, _, totalFuncs, _, err := controller.GetSystemStatus(ctx)
-	if err != nil {
-		fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
-		return
-	}
-	fmt.Printf("  + %-20s %d\n", i18n.T["LBL_MODS"]+":", totalMods)
-	fmt.Printf("  + %-20s %d\n", i18n.T["LBL_FUNCS"]+":", totalFuncs)
+	status := controller.GetSystemStatus()
+	fmt.Printf("  + %-20s %d\n", i18n.T["LBL_MODS"]+":", status.TotalModules)
+	fmt.Printf("  + %-20s %d\n", i18n.T["LBL_FUNCS"]+":", status.TotalFuncs)
 
 	fmt.Printf("  + %-20s %s\n", i18n.T["MSG_CONN_DB"]+":", colorGreen+i18n.T["MSG_STATUS_CONN"]+colorReset)
 	fmt.Println()
@@ -152,7 +148,7 @@ func printProjectStats(ctx context.Context) {
 			for cat := range statsByCat {
 				catKeys = append(catKeys, cat)
 			}
-			sort.Strings(catKeys)
+			slices.Sort(catKeys)
 
 			for _, cat := range catKeys {
 				catTotal := totalsByCat[cat]
@@ -170,7 +166,7 @@ func printProjectStats(ctx context.Context) {
 						keys = append(keys, t)
 					}
 				}
-				sort.Strings(keys)
+				slices.Sort(keys)
 				if hasInvalid {
 					keys = append(keys, "invalid")
 				}
@@ -185,8 +181,19 @@ func printProjectStats(ctx context.Context) {
 	}
 }
 
-// ShowReconCompleteBanner prints the post-scan status message and entity statistics.
-func ShowReconCompleteBanner(ctx context.Context) {
+// HandleReconComplete processes post-scan results, outputs reports, and handles session finalization.
+func HandleReconComplete(ctx context.Context) {
+	parsed := parseCLIArgs(os.Args)
+	if parsed.Target != "" && len(parsed.ModuleSpecs) > 0 {
+		graph, err := controller.GetActiveGraph(ctx, false)
+		if err != nil {
+			fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
+			os.Exit(1)
+		}
+		report.RenderResultsTree(os.Stdout, graph, &report.ConsoleTreeFormatter{})
+		os.Exit(0)
+	}
+
 	fmt.Println("\n" + colorGreen + colorBold + "--------------------------------------------------" + colorReset)
 	fmt.Println(colorGreen + colorBold + "[*] " + i18n.T["MSG_RECON_COMPLETE"] + colorReset)
 	printProjectStats(ctx)
@@ -195,8 +202,25 @@ func ShowReconCompleteBanner(ctx context.Context) {
 
 // GetRawTarget extracts the target from args or presents a menu of existing targets when no target argument is provided.
 func GetRawTarget(ctx context.Context, osArgs []string) string {
-	if len(osArgs) >= 2 {
-		return osArgs[1]
+	if err := controller.CleanupTempDatabases(ctx); err != nil {
+		fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
+	}
+
+	parsed := parseCLIArgs(osArgs)
+	if parsed.ShowHelp {
+		ShowHelp()
+		os.Exit(0)
+	}
+	if parsed.ListModules {
+		ShowModules(ctx)
+		os.Exit(0)
+	}
+	if parsed.ListFuncMod != "" {
+		ShowModuleFuncs(ctx, parsed.ListFuncMod)
+		os.Exit(0)
+	}
+	if parsed.Target != "" {
+		return parsed.Target
 	}
 
 	targets, err := controller.GetExistingTargets(ctx)
@@ -234,7 +258,7 @@ func GetRawTarget(ctx context.Context, osArgs []string) string {
 				fmt.Println(colorRed + i18n.T["ERR_INVALID_FORMAT"] + colorReset)
 				continue
 			}
-			_, _, vErr := controller.ValidateTarget(ctx, "auto", target)
+			_, _, vErr := controller.ValidateTarget(ctx, "auto", target, false)
 			if vErr != nil {
 				printTargetError(vErr)
 				continue
@@ -259,13 +283,16 @@ func resolveTarget(ctx context.Context, rawInput string) (string, string, error)
 			}
 		}
 	}
-	return controller.ValidateTarget(ctx, "auto", rawInput)
+	return controller.ValidateTarget(ctx, "auto", rawInput, false)
 }
 
 // HandleUserInput manages the UI loop for projects and actions.
 func HandleUserInput(ctx context.Context, rawInput string) bool {
 	if rawInput == "" {
 		return false
+	}
+	if HandleArgs(ctx, os.Args) {
+		return true
 	}
 
 	var targetType, targetValue string
@@ -303,12 +330,8 @@ func HandleUserInput(ctx context.Context, rawInput string) bool {
 
 		fmt.Printf("\n%s%s: %s%s%s%s (%s)\n", colorCyan, i18n.T["LBL_TARGET"], colorReset, colorBold, targetValue, colorReset, targetType)
 
-		tM, aM, tF, aF, err := controller.GetSystemStatus(ctx)
-		if err != nil {
-			fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
-			continue
-		}
-		fmt.Printf("%s%s:%s %d/%d %s, %d/%d %s\n", colorCyan, i18n.T["MSG_ACTIVE_TOOLS"], colorReset, aM, tM, i18n.T["LBL_MODS"], aF, tF, i18n.T["LBL_FUNCS"])
+		status := controller.GetSystemStatus()
+		fmt.Printf("%s%s:%s %d/%d %s, %d/%d %s\n", colorCyan, i18n.T["MSG_ACTIVE_TOOLS"], colorReset, status.ActiveModules, status.TotalModules, i18n.T["LBL_MODS"], status.ActiveFuncs, status.TotalFuncs, i18n.T["LBL_FUNCS"])
 		projects, hasModules, hasActiveFuncs, err := controller.GetProjects(ctx, targetType, targetValue)
 		if err != nil {
 			fmt.Printf("%s%s: %v%s\n", colorRed, i18n.T["LBL_ERROR"], err, colorReset)
@@ -440,7 +463,7 @@ func handleModuleConfiguration(ctx context.Context) {
 		for m := range settings {
 			mods = append(mods, m)
 		}
-		sort.Strings(mods)
+		slices.Sort(mods)
 
 		actions = append(actions, menuAction{actionType: "toggleAll"})
 
@@ -452,7 +475,7 @@ func handleModuleConfiguration(ctx context.Context) {
 			for f := range fns {
 				fnNames = append(fnNames, f)
 			}
-			sort.Strings(fnNames)
+			slices.Sort(fnNames)
 			for _, f := range fnNames {
 				actions = append(actions, menuAction{actionType: "toggleFunc", modName: m, fnName: f})
 			}
@@ -549,7 +572,7 @@ func printTargetError(err error) {
 }
 
 func checkTargetScope(ctx context.Context, targetType, targetValue string) bool {
-	_, _, err := controller.ValidateTarget(ctx, targetType, targetValue)
+	_, _, err := controller.ValidateTarget(ctx, targetType, targetValue, false)
 	if err != nil {
 		printTargetError(err)
 		return false
@@ -731,4 +754,156 @@ func formatBytes(bytes int64) string {
 	default:
 		return fmt.Sprintf("%d B", bytes)
 	}
+}
+
+// ShowHelp outputs CLI command usage, available flags, and examples.
+func ShowHelp() {
+	fmt.Println(i18n.T["LBL_USAGE"] + ":")
+	fmt.Println("  " + AppName)
+	fmt.Println("  " + AppName + " [" + i18n.T["LBL_TARGET_HINT"] + "]")
+	fmt.Printf("  %s [%s] [%s] [%s]\n\n",
+		AppName,
+		i18n.T["LBL_TARGET_HINT"],
+		strings.ToLower(i18n.T["LBL_MODS"])+":func...",
+		strings.ToLower(i18n.T["LBL_FLAGS"]),
+	)
+	fmt.Println(i18n.T["LBL_ARGUMENTS"] + ":")
+	fmt.Printf("  %-24s %s\n", "["+i18n.T["LBL_TARGET_HINT"]+"]", i18n.T["DESC_TARGET_ARG"])
+	fmt.Printf("  %-24s %s\n", "["+strings.ToLower(i18n.T["LBL_MODS"])+"...]", i18n.T["DESC_MODULES_ARG"])
+	fmt.Println()
+	fmt.Println(i18n.T["LBL_FLAGS"] + ":")
+	fmt.Printf("  %-24s %s\n", "-h, --help", i18n.T["DESC_FLAG_HELP"])
+	fmt.Printf("  %-24s %s\n", "-m, --modules <mods>", i18n.T["DESC_MODULES_ARG"])
+	fmt.Printf("  %-24s %s\n", "--ignore-scope", i18n.T["DESC_FLAG_IGNORE_SCOPE"])
+	fmt.Printf("  %-24s %s\n", "-l, --list-modules", i18n.T["DESC_FLAG_LIST_MODULES"])
+	fmt.Printf("  %-24s %s\n", "--list-funcs <mod>", i18n.T["DESC_FLAG_LIST_FUNCS"])
+	fmt.Println()
+	fmt.Println(i18n.T["LBL_EXAMPLES"] + ":")
+	fmt.Println("  " + AppName)
+	fmt.Println("  " + AppName + " example.com")
+	fmt.Println("  " + AppName + " example.com dns:get_mx:get_ns hunterio whois")
+	fmt.Println("  " + AppName + " -m dns:get_mx,whois example.com")
+	fmt.Println("  " + AppName + " --list-funcs dns")
+}
+
+// ShowModules outputs all registered modules and their capabilities.
+func ShowModules(ctx context.Context) {
+	mods, err := controller.GetAvailableModules(ctx)
+	if err != nil {
+		fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
+		os.Exit(1)
+	}
+	modNames := make([]string, 0, len(mods))
+	for m := range mods {
+		modNames = append(modNames, m)
+	}
+	slices.Sort(modNames)
+	fmt.Println("\n" + colorCyan + colorBold + "--- " + i18n.T["LBL_MODS"] + " ---" + colorReset)
+	for _, m := range modNames {
+		fmt.Printf("  - %-20s (%d %s)\n", m, len(mods[m]), strings.ToLower(i18n.T["LBL_FUNCS"]))
+	}
+	fmt.Printf("\n%s  [!] %s: %s --list-funcs <module>%s\n\n", colorYellow, i18n.T["MSG_LIST_FUNCS_HINT"], AppName, colorReset)
+}
+
+// ShowModuleFuncs outputs functions and their supported types for the given module.
+func ShowModuleFuncs(ctx context.Context, moduleName string) {
+	mods, err := controller.GetAvailableModules(ctx)
+	if err != nil {
+		fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
+		os.Exit(1)
+	}
+	funcs, ok := mods[moduleName]
+	if !ok {
+		fmt.Printf("%s[!] %s: %s%s\n", colorRed, i18n.T["MSG_MODULE_NOT_FOUND"], moduleName, colorReset)
+		os.Exit(1)
+	}
+	fnNames := make([]string, 0, len(funcs))
+	for fn := range funcs {
+		fnNames = append(fnNames, fn)
+	}
+	slices.Sort(fnNames)
+	fmt.Printf("\n%s%s--- %s: %s ---%s\n", colorCyan, colorBold, i18n.T["LBL_FUNCS"], moduleName, colorReset)
+	for _, fn := range fnNames {
+		types := funcs[fn]
+		typeStr := strings.Join(types, ", ")
+		if typeStr == "" {
+			typeStr = "-"
+		}
+		fmt.Printf("  - %-24s [%s: %s]\n", fn, i18n.T["LBL_TYPE"], typeStr)
+	}
+	fmt.Println()
+}
+
+// HandleArgs parses CLI arguments and executes standalone actions if requested.
+// Returns true if an argument or standalone run was handled, or false to proceed to interactive mode.
+func HandleArgs(ctx context.Context, osArgs []string) bool {
+	parsed := parseCLIArgs(osArgs)
+	if parsed.Target == "" || len(parsed.ModuleSpecs) == 0 {
+		return false
+	}
+
+	targetType, targetValue, err := controller.ValidateTarget(ctx, "auto", parsed.Target, parsed.IgnoreScope)
+	if err != nil {
+		printTargetError(err)
+		os.Exit(1)
+	}
+
+	requested := parseModuleSpecs(parsed.ModuleSpecs)
+	valRes, err := controller.ValidateModuleFunctions(ctx, targetType, requested)
+	if err != nil {
+		fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
+		os.Exit(1)
+	}
+
+	slices.Sort(valRes.NotFoundModules)
+	for _, m := range valRes.NotFoundModules {
+		fmt.Printf("%s[!] %s: %s%s\n", colorYellow, i18n.T["MSG_MODULE_NOT_FOUND"], m, colorReset)
+	}
+	nfMods := make([]string, 0, len(valRes.NotFoundFuncs))
+	for m := range valRes.NotFoundFuncs {
+		nfMods = append(nfMods, m)
+	}
+	slices.Sort(nfMods)
+	for _, m := range nfMods {
+		fns := valRes.NotFoundFuncs[m]
+		slices.Sort(fns)
+		fmt.Printf("%s[!] %s: %s (%s)%s\n", colorYellow, i18n.T["MSG_FUNC_NOT_FOUND"], m, strings.Join(fns, ", "), colorReset)
+	}
+
+	if len(valRes.Supported) == 0 {
+		if len(valRes.IncompatibleFuncs) > 0 {
+			fmt.Printf("%s[!] %s%s\n", colorRed, i18n.T["MSG_NO_SUPPORTED_FUNCS"], colorReset)
+			printIncompatibleFuncs(targetType, valRes.IncompatibleFuncs)
+		}
+		os.Exit(1)
+	}
+
+	_, err = controller.PrepareStandaloneSession(ctx, targetType, targetValue, parsed.IgnoreScope, valRes.Supported)
+	if err != nil {
+		fmt.Printf("%s: %v\n", i18n.T["LBL_ERROR"], err)
+		os.Exit(1)
+	}
+
+	printIncompatibleFuncs(targetType, valRes.IncompatibleFuncs)
+
+	printReconStatus(false)
+	return true
+}
+
+func printIncompatibleFuncs(targetType string, incompatible map[string][]string) {
+	if len(incompatible) == 0 {
+		return
+	}
+	total := 0
+	for _, fns := range incompatible {
+		total += len(fns)
+	}
+	skipped := make([]string, 0, total)
+	for m, fns := range incompatible {
+		for _, fn := range fns {
+			skipped = append(skipped, m+":"+fn)
+		}
+	}
+	slices.Sort(skipped)
+	fmt.Printf("%s[!] %s '%s': %s%s\n", colorYellow, i18n.T["MSG_SKIPPED_INCOMPATIBLE"], targetType, strings.Join(skipped, ", "), colorReset)
 }

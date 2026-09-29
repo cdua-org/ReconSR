@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"sync"
 	"time"
 )
@@ -36,6 +37,8 @@ func GetInjection() *schema.PipelineInjection {
 	return inj
 }
 
+const unlimitedDepth = 999999
+
 // GetActiveGraph retrieves the results for the currently active session and applies depth limits.
 func GetActiveGraph(ctx context.Context, includeRawData bool) (*schema.ProjectGraph, error) {
 	if currentProjID == "" {
@@ -45,6 +48,17 @@ func GetActiveGraph(ctx context.Context, includeRawData bool) (*schema.ProjectGr
 	graph, err := repository.GetGraphData(ctx, currentProjID, includeRawData)
 	if err != nil {
 		return nil, err
+	}
+
+	deleted, err := repository.DeleteTempProject(ctx, currentProjID)
+	if err != nil {
+		return nil, err
+	}
+	if deleted {
+		ClearActiveProject()
+		graph.MaxDepth = unlimitedDepth
+		graph.StrictDepth = false
+		return graph, nil
 	}
 
 	root, err := os.OpenRoot(".")
@@ -102,17 +116,20 @@ func ClearActiveProject() {
 	activeSession = nil
 }
 
-// ValidateTarget checks if the input is valid and returns its type, value, and anchor.
-func ValidateTarget(ctx context.Context, targetType, rawInput string) (string, string, error) {
-	if _, err := scopemanager.Load(ctx); err != nil {
-		return "", "", err
-	}
-
+// ValidateTarget checks if the input is valid and returns its type, value.
+func ValidateTarget(ctx context.Context, targetType, rawInput string, ignoreScope bool) (string, string, error) {
 	res, err := validator.Validate(targetType, rawInput)
 	if err != nil {
 		return "", "", err
 	}
 
+	if ignoreScope {
+		return res.Type, res.Value, nil
+	}
+
+	if _, err := scopemanager.Load(ctx); err != nil {
+		return "", "", err
+	}
 	if scopemanager.IsOutOfScope(res.Type, res.Value) {
 		return "", "", ErrOutOfScope
 	}
@@ -274,29 +291,38 @@ func SetResumeSession(ctx context.Context, projectID string, resumePending, retr
 	return nil
 }
 
-// GetSystemStatus returns the current module and function counts from the dispatcher.
-func GetSystemStatus(ctx context.Context) (totalMods, activeMods, totalFuncs, activeFuncs int, err error) {
-	settings := GetModuleSettings()
+// SystemStatus contains aggregate counts of modules and functions in the system.
+type SystemStatus struct {
+	TotalModules  int
+	ActiveModules int
+	TotalFuncs    int
+	ActiveFuncs   int
+}
 
+// GetSystemStatus returns the current module and function counts from the dispatcher.
+func GetSystemStatus() SystemStatus {
+	settings := GetModuleSettings()
 	allCaps := dispatcher.GetAllCapabilities()
-	totalMods = len(allCaps)
+
+	var status SystemStatus
+	status.TotalModules = len(allCaps)
 	for _, fns := range allCaps {
-		totalFuncs += len(fns)
+		status.TotalFuncs += len(fns)
 	}
 
 	for _, fns := range settings {
 		hasActive := false
 		for _, enabled := range fns {
 			if enabled {
-				activeFuncs++
+				status.ActiveFuncs++
 				hasActive = true
 			}
 		}
 		if hasActive {
-			activeMods++
+			status.ActiveModules++
 		}
 	}
-	return totalMods, activeMods, totalFuncs, activeFuncs, nil
+	return status
 }
 
 // GetProjectGraph retrieves the complete relationship graph for a project.
@@ -309,10 +335,12 @@ func GetModuleCount() int {
 	return len(dispatcher.ModuleRegistry)
 }
 
+// PauseRecon pauses the reconnaissance pipeline execution.
 func PauseRecon() {
 	dispatcher.SetPause(true)
 }
 
+// ResumeRecon resumes the paused reconnaissance pipeline execution.
 func ResumeRecon() {
 	dispatcher.SetPause(false)
 }
@@ -424,4 +452,129 @@ func CheckAndResumeScope(ctx context.Context, dispatchChan chan<- *schema.RepoTo
 	case dispatchChan <- payload:
 		return true
 	}
+}
+
+// CleanupTempDatabases delegates orphaned temporary database cleanup to the repository.
+func CleanupTempDatabases(ctx context.Context) error {
+	return repository.CleanupOrphanedTempDatabases(ctx)
+}
+
+// GetAvailableModules retrieves registered module capabilities from the repository.
+func GetAvailableModules(ctx context.Context) (map[string]map[string][]string, error) {
+	return repository.GetAvailableModules(ctx)
+}
+
+// ModuleValidationResult groups the categorization of requested modules and functions.
+type ModuleValidationResult struct {
+	Supported         map[string][]string
+	NotFoundModules   []string
+	NotFoundFuncs     map[string][]string
+	IncompatibleFuncs map[string][]string
+}
+
+// ValidateModuleFunctions validates requested module specs against available modules and target type.
+func ValidateModuleFunctions(ctx context.Context, targetType string, requested map[string][]string) (*ModuleValidationResult, error) {
+	avail, err := repository.GetAvailableModules(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &ModuleValidationResult{
+		Supported:         make(map[string][]string, len(requested)),
+		NotFoundFuncs:     make(map[string][]string),
+		IncompatibleFuncs: make(map[string][]string),
+	}
+
+	for modName, explicitFuncs := range requested {
+		availFuncs, exists := avail[modName]
+		if !exists {
+			res.NotFoundModules = append(res.NotFoundModules, modName)
+			continue
+		}
+
+		funcsToCheck := explicitFuncs
+		if len(funcsToCheck) == 0 {
+			funcsToCheck = make([]string, 0, len(availFuncs))
+			for fn := range availFuncs {
+				funcsToCheck = append(funcsToCheck, fn)
+			}
+		}
+
+		for _, fn := range funcsToCheck {
+			types, fnExists := availFuncs[fn]
+			if !fnExists {
+				res.NotFoundFuncs[modName] = append(res.NotFoundFuncs[modName], fn)
+				continue
+			}
+
+			if slices.Contains(types, targetType) {
+				res.Supported[modName] = append(res.Supported[modName], fn)
+			} else {
+				res.IncompatibleFuncs[modName] = append(res.IncompatibleFuncs[modName], fn)
+			}
+		}
+	}
+
+	return res, nil
+}
+
+// PrepareStandaloneSession prepares the standalone execution pipeline and returns the temporary project ID.
+func PrepareStandaloneSession(ctx context.Context, targetType, targetValue string, ignoreScope bool, supported map[string][]string) (string, error) {
+	res, err := validator.Validate(targetType, targetValue)
+	if err != nil {
+		return "", err
+	}
+	anchor := res.Anchor
+	if res.Type == "domain" {
+		anchor = ""
+	}
+
+	if !ignoreScope {
+		if _, err := scopemanager.Load(ctx); err != nil {
+			return "", err
+		}
+		if scopemanager.IsOutOfScope(res.Type, res.Value) {
+			return "", ErrOutOfScope
+		}
+	}
+
+	baseSettings := GetModuleSettings()
+	standaloneSettings := make(map[string]map[string]bool, len(baseSettings))
+	for mod, fns := range baseSettings {
+		standaloneSettings[mod] = make(map[string]bool, len(fns))
+		for fn := range fns {
+			standaloneSettings[mod][fn] = false
+		}
+	}
+	for mod, fns := range supported {
+		if standaloneSettings[mod] == nil {
+			standaloneSettings[mod] = make(map[string]bool, len(fns))
+		}
+		for _, fn := range fns {
+			standaloneSettings[mod][fn] = true
+		}
+	}
+
+	dispatcher.LoadMemoryConfig(standaloneSettings)
+
+	routeRef, err := repository.CreateTempProjectDB(ctx, res.Type, res.Value, anchor)
+	if err != nil {
+		return "", err
+	}
+
+	payload, err := repository.GetResumePayload(ctx, routeRef, true, false)
+	if err == nil && (payload == nil || len(payload.Batch) == 0) {
+		err = errors.New("no pending tasks found for project")
+	}
+	if err != nil {
+		if _, delErr := repository.DeleteTempProject(ctx, routeRef); delErr != nil {
+			return "", delErr
+		}
+		return "", err
+	}
+
+	activeSession = &schema.PipelineInjection{ToDispatcher: payload}
+	currentProjID = routeRef
+
+	return routeRef, nil
 }

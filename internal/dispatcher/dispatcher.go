@@ -192,9 +192,19 @@ func ApplyConfigOverrides(maxDepth int, strictDepth bool, globalMax, defConc, ma
 	cfgFuncDelays = delays
 }
 
+// LoadMemoryConfig updates the in-memory module index without modifying the database.
+func LoadMemoryConfig(settings map[string]map[string]bool) {
+	loadMemoryConfig(settings)
+}
+
 // LoadConfig updates the module index and repository based on provided settings.
 func LoadConfig(ctx context.Context, settings map[string]map[string]bool) error {
-	cleanSettings := make(map[string]map[string]bool)
+	registrations := loadMemoryConfig(settings)
+	return repository.SyncMasterDB(ctx, registrations)
+}
+
+func loadMemoryConfig(settings map[string]map[string]bool) []schema.ModuleRegistration {
+	cleanSettings := make(map[string]map[string]bool, len(settings))
 	allCaps := GetAllCapabilities()
 
 	for mod, fns := range settings {
@@ -203,12 +213,12 @@ func LoadConfig(ctx context.Context, settings map[string]map[string]bool) error 
 			continue
 		}
 
-		validFnMap := make(map[string]bool)
+		validFnMap := make(map[string]bool, len(validFns))
 		for _, fn := range validFns {
 			validFnMap[fn] = true
 		}
 
-		cleanSettings[mod] = make(map[string]bool)
+		cleanSettings[mod] = make(map[string]bool, len(fns))
 		for fn, state := range fns {
 			if validFnMap[fn] {
 				cleanSettings[mod][fn] = state
@@ -220,7 +230,8 @@ func LoadConfig(ctx context.Context, settings map[string]map[string]bool) error 
 	moduleIndex = make(map[string][]moduleEntry)
 	funcLimits = make(map[string]map[string]int)
 	funcDelays = make(map[string]map[string]int)
-	var registrations []schema.ModuleRegistration
+	moduleLimits.Clear()
+	registrations := make([]schema.ModuleRegistration, 0, len(ModuleRegistry))
 
 	for _, m := range ModuleRegistry {
 		caps, err := m.Capabilities()
@@ -236,7 +247,7 @@ func LoadConfig(ctx context.Context, settings map[string]map[string]bool) error 
 			funcSet[fn] = true
 		}
 
-		var mergedFuncs []string
+		mergedFuncs := make([]string, 0, len(funcSet))
 		for fn := range funcSet {
 			mergedFuncs = append(mergedFuncs, fn)
 		}
@@ -369,7 +380,7 @@ func LoadConfig(ctx context.Context, settings map[string]map[string]bool) error 
 		}
 	}
 
-	return repository.SyncMasterDB(ctx, registrations)
+	return registrations
 }
 
 // Dispatch routes each entity to the appropriate modules based on type and pending functions.

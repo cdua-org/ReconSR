@@ -23,17 +23,23 @@ const (
 	AnchorEntityType   = "domain"
 	StorageBaseDir     = "storage/base"
 	StorageProjectsDir = "storage/projects"
+	StorageTmpDir      = "storage/tmp"
 	MasterDBName       = "master.db"
 	sqliteMaxParams    = 999
 )
 
+type routeInfo struct {
+	internalName string
+	dbPath       string
+}
+
 type routeRegistry struct {
 	mu     sync.RWMutex
-	routes map[string]string
+	routes map[string]routeInfo
 }
 
 var activeRoutes = &routeRegistry{
-	routes: make(map[string]string),
+	routes: make(map[string]routeInfo),
 }
 
 func generateRouteRef() (string, error) {
@@ -45,7 +51,7 @@ func generateRouteRef() (string, error) {
 }
 
 // AllocateWorkspaceRoute reserves a new route for the workspace context.
-func AllocateWorkspaceRoute(internalName string) (string, error) {
+func AllocateWorkspaceRoute(internalName, dbPath string) (string, error) {
 	activeRoutes.mu.Lock()
 	defer activeRoutes.mu.Unlock()
 
@@ -53,7 +59,10 @@ func AllocateWorkspaceRoute(internalName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	activeRoutes.routes[ref] = internalName
+	activeRoutes.routes[ref] = routeInfo{
+		internalName: internalName,
+		dbPath:       dbPath,
+	}
 	return ref, nil
 }
 
@@ -62,11 +71,23 @@ func ResolveWorkspaceRoute(ref string) (string, error) {
 	activeRoutes.mu.RLock()
 	defer activeRoutes.mu.RUnlock()
 
-	internalName, exists := activeRoutes.routes[ref]
+	info, exists := activeRoutes.routes[ref]
 	if !exists {
 		return "", errors.New("workspace route is invalid or detached")
 	}
-	return internalName, nil
+	return info.internalName, nil
+}
+
+// ResolveWorkspacePath translates a route reference to the database file path.
+func ResolveWorkspacePath(ctx context.Context, ref string) (string, error) {
+	activeRoutes.mu.RLock()
+	info, exists := activeRoutes.routes[ref]
+	activeRoutes.mu.RUnlock()
+
+	if exists && info.dbPath != "" {
+		return info.dbPath, nil
+	}
+	return getProjectDBPath(ctx, ref)
 }
 
 // openDB handles SQLite connections with WAL mode and busy timeout to prevent locks.
@@ -194,7 +215,7 @@ func syncProjectsDB(ctx context.Context, masterDB *sql.DB) error {
 		diskProjects[dbID] = struct{}{}
 	}
 
-	rows, err := masterDB.QueryContext(ctx, "SELECT id, db_identifier FROM projects")
+	rows, err := masterDB.QueryContext(ctx, "SELECT id, db_identifier FROM projects WHERE status = 'active'")
 	if err != nil {
 		return err
 	}
@@ -370,7 +391,7 @@ func FindProjects(ctx context.Context, targetType, targetValue string) (projects
 		if info, statErr := os.Stat(projectDBPath); statErr == nil {
 			p.SizeBytes = info.Size()
 		}
-		ref, err := AllocateWorkspaceRoute(p.DBIdentifier)
+		ref, err := AllocateWorkspaceRoute(p.DBIdentifier, projectDBPath)
 		if err != nil {
 			return nil, false, false, err
 		}
@@ -394,20 +415,42 @@ func FindProjects(ctx context.Context, targetType, targetValue string) (projects
 }
 
 // CreateProjectDB creates a new project database and registers it in the master database.
-func CreateProjectDB(ctx context.Context, targetType, targetValue, anchor string) (id string, err error) {
-	if err := os.MkdirAll(StorageProjectsDir, 0750); err != nil {
+func CreateProjectDB(ctx context.Context, targetType, targetValue, anchor string) (string, error) {
+	return initProjectDB(ctx, targetType, targetValue, anchor, false)
+}
+
+// CreateTempProjectDB creates an isolated temporary project database in storage/tmp for standalone runs.
+func CreateTempProjectDB(ctx context.Context, targetType, targetValue, anchor string) (string, error) {
+	return initProjectDB(ctx, targetType, targetValue, anchor, true)
+}
+
+func initProjectDB(ctx context.Context, targetType, targetValue, anchor string, temp bool) (id string, err error) {
+	var targetDir, projectID string
+	if temp {
+		targetDir = StorageTmpDir
+		projectID = strconv.Itoa(os.Getpid())
+		if _, err := DeleteTempProjectRecord(ctx, projectID); err != nil {
+			return "", err
+		}
+		if err := DeleteTempDatabases(ctx, []string{projectID}); err != nil {
+			return "", err
+		}
+	} else {
+		targetDir = StorageProjectsDir
+		uuidBytes := make([]byte, 16)
+		if _, err := rand.Read(uuidBytes); err != nil {
+			return "", err
+		}
+		uuidBytes[6] = (uuidBytes[6] & 0x0f) | 0x40
+		uuidBytes[8] = (uuidBytes[8] & 0x3f) | 0x80
+		projectID = "proj_" + hex.EncodeToString(uuidBytes)
+	}
+
+	if err := os.MkdirAll(targetDir, 0750); err != nil {
 		return "", err
 	}
 
-	uuidBytes := make([]byte, 16)
-	if _, err := rand.Read(uuidBytes); err != nil {
-		return "", err
-	}
-	uuidBytes[6] = (uuidBytes[6] & 0x0f) | 0x40
-	uuidBytes[8] = (uuidBytes[8] & 0x3f) | 0x80
-	projectID := "proj_" + hex.EncodeToString(uuidBytes)
-
-	projectDBPath := filepath.Join(StorageProjectsDir, projectID+".db")
+	projectDBPath := filepath.Join(targetDir, projectID+".db")
 	db, dbErr := openDB(projectDBPath)
 	if dbErr != nil {
 		return "", dbErr
@@ -530,13 +573,282 @@ func CreateProjectDB(ctx context.Context, targetType, targetValue, anchor string
 		}
 	}()
 
+	status := "active"
+	if temp {
+		status = "temporary"
+	}
+
 	insertProject := `INSERT INTO projects (name, db_identifier, initial_target_type, initial_target_value, status)
 	                  VALUES (?, ?, ?, ?, ?)`
-	if _, err := masterDB.ExecContext(ctx, insertProject, targetValue, projectID, targetType, targetValue, "active"); err != nil {
+	if _, err := masterDB.ExecContext(ctx, insertProject, targetValue, projectID, targetType, targetValue, status); err != nil {
 		return "", err
 	}
 
-	return AllocateWorkspaceRoute(projectID)
+	return AllocateWorkspaceRoute(projectID, projectDBPath)
+}
+
+func getProjectDBPath(ctx context.Context, refOrName string) (string, error) {
+	internal, err := ResolveWorkspaceRoute(refOrName)
+	if err != nil {
+		internal = refOrName
+	}
+	clean := filepath.Base(filepath.Clean(strings.TrimSuffix(internal, ".db")))
+
+	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
+	masterDB, err := openDB(masterDBPath)
+	if err != nil {
+		return "", err
+	}
+	defer masterDB.Close()
+
+	var status string
+	err = masterDB.QueryRowContext(ctx, "SELECT status FROM projects WHERE db_identifier = ?", clean).Scan(&status)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return filepath.Join(StorageProjectsDir, clean+".db"), nil
+		}
+		return "", err
+	}
+
+	if status == "temporary" {
+		return filepath.Join(StorageTmpDir, clean+".db"), nil
+	}
+	return filepath.Join(StorageProjectsDir, clean+".db"), nil
+}
+
+// GetAvailableModules retrieves registered module capabilities from the master database.
+func GetAvailableModules(ctx context.Context) (map[string]map[string][]string, error) {
+	dbPath := filepath.Join(StorageBaseDir, MasterDBName)
+	db, err := openDB(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	query := `SELECT DISTINCT module_name, function, input_type FROM modules ORDER BY module_name, function, input_type`
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string]map[string][]string)
+	for rows.Next() {
+		var mod, fn, itype string
+		if err := rows.Scan(&mod, &fn, &itype); err != nil {
+			return nil, err
+		}
+		if result[mod] == nil {
+			result[mod] = make(map[string][]string)
+		}
+		if fn != "" {
+			if itype != "" {
+				result[mod][fn] = append(result[mod][fn], itype)
+			} else if result[mod][fn] == nil {
+				result[mod][fn] = []string{}
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func isTemporaryRoute(refOrID string) (bool, bool) {
+	activeRoutes.mu.RLock()
+	defer activeRoutes.mu.RUnlock()
+
+	info, exists := activeRoutes.routes[refOrID]
+	if !exists {
+		for _, rInfo := range activeRoutes.routes {
+			if rInfo.internalName == refOrID {
+				info = rInfo
+				exists = true
+				break
+			}
+		}
+	}
+	if !exists {
+		return false, false
+	}
+	return filepath.Dir(filepath.Clean(info.dbPath)) == filepath.Clean(StorageTmpDir), true
+}
+
+// DeleteTempProjectRecord removes a temporary project record from master.db if its status is 'temporary'.
+func DeleteTempProjectRecord(ctx context.Context, projectID string) (bool, error) {
+	if projectID == "" {
+		return false, nil
+	}
+	if isTemp, known := isTemporaryRoute(projectID); known && !isTemp {
+		return false, nil
+	}
+
+	internal, err := ResolveWorkspaceRoute(projectID)
+	if err != nil {
+		internal = projectID
+	}
+	clean := filepath.Base(filepath.Clean(strings.TrimSuffix(internal, ".db")))
+
+	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
+	masterDB, err := openDB(masterDBPath)
+	if err != nil {
+		return false, err
+	}
+	defer masterDB.Close()
+
+	res, err := masterDB.ExecContext(ctx, "DELETE FROM projects WHERE db_identifier = ? AND status = 'temporary'", clean)
+	if err != nil {
+		return false, err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return rows > 0, nil
+}
+
+// DeleteTempProject performs complete temporary project removal if the project is registered as temporary.
+func DeleteTempProject(ctx context.Context, projectID string) (bool, error) {
+	deleted, err := DeleteTempProjectRecord(ctx, projectID)
+	if err != nil {
+		return false, err
+	}
+	if !deleted {
+		return false, nil
+	}
+	if err := DeleteTempDatabases(ctx, []string{projectID}); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// DeleteTempDatabases removes temporary database files (.db, -wal, -shm) and cleans up storage/tmp if empty.
+func DeleteTempDatabases(ctx context.Context, targets []string) error {
+	for _, p := range targets {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		internal, err := ResolveWorkspaceRoute(p)
+		if err != nil {
+			internal = p
+		}
+		clean := filepath.Base(filepath.Clean(strings.TrimSuffix(internal, ".db")))
+		if clean == "." || clean == ".." || clean == "" {
+			continue
+		}
+		basePath := filepath.Join(StorageTmpDir, clean)
+		for _, ext := range []string{".db", ".db-wal", ".db-shm"} {
+			if err := os.Remove(basePath + ext); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		}
+	}
+
+	cleanTargets := make(map[string]bool, len(targets)*2)
+	for _, p := range targets {
+		cleanTargets[p] = true
+		cleanTargets[filepath.Base(filepath.Clean(strings.TrimSuffix(p, ".db")))] = true
+	}
+
+	activeRoutes.mu.Lock()
+	for ref, info := range activeRoutes.routes {
+		cleanInt := filepath.Base(filepath.Clean(strings.TrimSuffix(info.internalName, ".db")))
+		if cleanTargets[ref] || cleanTargets[cleanInt] {
+			delete(activeRoutes.routes, ref)
+		}
+	}
+	activeRoutes.mu.Unlock()
+
+	entries, err := os.ReadDir(StorageTmpDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if len(entries) == 0 {
+		if err := os.Remove(StorageTmpDir); err != nil && !errors.Is(err, os.ErrNotExist) && !isDirNotEmpty(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// CleanupOrphanedTempDatabases checks for dangling temporary databases from terminated processes.
+func CleanupOrphanedTempDatabases(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	currentPID := os.Getpid()
+
+	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
+	masterDB, err := openDB(masterDBPath)
+	if err != nil {
+		return err
+	}
+	defer masterDB.Close()
+
+	rows, err := masterDB.QueryContext(ctx, "SELECT db_identifier FROM projects WHERE status = 'temporary'")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var deadDBIDs []string
+	for rows.Next() {
+		var dbID string
+		if err := rows.Scan(&dbID); err != nil {
+			return err
+		}
+		pid, err := strconv.Atoi(dbID)
+		if err != nil || (pid != currentPID && !isProcessAlive(pid)) {
+			deadDBIDs = append(deadDBIDs, dbID)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, id := range deadDBIDs {
+		if _, err := masterDB.ExecContext(ctx, "DELETE FROM projects WHERE db_identifier = ? AND status = 'temporary'", id); err != nil {
+			return err
+		}
+	}
+	if err := DeleteTempDatabases(ctx, deadDBIDs); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(StorageTmpDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+
+	toDelete := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".db") {
+			continue
+		}
+		pidStr := strings.TrimSuffix(entry.Name(), ".db")
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			continue
+		}
+		if pid == currentPID {
+			continue
+		}
+		if !isProcessAlive(pid) {
+			toDelete = append(toDelete, filepath.Join(StorageTmpDir, entry.Name()))
+		}
+	}
+
+	return DeleteTempDatabases(ctx, toDelete)
 }
 
 const unresolvedDepth = 999999
@@ -1463,12 +1775,10 @@ func Store(ctx context.Context, data *schema.ProcessorToRepoData) (resData *sche
 		return nil, errors.New("source entity is empty")
 	}
 
-	internalName, err := ResolveWorkspaceRoute(data.ProjectID)
+	dbPath, err := ResolveWorkspacePath(ctx, data.ProjectID)
 	if err != nil {
 		return nil, err
 	}
-
-	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, dbErr
@@ -2137,12 +2447,10 @@ func upsertAndGetEntities(ctx context.Context, tx *sql.Tx, aggMap map[string]*en
 
 // GetProjectStatus analyzes a project's state against available modules.
 func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.PendingTask, errors []schema.PendingTask, err error) {
-	internalName, err := ResolveWorkspaceRoute(projectID)
+	dbPath, err := ResolveWorkspacePath(ctx, projectID)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, nil, dbErr
@@ -2248,12 +2556,10 @@ func GetProjectStatus(ctx context.Context, projectID string) (pending []schema.P
 
 // ResetProjectLog clears execution logs for a project to force rescan.
 func ResetProjectLog(ctx context.Context, projectID string, clearAll, clearErrors bool) (err error) {
-	internalName, err := ResolveWorkspaceRoute(projectID)
+	dbPath, err := ResolveWorkspacePath(ctx, projectID)
 	if err != nil {
 		return err
 	}
-
-	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return dbErr
@@ -2294,12 +2600,10 @@ func ResetProjectLog(ctx context.Context, projectID string, clearAll, clearError
 
 // GetResumePayload queries the database for entities needing processing and constructs a dispatch batch.
 func GetResumePayload(ctx context.Context, projectID string, resumePending, retryErrors bool) (resData *schema.RepoToDispatcherData, err error) {
-	internalName, err := ResolveWorkspaceRoute(projectID)
+	dbPath, err := ResolveWorkspacePath(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
-
-	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, dbErr
@@ -2311,32 +2615,48 @@ func GetResumePayload(ctx context.Context, projectID string, resumePending, retr
 		}
 	}()
 
-	masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
-	if _, err := db.ExecContext(ctx, fmt.Sprintf("ATTACH DATABASE '%s' AS master", masterDBPath)); err != nil {
-		return nil, err
+	isTemp, _ := isTemporaryRoute(projectID)
+	if !isTemp {
+		isTemp = filepath.Dir(filepath.Clean(dbPath)) == filepath.Clean(StorageTmpDir)
+	}
+
+	if !isTemp {
+		masterDBPath := filepath.Join(StorageBaseDir, MasterDBName)
+		if _, err := db.ExecContext(ctx, fmt.Sprintf("ATTACH DATABASE '%s' AS master", masterDBPath)); err != nil {
+			return nil, err
+		}
 	}
 
 	var queryParts []string
-	if resumePending {
+	if isTemp {
 		queryParts = append(queryParts, `
 			SELECT DISTINCT e.id, e.type, d.value, COALESCE(e.out_of_scope, a.out_of_scope, 0), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
 			FROM entities e
 			JOIN dictionary d ON e.value_id = d.id
 			LEFT JOIN entities a ON e.anchor_id = a.id
-			JOIN master.modules m ON e.type = m.input_type
-			LEFT JOIN entity_function_log efl
-			  ON e.id = efl.entity_id AND m.module_name = efl.module_name AND m.function = efl.function_name
-			WHERE efl.entity_id IS NULL AND m.function != '' AND COALESCE(e.out_of_scope, a.out_of_scope, 0) = 0 AND e.is_anchor = 0 AND m.is_enabled = 1`)
-	}
-	if retryErrors {
-		queryParts = append(queryParts, `
-			SELECT DISTINCT e.id, e.type, d.value, COALESCE(e.out_of_scope, a.out_of_scope, 0), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
-			FROM entities e
-			JOIN dictionary d ON e.value_id = d.id
-			LEFT JOIN entities a ON e.anchor_id = a.id
-			JOIN entity_function_log efl ON e.id = efl.entity_id
-			JOIN master.modules m ON efl.module_name = m.module_name AND efl.function_name = m.function
-			WHERE efl.is_success = 0 AND COALESCE(e.out_of_scope, a.out_of_scope, 0) = 0 AND m.is_enabled = 1`)
+			WHERE e.is_anchor = 0 AND COALESCE(e.out_of_scope, a.out_of_scope, 0) = 0`)
+	} else {
+		if resumePending {
+			queryParts = append(queryParts, `
+				SELECT DISTINCT e.id, e.type, d.value, COALESCE(e.out_of_scope, a.out_of_scope, 0), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
+				FROM entities e
+				JOIN dictionary d ON e.value_id = d.id
+				LEFT JOIN entities a ON e.anchor_id = a.id
+				JOIN master.modules m ON e.type = m.input_type
+				LEFT JOIN entity_function_log efl
+				  ON e.id = efl.entity_id AND m.module_name = efl.module_name AND m.function = efl.function_name
+				WHERE efl.entity_id IS NULL AND m.function != '' AND COALESCE(e.out_of_scope, a.out_of_scope, 0) = 0 AND e.is_anchor = 0 AND m.is_enabled = 1`)
+		}
+		if retryErrors {
+			queryParts = append(queryParts, `
+				SELECT DISTINCT e.id, e.type, d.value, COALESCE(e.out_of_scope, a.out_of_scope, 0), e.depth_strict, COALESCE(a.depth_relaxed, e.depth_relaxed)
+				FROM entities e
+				JOIN dictionary d ON e.value_id = d.id
+				LEFT JOIN entities a ON e.anchor_id = a.id
+				JOIN entity_function_log efl ON e.id = efl.entity_id
+				JOIN master.modules m ON efl.module_name = m.module_name AND efl.function_name = m.function
+				WHERE efl.is_success = 0 AND COALESCE(e.out_of_scope, a.out_of_scope, 0) = 0 AND m.is_enabled = 1`)
+		}
 	}
 
 	if len(queryParts) == 0 {
@@ -2371,6 +2691,9 @@ func GetResumePayload(ctx context.Context, projectID string, resumePending, retr
 			depthStrict:  ds,
 			depthRelaxed: dr,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	if retryErrors {
@@ -2503,12 +2826,10 @@ func buildBatchItems(ctx context.Context, db *sql.DB, entities []entityWithID) (
 
 // GetProjectStats retrieves the counts of unique entity values grouped by category and type.
 func GetProjectStats(ctx context.Context, projectID string) (map[string]map[string]int, error) {
-	internalName, err := ResolveWorkspaceRoute(projectID)
+	dbPath, err := ResolveWorkspacePath(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
-
-	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, dbErr
@@ -2571,7 +2892,10 @@ func GetGraphData(ctx context.Context, projectID string, includeRawData bool) (g
 		projectName = internalName
 	}
 
-	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
+	dbPath, err := ResolveWorkspacePath(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
 	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, dbErr
@@ -2923,6 +3247,11 @@ func DeleteProject(ctx context.Context, projectID string) (err error) {
 		}
 	}()
 
+	projectDBPath, pErr := ResolveWorkspacePath(ctx, projectID)
+	if pErr != nil {
+		projectDBPath = filepath.Join(StorageProjectsDir, cleanName+".db")
+	}
+
 	if _, err := masterDB.ExecContext(ctx, "DELETE FROM projects WHERE db_identifier = ?", cleanName); err != nil {
 		return err
 	}
@@ -2930,15 +3259,13 @@ func DeleteProject(ctx context.Context, projectID string) (err error) {
 	activeRoutes.mu.Lock()
 	delete(activeRoutes.routes, projectID)
 	activeRoutes.mu.Unlock()
-
-	projectDBPath := filepath.Join(StorageProjectsDir, cleanName+".db")
-	if err := os.Remove(projectDBPath); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(projectDBPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	if err := os.Remove(projectDBPath + "-wal"); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(projectDBPath + "-wal"); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	if err := os.Remove(projectDBPath + "-shm"); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(projectDBPath + "-shm"); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 
@@ -2954,12 +3281,10 @@ type EntityItem struct {
 
 // GetScopeAuditEntities retrieves explicitly allowed (Packet A) and all blocked (Packet B) entities for scope audit.
 func GetScopeAuditEntities(ctx context.Context, projectID string) (allowed []EntityItem, blocked []EntityItem, err error) {
-	internalName, err := ResolveWorkspaceRoute(projectID)
+	dbPath, err := ResolveWorkspacePath(ctx, projectID)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return nil, nil, dbErr
@@ -3026,12 +3351,10 @@ func UpdateEntitiesScope(ctx context.Context, projectID string, toNullIDs, toOne
 		return nil
 	}
 
-	internalName, err := ResolveWorkspaceRoute(projectID)
+	dbPath, err := ResolveWorkspacePath(ctx, projectID)
 	if err != nil {
 		return err
 	}
-
-	dbPath := filepath.Join(StorageProjectsDir, internalName+".db")
 	db, dbErr := openDB(dbPath)
 	if dbErr != nil {
 		return dbErr

@@ -36,6 +36,6 @@ func main() {
 		}()
 
 		cli.InteractiveControl(ctx, done)
-		cli.ShowReconCompleteBanner(ctx)
+		cli.HandleReconComplete(ctx)
 	}
 }
