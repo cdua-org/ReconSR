@@ -531,9 +531,9 @@ func TestVTRequestError_Unwrap(t *testing.T) {
 		t.Errorf("expected Unwrap() to return %v, got %v", err, unwrapped)
 	}
 
-	var target *vtRequestError
 	wrapped := fmt.Errorf("wrapped: %w", reqErr)
-	if !errors.As(wrapped, &target) {
+	target, ok := errors.AsType[*vtRequestError](wrapped)
+	if !ok || target != reqErr {
 		t.Error("errors.As failed to unwrap vtRequestError")
 	}
 }

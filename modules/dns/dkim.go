@@ -37,7 +37,7 @@ func getDKIMData(ctx context.Context, target string, gen *modutil.LocalIDGenerat
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, resolver.DNSConcurrency)
 
-	firstPart := strings.Split(target, ".")[0]
+	firstPart, _, _ := strings.Cut(target, ".")
 	dynamicSelectors := []string{
 		"mail." + firstPart,
 		firstPart,

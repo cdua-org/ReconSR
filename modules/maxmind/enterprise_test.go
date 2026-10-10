@@ -38,7 +38,7 @@ func runEnterpriseFixtureTest(t *testing.T, cidr string, mockResponse *geoip2.En
 			return mockResponse, nil
 		}
 
-		ipStr := strings.Split(cidr, "/")[0]
+		ipStr, _, _ := strings.Cut(cidr, "/")
 		exec := getEnterpriseData(ipStr, "mock.mmdb")
 
 		if exec.Error != nil {

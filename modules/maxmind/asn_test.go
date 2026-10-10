@@ -42,7 +42,7 @@ func runASNFixtureTest(t *testing.T, cidr string, mockResponse *geoip2.ISP) {
 			return mockResponse, nil, nil
 		}
 
-		ipStr := strings.Split(cidr, "/")[0]
+		ipStr, _, _ := strings.Cut(cidr, "/")
 		exec := getIPASN(ipStr, "mock.mmdb")
 
 		if exec.Error != nil {

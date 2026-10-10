@@ -171,7 +171,21 @@ func setupMockServer(t *testing.T) *httptest.Server {
 			return
 		}
 
-		data, err := os.ReadFile(filepath.Clean(filepath.Join("testdata", fixture)))
+		if !filepath.IsLocal(fixture) {
+			t.Fatalf("fixture path must be local: %q", fixture)
+		}
+
+		fixtureRoot, err := os.OpenRoot("testdata")
+		if err != nil {
+			t.Fatalf("failed to open fixture directory: %v", err)
+		}
+		defer func() {
+			if closeErr := fixtureRoot.Close(); closeErr != nil {
+				t.Errorf("failed to close fixture directory: %v", closeErr)
+			}
+		}()
+
+		data, err := fixtureRoot.ReadFile(fixture)
 		if err != nil {
 			t.Fatalf("failed to read fixture: %v", err)
 		}

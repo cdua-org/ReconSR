@@ -38,7 +38,7 @@ func runFixtureTest(t *testing.T, cidr string, mockResponse *AnonymousPlusIP) {
 			return mockResponse, nil
 		}
 
-		ipStr := strings.Split(cidr, "/")[0]
+		ipStr, _, _ := strings.Cut(cidr, "/")
 		exec := getProxyCheck(ipStr, "mock.mmdb")
 
 		if exec.Error != nil {

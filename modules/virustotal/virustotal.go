@@ -80,8 +80,7 @@ func parseVTError(statusCode int, bodyBytes []byte) error {
 }
 
 func requestAction(err error) httputil.ResponseAction {
-	var reqErr *vtRequestError
-	if errors.As(err, &reqErr) {
+	if reqErr, ok := errors.AsType[*vtRequestError](err); ok {
 		return reqErr.action
 	}
 
@@ -450,8 +449,7 @@ func (m *module) processResponse(resp *http.Response, attempt int) (data map[str
 }
 
 func handleVTError(err error, exec *schema.ModuleExecution, gen *modutil.LocalIDGenerator, contextMsg string) {
-	var reqErr *vtRequestError
-	if errors.As(err, &reqErr) {
+	if reqErr, ok := errors.AsType[*vtRequestError](err); ok {
 		if reqErr.statusCode == http.StatusUnauthorized || reqErr.statusCode == http.StatusForbidden || reqErr.statusCode == http.StatusTooManyRequests || reqErr.statusCode == 429 || reqErr.statusCode == http.StatusPaymentRequired {
 			exec.Results = append(exec.Results, schema.ModuleResult{
 				Type:     constants.TypeInfo,

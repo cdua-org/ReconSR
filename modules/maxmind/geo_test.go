@@ -39,7 +39,7 @@ func runCityFixtureTest(t *testing.T, cidr string, mockResponse *geoip2.City) {
 			return mockResponse, nil
 		}
 
-		ipStr := strings.Split(cidr, "/")[0]
+		ipStr, _, _ := strings.Cut(cidr, "/")
 		exec := getGeoIP(ipStr, "mock-city.mmdb")
 
 		if exec.Error != nil {

@@ -642,8 +642,7 @@ func ResolveRecord(ctx context.Context, target string, qtype int, plainFallback 
 			return recs, rData, nil
 		}
 		lastErr = rErr
-		var statusErr *dohStatusError
-		if errors.As(rErr, &statusErr) {
+		if statusErr, ok := errors.AsType[*dohStatusError](rErr); ok {
 			if statusErr.action == httputil.Abort {
 				break
 			}
@@ -672,8 +671,7 @@ func ResolveRecord(ctx context.Context, target string, qtype int, plainFallback 
 			return recs, nil, nil
 		}
 
-		var dnsErr *net.DNSError
-		if errors.As(pErr, &dnsErr) {
+		if dnsErr, ok := errors.AsType[*net.DNSError](pErr); ok {
 			if dnsErr.IsNotFound || strings.Contains(pErr.Error(), "no such host") || strings.Contains(pErr.Error(), "server misbehaving") {
 				return nil, nil, nil // NXDOMAIN equivalent, return empty success
 			}
@@ -724,8 +722,7 @@ func attemptDoHResolution(ctx context.Context, target string) (ips []string, raw
 		} else {
 			lastErr = errAAAA
 		}
-		var statusErr *dohStatusError
-		if errors.As(lastErr, &statusErr) {
+		if statusErr, ok := errors.AsType[*dohStatusError](lastErr); ok {
 			if statusErr.action == httputil.Abort {
 				break
 			}
@@ -763,8 +760,7 @@ func attemptPlainResolution(ctx context.Context, target string) (ips []string, e
 			return results, nil
 		}
 
-		var dnsErr *net.DNSError
-		if errors.As(rErr, &dnsErr) {
+		if dnsErr, ok := errors.AsType[*net.DNSError](rErr); ok {
 			if dnsErr.IsNotFound || strings.Contains(rErr.Error(), "no such host") || strings.Contains(rErr.Error(), "server misbehaving") {
 				return nil, errPlainNXDOMAIN
 			}
