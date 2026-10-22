@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	hibpAPIBaseURL                        = "https://haveibeenpwned.com/api/v3"
-	httpClientTransport http.RoundTripper = http.DefaultTransport
+	hibpAPIBaseURL      = "https://haveibeenpwned.com/api/v3"
+	httpClientTransport = http.DefaultTransport
 )
 
 type apiBreachEntry struct {

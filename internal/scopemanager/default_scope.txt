@@ -116,7 +116,7 @@ oraclecloud.com, appdomain.cloud, aliyun.com, aliyuncs.com, tencentcloudapi.com
 domaincontrol.com, secureserver.net, registrar-servers.com, nsone.net, ns1.com, dynect.net, ultradns.net, ultradns.com, name-services.com
 
 # Certificate Authorities
-letsencrypt.org, ca.letsencrypt.org, acme-v01.api.letsencrypt.org, acme-v02.api.letsencrypt.org
+letsencrypt.org, acme-v01.api.letsencrypt.org, ca.letsencrypt.org, acme-v02.api.letsencrypt.org
 digicert.com, digicertcloud.com, digicerttrust.com, omaha.digicert.com
 godaddy.com, gdns1.godaddy.com, gdns2.godaddy.com
 globalsign.com, globalsign.net, globalsign.com.mx

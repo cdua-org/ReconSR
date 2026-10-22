@@ -392,13 +392,13 @@ func TestAPICoverage(t *testing.T) {
 	m.getEmailBreaches(context.Background(), "user@example.com")
 	ts500.Close()
 
-	ts429bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	tsRetry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("retry-after", "invalid")
 		w.WriteHeader(http.StatusTooManyRequests)
 	}))
-	hibpAPIBaseURL = ts429bad.URL
+	hibpAPIBaseURL = tsRetry.URL
 	m.getEmailBreaches(context.Background(), "user@example.com")
-	ts429bad.Close()
+	tsRetry.Close()
 
 	ts400 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
