@@ -54,7 +54,7 @@ func SyncConfig(ctx context.Context) error {
 		for mod, fns := range allCaps {
 			defaultSettings[mod] = make(map[string]bool)
 			for _, fn := range fns {
-				defaultSettings[mod][fn] = true
+				defaultSettings[mod][fn] = false
 			}
 		}
 		if err := dispatcher.LoadConfig(ctx, defaultSettings); err != nil {
