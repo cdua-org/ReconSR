@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,6 +52,7 @@ func resetDebugLogState(t *testing.T) {
 	t.Helper()
 
 	t.Chdir(t.TempDir())
+	t.Setenv("RECONSR_LOG_DIR", "")
 
 	if debugLogFile != nil {
 		if err := debugLogFile.Close(); err != nil {
@@ -63,6 +65,7 @@ func resetDebugLogState(t *testing.T) {
 	debugLogOnce = sync.Once{}
 	writeMu = sync.Mutex{}
 	debugLogPath = testDebugLogFile
+	dockerDebugLogPath = defaultDockerDebugLogPath
 	timeNow = time.Now
 }
 
@@ -317,5 +320,60 @@ func TestIsConsoleEnabled(t *testing.T) {
 		if got := isConsoleEnabled(); got != tt.want {
 			t.Errorf("%s: expected %v, got %v", tt.name, tt.want, got)
 		}
+	}
+}
+
+func TestResolveDebugLogPath(t *testing.T) {
+	resetDebugLogState(t)
+
+	tests := []struct {
+		name           string
+		envVal         string
+		wantDockerPath bool
+	}{
+		{name: "unset", envVal: "", wantDockerPath: false},
+		{name: "zero", envVal: "0", wantDockerPath: false},
+		{name: "false", envVal: "false", wantDockerPath: false},
+		{name: "other", envVal: "arbitrary", wantDockerPath: false},
+		{name: "one", envVal: "1", wantDockerPath: true},
+		{name: "true", envVal: "true", wantDockerPath: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(subT *testing.T) {
+			subT.Setenv("RECONSR_LOG_DIR", tt.envVal)
+			want := testDebugLogFile
+			if tt.wantDockerPath {
+				want = defaultDockerDebugLogPath
+			}
+			if got := resolveDebugLogPath(); got != want {
+				subT.Errorf("resolveDebugLogPath() = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestPrintf_EnvLogDir(t *testing.T) {
+	resetDebugLogState(t)
+	customDir := t.TempDir()
+	customLogFile := filepath.Clean(filepath.Join(customDir, testDebugLogFile))
+	dockerDebugLogPath = customLogFile
+	t.Setenv("RECONSR_LOG_DIR", "1")
+	withFixedTime(t, time.Date(2026, time.June, 7, 14, 23, 11, 482000000, time.FixedZone("MSK", 3*60*60)))
+	resolver.Options["Debug"] = strconv.FormatBool(true)
+	defer delete(resolver.Options, "Debug")
+	delete(resolver.Options, "DebugConsole")
+
+	log := New("envtest")
+	log.Printf("custom dir message")
+
+	fileOutput, err := os.ReadFile(customLogFile)
+	if err != nil {
+		t.Fatalf("failed to read debug log file: %v", err)
+	}
+
+	expected := "[2026-06-07T14:23:11.482+03:00] [envtest-debug] custom dir message\n"
+	if string(fileOutput) != expected {
+		t.Errorf("file got %q, want %q", string(fileOutput), expected)
 	}
 }

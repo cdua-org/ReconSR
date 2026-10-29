@@ -9,14 +9,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
 	"cdua-org/ReconSR/modules/utils/resolver"
 )
 
-// Logger emits prefixed debug messages into a debug.log file in the
-// current working directory when the global Debug option is enabled.
+// Logger emits prefixed debug messages into a debug.log file
+// (located in /logs/debug.log when RECONSR_LOG_DIR=true, or in the current
+// working directory by default) when the global Debug option is enabled.
 // When DebugConsole=true, it mirrors the same output to stderr.
 // It is a value type — safe to store as a package-level variable
 // without heap allocation.
@@ -25,12 +28,14 @@ type Logger struct {
 }
 
 var (
-	debugLogPath = "debug.log"
-	debugLogFile *os.File
-	errDebugLog  error
-	debugLogOnce sync.Once
-	writeMu      sync.Mutex
-	timeNow      = time.Now
+	debugLogPath              = "debug.log"
+	defaultDockerDebugLogPath = "/logs/debug.log"
+	dockerDebugLogPath        = defaultDockerDebugLogPath
+	debugLogFile              *os.File
+	errDebugLog               error
+	debugLogOnce              sync.Once
+	writeMu                   sync.Mutex
+	timeNow                   = time.Now
 )
 
 // New creates a Logger that tags every message with "[tag-debug] ".
@@ -60,9 +65,21 @@ func (l Logger) Printf(format string, args ...any) {
 	}
 }
 
+func isDockerLogDir() bool {
+	enabled, err := strconv.ParseBool(os.Getenv("RECONSR_LOG_DIR"))
+	return err == nil && enabled
+}
+
+func resolveDebugLogPath() string {
+	if isDockerLogDir() {
+		return dockerDebugLogPath
+	}
+	return debugLogPath
+}
+
 func getDebugLogFile() *os.File {
 	debugLogOnce.Do(func() {
-		debugLogFile, errDebugLog = os.OpenFile(debugLogPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+		debugLogFile, errDebugLog = os.OpenFile(filepath.Clean(resolveDebugLogPath()), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	})
 	if errDebugLog != nil {
 		return nil
