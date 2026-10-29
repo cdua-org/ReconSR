@@ -374,7 +374,7 @@ ReconSR is designed as a decoupled framework for Attack Surface Discovery and Ma
 
 ### Future Goals
 
-While the current alpha release is focused on automating point-in-time investigations, our long-term vision includes expanding the platform's operational capabilities:
+While the current release is focused on automating point-in-time investigations, our long-term vision includes expanding the platform's operational capabilities:
 
 - **Collaborative Workspaces:** We aim to implement multi-user environments where distributed security teams can work simultaneously on complex investigations, sharing real-time insights and graph visualizations within a unified project scope.
 - **Continuous Monitoring:** We plan to extend ReconSR's capabilities to include continuous infrastructure monitoring, running alongside traditional single-run reconnaissance. Future features will focus on scheduled scanning, state comparisons, and alerting teams to unintended public exposures (e.g., forgotten subdomains, exposed sensitive data) or infrastructure changes. This paves the way for potential on-premise enterprise deployments or managed SaaS offerings.

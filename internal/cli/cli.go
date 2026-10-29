@@ -21,7 +21,6 @@ var (
 	AppName    = "ReconSR"
 	AppVersion = "dev"
 	AppDesc    = "Automated OSINT tool"
-	AppStage   = "Initial design and development phase"
 )
 
 // WikiURL is the link to the project documentation and setup guides.
@@ -106,7 +105,6 @@ func ShowBanner(ctx context.Context) {
 	fmt.Println()
 	fmt.Printf(colorCyan+"  :: %s %s ::"+colorReset+"\n", AppName, AppVersion)
 	fmt.Printf(colorCyan+"  :: %s ::"+colorReset+"\n", AppDesc)
-	fmt.Printf(colorCyan+"  :: %s ::"+colorReset+"\n", AppStage)
 
 	if AppVersion != "dev" {
 		release, err := controller.CheckAppUpdate(ctx)
