@@ -1,0 +1,50 @@
+name: reconsr
+
+services:
+  reconsr:
+    image: ghcr.io/cdua-org/reconsr:${RECONSR_VERSION:-latest}
+    container_name: reconsr
+    hostname: reconsr
+    profiles:
+      - tools
+    restart: "no"
+    user: "${APP_UID}:${APP_GID}"
+    read_only: true
+    ipc: "none"
+    cap_drop:
+      - ALL
+    cap_add: []
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          # cpus: "4.0"
+          # memory: 2g
+          pids: 100
+    mem_reservation: 256m
+    env_file:
+      - .env
+    tmpfs:
+      - /tmp:mode=1777,noexec,nosuid,nodev,size=64m
+    volumes:
+      - ./configs:/configs:rw,noexec,nosuid,nodev
+      - ./storage:/storage:rw,noexec,nosuid,nodev
+      - ./data:/data:ro,noexec,nosuid,nodev
+      - ./lang:/lang:rw,noexec,nosuid,nodev
+      - ./reports:/reports:rw,noexec,nosuid,nodev
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - reconsr
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  reconsr:
+    name: reconsr
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"

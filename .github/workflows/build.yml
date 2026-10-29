@@ -1,0 +1,151 @@
+name: Build and Publish Docker Image
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Custom binary version (leave empty for auto/dev)'
+        required: false
+        default: ''
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Prepare Metadata
+    runs-on: ubuntu-latest
+    outputs:
+      image_base: ${{ steps.prepare.outputs.image_base }}
+      tags: ${{ steps.meta.outputs.tags }}
+      app_version: ${{ steps.version.outputs.app_version }}
+    steps:
+      - name: Convert image name to lowercase
+        id: prepare
+        env:
+          IMAGE_REPO: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          IMAGE_BASE=$(printf '%s\n' "$IMAGE_REPO" | tr '[:upper:]' '[:lower:]')
+          echo "image_base=${IMAGE_BASE}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve binary version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          GITHUB_REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          RAW_VER="${INPUT_VERSION}"
+          if [ -z "$RAW_VER" ]; then
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              RAW_VER="$REF_NAME"
+            else
+              RAW_VER="dev"
+            fi
+          fi
+          if [[ ! "$RAW_VER" =~ ^(dev|v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)$ ]]; then
+            echo "Invalid version format: $RAW_VER" >&2
+            exit 1
+          fi
+          echo "app_version=${RAW_VER}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')) || github.ref == format('refs/heads/{0}', 'main') }}
+
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            push_tag_suffix: -amd64
+          - platform: linux/arm64
+            push_tag_suffix: -arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push platform image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          platforms: ${{ matrix.platform }}
+          tags: ${{ needs.prepare.outputs.image_base }}:${{ needs.prepare.outputs.app_version }}${{ matrix.push_tag_suffix }}
+          provenance: false
+          build-args: |
+            VERSION=${{ needs.prepare.outputs.app_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  merge:
+    name: Merge fat manifests
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Log in to the Container registry
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create fat manifest
+        env:
+          BASE: ${{ needs.prepare.outputs.image_base }}
+          VERSION: ${{ needs.prepare.outputs.app_version }}
+          RAW_TAGS: ${{ needs.prepare.outputs.tags }}
+        run: |
+          TAGS_ARGS=()
+          while IFS= read -r tag; do
+            if [ -n "$tag" ]; then
+              TAGS_ARGS+=("--tag" "$tag")
+            fi
+          done <<< "$RAW_TAGS"
+
+          if [ ${#TAGS_ARGS[@]} -eq 0 ]; then
+            TAGS_ARGS+=("--tag" "${BASE}:${VERSION}")
+          fi
+
+          docker buildx imagetools create "${TAGS_ARGS[@]}" \
+            "${BASE}:${VERSION}-amd64" \
+            "${BASE}:${VERSION}-arm64"
