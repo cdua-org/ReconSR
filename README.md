@@ -14,7 +14,7 @@
 [![Wiki](https://img.shields.io/badge/docs-Wiki-blue)](https://github.com/cdua-org/ReconSR/wiki)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/static/v1?label=License&message=PolyForm%20Noncommercial%201.0.0&color=blue)](LICENSE)
 
-ReconSR is an automated OSINT tool designed to provide cybersecurity researchers with a modular framework for mapping and analyzing complex digital footprints and attack surfaces.
+ReconSR is an automated OSINT tool designed to provide cybersecurity researchers with a modular framework for mapping and analyzing complex digital footprints and attack surfaces. It can be used either as a standalone utility or inside a containerized [Docker](docker/README.md) environment.
 
 <table>
   <tr>
@@ -413,6 +413,7 @@ While the current alpha release is focused on automating point-in-time investiga
 - ✅ VirusTotal API enrichment for domain/IP reputation, passive DNS, certificate, DNS-derived, communicating files, and threat-intelligence findings with demo mode.
 - ✅ CIRCL vulnerability lookup for CVE enrichment and CPE search with CVSS, CWE, EPSS, SSVC/KEV, CPE, and related vulnerability metadata.
 - ✅ LeakIX exposure and data leak intelligence for domains and IPs, including service discovery, leaked credentials, SSL/SSH metadata, subdomain enumeration, and demo mode.
+- ✅ Docker deployment support.
 
 </details>
 

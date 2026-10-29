@@ -13,10 +13,13 @@ import (
 //go:embed default_keys.txt
 var defaultKeysConfig []byte
 
+const maxSecretSize = 4096
+
 var (
 	keysMap        map[string]string
 	initOnce       sync.Once
 	configFilePath = "configs/keys.txt"
+	secretsDir     = "/run/secrets"
 )
 
 func init() {
@@ -38,7 +41,7 @@ func loadConfig() {
 		return
 	}
 
-	data, err := os.ReadFile(configFilePath)
+	data, err := os.ReadFile(filepath.Clean(configFilePath))
 	if err != nil {
 		if os.IsNotExist(err) {
 			if writeErr := os.WriteFile(configFilePath, defaultKeysConfig, 0o600); writeErr != nil {
@@ -76,18 +79,56 @@ func parseConfig(content []byte) {
 	}
 }
 
-// GetKey returns the configuration value for the given serviceName.
+func readSecretFile(name string) string {
+	cleanName := filepath.Base(name)
+	if cleanName == "." || cleanName == "/" || cleanName == "" {
+		return ""
+	}
+	targetPath := filepath.Join(secretsDir, cleanName)
+	data, err := os.ReadFile(filepath.Clean(targetPath))
+	if err != nil {
+		return ""
+	}
+	if len(data) > maxSecretSize {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// GetKey retrieves credentials for a specific provider by evaluating Docker secrets,
+// environment variables, and local configuration files in hierarchical order to prioritize secure credential injection.
 func GetKey(serviceName string) string {
 	initOnce.Do(loadConfig)
-	envKey := "RECONSR_" + strings.ToUpper(serviceName)
-	if val := os.Getenv(envKey); val != "" {
+
+	upperName := strings.ToUpper(serviceName)
+	if secretName := os.Getenv("RECONSR_" + upperName + "_FILE"); secretName != "" {
+		if val := readSecretFile(secretName); val != "" {
+			return val
+		}
+	}
+
+	lowerName := strings.ToLower(serviceName)
+	if val := readSecretFile("reconsr_" + lowerName); val != "" {
 		return val
 	}
+	if val := readSecretFile(lowerName); val != "" {
+		return val
+	}
+
+	if val := os.Getenv("RECONSR_" + upperName); val != "" {
+		return val
+	}
+
 	return keysMap[serviceName]
 }
 
-func resetForTest(mockPath string) {
+func resetForTest(mockPath, mockSecretsDir string) {
 	keysMap = nil
 	initOnce = sync.Once{}
 	configFilePath = mockPath
+	if mockSecretsDir != "" {
+		secretsDir = mockSecretsDir
+	} else {
+		secretsDir = "/run/secrets"
+	}
 }

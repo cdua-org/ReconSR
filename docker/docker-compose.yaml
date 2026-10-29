@@ -2,7 +2,7 @@ name: reconsr
 
 services:
   reconsr:
-    image: ghcr.io/cdua-org/reconsr:${RECONSR_VERSION:-latest}
+    image: ghcr.io/cdua-org/reconsr:${RECONSR_VERSION:-stable}
     container_name: reconsr
     hostname: reconsr
     profiles:
@@ -29,11 +29,24 @@ services:
       - /tmp:mode=1777,noexec,nosuid,nodev,size=64m
     volumes:
       - ./configs:/configs:rw,noexec,nosuid,nodev
+      # - ./configs/keys.txt:/configs/keys.txt:ro,noexec,nosuid,nodev
+      # - ./configs/network.txt:/configs/network.txt:ro,noexec,nosuid,nodev
       - ./storage:/storage:rw,noexec,nosuid,nodev
       - ./data:/data:ro,noexec,nosuid,nodev
       - ./lang:/lang:rw,noexec,nosuid,nodev
       - ./reports:/reports:rw,noexec,nosuid,nodev
       - /etc/localtime:/etc/localtime:ro
+    # secrets:
+    #   - reconsr_abuseipdb
+    #   - reconsr_hackertarget
+    #   - reconsr_shodan
+    #   - reconsr_virustotal
+    #   - reconsr_hunterio
+    #   - reconsr_haveibeenpwned
+    #   - reconsr_circl
+    #   - reconsr_ipinfo
+    #   - reconsr_leakix
+    #   - reconsr_netlas
     networks:
       - reconsr
     logging:
@@ -48,3 +61,25 @@ networks:
     driver: bridge
     driver_opts:
       com.docker.network.bridge.enable_icc: "false"
+
+# secrets:
+#   reconsr_abuseipdb:
+#     file: ./secrets/abuseipdb.txt
+#   reconsr_hackertarget:
+#     file: ./secrets/hackertarget.txt
+#   reconsr_shodan:
+#     file: ./secrets/shodan.txt
+#   reconsr_virustotal:
+#     file: ./secrets/virustotal.txt
+#   reconsr_hunterio:
+#     file: ./secrets/hunterio.txt
+#   reconsr_haveibeenpwned:
+#     file: ./secrets/haveibeenpwned.txt
+#   reconsr_circl:
+#     file: ./secrets/circl.txt
+#   reconsr_ipinfo:
+#     file: ./secrets/ipinfo.txt
+#   reconsr_leakix:
+#     file: ./secrets/leakix.txt
+#   reconsr_netlas:
+#     file: ./secrets/netlas.txt
