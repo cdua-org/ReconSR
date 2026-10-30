@@ -19,8 +19,8 @@ services:
     deploy:
       resources:
         limits:
-          # cpus: "4.0"
-          # memory: 2g
+          cpus: "1.0"
+          memory: 512m
           pids: 100
     mem_reservation: 256m
     env_file:
