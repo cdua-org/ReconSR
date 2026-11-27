@@ -8,7 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/oschwald/maxminddb-golang v1.13.1
-	golang.org/x/net v0.62.0
+	golang.org/x/net v0.63.0
 	golang.org/x/sys v0.50.0
 	modernc.org/sqlite v1.62.0
 )
